@@ -57,7 +57,7 @@ export function MapEditor(){
   const [tool,setTool]=useState<Tool>("select"); const [stopType,setStopType]=useState<StopType>("city"); const [routeType,setRouteType]=useState<RouteType>("city"); const [routeColor,setRouteColor]=useState("neutral");
   const [routeStart,setRouteStart]=useState<string|null>(null); const [selectedStop,setSelectedStop]=useState<string|null>(null); const [selectedRoute,setSelectedRoute]=useState<string|null>(null);
   const [past,setPast]=useState<MapData[]>([]); const [future,setFuture]=useState<MapData[]>([]); const [danger,setDanger]=useState<"reset"|"delete"|null>(null);
-  const dragRef=useRef<string|null>(null); const fileRef=useRef<HTMLInputElement>(null);
+  const dragRef=useRef<string|null>(null); const dragWaypointRef=useRef<{routeId:string;index:number}|null>(null); const fileRef=useRef<HTMLInputElement>(null);
   useEffect(()=>{queueMicrotask(()=>{try{const stored=localStorage.getItem(STORAGE_KEY);if(stored)setData(JSON.parse(stored));}catch{}setReady(true);});},[]);
   useEffect(()=>{if(!ready)return;localStorage.setItem(STORAGE_KEY,JSON.stringify(data));const timer=window.setTimeout(()=>setSaved(true),0);return()=>window.clearTimeout(timer);},[data,ready]);
   const crossings=useMemo(()=>crossingPairs(data),[data]); const selectedS=data.stops.find(s=>s.id===selectedStop); const selectedR=data.routes.find(r=>r.id===selectedRoute);
@@ -76,7 +76,7 @@ export function MapEditor(){
     if(tool!=="stop"){setSelectedStop(null);setSelectedRoute(null);return;}
     const point=canvasPoint(event); change(draft=>{draft.stops.push({id:`s-${Date.now()}`,name:"Ny hållplats",type:stopType,...point});return draft;});
   };
-  const onCanvasMove=(event:React.PointerEvent<SVGSVGElement>)=>{if(!dragRef.current)return;const point=canvasPoint(event);setData(current=>({...current,stops:current.stops.map(stop=>stop.id===dragRef.current?{...stop,...point}:stop)}));setSaved(false);};
+  const onCanvasMove=(event:React.PointerEvent<SVGSVGElement>)=>{const point=canvasPoint(event);if(dragWaypointRef.current){const target=dragWaypointRef.current;setData(current=>({...current,routes:current.routes.map(route=>route.id===target.routeId?{...route,points:(route.points??[]).map((item,index)=>index===target.index?point:item)}:route)}));setSaved(false);return;}if(!dragRef.current)return;setData(current=>({...current,stops:current.stops.map(stop=>stop.id===dragRef.current?{...stop,...point}:stop)}));setSaved(false);};
   const deleteSelected=()=>{change(draft=>{if(selectedRoute)draft.routes=draft.routes.filter(route=>route.id!==selectedRoute);if(selectedStop){draft.stops=draft.stops.filter(stop=>stop.id!==selectedStop);draft.routes=draft.routes.filter(route=>route.a!==selectedStop&&route.b!==selectedStop);}return draft;});setSelectedRoute(null);setSelectedStop(null);setDanger(null);};
   const exportMap=()=>{const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});const url=URL.createObjectURL(blob);const link=document.createElement("a");link.href=url;link.download=`${data.name.replace(/[^a-z0-9åäö]+/gi,"-").toLowerCase()}.json`;link.click();URL.revokeObjectURL(url);};
   const importMap=(file?:File)=>{if(!file)return;const reader=new FileReader();reader.onload=()=>{try{const incoming=JSON.parse(String(reader.result));if(!Array.isArray(incoming.stops)||!Array.isArray(incoming.routes))throw new Error();change(()=>incoming);setSelectedRoute(null);setSelectedStop(null);}catch{window.alert("Filen kunde inte läsas som en kartvariant.");}};reader.readAsText(file);};
@@ -103,8 +103,8 @@ export function MapEditor(){
       </aside>
       <section className="map-wrap">
         <div className="map-status"><Badge variant="secondary">{data.stops.length} hållplatser</Badge><Badge variant="secondary">{data.routes.length} linjer</Badge><span>Dra hållplatser för att prova nya nät</span></div>
-        <svg className={cn("map-canvas",`tool-${tool}`)} viewBox={`0 0 ${W} ${H}`} onPointerDown={onCanvasDown} onPointerMove={onCanvasMove} onPointerUp={()=>dragRef.current=null} onPointerLeave={()=>dragRef.current=null}>
-          <MapArtwork data={data} selectedRoute={selectedRoute} selectedStop={selectedStop} routeStart={routeStart} onRoute={id=>{setSelectedRoute(id);setSelectedStop(null);setTool("select");}} onStop={id=>{chooseStop(id);if(tool==="select")dragRef.current=id;}}/>
+        <svg className={cn("map-canvas",`tool-${tool}`)} viewBox={`0 0 ${W} ${H}`} onPointerDown={onCanvasDown} onPointerMove={onCanvasMove} onPointerUp={()=>{dragRef.current=null;dragWaypointRef.current=null;}} onPointerLeave={()=>{dragRef.current=null;dragWaypointRef.current=null;}}>
+          <MapArtwork data={data} selectedRoute={selectedRoute} selectedStop={selectedStop} routeStart={routeStart} onRoute={id=>{setSelectedRoute(id);setSelectedStop(null);setTool("select");}} onStop={id=>{chooseStop(id);if(tool==="select")dragRef.current=id;}} onWaypoint={(routeId,index)=>{dragWaypointRef.current={routeId,index};}}/>
         </svg>
       </section>
       <aside className="properties panel">
@@ -122,7 +122,7 @@ export function MapEditor(){
   </main>;
 }
 
-function MapArtwork({data,selectedRoute,selectedStop,routeStart,onRoute,onStop,print=false}:{data:MapData;selectedRoute?:string|null;selectedStop?:string|null;routeStart?:string|null;onRoute?:(id:string)=>void;onStop?:(id:string)=>void;print?:boolean}){
+function MapArtwork({data,selectedRoute,selectedStop,routeStart,onRoute,onStop,onWaypoint,print=false}:{data:MapData;selectedRoute?:string|null;selectedStop?:string|null;routeStart?:string|null;onRoute?:(id:string)=>void;onStop?:(id:string)=>void;onWaypoint?:(routeId:string,index:number)=>void;print?:boolean}){
   return <>
     <defs><pattern id="grid" width="24" height="24" patternUnits="userSpaceOnUse"><path d="M24 0L0 0 0 24" fill="none" stroke="#6b675f" strokeOpacity=".11"/></pattern><filter id="shadow" x="-50%" y="-50%" width="200%" height="200%"><feDropShadow dx="0" dy="2" stdDeviation="2" floodOpacity=".18"/></filter></defs>
     <rect className="map-bg" width={W} height={H} fill="#f7f1e5"/><rect className="map-bg" width={W} height={H} fill="url(#grid)"/><path className="lake" d="M815 241C900 200 1046 220 1098 270L1098 590C1040 575 1012 518 963 494C916 470 897 408 840 366C805 340 790 287 815 241Z"/><text x="985" y="285" className="water-label">HJÄLMAREN</text><path d="M230 78C286 110 318 185 330 286" className="hill-line"/><text x="220" y="92" className="terrain-label">KILSBERGEN</text>
@@ -131,6 +131,7 @@ function MapArtwork({data,selectedRoute,selectedStop,routeStart,onRoute,onStop,p
       {!infrastructure&&Array.from({length:route.length},(_,index)=>{const position=pointAlong(points,(index+.5)/route.length);return <g key={index} className="wagon-slot" transform={`translate(${position.x},${position.y}) rotate(${position.angle})`} filter={print?undefined:"url(#shadow)"}><rect className="wagon-slot-outline" x={-13} y={-7} width="26" height="14" rx="4"/><rect x={-12} y={-6} width="24" height="12" rx="3" fill="#fffaf0" stroke={routeColor} strokeWidth="3"/></g>;})}
     </g>;})}
     {data.stops.map(stop=>{const meta=stopTypeMeta[stop.type];const active=stop.id===selectedStop||stop.id===routeStart;return <g key={stop.id} className={cn("stop",active&&"active")} transform={`translate(${stop.x},${stop.y})`} onPointerDown={onStop?event=>{event.stopPropagation();onStop(stop.id);}:undefined}><circle r={active?12:9} fill={meta.fill} stroke={meta.stroke} strokeWidth={active?4:3}/>{stop.type==="rail"&&<rect x={-4} y={-4} width="8" height="8" fill={meta.stroke}/>}<text x={stop.x>900?-14:14} y={stop.y>620?-13:-12} textAnchor={stop.x>900?"end":"start"}>{stop.name}</text></g>;})}
+    {!print&&selectedRoute&&data.routes.find(route=>route.id===selectedRoute)?.points?.map((point,index)=><g key={index} className="waypoint-handle" transform={`translate(${point.x},${point.y})`} onPointerDown={event=>{event.stopPropagation();onWaypoint?.(selectedRoute,index);}}><circle className="waypoint-hit" r="19"/><rect x="-8" y="-8" width="16" height="16" rx="3" transform="rotate(45)"/><circle r="3"/></g>)}
     {print&&<g className="join-marks"><path d={`M${W/2} 0v18M${W/2} ${H-18}v18`}/><path d={`M${W/2-8} 9h16M${W/2-8} ${H-9}h16`}/></g>}
   </>;
 }

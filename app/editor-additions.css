@@ -5,6 +5,11 @@
 .route-guide.infrastructure{opacity:.9}
 .route-group.selected .wagon-slot-outline{stroke:#721c24;stroke-width:8px}
 .join-marks{fill:none;stroke:#1f1f1f;stroke-width:2px}
+.waypoint-handle{cursor:grab;touch-action:none}
+.waypoint-handle:active{cursor:grabbing}
+.waypoint-hit{fill:transparent;stroke:none}
+.waypoint-handle rect{fill:#f7a928;stroke:#5d3a08;stroke-width:2px;filter:drop-shadow(0 2px 2px #0005)}
+.waypoint-handle>circle:last-child{fill:#fff8e8;stroke:#5d3a08;stroke-width:1.5px;pointer-events:none}
 
 @media(max-width:720px){
   .map-wrap{overflow-x:scroll!important;overflow-y:auto!important;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-x pan-y}
