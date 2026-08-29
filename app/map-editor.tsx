@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, BusFront, Check, ChevronDown, CircleDot, Download, Link2, MapPinPlus, Minus, MousePointer2, Plus, Redo2, RotateCcw, Trash2, Undo2, Upload } from "lucide-react";
+import { AlertTriangle, BusFront, Check, ChevronDown, CircleDot, Download, Link2, MapPinPlus, Minus, MousePointer2, Plus, Printer, Redo2, RotateCcw, Trash2, Undo2, Upload } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -34,10 +34,10 @@ function crossingPairs(data: MapData) {
   }
   return found;
 }
-function midpoint(data:MapData, route:Route):Point {
-  const points=pointsFor(data,route); const lengths=points.slice(1).map((q,i)=>Math.hypot(q.x-points[i].x,q.y-points[i].y)); const total=lengths.reduce((a,b)=>a+b,0); let target=total/2;
-  for(let i=0;i<lengths.length;i++){if(target<=lengths[i]){const t=target/lengths[i];return{x:points[i].x+(points[i+1].x-points[i].x)*t,y:points[i].y+(points[i+1].y-points[i].y)*t};}target-=lengths[i];}
-  return points[0]??{x:0,y:0};
+function pointAlong(points:Point[], fraction:number):Point&{angle:number}{
+  const lengths=points.slice(1).map((q,i)=>Math.hypot(q.x-points[i].x,q.y-points[i].y));const total=lengths.reduce((a,b)=>a+b,0);let target=total*fraction;
+  for(let i=0;i<lengths.length;i++){if(target<=lengths[i]){const t=lengths[i]?target/lengths[i]:0;return{x:points[i].x+(points[i+1].x-points[i].x)*t,y:points[i].y+(points[i+1].y-points[i].y)*t,angle:Math.atan2(points[i+1].y-points[i].y,points[i+1].x-points[i].x)*180/Math.PI};}target-=lengths[i];}
+  return{...(points.at(-1)??{x:0,y:0}),angle:0};
 }
 function canvasPoint(event:React.PointerEvent<SVGSVGElement>):Point {
   const rect=event.currentTarget.getBoundingClientRect();
@@ -77,7 +77,7 @@ export function MapEditor(){
     <header className="topbar">
       <div className="brand"><span className="brand-mark"><BusFront/></span><div><p>Ticket to Ride · Örebro</p><h1>Kartverkstad</h1></div></div>
       <div className="map-title"><Label htmlFor="map-name" className="sr-only">Variantens namn</Label><Input id="map-name" value={data.name} onChange={event=>change(draft=>({...draft,name:event.target.value}))}/><span className="save-state"><Check/>{saved?"Sparad lokalt":"Sparar…"}</span></div>
-      <div className="header-actions"><Button variant="ghost" size="icon" aria-label="Ångra" disabled={!past.length} onClick={undo}><Undo2/></Button><Button variant="ghost" size="icon" aria-label="Gör om" disabled={!future.length} onClick={redo}><Redo2/></Button><Button variant="outline" size="sm" onClick={()=>fileRef.current?.click()}><Upload/>Importera</Button><input ref={fileRef} hidden type="file" accept="application/json" onChange={event=>importMap(event.target.files?.[0])}/><Button size="sm" onClick={exportMap}><Download/>Exportera</Button></div>
+      <div className="header-actions"><Button variant="ghost" size="icon" aria-label="Ångra" disabled={!past.length} onClick={undo}><Undo2/></Button><Button variant="ghost" size="icon" aria-label="Gör om" disabled={!future.length} onClick={redo}><Redo2/></Button><Button variant="outline" size="sm" onClick={()=>fileRef.current?.click()}><Upload/>Importera</Button><input ref={fileRef} hidden type="file" accept="application/json" onChange={event=>importMap(event.target.files?.[0])}/><Button variant="outline" size="sm" onClick={()=>window.print()}><Printer/>Skriv ut 2×A4</Button><Button size="sm" onClick={exportMap}><Download/>Exportera</Button></div>
     </header>
     <div className="workspace">
       <aside className="tools-panel panel">
@@ -96,10 +96,7 @@ export function MapEditor(){
       <section className="map-wrap">
         <div className="map-status"><Badge variant="secondary">{data.stops.length} hållplatser</Badge><Badge variant="secondary">{data.routes.length} linjer</Badge><span>Dra hållplatser för att prova nya nät</span></div>
         <svg className={cn("map-canvas",`tool-${tool}`)} viewBox={`0 0 ${W} ${H}`} onPointerDown={onCanvasDown} onPointerMove={onCanvasMove} onPointerUp={()=>dragRef.current=null} onPointerLeave={()=>dragRef.current=null}>
-          <defs><pattern id="grid" width="24" height="24" patternUnits="userSpaceOnUse"><path d="M24 0L0 0 0 24" fill="none" stroke="#6b675f" strokeOpacity=".11"/></pattern><filter id="shadow" x="-50%" y="-50%" width="200%" height="200%"><feDropShadow dx="0" dy="2" stdDeviation="2" floodOpacity=".18"/></filter></defs>
-          <rect className="map-bg" width={W} height={H} fill="#f7f1e5"/><rect className="map-bg" width={W} height={H} fill="url(#grid)"/><path className="lake" d="M815 241C900 200 1046 220 1098 270L1098 590C1040 575 1012 518 963 494C916 470 897 408 840 366C805 340 790 287 815 241Z"/><text x="985" y="285" className="water-label">HJÄLMAREN</text><path d="M230 78C286 110 318 185 330 286" className="hill-line"/><text x="220" y="92" className="terrain-label">KILSBERGEN</text>
-          {data.routes.map(route=>{const meta=routeTypeMeta[route.type];const middle=midpoint(data,route);const color=route.type==="city"||route.type==="region"?routeColors[route.color]:meta.stroke;return <g key={route.id} className={cn("route-group",route.id===selectedRoute&&"selected")} onPointerDown={event=>{event.stopPropagation();setSelectedRoute(route.id);setSelectedStop(null);setTool("select");}}><path d={pathFor(data,route)} className="route-hit"/><path d={pathFor(data,route)} fill="none" stroke={color} strokeWidth={route.type==="brt"?9:route.type==="rail"?4:7} strokeDasharray={meta.dash} strokeLinecap="round" strokeLinejoin="round"/>{route.type!=="rail"&&route.type!=="trail"&&<g transform={`translate(${middle.x},${middle.y})`} className="slot-marker" filter="url(#shadow)"><rect x={-17} y={-11} width="34" height="22" rx="10"/><text textAnchor="middle" y="5">{route.length}</text></g>}</g>;})}
-          {data.stops.map(stop=>{const meta=stopTypeMeta[stop.type];const active=stop.id===selectedStop||stop.id===routeStart;return <g key={stop.id} className={cn("stop",active&&"active")} transform={`translate(${stop.x},${stop.y})`} onPointerDown={event=>{event.stopPropagation();chooseStop(stop.id);if(tool==="select")dragRef.current=stop.id;}}><circle r={active?12:9} fill={meta.fill} stroke={meta.stroke} strokeWidth={active?4:3}/>{stop.type==="rail"&&<rect x={-4} y={-4} width="8" height="8" fill={meta.stroke}/>}<text x={stop.x>900?-14:14} y={stop.y>620?-13:-12} textAnchor={stop.x>900?"end":"start"}>{stop.name}</text></g>;})}
+          <MapArtwork data={data} selectedRoute={selectedRoute} selectedStop={selectedStop} routeStart={routeStart} onRoute={id=>{setSelectedRoute(id);setSelectedStop(null);setTool("select");}} onStop={id=>{chooseStop(id);if(tool==="select")dragRef.current=id;}}/>
         </svg>
       </section>
       <aside className="properties panel">
@@ -110,7 +107,24 @@ export function MapEditor(){
       </aside>
     </div>
     <AlertDialog open={danger!==null} onOpenChange={open=>!open&&setDanger(null)}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{danger==="reset"?"Återställa arbetskartan?":"Ta bort markerat objekt?"}</AlertDialogTitle><AlertDialogDescription>{danger==="reset"?"Din lokalt sparade variant ersätts med Örebro v0.2. Exportera först om du vill behålla den.":selectedStop?"Hållplatsen och alla anslutna linjer tas bort.":"Linjen tas bort från kartan."}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Avbryt</AlertDialogCancel><AlertDialogAction onClick={()=>{if(danger==="reset"){change(()=>cloneMap(initialMap));setSelectedRoute(null);setSelectedStop(null);setDanger(null);}else deleteSelected();}}>Fortsätt</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+    <div className="print-pages" aria-hidden="true">
+      <section className="print-page"><div className="print-caption"><strong>{data.name}</strong><span>Vänster del · sammanfoga vid mittmarkeringarna</span></div><svg viewBox={`0 0 ${W/2+12} ${H}`}><MapArtwork data={data} print/></svg></section>
+      <section className="print-page"><div className="print-caption"><strong>{data.name}</strong><span>Höger del · sammanfoga vid mittmarkeringarna</span></div><svg viewBox={`${W/2-12} 0 ${W/2+12} ${H}`}><MapArtwork data={data} print/></svg></section>
+    </div>
   </main>;
+}
+
+function MapArtwork({data,selectedRoute,selectedStop,routeStart,onRoute,onStop,print=false}:{data:MapData;selectedRoute?:string|null;selectedStop?:string|null;routeStart?:string|null;onRoute?:(id:string)=>void;onStop?:(id:string)=>void;print?:boolean}){
+  return <>
+    <defs><pattern id="grid" width="24" height="24" patternUnits="userSpaceOnUse"><path d="M24 0L0 0 0 24" fill="none" stroke="#6b675f" strokeOpacity=".11"/></pattern><filter id="shadow" x="-50%" y="-50%" width="200%" height="200%"><feDropShadow dx="0" dy="2" stdDeviation="2" floodOpacity=".18"/></filter></defs>
+    <rect className="map-bg" width={W} height={H} fill="#f7f1e5"/><rect className="map-bg" width={W} height={H} fill="url(#grid)"/><path className="lake" d="M815 241C900 200 1046 220 1098 270L1098 590C1040 575 1012 518 963 494C916 470 897 408 840 366C805 340 790 287 815 241Z"/><text x="985" y="285" className="water-label">HJÄLMAREN</text><path d="M230 78C286 110 318 185 330 286" className="hill-line"/><text x="220" y="92" className="terrain-label">KILSBERGEN</text>
+    {data.routes.map(route=>{const meta=routeTypeMeta[route.type];const points=pointsFor(data,route);const infrastructure=route.type==="rail"||route.type==="trail";const routeColor=route.type==="city"||route.type==="region"?(route.color==="neutral"?"#736d64":routeColors[route.color]):meta.stroke;return <g key={route.id} className={cn("route-group",route.id===selectedRoute&&"selected")} onPointerDown={onRoute?event=>{event.stopPropagation();onRoute(route.id);}:undefined}>
+      <path d={pathFor(data,route)} className="route-hit"/><path d={pathFor(data,route)} className={cn("route-guide",infrastructure&&"infrastructure")} fill="none" stroke={routeColor} strokeWidth={infrastructure?(route.type==="rail"?4:5):3} strokeDasharray={meta.dash} strokeLinecap="round" strokeLinejoin="round"/>
+      {!infrastructure&&Array.from({length:route.length},(_,index)=>{const position=pointAlong(points,(index+.5)/route.length);return <g key={index} className="wagon-slot" transform={`translate(${position.x},${position.y}) rotate(${position.angle})`} filter={print?undefined:"url(#shadow)"}><rect className="wagon-slot-outline" x={-13} y={-7} width="26" height="14" rx="4"/><rect x={-12} y={-6} width="24" height="12" rx="3" fill="#fffaf0" stroke={routeColor} strokeWidth="3"/></g>;})}
+    </g>;})}
+    {data.stops.map(stop=>{const meta=stopTypeMeta[stop.type];const active=stop.id===selectedStop||stop.id===routeStart;return <g key={stop.id} className={cn("stop",active&&"active")} transform={`translate(${stop.x},${stop.y})`} onPointerDown={onStop?event=>{event.stopPropagation();onStop(stop.id);}:undefined}><circle r={active?12:9} fill={meta.fill} stroke={meta.stroke} strokeWidth={active?4:3}/>{stop.type==="rail"&&<rect x={-4} y={-4} width="8" height="8" fill={meta.stroke}/>}<text x={stop.x>900?-14:14} y={stop.y>620?-13:-12} textAnchor={stop.x>900?"end":"start"}>{stop.name}</text></g>;})}
+    {print&&<g className="join-marks"><path d={`M${W/2} 0v18M${W/2} ${H-18}v18`}/><path d={`M${W/2-8} 9h16M${W/2-8} ${H-9}h16`}/></g>}
+  </>;
 }
 
 function ToolButton({active,icon,title,note,onClick}:{active:boolean;icon:React.ReactNode;title:string;note:string;onClick:()=>void}){return <button className={cn("tool-button",active&&"active")} onClick={onClick}><span>{icon}</span><div><strong>{title}</strong><small>{note}</small></div></button>;}
