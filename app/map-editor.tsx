@@ -18,7 +18,15 @@ const pointsFor = (data: MapData, route: Route): Point[] => {
   const a = stopById(data, route.a); const b = stopById(data, route.b);
   return a && b ? [a, ...(route.points ?? []), b] : [];
 };
-const pathFor = (data: MapData, route: Route) => pointsFor(data, route).map((point, index) => `${index ? "L" : "M"}${point.x},${point.y}`).join(" ");
+const pathFromPoints = (points:Point[]) => points.map((point,index)=>`${index?"L":"M"}${point.x},${point.y}`).join(" ");
+function parallelPoints(data:MapData,route:Route):Point[]{
+  const siblings=data.routes.filter(item=>(item.a===route.a&&item.b===route.b)||(item.a===route.b&&item.b===route.a));
+  const points=pointsFor(data,route);if(siblings.length<2||points.length<2)return points;
+  const index=siblings.findIndex(item=>item.id===route.id);const direction=route.a.localeCompare(route.b)<=0?1:-1;const offset=(index-(siblings.length-1)/2)*26*direction;
+  const shifted=(point:Point,from:Point,to:Point,distance:number)=>{const dx=to.x-from.x,dy=to.y-from.y,length=Math.hypot(dx,dy)||1;return{x:point.x-dy/length*distance,y:point.y+dx/length*distance};};
+  if(points.length===2){const [a,b]=points;const nearA={x:a.x+(b.x-a.x)*.16,y:a.y+(b.y-a.y)*.16};const nearB={x:a.x+(b.x-a.x)*.84,y:a.y+(b.y-a.y)*.84};return[a,shifted(nearA,a,b,offset),shifted(nearB,a,b,offset),b];}
+  return points.map((point,i)=>i===0||i===points.length-1?point:shifted(point,points[i-1],points[i+1],offset));
+}
 const orient = (a: Point, b: Point, c: Point) => (b.x-a.x)*(c.y-a.y)-(b.y-a.y)*(c.x-a.x);
 const intersects = (a:Point,b:Point,c:Point,d:Point) => {
   const o1=orient(a,b,c), o2=orient(a,b,d), o3=orient(c,d,a), o4=orient(c,d,b);
@@ -118,8 +126,8 @@ function MapArtwork({data,selectedRoute,selectedStop,routeStart,onRoute,onStop,p
   return <>
     <defs><pattern id="grid" width="24" height="24" patternUnits="userSpaceOnUse"><path d="M24 0L0 0 0 24" fill="none" stroke="#6b675f" strokeOpacity=".11"/></pattern><filter id="shadow" x="-50%" y="-50%" width="200%" height="200%"><feDropShadow dx="0" dy="2" stdDeviation="2" floodOpacity=".18"/></filter></defs>
     <rect className="map-bg" width={W} height={H} fill="#f7f1e5"/><rect className="map-bg" width={W} height={H} fill="url(#grid)"/><path className="lake" d="M815 241C900 200 1046 220 1098 270L1098 590C1040 575 1012 518 963 494C916 470 897 408 840 366C805 340 790 287 815 241Z"/><text x="985" y="285" className="water-label">HJÄLMAREN</text><path d="M230 78C286 110 318 185 330 286" className="hill-line"/><text x="220" y="92" className="terrain-label">KILSBERGEN</text>
-    {data.routes.map(route=>{const meta=routeTypeMeta[route.type];const points=pointsFor(data,route);const infrastructure=route.type==="rail"||route.type==="trail";const routeColor=route.type==="city"||route.type==="region"?(route.color==="neutral"?"#736d64":routeColors[route.color]):meta.stroke;return <g key={route.id} className={cn("route-group",route.id===selectedRoute&&"selected")} onPointerDown={onRoute?event=>{event.stopPropagation();onRoute(route.id);}:undefined}>
-      <path d={pathFor(data,route)} className="route-hit"/><path d={pathFor(data,route)} className={cn("route-guide",infrastructure&&"infrastructure")} fill="none" stroke={routeColor} strokeWidth={infrastructure?(route.type==="rail"?4:5):3} strokeDasharray={meta.dash} strokeLinecap="round" strokeLinejoin="round"/>
+    {data.routes.map(route=>{const meta=routeTypeMeta[route.type];const points=parallelPoints(data,route);const path=pathFromPoints(points);const infrastructure=route.type==="rail"||route.type==="trail";const routeColor=route.type==="city"||route.type==="region"?(route.color==="neutral"?"#736d64":routeColors[route.color]):meta.stroke;return <g key={route.id} className={cn("route-group",route.id===selectedRoute&&"selected")} onPointerDown={onRoute?event=>{event.stopPropagation();onRoute(route.id);}:undefined}>
+      <path d={path} className="route-hit"/><path d={path} className={cn("route-guide",infrastructure&&"infrastructure")} fill="none" stroke={routeColor} strokeWidth={infrastructure?(route.type==="rail"?4:5):3} strokeDasharray={meta.dash} strokeLinecap="round" strokeLinejoin="round"/>
       {!infrastructure&&Array.from({length:route.length},(_,index)=>{const position=pointAlong(points,(index+.5)/route.length);return <g key={index} className="wagon-slot" transform={`translate(${position.x},${position.y}) rotate(${position.angle})`} filter={print?undefined:"url(#shadow)"}><rect className="wagon-slot-outline" x={-13} y={-7} width="26" height="14" rx="4"/><rect x={-12} y={-6} width="24" height="12" rx="3" fill="#fffaf0" stroke={routeColor} strokeWidth="3"/></g>;})}
     </g>;})}
     {data.stops.map(stop=>{const meta=stopTypeMeta[stop.type];const active=stop.id===selectedStop||stop.id===routeStart;return <g key={stop.id} className={cn("stop",active&&"active")} transform={`translate(${stop.x},${stop.y})`} onPointerDown={onStop?event=>{event.stopPropagation();onStop(stop.id);}:undefined}><circle r={active?12:9} fill={meta.fill} stroke={meta.stroke} strokeWidth={active?4:3}/>{stop.type==="rail"&&<rect x={-4} y={-4} width="8" height="8" fill={meta.stroke}/>}<text x={stop.x>900?-14:14} y={stop.y>620?-13:-12} textAnchor={stop.x>900?"end":"start"}>{stop.name}</text></g>;})}
