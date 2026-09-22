@@ -4,6 +4,8 @@ Map projects are UTF-8 JSON files. A full export contains the map name, selected
 
 There is currently no explicit `schemaVersion` field. Compatibility is handled by `normalizeMap`, `normalizeBackgroundFile` and `normalizeNetworkFile` when a file or browser state is loaded. Adding versioned migrations is recommended before the format grows substantially.
 
+Every exported filename ends with the local date and time it was saved, as `-YYYYMMDD-HHmmss` (for example `example-map-20260922-211854.json`), so repeated exports of the same map sort chronologically and never silently overwrite one another.
+
 ## Top-level shape
 
 ```json

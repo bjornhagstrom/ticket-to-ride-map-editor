@@ -137,6 +137,10 @@ function pointAlong(points: Point[], fraction: number): Point & { angle: number 
   }
   return { ...(points.at(-1) ?? { x: 0, y: 0 }), angle: 0 };
 }
+function formatTimestamp(date: Date = new Date()): string {
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}-${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
+}
 function canvasPoint(svg: SVGSVGElement, clientX: number, clientY: number, height: number): Point {
   const rect = svg.getBoundingClientRect();
   return { x: Math.max(18, Math.min(W - 18, (clientX - rect.left) * W / rect.width)), y: Math.max(18, Math.min(height - 18, (clientY - rect.top) * height / rect.height)) };
@@ -284,7 +288,7 @@ export function MapEditor() {
     });
     clearSelection(); setDanger(null);
   };
-  const downloadJson = (payload: unknown, filenameBase: string) => { const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }); const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = `${filenameBase.replace(/[^a-z0-9]+/gi, "-").toLowerCase() || "map"}.json`; link.click(); URL.revokeObjectURL(url); };
+  const downloadJson = (payload: unknown, filenameBase: string) => { const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }); const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = `${filenameBase.replace(/[^a-z0-9]+/gi, "-").toLowerCase() || "map"}-${formatTimestamp()}.json`; link.click(); URL.revokeObjectURL(url); };
   const exportMap = () => downloadJson({ kind: "map", ...data }, data.name);
   const exportBackground = () => downloadJson({ kind: "background", format: data.format, background: data.background, backgroundImage: data.backgroundImage }, `${data.name} background`);
   const exportNetwork = () => downloadJson({ kind: "network", format: data.format, stops: data.stops, routes: data.routes }, `${data.name} network`);
