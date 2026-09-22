@@ -13,7 +13,7 @@ Live site: <https://hagstrom.nu/ttr/>
 - Mark specific wagon slots on a route as requiring a locomotive card.
 - Define reusable custom line styles (thickness and dash pattern) to flag routes that follow a special rule, and set a default style so new routes pick it up automatically.
 - Add areas, boundaries and labels behind the route network.
-- Import a background image (PNG, JPEG or WebP) and move, scale, rotate, crop, fade or lock it behind the rest of the map.
+- Import a background image (PNG, JPEG or WebP) — from the Import menu or the Draw background tool — and move, scale, rotate, crop, fade or lock it behind the rest of the map, or centre it and fit it to the page with a print-safe margin in one click.
 - Place resizable evaluation notes with explanatory text on the map, for reviewers and playtesters.
 - Choose standard, large and custom foldable board formats or A4/A3/US Letter test sheets.
 - Detect crossings between buildable routes.
