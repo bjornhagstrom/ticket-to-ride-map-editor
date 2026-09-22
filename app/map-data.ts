@@ -1,13 +1,14 @@
 export type StopType = "city" | "region" | "brt" | "rail" | "ferry" | "outing";
 export type StopSize = "small" | "medium" | "large";
 export type StopSymbol = "none" | "dot" | "dash" | "cross" | "letter";
-export type RouteType = "city" | "region" | "brt" | "ferry" | "rail" | "trail";
+export type RouteType = string;
 export type BackgroundType = "area" | "line" | "label";
 export type MapFormat = "board-2x3" | "board-2x3-large" | "board-2x4" | "a4" | "a3" | "us-letter";
 export type Point = { x: number; y: number };
 export type Stop = Point & { id: string; name: string; type: StopType; size?: StopSize; symbol?: StopSymbol; letter?: string };
 export type Route = { id: string; a: string; b: string; length: number; type: RouteType; color: string; points?: Point[]; locomotiveSlots?: number[]; lineStyle?: string };
 export type LineStyle = { id: string; label: string; strokeWidth: number; dash: string };
+export type RouteTypeStyle = { id: string; label: string; stroke: string; dash: string; strokeWidth: number; infrastructure: boolean };
 export type BackgroundShape = {
   id: string;
   type: BackgroundType;
@@ -43,7 +44,7 @@ export type NoteBox = {
   text: string;
   locked?: boolean;
 };
-export type MapData = { name: string; format: MapFormat; background: BackgroundShape[]; stops: Stop[]; routes: Route[]; backgroundImage?: BackgroundImage; notes: NoteBox[]; lineStyles: LineStyle[] };
+export type MapData = { name: string; format: MapFormat; background: BackgroundShape[]; stops: Stop[]; routes: Route[]; backgroundImage?: BackgroundImage; notes: NoteBox[]; lineStyles: LineStyle[]; routeTypeStyles: RouteTypeStyle[] };
 
 export const W = 1100;
 export const STORAGE_KEY = "orebro-map-editor-public-v2";
@@ -94,14 +95,14 @@ export const stopTypeMeta: Record<StopType, { label: string; fill: string; strok
   outing: { label: "Destination", fill: "#e8f0dc", stroke: "#53723b" },
 };
 
-export const routeTypeMeta: Record<RouteType, { label: string; stroke: string; dash?: string }> = {
-  city: { label: "City route", stroke: "#721c24" },
-  region: { label: "Regional route", stroke: "#b05b2a" },
-  brt: { label: "Rapid transit", stroke: "#00877c" },
-  ferry: { label: "Ferry", stroke: "#23749b", dash: "10 7" },
-  rail: { label: "Railway", stroke: "#292b2f", dash: "3 6" },
-  trail: { label: "Trail", stroke: "#53723b", dash: "11 6" },
-};
+export const defaultRouteTypeStyles: RouteTypeStyle[] = [
+  { id: "city", label: "City route", stroke: "#721c24", dash: "", strokeWidth: 3, infrastructure: false },
+  { id: "region", label: "Regional route", stroke: "#b05b2a", dash: "", strokeWidth: 3, infrastructure: false },
+  { id: "brt", label: "Rapid transit", stroke: "#00877c", dash: "", strokeWidth: 3, infrastructure: false },
+  { id: "ferry", label: "Ferry", stroke: "#23749b", dash: "10 7", strokeWidth: 3, infrastructure: false },
+  { id: "rail", label: "Railway", stroke: "#292b2f", dash: "3 6", strokeWidth: 4, infrastructure: true },
+  { id: "trail", label: "Trail", stroke: "#53723b", dash: "11 6", strokeWidth: 5, infrastructure: true },
+];
 
 export const routeColors: Record<string, string> = {
   neutral: "#f2ead8", red: "#cf3f3f", blue: "#3b72b9", green: "#4c8b58",
@@ -121,6 +122,7 @@ export const emptyMap: MapData = {
   routes: [],
   notes: [],
   lineStyles: [],
+  routeTypeStyles: defaultRouteTypeStyles.map((style) => ({ ...style })),
 };
 
 export const initialMap: MapData = {
@@ -139,6 +141,7 @@ export const initialMap: MapData = {
   lineStyles: [
     { id: "example-tunnel", label: "Tunnel", strokeWidth: 7, dash: "2 5" },
   ],
+  routeTypeStyles: defaultRouteTypeStyles.map((style) => ({ ...style })),
   background: [
     {
       id: "example-lake",

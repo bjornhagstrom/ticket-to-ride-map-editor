@@ -84,11 +84,23 @@ Supported stop types are `city`, `region`, `brt`, `rail`, `ferry` and `outing`. 
 }
 ```
 
-`a` and `b` reference stop IDs. `points` is optional and contains movable intermediate waypoints. Supported route types are `city`, `region`, `brt`, `ferry`, `rail` and `trail`.
+`a` and `b` reference stop IDs. `points` is optional and contains movable intermediate waypoints. `type` references the `id` of an entry in the map's `routeTypeStyles` list (see below) — `city`, `region`, `brt`, `ferry`, `rail` and `trail` by default, but any map can rename, restyle, delete or add to that list.
 
 `locomotiveSlots` is optional and lists the zero-based wagon-slot indices (out of `length`) that must be covered with a locomotive card, drawn with a small engine icon. Toggle it by clicking a wagon slot on a selected route.
 
-`lineStyle` is optional and references the `id` of an entry in the map's `lineStyles` list (see below). It overrides the route's default line thickness and dash pattern to flag that the route follows some special rule, independent of its `type` and `color`, which still control the route's card colour and infrastructure behaviour.
+`lineStyle` is optional and references the `id` of an entry in the map's `lineStyles` list (see below). It overrides one specific route's line thickness and dash pattern on top of its type's own appearance, to flag that this particular route follows some special rule.
+
+## Route type styles
+
+`routeTypeStyles` is a map-level array defining every route type's default appearance — this is what makes, for example, a railway look different from a ferry:
+
+```json
+{ "id": "rail", "label": "Railway", "stroke": "#292b2f", "dash": "3 6", "strokeWidth": 4, "infrastructure": true }
+```
+
+`stroke` is the line's colour, used directly for every type except `city` and `region`, whose routes use each route's own `color` (from the standard nine-colour deck) instead — for those two, `stroke` is unused. `dash` is an SVG `stroke-dasharray` (`""` for solid) and `strokeWidth` the line thickness in canvas units. `infrastructure: true` marks a pre-built type with no train cards and no wagon slots (drawn as a continuous line, like the default `rail` and `trail`); `false` marks a type that shows wagon slots, a colour choice and can take locomotive requirements (like `city`, `region`, `brt` and `ferry`).
+
+Create, rename, restyle and delete types from the Route type control in the Draw route tool (sets the default for new routes) or in a selected route's Properties panel (changes that route's type and, through it, every other route sharing it). A type cannot be deleted while any route still uses it, or if it is the map's only remaining type. `routeTypeStyles` travels with full-map and network-only exports.
 
 ## Line styles
 
@@ -165,6 +177,7 @@ Notes are only part of full-map exports, not background-only or network-only exp
 
 - Missing `background` becomes an empty array, supporting older map files.
 - Missing `notes` or `lineStyles` becomes an empty array.
+- Missing or empty `routeTypeStyles` falls back to the six default types (`city`, `region`, `brt`, `ferry`, `rail`, `trail`).
 - Missing or unknown `format` becomes `board-2x3`.
 - Missing or unrecognized `kind` is treated as a full map (`"map"`).
 - Missing or invalid `backgroundImage` is dropped; a map with no image simply omits the field.

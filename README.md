@@ -7,6 +7,7 @@ Live site: <https://hagstrom.nu/ttr/>
 ## Current capabilities
 
 - Draw, move and edit stops and routes.
+- Fully customise route types: rename, restyle (colour, thickness, dash) or delete the built-in city/region/rapid transit/ferry/railway/trail types, and add your own, each with its own appearance and infrastructure behaviour.
 - Choose one of three stop sizes, which can carry meaning in some expansions.
 - Mark a stop with a dot, dash, cross or a short letter code, independent of its type.
 - Mark specific wagon slots on a route as requiring a locomotive card.
