@@ -1,13 +1,14 @@
 # Map project format
 
-Map projects are UTF-8 JSON files. A full export contains the map name, selected board format, background objects, stops and routes.
+Map projects are UTF-8 JSON files. A full export contains the map name, selected board format, background objects, stops and routes. Background-only and network-only exports carry just their own part of the map, plus the board format needed to interpret their coordinates.
 
-There is currently no explicit `schemaVersion` field. Compatibility is handled by `normalizeMap` when a file or browser state is loaded. Adding versioned migrations is recommended before the format grows substantially.
+There is currently no explicit `schemaVersion` field. Compatibility is handled by `normalizeMap`, `normalizeBackgroundFile` and `normalizeNetworkFile` when a file or browser state is loaded. Adding versioned migrations is recommended before the format grows substantially.
 
 ## Top-level shape
 
 ```json
 {
+  "kind": "map",
   "name": "Example map",
   "format": "board-2x3",
   "background": [],
@@ -15,6 +16,22 @@ There is currently no explicit `schemaVersion` field. Compatibility is handled b
   "routes": []
 }
 ```
+
+The `kind` field identifies what a file contains. `"map"` (or a missing `kind`, for compatibility with files exported before this field existed) is a full map and replaces everything on import. The Import action reads this field to decide what to do with a file — there is no separate control for choosing the import type.
+
+## Background-only and network-only files
+
+The Export menu can also produce two narrower files:
+
+```json
+{ "kind": "background", "format": "board-2x3", "background": [] }
+```
+
+```json
+{ "kind": "network", "format": "board-2x3", "stops": [], "routes": [] }
+```
+
+Importing one of these only replaces its own part of the current map (background objects, or stops and routes) and leaves the rest untouched. If that part already has content, the editor asks for confirmation before replacing it. Coordinates are rescaled from the file's `format` to the current map's format on import, the same way a full map is rescaled when you change board format.
 
 ## Board formats
 
@@ -88,6 +105,7 @@ For an area, `points` defines a polygon. For a line it defines a polyline. A lab
 
 - Missing `background` becomes an empty array, supporting older map files.
 - Missing or unknown `format` becomes `board-2x3`.
+- Missing or unrecognized `kind` is treated as a full map (`"map"`).
 - Unknown object types are not currently validated at runtime.
 - IDs must be unique within their object category.
 - Routes should reference existing stops.

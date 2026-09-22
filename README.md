@@ -12,7 +12,7 @@ Live site: <https://hagstrom.nu/ttr/>
 - Detect crossings between buildable routes.
 - Undo and redo up to 40 changes during the current session.
 - Save automatically in the current browser.
-- Import and export complete maps as JSON.
+- Import and export complete maps as JSON, or just the background or the route network on their own.
 - Print full test sheets or reduced A4 proofs of individual foldable-board panels.
 - Show a neutral example map to first-time visitors.
 

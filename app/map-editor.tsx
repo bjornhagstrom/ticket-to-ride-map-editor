@@ -6,14 +6,16 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { cn } from "@/lib/utils";
-import { colorLabels, emptyMap, initialMap, mapFormats, type BackgroundShape, type BackgroundType, type MapData, type MapFormat, type Point, type Route, type RouteType, routeColors, routeTypeMeta, STORAGE_KEY, type StopType, stopTypeMeta, W } from "./map-data";
+import { colorLabels, emptyMap, initialMap, mapFormats, type BackgroundShape, type BackgroundType, type MapData, type MapFormat, type Point, type Route, type RouteType, routeColors, routeTypeMeta, STORAGE_KEY, type Stop, type StopType, stopTypeMeta, W } from "./map-data";
 
 type Tool = "select" | "stop" | "route" | "background";
-type Danger = "reset" | "delete" | "load-blank" | "load-example" | null;
+type Danger = "reset" | "delete" | "load-blank" | "load-example" | "import-background" | "import-network" | null;
+type PendingImport = { kind: "background"; background: BackgroundShape[] } | { kind: "network"; stops: Stop[]; routes: Route[] };
 const GUIDE_SEEN_KEY = `${STORAGE_KEY}-guide-seen`;
 
 const cloneMap = (data: MapData): MapData => JSON.parse(JSON.stringify(data));
@@ -25,6 +27,13 @@ const normalizeMap = (value: Partial<MapData>): MapData => ({
   stops: Array.isArray(value.stops) ? value.stops : [],
   routes: Array.isArray(value.routes) ? value.routes : [],
 });
+const scalePointToHeight = (point: Point, fromHeight: number, toHeight: number): Point => ({ x: point.x, y: point.y * toHeight / fromHeight });
+const scaleBackgroundToHeight = (shapes: BackgroundShape[], fromHeight: number, toHeight: number): BackgroundShape[] => shapes.map((shape) => ({ ...shape, points: shape.points.map((point) => scalePointToHeight(point, fromHeight, toHeight)), labelPoint: shape.labelPoint ? scalePointToHeight(shape.labelPoint, fromHeight, toHeight) : undefined }));
+const scaleStopsToHeight = (stops: Stop[], fromHeight: number, toHeight: number): Stop[] => stops.map((stop) => ({ ...stop, ...scalePointToHeight(stop, fromHeight, toHeight) }));
+const scaleRoutesToHeight = (routes: Route[], fromHeight: number, toHeight: number): Route[] => routes.map((route) => ({ ...route, points: route.points?.map((point) => scalePointToHeight(point, fromHeight, toHeight)) }));
+const sourceHeight = (value: { format?: unknown }): number => mapFormats[isMapFormat(value.format) ? value.format : "board-2x3"].height;
+const normalizeBackgroundFile = (value: { format?: unknown; background?: unknown }, toHeight: number): BackgroundShape[] => scaleBackgroundToHeight(Array.isArray(value.background) ? value.background : [], sourceHeight(value), toHeight);
+const normalizeNetworkFile = (value: { format?: unknown; stops?: unknown; routes?: unknown }, toHeight: number): { stops: Stop[]; routes: Route[] } => { const fromHeight = sourceHeight(value); return { stops: scaleStopsToHeight(Array.isArray(value.stops) ? value.stops : [], fromHeight, toHeight), routes: scaleRoutesToHeight(Array.isArray(value.routes) ? value.routes : [], fromHeight, toHeight) }; };
 const stopById = (data: MapData, id: string) => data.stops.find((stop) => stop.id === id);
 const pointsFor = (data: MapData, route: Route): Point[] => {
   const a = stopById(data, route.a);
@@ -118,6 +127,7 @@ export function MapEditor() {
   const [past, setPast] = useState<MapData[]>([]);
   const [future, setFuture] = useState<MapData[]>([]);
   const [danger, setDanger] = useState<Danger>(null);
+  const [pendingImport, setPendingImport] = useState<PendingImport | null>(null);
   const dragStopRef = useRef<string | null>(null);
   const dragWaypointRef = useRef<{ routeId: string; index: number } | null>(null);
   const dragBackgroundPointRef = useRef<{ shapeId: string; index: number } | null>(null);
@@ -214,17 +224,45 @@ export function MapEditor() {
     });
     clearSelection(); setDanger(null);
   };
-  const exportMap = () => { const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }); const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = `${data.name.replace(/[^a-z0-9]+/gi, "-").toLowerCase() || "map"}.json`; link.click(); URL.revokeObjectURL(url); };
-  const importMap = (file?: File) => { if (!file) return; const reader = new FileReader(); reader.onload = () => { try { const incoming = normalizeMap(JSON.parse(String(reader.result))); change(() => incoming); clearSelection(); } catch { window.alert("The file could not be read as a map project."); } }; reader.readAsText(file); };
+  const downloadJson = (payload: unknown, filenameBase: string) => { const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }); const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = `${filenameBase.replace(/[^a-z0-9]+/gi, "-").toLowerCase() || "map"}.json`; link.click(); URL.revokeObjectURL(url); };
+  const exportMap = () => downloadJson({ kind: "map", ...data }, data.name);
+  const exportBackground = () => downloadJson({ kind: "background", format: data.format, background: data.background }, `${data.name} background`);
+  const exportNetwork = () => downloadJson({ kind: "network", format: data.format, stops: data.stops, routes: data.routes }, `${data.name} network`);
+  const applyBackgroundImport = (background: BackgroundShape[]) => { change((draft) => ({ ...draft, background })); clearSelection(); setDanger(null); setPendingImport(null); };
+  const applyNetworkImport = (stops: Stop[], routes: Route[]) => { change((draft) => ({ ...draft, stops, routes })); clearSelection(); setDanger(null); setPendingImport(null); };
+  const importMap = (file?: File) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const raw = JSON.parse(String(reader.result));
+        if (raw && raw.kind === "background") {
+          const background = normalizeBackgroundFile(raw, format.height);
+          if (data.background.length) { setPendingImport({ kind: "background", background }); setDanger("import-background"); }
+          else applyBackgroundImport(background);
+          return;
+        }
+        if (raw && raw.kind === "network") {
+          const { stops, routes } = normalizeNetworkFile(raw, format.height);
+          if (data.stops.length || data.routes.length) { setPendingImport({ kind: "network", stops, routes }); setDanger("import-network"); }
+          else applyNetworkImport(stops, routes);
+          return;
+        }
+        const incoming = normalizeMap(raw);
+        change(() => incoming);
+        clearSelection();
+      } catch { window.alert("The file could not be read as a map project."); }
+    };
+    reader.readAsText(file);
+  };
   const changeFormat = (nextFormat: MapFormat) => {
     if (nextFormat === data.format) return;
     change((draft) => {
       const fromHeight = mapFormats[draft.format].height;
       const toHeight = mapFormats[nextFormat].height;
-      const scalePoint = (point: Point): Point => ({ x: point.x, y: point.y * toHeight / fromHeight });
-      draft.stops = draft.stops.map((stop) => ({ ...stop, ...scalePoint(stop) }));
-      draft.routes = draft.routes.map((route) => ({ ...route, points: route.points?.map(scalePoint) }));
-      draft.background = draft.background.map((shape) => ({ ...shape, points: shape.points.map(scalePoint), labelPoint: shape.labelPoint ? scalePoint(shape.labelPoint) : undefined }));
+      draft.stops = scaleStopsToHeight(draft.stops, fromHeight, toHeight);
+      draft.routes = scaleRoutesToHeight(draft.routes, fromHeight, toHeight);
+      draft.background = scaleBackgroundToHeight(draft.background, fromHeight, toHeight);
       draft.format = nextFormat;
       return draft;
     });
@@ -236,7 +274,7 @@ export function MapEditor() {
     <header className="topbar">
       <div className="brand"><span className="brand-mark"><BusFront /></span><div><p>Ticket to Ride</p><h1>Map editor</h1></div></div>
       <div className="map-title"><Label htmlFor="map-name" className="sr-only">Map name</Label><Input id="map-name" value={data.name} onChange={(event) => change((draft) => ({ ...draft, name: event.target.value }))} /><span className="save-state"><Check />{saved ? "Saved locally" : "Saving…"}</span></div>
-      <div className="header-actions"><Button variant="outline" size="sm" onClick={() => setShowGuide(true)}><CircleHelp />Help</Button><Button variant="ghost" size="icon" aria-label="Undo" disabled={!past.length} onClick={undo}><Undo2 /></Button><Button variant="ghost" size="icon" aria-label="Redo" disabled={!future.length} onClick={redo}><Redo2 /></Button><Button variant="outline" size="sm" onClick={() => fileRef.current?.click()}><Upload />Import</Button><input ref={fileRef} hidden type="file" accept="application/json" onChange={(event) => importMap(event.target.files?.[0])} /><Button variant="outline" size="sm" onClick={() => window.print()}><Printer />Print {format.shortLabel}</Button><Button size="sm" onClick={exportMap}><Download />Export</Button></div>
+      <div className="header-actions"><Button variant="outline" size="sm" onClick={() => setShowGuide(true)}><CircleHelp />Help</Button><Button variant="ghost" size="icon" aria-label="Undo" disabled={!past.length} onClick={undo}><Undo2 /></Button><Button variant="ghost" size="icon" aria-label="Redo" disabled={!future.length} onClick={redo}><Redo2 /></Button><Button variant="outline" size="sm" onClick={() => fileRef.current?.click()}><Upload />Import</Button><input ref={fileRef} hidden type="file" accept="application/json" onChange={(event) => { importMap(event.target.files?.[0]); event.target.value = ""; }} /><Button variant="outline" size="sm" onClick={() => window.print()}><Printer />Print {format.shortLabel}</Button><DropdownMenu><DropdownMenuTrigger asChild><Button size="sm"><Download />Export</Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onClick={exportMap}><Download />Full map</DropdownMenuItem><DropdownMenuItem onClick={exportBackground}><Layers3 />Background only</DropdownMenuItem><DropdownMenuItem onClick={exportNetwork}><Link2 />Network only</DropdownMenuItem></DropdownMenuContent></DropdownMenu></div>
     </header>
     <div className="workspace">
       <aside className="tools-panel panel">
@@ -269,7 +307,7 @@ export function MapEditor() {
         {selectedR && <div className="property-form"><div className="route-names"><span>{stopById(data, selectedR.a)?.name}</span><ChevronDown /><span>{stopById(data, selectedR.b)?.name}</span></div><div><Label>Route type</Label><NativeSelect value={selectedR.type} onChange={(event) => change((draft) => { const route = draft.routes.find((item) => item.id === selectedR.id); if (route) route.type = event.target.value as RouteType; return draft; })}>{Object.entries(routeTypeMeta).map(([key, meta]) => <NativeSelectOption key={key} value={key}>{meta.label}</NativeSelectOption>)}</NativeSelect></div>{selectedR.type !== "rail" && selectedR.type !== "trail" && <><div><Label>Colour</Label><NativeSelect value={selectedR.color} onChange={(event) => change((draft) => { const route = draft.routes.find((item) => item.id === selectedR.id); if (route) route.color = event.target.value; return draft; })}>{Object.keys(routeColors).map((key) => <NativeSelectOption key={key} value={key}>{colorLabels[key]}</NativeSelectOption>)}</NativeSelect></div><div><Label>Vehicle spaces</Label><div className="length-stepper"><Button variant="outline" size="icon" aria-label="Decrease" disabled={selectedR.length <= 1} onClick={() => change((draft) => { const route = draft.routes.find((item) => item.id === selectedR.id); if (route) route.length = Math.max(1, route.length - 1); return draft; })}><Minus /></Button><strong>{selectedR.length}</strong><Button variant="outline" size="icon" aria-label="Increase" disabled={selectedR.length >= 8} onClick={() => change((draft) => { const route = draft.routes.find((item) => item.id === selectedR.id); if (route) route.length = Math.min(8, route.length + 1); return draft; })}><Plus /></Button></div><p className="helper">The change is shown directly on the route.</p></div></>}<Button variant="destructive" onClick={() => setDanger("delete")}><Trash2 />Delete route</Button></div>}
       </aside>
     </div>
-    <AlertDialog open={danger !== null} onOpenChange={(open) => !open && setDanger(null)}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{danger === "reset" ? "Clear the entire map?" : danger === "load-blank" ? "Replace the current map with a blank one?" : danger === "load-example" ? "Replace the current map with the example?" : "Delete the selected object?"}</AlertDialogTitle><AlertDialogDescription>{danger === "reset" ? "All locally stored background objects, stops and routes will be removed. Export the map first if you want to keep it." : danger === "load-blank" ? "Your current background objects, stops and routes will be replaced with a blank map. Export the map first if you want to keep your work." : danger === "load-example" ? "Your current background objects, stops and routes will be replaced with the neutral example map. Export the map first if you want to keep your work." : selectedStop ? "The stop and all connected routes will be deleted." : "The selected object will be deleted."}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => { if (danger === "reset") { change(() => cloneMap(emptyMap)); clearSelection(); setDanger(null); } else if (danger === "load-blank") applyGuideChoice(emptyMap); else if (danger === "load-example") applyGuideChoice(initialMap); else deleteSelected(); }}>Continue</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+    <AlertDialog open={danger !== null} onOpenChange={(open) => { if (!open) { setDanger(null); setPendingImport(null); } }}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{danger === "reset" ? "Clear the entire map?" : danger === "load-blank" ? "Replace the current map with a blank one?" : danger === "load-example" ? "Replace the current map with the example?" : danger === "import-background" ? "Replace the background?" : danger === "import-network" ? "Replace stops and routes?" : "Delete the selected object?"}</AlertDialogTitle><AlertDialogDescription>{danger === "reset" ? "All locally stored background objects, stops and routes will be removed. Export the map first if you want to keep it." : danger === "load-blank" ? "Your current background objects, stops and routes will be replaced with a blank map. Export the map first if you want to keep your work." : danger === "load-example" ? "Your current background objects, stops and routes will be replaced with the neutral example map. Export the map first if you want to keep your work." : danger === "import-background" ? "The imported areas, boundaries and labels will replace the current background. Stops and routes are kept as they are." : danger === "import-network" ? "The imported stops and routes will replace the current network. Background objects are kept as they are." : selectedStop ? "The stop and all connected routes will be deleted." : "The selected object will be deleted."}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => { if (danger === "reset") { change(() => cloneMap(emptyMap)); clearSelection(); setDanger(null); } else if (danger === "load-blank") applyGuideChoice(emptyMap); else if (danger === "load-example") applyGuideChoice(initialMap); else if (danger === "import-background" && pendingImport?.kind === "background") applyBackgroundImport(pendingImport.background); else if (danger === "import-network" && pendingImport?.kind === "network") applyNetworkImport(pendingImport.stops, pendingImport.routes); else deleteSelected(); }}>Continue</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
     <WelcomeGuide open={showGuide} onOpenChange={(open) => !open && dismissGuide()} onChooseBlank={() => chooseFromGuide("blank")} onChooseExample={() => chooseFromGuide("example")} />
     <PrintPages data={data} />
   </main>;
