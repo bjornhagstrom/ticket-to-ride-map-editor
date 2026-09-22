@@ -1,30 +1,64 @@
 export type StopType = "city" | "region" | "brt" | "rail" | "ferry" | "outing";
 export type RouteType = "city" | "region" | "brt" | "ferry" | "rail" | "trail";
+export type BackgroundType = "area" | "line" | "label";
+export type MapFormat = "board-2x3" | "board-2x3-large" | "board-2x4" | "a4" | "a3";
 export type Point = { x: number; y: number };
 export type Stop = Point & { id: string; name: string; type: StopType };
 export type Route = { id: string; a: string; b: string; length: number; type: RouteType; color: string; points?: Point[] };
-export type MapData = { name: string; stops: Stop[]; routes: Route[] };
+export type BackgroundShape = {
+  id: string;
+  type: BackgroundType;
+  label: string;
+  labelPoint?: Point;
+  points: Point[];
+  fill: string;
+  stroke: string;
+  opacity: number;
+  strokeWidth: number;
+  locked?: boolean;
+};
+export type MapData = { name: string; format: MapFormat; background: BackgroundShape[]; stops: Stop[]; routes: Route[] };
 
 export const W = 1100;
-export const H = 720;
-export const STORAGE_KEY = "orebro-map-editor-v1";
+export const STORAGE_KEY = "orebro-map-editor-public-v2";
+
+export type MapFormatDefinition = {
+  label: string;
+  shortLabel: string;
+  note: string;
+  width: number;
+  height: number;
+  widthMm: number;
+  heightMm: number;
+  columns: number;
+  rows: number;
+  custom?: boolean;
+};
+
+export const mapFormats: Record<MapFormat, MapFormatDefinition> = {
+  "board-2x3": { label: "Standard board 2×3 · 790 × 525 mm", shortLabel: "Standard board 2×3", note: "Verified standard Ticket to Ride size", width: W, height: Math.round(W * 525 / 790), widthMm: 790, heightMm: 525, columns: 3, rows: 2 },
+  "board-2x3-large": { label: "Large board 2×3 · 972 × 648 mm", shortLabel: "Large board 2×3", note: "Large Anniversary-style size", width: W, height: Math.round(W * 648 / 972), widthMm: 972, heightMm: 648, columns: 3, rows: 2 },
+  "board-2x4": { label: "Extended board 2×4 · 1,053 × 526 mm", shortLabel: "Extended board 2×4", note: "Custom size using standard-size square panels", width: W, height: Math.round(W * 526 / 1053), widthMm: 1053, heightMm: 526, columns: 4, rows: 2, custom: true },
+  a4: { label: "A4 test sheet · 297 × 210 mm", shortLabel: "A4 test sheet", note: "One landscape test sheet", width: W, height: Math.round(W * 210 / 297), widthMm: 297, heightMm: 210, columns: 1, rows: 1 },
+  a3: { label: "A3 test sheet · 420 × 297 mm", shortLabel: "A3 test sheet", note: "One landscape test sheet", width: W, height: Math.round(W * 297 / 420), widthMm: 420, heightMm: 297, columns: 1, rows: 1 },
+};
 
 export const stopTypeMeta: Record<StopType, { label: string; fill: string; stroke: string }> = {
-  city: { label: "Stadshållplats", fill: "#fffaf0", stroke: "#721c24" },
-  region: { label: "Länshållplats", fill: "#fff4dc", stroke: "#b05b2a" },
-  brt: { label: "Citylinjen", fill: "#d9f2ef", stroke: "#00877c" },
-  rail: { label: "Järnvägsstation", fill: "#e8e9eb", stroke: "#292b2f" },
-  ferry: { label: "Färjehamn", fill: "#dceff8", stroke: "#23749b" },
-  outing: { label: "Utflyktsmål", fill: "#e8f0dc", stroke: "#53723b" },
+  city: { label: "City stop", fill: "#fffaf0", stroke: "#721c24" },
+  region: { label: "Regional stop", fill: "#fff4dc", stroke: "#b05b2a" },
+  brt: { label: "Rapid transit", fill: "#d9f2ef", stroke: "#00877c" },
+  rail: { label: "Railway station", fill: "#e8e9eb", stroke: "#292b2f" },
+  ferry: { label: "Ferry port", fill: "#dceff8", stroke: "#23749b" },
+  outing: { label: "Destination", fill: "#e8f0dc", stroke: "#53723b" },
 };
 
 export const routeTypeMeta: Record<RouteType, { label: string; stroke: string; dash?: string }> = {
-  city: { label: "Stadsbuss", stroke: "#721c24" },
-  region: { label: "Länsbuss", stroke: "#b05b2a" },
-  brt: { label: "Citylinjen", stroke: "#00877c" },
-  ferry: { label: "Färja", stroke: "#23749b", dash: "10 7" },
-  rail: { label: "Järnväg", stroke: "#292b2f", dash: "3 6" },
-  trail: { label: "Bergslagsleden", stroke: "#53723b", dash: "11 6" },
+  city: { label: "City route", stroke: "#721c24" },
+  region: { label: "Regional route", stroke: "#b05b2a" },
+  brt: { label: "Rapid transit", stroke: "#00877c" },
+  ferry: { label: "Ferry", stroke: "#23749b", dash: "10 7" },
+  rail: { label: "Railway", stroke: "#292b2f", dash: "3 6" },
+  trail: { label: "Trail", stroke: "#53723b", dash: "11 6" },
 };
 
 export const routeColors: Record<string, string> = {
@@ -33,51 +67,88 @@ export const routeColors: Record<string, string> = {
 };
 
 export const colorLabels: Record<string, string> = {
-  neutral: "Grå", red: "Röd", blue: "Blå", green: "Grön", yellow: "Gul",
-  black: "Svart", white: "Vit", orange: "Orange", purple: "Lila",
+  neutral: "Grey", red: "Red", blue: "Blue", green: "Green", yellow: "Yellow",
+  black: "Black", white: "White", orange: "Orange", purple: "Purple",
 };
 
-const rawStops: Array<[string, string, number, number, StopType]> = [
-  ["OSLO","Oslo",50,225,"region"],["KARLSKOGA","Karlskoga",160,252,"region"],["STORSTEN","Storstenshöjden",265,180,"outing"],
-  ["ANNABODA","Ånnaboda",335,108,"outing"],["GARPH","Garphyttan",335,274,"outing"],["NORA","Nora",378,86,"region"],
-  ["LIND","Lindesberg",530,50,"region"],["MELL","Mellringe",438,202,"city"],["VIV","Vivalla",530,144,"city"],
-  ["SVAMP","Svampen",595,194,"outing"],["KARLSLUND","Karlslund",454,317,"outing"],["RC","Resecentrum",552,310,"rail"],
-  ["JARN","Järntorget",632,266,"city"],["USO","USÖ",714,216,"city"],["KULTUR","Kulturkvarteret",638,331,"city"],
-  ["WAD","Wadköping",724,302,"outing"],["VAG","Våghustorget",676,389,"city"],["OSTER","Österplan",772,382,"city"],
-  ["OSET","Oset / Naturens hus",828,266,"outing"],["SKEBACK","Skebäck",905,310,"city"],["UNI","Universitetet",853,403,"brt"],
-  ["BRICK","Brickebacken",929,432,"brt"],["HJALMBAD","Hjälmarbadet",982,360,"ferry"],["ARBOGA","Arboga",1030,259,"rail"],
-  ["STOCKHOLM","Stockholm",1042,115,"rail"],["ODENS","Odensbacken",994,461,"region"],["HAMP","Hampetorp",950,547,"ferry"],
-  ["VINON","Vinön",1042,569,"ferry"],["GUST","Gustavsvik / Södra tornet",606,446,"outing"],["LYRA","Lyran / Adolfsberg",595,490,"outing"],
-  ["MARIE","Marieberg",487,526,"region"],["KUMLA","Kumla",595,562,"region"],["HALLSBERG","Hallsberg",681,648,"rail"],
-  ["GOTEBORG","Göteborg",498,684,"rail"],
-];
-
-const routeRows: Array<[string,string,number,RouteType,string,Point[]?]> = [
-  ["RC","JARN",1,"city","neutral"],["RC","KARLSLUND",2,"city","green"],["RC","GUST",2,"city","black"],["RC","SVAMP",2,"city","red"],
-  ["JARN","KULTUR",1,"city","orange"],["JARN","WAD",2,"city","green"],["JARN","USO",2,"city","yellow"],["KULTUR","WAD",1,"city","neutral"],
-  ["WAD","VAG",1,"city","red"],["WAD","OSTER",1,"city","neutral"],["WAD","OSET",2,"city","purple"],["VAG","GUST",2,"city","yellow"],
-  ["USO","SVAMP",2,"city","purple"],["USO","OSET",2,"city","white"],["OSTER","OSET",2,"city","blue"],["GUST","LYRA",2,"city","orange"],
-  ["GUST","MARIE",3,"city","white"],["LYRA","MARIE",2,"city","neutral"],["KARLSLUND","MELL",2,"city","neutral"],["SVAMP","VIV",2,"city","black"],
-  ["OSET","SKEBACK",1,"city","neutral"],["OSTER","UNI",3,"city","orange"],["UNI","BRICK",3,"city","blue"],
-  ["KARLSLUND","GARPH",3,"region","white"],["KARLSLUND","ANNABODA",4,"region","neutral"],["MARIE","GARPH",4,"region","purple"],
-  ["LYRA","KUMLA",3,"region","blue"],["MARIE","KUMLA",3,"region","black"],["KUMLA","HALLSBERG",2,"region","purple"],["MARIE","HALLSBERG",4,"region","red"],
-  ["VIV","NORA",4,"region","orange"],["MELL","NORA",4,"region","blue"],["SVAMP","LIND",5,"region","orange"],["NORA","LIND",3,"region","yellow"],
-  ["GARPH","ANNABODA",2,"region","green"],["ANNABODA","STORSTEN",1,"region","neutral"],["GARPH","STORSTEN",2,"region","yellow"],
-  ["GARPH","KARLSKOGA",4,"region","blue"],["STORSTEN","KARLSKOGA",4,"region","white"],["UNI","HJALMBAD",3,"region","black"],
-  ["BRICK","HJALMBAD",3,"region","red"],["SKEBACK","HJALMBAD",3,"region","white"],["HJALMBAD","ODENS",3,"region","neutral"],
-  ["USO","ODENS",5,"region","red",[{x:930,y:180},{x:1000,y:230},{x:1010,y:396}]],["ODENS","HAMP",4,"region","green"],
-  ["ODENS","ARBOGA",5,"region","black"],["HAMP","ARBOGA",5,"region","neutral",[{x:1070,y:504},{x:1070,y:302}]],
-  ["ARBOGA","STOCKHOLM",6,"region","green"],["HALLSBERG","GOTEBORG",6,"region","yellow"],["KARLSKOGA","OSLO",6,"region","purple"],
-  ["HAMP","VINON",2,"ferry","neutral"],["SKEBACK","HAMP",4,"ferry","neutral",[{x:938,y:374},{x:938,y:418}]],
-  ["RC","KULTUR",1,"brt","neutral"],["KULTUR","VAG",1,"brt","neutral"],["VAG","OSTER",2,"brt","neutral"],["OSTER","UNI",2,"brt","neutral"],
-  ["UNI","BRICK",2,"brt","neutral"],["RC","VIV",3,"brt","neutral"],["RC","MELL",3,"brt","neutral"],
-  ["RC","LIND",1,"rail","black"],["RC","ARBOGA",1,"rail","black"],["ARBOGA","STOCKHOLM",2,"rail","black"],
-  ["RC","HALLSBERG",1,"rail","black"],["HALLSBERG","GOTEBORG",2,"rail","black"],["RC","KARLSKOGA",1,"rail","black"],["KARLSKOGA","OSLO",2,"rail","black"],
-  ["ANNABODA","GARPH",1,"trail","green"],
-];
+export const emptyMap: MapData = {
+  name: "New map",
+  format: "board-2x3",
+  background: [],
+  stops: [],
+  routes: [],
+};
 
 export const initialMap: MapData = {
-  name: "Örebro v0.2 – arbetskopia",
-  stops: rawStops.map(([id,name,x,y,type]) => ({ id,name,x,y,type })),
-  routes: routeRows.map(([a,b,length,type,color,points], i) => ({ id: `r${i+1}`,a,b,length,type,color,points })),
+  name: "Example map",
+  format: "board-2x3",
+  background: [
+    {
+      id: "example-lake",
+      type: "area",
+      label: "Lake",
+      labelPoint: { x: 575, y: 320 },
+      points: [{ x: 455, y: 205 }, { x: 620, y: 190 }, { x: 720, y: 300 }, { x: 665, y: 425 }, { x: 500, y: 445 }, { x: 410, y: 325 }],
+      fill: "#b8ddea",
+      stroke: "#4f8394",
+      opacity: 0.65,
+      strokeWidth: 3,
+      locked: true,
+    },
+    {
+      id: "example-highlands",
+      type: "area",
+      label: "Highlands",
+      labelPoint: { x: 185, y: 545 },
+      points: [{ x: 35, y: 445 }, { x: 205, y: 400 }, { x: 345, y: 500 }, { x: 300, y: 690 }, { x: 55, y: 690 }],
+      fill: "#c9d9ad",
+      stroke: "#718360",
+      opacity: 0.55,
+      strokeWidth: 3,
+      locked: true,
+    },
+    {
+      id: "example-river",
+      type: "line",
+      label: "River",
+      labelPoint: { x: 790, y: 510 },
+      points: [{ x: 30, y: 345 }, { x: 240, y: 330 }, { x: 420, y: 385 }, { x: 625, y: 465 }, { x: 830, y: 500 }, { x: 1070, y: 455 }],
+      fill: "#000000",
+      stroke: "#5b9db4",
+      opacity: 0.75,
+      strokeWidth: 10,
+      locked: true,
+    },
+    {
+      id: "example-north-label",
+      type: "label",
+      label: "North District",
+      points: [{ x: 500, y: 75 }],
+      fill: "#000000",
+      stroke: "#71685c",
+      opacity: 0.8,
+      strokeWidth: 0,
+      locked: true,
+    },
+  ],
+  stops: [
+    { id: "example-westport", name: "Westport", type: "city", x: 130, y: 205 },
+    { id: "example-pine-hill", name: "Pine Hill", type: "outing", x: 280, y: 575 },
+    { id: "example-central", name: "Central", type: "rail", x: 420, y: 345 },
+    { id: "example-lakeside", name: "Lakeside", type: "city", x: 640, y: 185 },
+    { id: "example-old-town", name: "Old Town", type: "region", x: 690, y: 600 },
+    { id: "example-harbour", name: "Harbour", type: "ferry", x: 875, y: 455 },
+    { id: "example-eastgate", name: "Eastgate", type: "brt", x: 980, y: 210 },
+  ],
+  routes: [
+    { id: "example-route-1", a: "example-westport", b: "example-central", length: 4, type: "city", color: "red", points: [{ x: 265, y: 235 }] },
+    { id: "example-route-2", a: "example-westport", b: "example-pine-hill", length: 3, type: "region", color: "orange", points: [{ x: 170, y: 420 }] },
+    { id: "example-route-3", a: "example-pine-hill", b: "example-central", length: 3, type: "trail", color: "neutral", points: [{ x: 350, y: 500 }] },
+    { id: "example-route-4", a: "example-central", b: "example-lakeside", length: 3, type: "rail", color: "neutral", points: [{ x: 525, y: 225 }] },
+    { id: "example-route-5", a: "example-central", b: "example-old-town", length: 4, type: "city", color: "blue", points: [{ x: 545, y: 485 }] },
+    { id: "example-route-6", a: "example-lakeside", b: "example-eastgate", length: 4, type: "brt", color: "neutral", points: [{ x: 815, y: 165 }] },
+    { id: "example-route-7", a: "example-lakeside", b: "example-harbour", length: 3, type: "ferry", color: "neutral", points: [{ x: 770, y: 315 }] },
+    { id: "example-route-8", a: "example-old-town", b: "example-harbour", length: 3, type: "region", color: "green", points: [{ x: 790, y: 585 }] },
+    { id: "example-route-9", a: "example-harbour", b: "example-eastgate", length: 3, type: "city", color: "yellow", points: [{ x: 950, y: 335 }] },
+  ],
 };

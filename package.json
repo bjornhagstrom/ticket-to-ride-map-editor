@@ -1,17 +1,17 @@
 {
-  "name": "orebro-karteditor",
+  "name": "ticket-to-ride-map-editor",
   "version": "0.1.0",
   "private": true,
   "engines": {
     "node": ">=22.13.0"
   },
   "scripts": {
-    "install:ci": "bash scripts/install-ci.sh",
-    "dev": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vite",
-    "build": "bash scripts/build-verified.sh",
-    "start": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext start",
-    "test": "npm run build && node --test tests/*.test.mjs",
-    "lint": "bash scripts/sites-env.sh -- eslint . --ignore-pattern dist --ignore-pattern .next",
+    "install:ci": "npm ci",
+    "dev": "next dev",
+    "build": "next build",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run typecheck && npm run build",
+    "lint": "eslint app components hooks lib --ignore-pattern .next --ignore-pattern out",
     "db:generate": "bash scripts/sites-env.sh -- drizzle-kit generate"
   },
   "dependencies": {
@@ -60,5 +60,5 @@
     "wrangler": "4.92.0"
   },
   "type": "module",
-  "displayName": "Ticket to Ride \u00d6rebro \u2013 karteditor"
+  "displayName": "Ticket to Ride \u2013 Map editor"
 }

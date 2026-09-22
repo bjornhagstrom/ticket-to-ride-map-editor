@@ -2,14 +2,11 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Örebro kartverkstad",
-  description: "Bygg och testa ruttnät för Ticket to Ride Örebro.",
-  other: {
-    "codex-preview": "development",
-  },
+  title: "Ticket to Ride – Map editor",
+  description: "Build and test route networks for custom maps.",
   icons: {
-    icon: "/favicon.svg",
-    shortcut: "/favicon.svg",
+    icon: "/ttr/favicon.svg",
+    shortcut: "/ttr/favicon.svg",
   },
 };
 
@@ -19,7 +16,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="sv">
+    <html lang="en">
       <body className="antialiased">{children}</body>
     </html>
   );
