@@ -1,10 +1,11 @@
 export type StopType = "city" | "region" | "brt" | "rail" | "ferry" | "outing";
 export type StopSize = "small" | "medium" | "large";
+export type StopSymbol = "none" | "dot" | "dash" | "cross" | "letter";
 export type RouteType = "city" | "region" | "brt" | "ferry" | "rail" | "trail";
 export type BackgroundType = "area" | "line" | "label";
 export type MapFormat = "board-2x3" | "board-2x3-large" | "board-2x4" | "a4" | "a3" | "us-letter";
 export type Point = { x: number; y: number };
-export type Stop = Point & { id: string; name: string; type: StopType; size?: StopSize };
+export type Stop = Point & { id: string; name: string; type: StopType; size?: StopSize; symbol?: StopSymbol; letter?: string };
 export type Route = { id: string; a: string; b: string; length: number; type: RouteType; color: string; points?: Point[]; locomotiveSlots?: number[]; lineStyle?: string };
 export type LineStyle = { id: string; label: string; strokeWidth: number; dash: string };
 export type BackgroundShape = {
@@ -74,6 +75,14 @@ export const stopSizeMeta: Record<StopSize, { label: string; radius: number }> =
   small: { label: "Small", radius: 6 },
   medium: { label: "Medium", radius: 9 },
   large: { label: "Large", radius: 13 },
+};
+
+export const stopSymbolMeta: Record<StopSymbol, { label: string }> = {
+  none: { label: "No symbol" },
+  dot: { label: "Dot" },
+  dash: { label: "Dash" },
+  cross: { label: "Cross (X)" },
+  letter: { label: "Letter" },
 };
 
 export const stopTypeMeta: Record<StopType, { label: string; fill: string; stroke: string }> = {
@@ -180,12 +189,12 @@ export const initialMap: MapData = {
     },
   ],
   stops: [
-    { id: "example-westport", name: "Westport", type: "city", x: 130, y: 205 },
+    { id: "example-westport", name: "Westport", type: "city", x: 130, y: 205, symbol: "dot" },
     { id: "example-pine-hill", name: "Pine Hill", type: "outing", x: 280, y: 575, size: "small" },
     { id: "example-central", name: "Central", type: "rail", x: 420, y: 345 },
     { id: "example-lakeside", name: "Lakeside", type: "city", x: 640, y: 185 },
     { id: "example-old-town", name: "Old Town", type: "region", x: 690, y: 600 },
-    { id: "example-harbour", name: "Harbour", type: "ferry", x: 875, y: 455 },
+    { id: "example-harbour", name: "Harbour", type: "ferry", x: 875, y: 455, symbol: "letter", letter: "F" },
     { id: "example-eastgate", name: "Eastgate", type: "brt", x: 980, y: 210, size: "large" },
   ],
   routes: [

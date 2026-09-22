@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { colorLabels, emptyMap, initialMap, type LineStyle, mapFormats, type BackgroundImage, type BackgroundShape, type BackgroundType, type ImageCrop, type MapData, type MapFormat, type NoteBox, type Point, type Route, type RouteType, routeColors, routeTypeMeta, STORAGE_KEY, type Stop, type StopSize, stopSizeMeta, type StopType, stopTypeMeta, W } from "./map-data";
+import { colorLabels, emptyMap, initialMap, type LineStyle, mapFormats, type BackgroundImage, type BackgroundShape, type BackgroundType, type ImageCrop, type MapData, type MapFormat, type NoteBox, type Point, type Route, type RouteType, routeColors, routeTypeMeta, STORAGE_KEY, type Stop, type StopSize, stopSizeMeta, type StopSymbol, stopSymbolMeta, type StopType, stopTypeMeta, W } from "./map-data";
 
 type Tool = "select" | "stop" | "route" | "background" | "note";
 type Danger = "reset" | "delete" | "load-blank" | "load-example" | "import-background" | "import-network" | "import-image" | null;
@@ -167,6 +167,9 @@ export function MapEditor() {
   const [stopSize, setStopSize] = useState<StopSize>("medium");
   const [routeType, setRouteType] = useState<RouteType>("city");
   const [routeColor, setRouteColor] = useState("neutral");
+  const [routeLineStyle, setRouteLineStyle] = useState<string | undefined>(undefined);
+  const [stopSymbol, setStopSymbol] = useState<StopSymbol>("none");
+  const [stopLetter, setStopLetter] = useState("");
   const [backgroundType, setBackgroundType] = useState<BackgroundType>("area");
   const [backgroundFill, setBackgroundFill] = useState("#b8ddea");
   const [backgroundStroke, setBackgroundStroke] = useState("#4f8394");
@@ -220,7 +223,7 @@ export function MapEditor() {
     if (tool === "route") {
       if (!routeStart) { setRouteStart(id); return; }
       if (routeStart === id) { setRouteStart(null); return; }
-      change((draft) => { draft.routes.push({ id: `r-${Date.now()}`, a: routeStart, b: id, length: 2, type: routeType, color: routeColor }); return draft; });
+      change((draft) => { draft.routes.push({ id: `r-${Date.now()}`, a: routeStart, b: id, length: 2, type: routeType, color: routeColor, lineStyle: routeLineStyle }); return draft; });
       setRouteStart(null);
       return;
     }
@@ -239,7 +242,7 @@ export function MapEditor() {
     if (target !== event.currentTarget && !target.classList.contains("map-bg")) return;
     const point = canvasPoint(event.currentTarget, event.clientX, event.clientY, format.height);
     if (tool === "stop") {
-      change((draft) => { draft.stops.push({ id: `s-${Date.now()}`, name: "New stop", type: stopType, size: stopSize, ...point }); return draft; });
+      change((draft) => { draft.stops.push({ id: `s-${Date.now()}`, name: "New stop", type: stopType, size: stopSize, symbol: stopSymbol, letter: stopSymbol === "letter" ? stopLetter || "A" : undefined, ...point }); return draft; });
       return;
     }
     if (tool === "background") {
@@ -327,10 +330,11 @@ export function MapEditor() {
       return draft;
     });
   };
-  const setRouteLineStyle = (routeId: string, styleId: string | undefined) => change((draft) => { const route = draft.routes.find((item) => item.id === routeId); if (route) route.lineStyle = styleId; return draft; });
+  const assignRouteLineStyle = (routeId: string, styleId: string | undefined) => change((draft) => { const route = draft.routes.find((item) => item.id === routeId); if (route) route.lineStyle = styleId; return draft; });
   const addLineStyleToRoute = (routeId: string) => { const id = `style-${Date.now()}`; change((draft) => { draft.lineStyles.push({ id, label: "New style", strokeWidth: 6, dash: "10 6" }); const route = draft.routes.find((item) => item.id === routeId); if (route) route.lineStyle = id; return draft; }); };
+  const createLineStyle = (): string => { const id = `style-${Date.now()}`; change((draft) => { draft.lineStyles.push({ id, label: "New style", strokeWidth: 6, dash: "10 6" }); return draft; }); return id; };
   const updateLineStyle = (styleId: string, values: Partial<LineStyle>) => change((draft) => { const style = draft.lineStyles.find((item) => item.id === styleId); if (style) Object.assign(style, values); return draft; });
-  const deleteLineStyle = (styleId: string) => change((draft) => { draft.lineStyles = draft.lineStyles.filter((item) => item.id !== styleId); draft.routes = draft.routes.map((route) => route.lineStyle === styleId ? { ...route, lineStyle: undefined } : route); return draft; });
+  const deleteLineStyle = (styleId: string) => { change((draft) => { draft.lineStyles = draft.lineStyles.filter((item) => item.id !== styleId); draft.routes = draft.routes.map((route) => route.lineStyle === styleId ? { ...route, lineStyle: undefined } : route); return draft; }); setRouteLineStyle((current) => current === styleId ? undefined : current); };
   const downloadJson = (payload: unknown, filenameBase: string) => { const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }); const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = `${filenameBase.replace(/[^a-z0-9]+/gi, "-").toLowerCase() || "map"}-${formatTimestamp()}.json`; link.click(); URL.revokeObjectURL(url); };
   const exportMap = () => downloadJson({ kind: "map", ...data }, data.name);
   const exportBackground = () => downloadJson({ kind: "background", format: data.format, background: data.background, backgroundImage: data.backgroundImage }, `${data.name} background`);
@@ -406,9 +410,9 @@ export function MapEditor() {
         <div className="tool-list">
           <ToolButton active={tool === "select"} icon={<MousePointer2 />} title="Select & move" note="Edit stops, routes and shapes" onClick={() => { setTool("select"); setRouteStart(null); setDraftPoints([]); }} />
           <ToolButton active={tool === "stop"} icon={<MapPinPlus />} title="Add stop" note="Click the map to place it" onClick={() => { setTool("stop"); setRouteStart(null); setDraftPoints([]); }} />
-          {tool === "stop" && <div className="tool-options grid-two"><div><Label>Stop type</Label><NativeSelect value={stopType} onChange={(event) => setStopType(event.target.value as StopType)}>{Object.entries(stopTypeMeta).map(([key, meta]) => <NativeSelectOption key={key} value={key}>{meta.label}</NativeSelectOption>)}</NativeSelect></div><div><Label>Stop size</Label><NativeSelect value={stopSize} onChange={(event) => setStopSize(event.target.value as StopSize)}>{Object.entries(stopSizeMeta).map(([key, meta]) => <NativeSelectOption key={key} value={key}>{meta.label}</NativeSelectOption>)}</NativeSelect></div></div>}
+          {tool === "stop" && <div className="tool-options"><div className="grid-two"><div><Label>Stop type</Label><NativeSelect value={stopType} onChange={(event) => setStopType(event.target.value as StopType)}>{Object.entries(stopTypeMeta).map(([key, meta]) => <NativeSelectOption key={key} value={key}>{meta.label}</NativeSelectOption>)}</NativeSelect></div><div><Label>Stop size</Label><NativeSelect value={stopSize} onChange={(event) => setStopSize(event.target.value as StopSize)}>{Object.entries(stopSizeMeta).map(([key, meta]) => <NativeSelectOption key={key} value={key}>{meta.label}</NativeSelectOption>)}</NativeSelect></div></div><div className="grid-two"><div><Label>Symbol</Label><NativeSelect value={stopSymbol} onChange={(event) => setStopSymbol(event.target.value as StopSymbol)}>{Object.entries(stopSymbolMeta).map(([key, meta]) => <NativeSelectOption key={key} value={key}>{meta.label}</NativeSelectOption>)}</NativeSelect></div>{stopSymbol === "letter" && <div><Label>Letter</Label><Input maxLength={2} value={stopLetter} onChange={(event) => setStopLetter(event.target.value)} /></div>}</div></div>}
           <ToolButton active={tool === "route"} icon={<Link2 />} title="Draw route" note={routeStart ? `Start: ${stopById(data, routeStart)?.name} · choose end` : "Click two stops"} onClick={() => { setTool("route"); setRouteStart(null); setDraftPoints([]); }} />
-          {tool === "route" && <div className="tool-options grid-two"><div><Label>Route type</Label><NativeSelect value={routeType} onChange={(event) => setRouteType(event.target.value as RouteType)}>{Object.entries(routeTypeMeta).map(([key, meta]) => <NativeSelectOption key={key} value={key}>{meta.label}</NativeSelectOption>)}</NativeSelect></div><div><Label>Colour</Label><NativeSelect value={routeColor} onChange={(event) => setRouteColor(event.target.value)}>{Object.keys(routeColors).map((key) => <NativeSelectOption key={key} value={key}>{colorLabels[key]}</NativeSelectOption>)}</NativeSelect></div></div>}
+          {tool === "route" && <div className="tool-options"><div className="grid-two"><div><Label>Route type</Label><NativeSelect value={routeType} onChange={(event) => setRouteType(event.target.value as RouteType)}>{Object.entries(routeTypeMeta).map(([key, meta]) => <NativeSelectOption key={key} value={key}>{meta.label}</NativeSelectOption>)}</NativeSelect></div><div><Label>Colour</Label><NativeSelect value={routeColor} onChange={(event) => setRouteColor(event.target.value)}>{Object.keys(routeColors).map((key) => <NativeSelectOption key={key} value={key}>{colorLabels[key]}</NativeSelectOption>)}</NativeSelect></div></div><LineStylePicker value={routeLineStyle} lineStyles={data.lineStyles} onChange={setRouteLineStyle} onCreate={() => setRouteLineStyle(createLineStyle())} onUpdate={updateLineStyle} onDelete={deleteLineStyle} helper="New routes you draw will use this style. Change it anytime for an existing route from its Properties panel." /></div>}
           <ToolButton active={tool === "background"} icon={<Layers3 />} title="Draw background" note="Areas, boundaries and labels" onClick={() => { setTool("background"); setRouteStart(null); clearSelection(); }} />
           {tool === "background" && <div className="tool-options background-tools"><div className="image-import-row"><Label>Background image</Label><div className="image-import-buttons"><Button size="sm" variant="outline" onClick={() => imageFileRef.current?.click()}><ImageIcon />{data.backgroundImage ? "Replace image" : "Import image"}</Button>{data.backgroundImage && <Button size="sm" variant="ghost" onClick={() => { chooseImage(); setDanger("delete"); }}><Trash2 />Remove</Button>}</div><input ref={imageFileRef} hidden type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => { importBackgroundImage(event.target.files?.[0]); event.target.value = ""; }} /></div><Label>Object</Label><NativeSelect value={backgroundType} onChange={(event) => { setBackgroundType(event.target.value as BackgroundType); setDraftPoints([]); }}><NativeSelectOption value="area">Area</NativeSelectOption><NativeSelectOption value="line">Line</NativeSelectOption><NativeSelectOption value="label">Label</NativeSelectOption></NativeSelect>{backgroundType !== "label" && <><div className="colour-row"><label>Fill <input type="color" value={backgroundFill} onChange={(event) => setBackgroundFill(event.target.value)} disabled={backgroundType === "line"} /></label><label>Outline <input type="color" value={backgroundStroke} onChange={(event) => setBackgroundStroke(event.target.value)} /></label></div><p className="helper">Click to add points. Finish when the shape is ready.</p><div className="draft-actions"><Button size="sm" disabled={draftPoints.length < (backgroundType === "area" ? 3 : 2)} onClick={finishBackground}>Finish shape</Button><Button size="sm" variant="ghost" disabled={!draftPoints.length} onClick={() => setDraftPoints([])}>Cancel</Button></div></>}</div>}
           <ToolButton active={tool === "note"} icon={<StickyNote />} title="Add note" note="Click the map to place an evaluation note" onClick={() => { setTool("note"); setRouteStart(null); clearSelection(); }} />
@@ -430,8 +434,8 @@ export function MapEditor() {
         {selectedN && <NoteProperties note={selectedN} change={change} onDelete={() => setDanger("delete")} />}
         {imageSelected && data.backgroundImage && <BackgroundImageProperties image={data.backgroundImage} change={change} onDelete={() => setDanger("delete")} />}
         {selectedB && <BackgroundProperties shape={selectedB} change={change} onDelete={() => setDanger("delete")} />}
-        {selectedS && <div className="property-form"><div><Label htmlFor="stop-name">Name</Label><Input id="stop-name" value={selectedS.name} onChange={(event) => change((draft) => { const stop = stopById(draft, selectedS.id); if (stop) stop.name = event.target.value; return draft; })} /></div><div className="grid-two"><div><Label>Stop type</Label><NativeSelect value={selectedS.type} onChange={(event) => change((draft) => { const stop = stopById(draft, selectedS.id); if (stop) stop.type = event.target.value as StopType; return draft; })}>{Object.entries(stopTypeMeta).map(([key, meta]) => <NativeSelectOption key={key} value={key}>{meta.label}</NativeSelectOption>)}</NativeSelect></div><div><Label>Stop size</Label><NativeSelect value={selectedS.size ?? "medium"} onChange={(event) => change((draft) => { const stop = stopById(draft, selectedS.id); if (stop) stop.size = event.target.value as StopSize; return draft; })}>{Object.entries(stopSizeMeta).map(([key, meta]) => <NativeSelectOption key={key} value={key}>{meta.label}</NativeSelectOption>)}</NativeSelect></div></div><p className="helper">Size can carry meaning in some expansions, such as marking major cities.</p><Button variant="destructive" onClick={() => setDanger("delete")}><Trash2 />Delete stop</Button><p className="delete-note">Connected routes will also be deleted.</p></div>}
-        {selectedR && <RouteProperties route={selectedR} stops={data.stops} lineStyles={data.lineStyles} change={change} onDelete={() => setDanger("delete")} onCreateStyle={addLineStyleToRoute} onUpdateStyle={updateLineStyle} onDeleteStyle={deleteLineStyle} onSetStyle={setRouteLineStyle} />}
+        {selectedS && <StopProperties stop={selectedS} change={change} onDelete={() => setDanger("delete")} />}
+        {selectedR && <RouteProperties route={selectedR} stops={data.stops} lineStyles={data.lineStyles} change={change} onDelete={() => setDanger("delete")} onCreateStyle={addLineStyleToRoute} onUpdateStyle={updateLineStyle} onDeleteStyle={deleteLineStyle} onSetStyle={assignRouteLineStyle} />}
       </aside>
     </div>
     <AlertDialog open={danger !== null} onOpenChange={(open) => { if (!open) { setDanger(null); setPendingImport(null); } }}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{danger === "reset" ? "Clear the entire map?" : danger === "load-blank" ? "Replace the current map with a blank one?" : danger === "load-example" ? "Replace the current map with the example?" : danger === "import-background" ? "Replace the background?" : danger === "import-network" ? "Replace stops and routes?" : danger === "import-image" ? "Replace the background image?" : "Delete the selected object?"}</AlertDialogTitle><AlertDialogDescription>{danger === "reset" ? "All locally stored background objects, stops and routes will be removed. Export the map first if you want to keep it." : danger === "load-blank" ? "Your current background objects, stops and routes will be replaced with a blank map. Export the map first if you want to keep your work." : danger === "load-example" ? "Your current background objects, stops and routes will be replaced with the neutral example map. Export the map first if you want to keep your work." : danger === "import-background" ? "The imported background, including any background image, will replace the current one. Stops and routes are kept as they are." : danger === "import-network" ? "The imported stops and routes will replace the current network. Background objects are kept as they are." : danger === "import-image" ? "The new image will replace the current background image." : selectedStop ? "The stop and all connected routes will be deleted." : "The selected object will be deleted."}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => { if (danger === "reset") { change(() => cloneMap(emptyMap)); clearSelection(); setDanger(null); } else if (danger === "load-blank") applyGuideChoice(emptyMap); else if (danger === "load-example") applyGuideChoice(initialMap); else if (danger === "import-background" && pendingImport?.kind === "background") applyBackgroundImport(pendingImport.background, pendingImport.backgroundImage); else if (danger === "import-network" && pendingImport?.kind === "network") applyNetworkImport(pendingImport.stops, pendingImport.routes, pendingImport.lineStyles); else if (danger === "import-image" && pendingImport?.kind === "image") applyImageImport(pendingImport.image); else deleteSelected(); }}>Continue</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
@@ -480,10 +484,50 @@ const dashPresets: Array<{ value: string; label: string }> = [
   { value: "14 4 2 4", label: "Dash-dot" },
 ];
 
+function StopProperties({ stop, change, onDelete }: { stop: Stop; change: (fn: (draft: MapData) => MapData) => void; onDelete: () => void }) {
+  const update = (values: Partial<Stop>) => change((draft) => { const item = stopById(draft, stop.id); if (item) Object.assign(item, values); return draft; });
+  const symbol = stop.symbol ?? "none";
+  return <div className="property-form">
+    <div><Label htmlFor="stop-name">Name</Label><Input id="stop-name" value={stop.name} onChange={(event) => update({ name: event.target.value })} /></div>
+    <div className="grid-two">
+      <div><Label>Stop type</Label><NativeSelect value={stop.type} onChange={(event) => update({ type: event.target.value as StopType })}>{Object.entries(stopTypeMeta).map(([key, meta]) => <NativeSelectOption key={key} value={key}>{meta.label}</NativeSelectOption>)}</NativeSelect></div>
+      <div><Label>Stop size</Label><NativeSelect value={stop.size ?? "medium"} onChange={(event) => update({ size: event.target.value as StopSize })}>{Object.entries(stopSizeMeta).map(([key, meta]) => <NativeSelectOption key={key} value={key}>{meta.label}</NativeSelectOption>)}</NativeSelect></div>
+    </div>
+    <p className="helper">Size can carry meaning in some expansions, such as marking major cities.</p>
+    <div className="grid-two">
+      <div><Label>Symbol</Label><NativeSelect value={symbol} onChange={(event) => update({ symbol: event.target.value as StopSymbol, letter: event.target.value === "letter" ? (stop.letter || "A") : stop.letter })}>{Object.entries(stopSymbolMeta).map(([key, meta]) => <NativeSelectOption key={key} value={key}>{meta.label}</NativeSelectOption>)}</NativeSelect></div>
+      {symbol === "letter" && <div><Label>Letter</Label><Input maxLength={2} value={stop.letter ?? ""} onChange={(event) => update({ letter: event.target.value })} /></div>}
+    </div>
+    <p className="helper">Mark a stop with a symbol or short code for rules of your own, independent of its type.</p>
+    <Button variant="destructive" onClick={onDelete}><Trash2 />Delete stop</Button>
+    <p className="delete-note">Connected routes will also be deleted.</p>
+  </div>;
+}
+
+function LineStylePicker({ value, lineStyles, onChange, onCreate, onUpdate, onDelete, helper }: { value: string | undefined; lineStyles: LineStyle[]; onChange: (styleId: string | undefined) => void; onCreate: () => void; onUpdate: (styleId: string, values: Partial<LineStyle>) => void; onDelete: (styleId: string) => void; helper: string }) {
+  const activeStyle = lineStyles.find((style) => style.id === value);
+  return <div className="line-style-section">
+    <Label>Special rule style</Label>
+    <div className="line-style-row">
+      <NativeSelect value={value ?? ""} onChange={(event) => onChange(event.target.value || undefined)}>
+        <NativeSelectOption value="">Default appearance</NativeSelectOption>
+        {lineStyles.map((style) => <NativeSelectOption key={style.id} value={style.id}>{style.label}</NativeSelectOption>)}
+      </NativeSelect>
+      <Button size="sm" variant="outline" onClick={onCreate}>New style</Button>
+    </div>
+    <p className="helper">{helper}</p>
+    {activeStyle && <div className="line-style-editor">
+      <div><Label>Style name</Label><Input value={activeStyle.label} onChange={(event) => onUpdate(activeStyle.id, { label: event.target.value })} /></div>
+      <div><Label>Thickness · {activeStyle.strokeWidth}px</Label><input className="range-input" type="range" min="2" max="14" value={activeStyle.strokeWidth} onChange={(event) => onUpdate(activeStyle.id, { strokeWidth: Number(event.target.value) })} /></div>
+      <div><Label>Dash pattern</Label><NativeSelect value={activeStyle.dash} onChange={(event) => onUpdate(activeStyle.id, { dash: event.target.value })}>{dashPresets.map((preset) => <NativeSelectOption key={preset.label} value={preset.value}>{preset.label}</NativeSelectOption>)}</NativeSelect></div>
+      <Button size="sm" variant="ghost" onClick={() => onDelete(activeStyle.id)}>Delete this style</Button>
+    </div>}
+  </div>;
+}
+
 function RouteProperties({ route, stops, lineStyles, change, onDelete, onCreateStyle, onUpdateStyle, onDeleteStyle, onSetStyle }: { route: Route; stops: Stop[]; lineStyles: LineStyle[]; change: (fn: (draft: MapData) => MapData) => void; onDelete: () => void; onCreateStyle: (routeId: string) => void; onUpdateStyle: (styleId: string, values: Partial<LineStyle>) => void; onDeleteStyle: (styleId: string) => void; onSetStyle: (routeId: string, styleId: string | undefined) => void }) {
   const update = (values: Partial<Route>) => change((draft) => { const item = draft.routes.find((entry) => entry.id === route.id); if (item) Object.assign(item, values); return draft; });
   const infrastructure = route.type === "rail" || route.type === "trail";
-  const activeStyle = lineStyles.find((style) => style.id === route.lineStyle);
   const stopName = (id: string) => stops.find((stop) => stop.id === id)?.name ?? "";
   return <div className="property-form">
     <div className="route-names"><span>{stopName(route.a)}</span><ChevronDown /><span>{stopName(route.b)}</span></div>
@@ -493,23 +537,7 @@ function RouteProperties({ route, stops, lineStyles, change, onDelete, onCreateS
       <div><Label>Vehicle spaces</Label><div className="length-stepper"><Button variant="outline" size="icon" aria-label="Decrease" disabled={route.length <= 1} onClick={() => update({ length: Math.max(1, route.length - 1), locomotiveSlots: route.locomotiveSlots?.filter((index) => index < route.length - 1) })}><Minus /></Button><strong>{route.length}</strong><Button variant="outline" size="icon" aria-label="Increase" disabled={route.length >= 8} onClick={() => update({ length: Math.min(8, route.length + 1) })}><Plus /></Button></div><p className="helper">The change is shown directly on the route.</p></div>
       <div><Label>Locomotives required · {route.locomotiveSlots?.length ?? 0} of {route.length}</Label><p className="helper">Click a wagon slot directly on the selected route to toggle it.</p>{Boolean(route.locomotiveSlots?.length) && <Button size="sm" variant="ghost" onClick={() => update({ locomotiveSlots: [] })}><TrainFront />Clear locomotives</Button>}</div>
     </>}
-    <div className="line-style-section">
-      <Label>Special rule style</Label>
-      <div className="line-style-row">
-        <NativeSelect value={route.lineStyle ?? ""} onChange={(event) => onSetStyle(route.id, event.target.value || undefined)}>
-          <NativeSelectOption value="">Default appearance</NativeSelectOption>
-          {lineStyles.map((style) => <NativeSelectOption key={style.id} value={style.id}>{style.label}</NativeSelectOption>)}
-        </NativeSelect>
-        <Button size="sm" variant="outline" onClick={() => onCreateStyle(route.id)}>New style</Button>
-      </div>
-      <p className="helper">Give a route a thicker or dashed line to show it follows a special rule, and reuse the same style on other routes.</p>
-      {activeStyle && <div className="line-style-editor">
-        <div><Label>Style name</Label><Input value={activeStyle.label} onChange={(event) => onUpdateStyle(activeStyle.id, { label: event.target.value })} /></div>
-        <div><Label>Thickness · {activeStyle.strokeWidth}px</Label><input className="range-input" type="range" min="2" max="14" value={activeStyle.strokeWidth} onChange={(event) => onUpdateStyle(activeStyle.id, { strokeWidth: Number(event.target.value) })} /></div>
-        <div><Label>Dash pattern</Label><NativeSelect value={activeStyle.dash} onChange={(event) => onUpdateStyle(activeStyle.id, { dash: event.target.value })}>{dashPresets.map((preset) => <NativeSelectOption key={preset.label} value={preset.value}>{preset.label}</NativeSelectOption>)}</NativeSelect></div>
-        <Button size="sm" variant="ghost" onClick={() => onDeleteStyle(activeStyle.id)}>Delete this style</Button>
-      </div>}
-    </div>
+    <LineStylePicker value={route.lineStyle} lineStyles={lineStyles} onChange={(styleId) => onSetStyle(route.id, styleId)} onCreate={() => onCreateStyle(route.id)} onUpdate={onUpdateStyle} onDelete={onDeleteStyle} helper="Give this route a thicker or dashed line to show it follows a special rule, and reuse the same style on other routes." />
     <Button variant="destructive" onClick={onDelete}><Trash2 />Delete route</Button>
   </div>;
 }
@@ -538,7 +566,7 @@ function MapArtwork({ data, selectedRoute, selectedStop, selectedBackground, ima
     {data.background.map((shape) => <BackgroundObject key={shape.id} shape={shape} height={format.height} selected={shape.id === selectedBackground} print={print} onSelect={onBackground} onPoint={onBackgroundPoint} onLabel={onBackgroundLabel} />)}
     {!print && draft && draft.points.length > 0 && <g className="background-draft">{draft.type === "area" ? <polygon points={draft.points.map((p) => `${p.x},${p.y}`).join(" ")} fill={draft.fill} fillOpacity=".35" stroke={draft.stroke} /> : <polyline points={draft.points.map((p) => `${p.x},${p.y}`).join(" ")} fill="none" stroke={draft.stroke} />}{draft.points.map((point, index) => <circle key={index} cx={point.x} cy={point.y} r="6" />)}</g>}
     {data.routes.map((route) => { const meta = routeTypeMeta[route.type]; const style = route.lineStyle ? data.lineStyles.find((item) => item.id === route.lineStyle) : undefined; const points = parallelPoints(data, route); const path = pathFromPoints(points); const infrastructure = route.type === "rail" || route.type === "trail"; const routeColor = route.type === "city" || route.type === "region" ? (route.color === "neutral" ? "#736d64" : routeColors[route.color]) : meta.stroke; const routeSelected = route.id === selectedRoute; return <g key={route.id} className={cn("route-group", routeSelected && "selected", style && "custom-style")} onPointerDown={onRoute ? (event) => { event.stopPropagation(); onRoute(route.id); } : undefined}><path d={path} className="route-hit" /><path d={path} className={cn("route-guide", infrastructure && "infrastructure")} fill="none" stroke={routeColor} strokeWidth={style ? style.strokeWidth : (infrastructure ? (route.type === "rail" ? 4 : 5) : 3)} strokeDasharray={style ? style.dash : meta.dash} strokeLinecap="round" strokeLinejoin="round" />{!infrastructure && Array.from({ length: route.length }, (_, index) => { const position = pointAlong(points, (index + .5) / route.length); const isLocomotive = route.locomotiveSlots?.includes(index); const interactive = !print && routeSelected; return <g key={index} className={cn("wagon-slot", isLocomotive && "locomotive")} transform={`translate(${position.x},${position.y}) rotate(${position.angle})`} filter={print ? undefined : "url(#shadow)"} onPointerDown={interactive ? (event) => { event.stopPropagation(); onRouteSlot?.(route.id, index); } : undefined}><rect className="wagon-slot-outline" x={-13} y={-7} width="26" height="14" rx="4" /><rect x={-12} y={-6} width="24" height="12" rx="3" fill="#fffaf0" stroke={routeColor} strokeWidth="3" />{isLocomotive && <g className="locomotive-icon"><rect x={-8} y={-3.5} width="11" height="7" rx="1.5" /><rect x={2} y={-1.5} width="4.5" height="5" rx="1" /><rect x={-2.5} y={-6.5} width="2.5" height="3.5" /><circle cx={-4.5} cy={4} r="1.6" /><circle cx={1.5} cy={4} r="1.6" /></g>}</g>; })}</g>; })}
-    {data.stops.map((stop) => { const meta = stopTypeMeta[stop.type]; const active = stop.id === selectedStop || stop.id === routeStart; const radius = stopSizeMeta[stop.size ?? "medium"].radius; return <g key={stop.id} className={cn("stop", active && "active")} transform={`translate(${stop.x},${stop.y})`} onPointerDown={onStop ? (event) => { event.stopPropagation(); onStop(stop.id); } : undefined}><circle r={active ? radius + 3 : radius} fill={meta.fill} stroke={meta.stroke} strokeWidth={active ? 4 : 3} />{stop.type === "rail" && <rect x={-4} y={-4} width="8" height="8" fill={meta.stroke} />}<text x={stop.x > 900 ? -14 : 14} y={stop.y > format.height - 100 ? -13 : -12} textAnchor={stop.x > 900 ? "end" : "start"}>{stop.name}</text></g>; })}
+    {data.stops.map((stop) => { const meta = stopTypeMeta[stop.type]; const active = stop.id === selectedStop || stop.id === routeStart; const radius = stopSizeMeta[stop.size ?? "medium"].radius; return <g key={stop.id} className={cn("stop", active && "active")} transform={`translate(${stop.x},${stop.y})`} onPointerDown={onStop ? (event) => { event.stopPropagation(); onStop(stop.id); } : undefined}><circle r={active ? radius + 3 : radius} fill={meta.fill} stroke={meta.stroke} strokeWidth={active ? 4 : 3} />{stop.type === "rail" && <rect x={-4} y={-4} width="8" height="8" fill={meta.stroke} />}<StopSymbolGlyph stop={stop} radius={radius} color={meta.stroke} /><text x={stop.x > 900 ? -14 : 14} y={stop.y > format.height - 100 ? -13 : -12} textAnchor={stop.x > 900 ? "end" : "start"}>{stop.name}</text></g>; })}
     {data.notes.map((note) => <NoteBoxObject key={note.id} note={note} selected={note.id === selectedNote} print={print} onSelect={onNoteSelect} onMove={onNoteMove} onResize={onNoteResize} />)}
     {!print && selectedRoute && data.routes.find((route) => route.id === selectedRoute)?.points?.map((point, index) => <g key={index} className="waypoint-handle" transform={`translate(${point.x},${point.y})`} onPointerDown={(event) => { event.stopPropagation(); onWaypoint?.(selectedRoute, index); }}><circle className="waypoint-hit" r="19" /><rect x="-8" y="-8" width="16" height="16" rx="3" transform="rotate(45)" /><circle r="3" /></g>)}
     {format.columns > 1 && <g className="fold-guides">{Array.from({ length: format.columns - 1 }, (_, index) => <line key={`v-${index}`} x1={W * (index + 1) / format.columns} y1="0" x2={W * (index + 1) / format.columns} y2={format.height} />)}{Array.from({ length: format.rows - 1 }, (_, index) => <line key={`h-${index}`} x1="0" y1={format.height * (index + 1) / format.rows} x2={W} y2={format.height * (index + 1) / format.rows} />)}</g>}
@@ -608,6 +636,15 @@ function BackgroundObject({ shape, height, selected, print, onSelect, onPoint, o
     {!print && selected && !shape.locked && shape.points.map((point, index) => <g key={index} className="background-point" transform={`translate(${point.x},${point.y})`} onPointerDown={(event) => { event.stopPropagation(); onPoint?.(shape.id, index); }}><circle className="point-hit" r="18" /><circle r="7" /></g>)}
     {!print && selected && !shape.locked && shape.type !== "label" && anchor && <g className="background-label-handle" transform={`translate(${handleX},${handleY})`} onPointerDown={(event) => { event.stopPropagation(); onLabel?.(shape.id); }}><circle className="point-hit" r="20" /><rect x="-7" y="-7" width="14" height="14" rx="2" transform="rotate(45)" /></g>}
   </g>;
+}
+
+function StopSymbolGlyph({ stop, radius, color }: { stop: Stop; radius: number; color: string }) {
+  const symbol = stop.symbol ?? "none";
+  if (symbol === "dot") return <circle className="stop-symbol" r={radius * .38} fill={color} />;
+  if (symbol === "dash") return <rect className="stop-symbol" x={-radius * .62} y={-1.4} width={radius * 1.24} height="2.8" rx="1.4" fill={color} />;
+  if (symbol === "cross") return <g className="stop-symbol" stroke={color} strokeWidth="2.2" strokeLinecap="round"><line x1={-radius * .55} y1={-radius * .55} x2={radius * .55} y2={radius * .55} /><line x1={-radius * .55} y1={radius * .55} x2={radius * .55} y2={-radius * .55} /></g>;
+  if (symbol === "letter") return <text className="stop-symbol stop-letter" textAnchor="middle" dominantBaseline="central" fontSize={radius * 1.15} fill={color}>{(stop.letter || "A").slice(0, 2).toUpperCase()}</text>;
+  return null;
 }
 
 function ToolButton({ active, icon, title, note, onClick }: { active: boolean; icon: React.ReactNode; title: string; note: string; onClick: () => void }) { return <button className={cn("tool-button", active && "active")} onClick={onClick}><span>{icon}</span><div><strong>{title}</strong><small>{note}</small></div></button>; }

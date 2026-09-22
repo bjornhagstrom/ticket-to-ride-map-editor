@@ -66,6 +66,8 @@ All geometry uses SVG editor coordinates, for example `{ "x": 420, "y": 345 }`. 
 
 Supported stop types are `city`, `region`, `brt`, `rail`, `ferry` and `outing`. `size` is optional (`small`, `medium` or `large`; missing means `medium`) and only affects how large the stop is drawn — some expansions give meaning to stop size, such as marking major cities.
 
+`symbol` is optional (`none`, `dot`, `dash`, `cross` or `letter`; missing means `none`) and draws a small marker centred on the stop, independent of its type, for rules of your own. When `symbol` is `letter`, `letter` holds the one- or two-character text to draw (falls back to `"A"` if empty).
+
 ## Routes
 
 ```json
@@ -96,7 +98,7 @@ Supported stop types are `city`, `region`, `brt`, `rail`, `ferry` and `outing`. 
 { "id": "style-tunnel", "label": "Tunnel", "strokeWidth": 7, "dash": "2 5" }
 ```
 
-`dash` is an SVG `stroke-dasharray` value (`""` for a solid line). Create, edit and delete styles from a route's Properties panel; deleting a style clears `lineStyle` on any route that used it, falling back to that route's default appearance. `lineStyles` travels with full-map and network-only exports (it is route-related, not background-related).
+`dash` is an SVG `stroke-dasharray` value (`""` for a solid line). Create, edit and delete styles from a route's Properties panel, or set a default style in the Draw route tool so every route you draw next picks it up automatically. Deleting a style clears `lineStyle` on any route that used it, falling back to that route's default appearance. `lineStyles` travels with full-map and network-only exports (it is route-related, not background-related).
 
 ## Background objects
 
