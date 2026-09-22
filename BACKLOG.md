@@ -1,18 +1,5 @@
 # Backlog
 
-## Background image import
-
-Allow users to import an image as a map background:
-
-- Support common image formats such as PNG, JPEG and WebP.
-- Place the image behind schematic background objects, routes and stops.
-- Allow moving, scaling, cropping, rotating, changing opacity and locking the image.
-- Provide a clear remove or replace action.
-- Include the image in full-map exports so the project remains portable between browsers and devices.
-- Include the image when exporting the background only.
-- Keep imported images in print output.
-- Warn when an image makes the project file unusually large.
-
 ## Map collaboration
 
 Allow several people to work on the same map without passing project files manually.

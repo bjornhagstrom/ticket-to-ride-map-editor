@@ -101,11 +101,34 @@ Background objects have type `area`, `line` or `label`:
 
 For an area, `points` defines a polygon. For a line it defines a polyline. A label uses its first point as its position. `labelPoint` is optional and overrides the automatically calculated label position for areas and lines.
 
+## Background image
+
+`backgroundImage` is optional and holds at most one raster image, placed behind background objects, routes and stops:
+
+```json
+{
+  "dataUrl": "data:image/png;base64,...",
+  "naturalWidth": 1800,
+  "naturalHeight": 1200,
+  "x": 100,
+  "y": 80,
+  "width": 900,
+  "height": 600,
+  "rotation": 0,
+  "opacity": 1,
+  "crop": { "top": 0, "right": 0, "bottom": 0, "left": 0 },
+  "locked": false
+}
+```
+
+The image is embedded directly as a base64 `dataUrl`, so the project file stays a single portable JSON document — this can make it large, and the editor warns when an imported image is over about 2 MB. `x`/`y`/`width`/`height` place the image on the canvas in the same coordinate space as everything else, independent of `naturalWidth`/`naturalHeight` (the source image's real pixel size). `rotation` is in degrees around the image's own centre. `crop` insets are fractions (0–0.45) of the natural size cropped from each edge before the remaining area is stretched to fill the placement rectangle. `backgroundImage` is part of both full-map exports and background-only exports, and is replaced as a whole (not merged) whenever a background-only file is imported.
+
 ## Compatibility rules
 
 - Missing `background` becomes an empty array, supporting older map files.
 - Missing or unknown `format` becomes `board-2x3`.
 - Missing or unrecognized `kind` is treated as a full map (`"map"`).
+- Missing or invalid `backgroundImage` is dropped; a map with no image simply omits the field.
 - Unknown object types are not currently validated at runtime.
 - IDs must be unique within their object category.
 - Routes should reference existing stops.

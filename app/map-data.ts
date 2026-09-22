@@ -17,7 +17,21 @@ export type BackgroundShape = {
   strokeWidth: number;
   locked?: boolean;
 };
-export type MapData = { name: string; format: MapFormat; background: BackgroundShape[]; stops: Stop[]; routes: Route[] };
+export type ImageCrop = { top: number; right: number; bottom: number; left: number };
+export type BackgroundImage = {
+  dataUrl: string;
+  naturalWidth: number;
+  naturalHeight: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation: number;
+  opacity: number;
+  crop: ImageCrop;
+  locked?: boolean;
+};
+export type MapData = { name: string; format: MapFormat; background: BackgroundShape[]; stops: Stop[]; routes: Route[]; backgroundImage?: BackgroundImage };
 
 export const W = 1100;
 export const STORAGE_KEY = "orebro-map-editor-public-v2";

@@ -8,6 +8,7 @@ Live site: <https://hagstrom.nu/ttr/>
 
 - Draw, move and edit stops and routes.
 - Add areas, boundaries and labels behind the route network.
+- Import a background image (PNG, JPEG or WebP) and move, scale, rotate, crop, fade or lock it behind the rest of the map.
 - Choose standard, large and custom foldable board formats or A4/A3/US Letter test sheets.
 - Detect crossings between buildable routes.
 - Undo and redo up to 40 changes during the current session.
