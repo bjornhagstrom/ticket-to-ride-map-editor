@@ -1,16 +1,5 @@
 # Backlog
 
-## Selective import and export
-
-Allow users to import or export either part of a map independently:
-
-- Background only: areas, boundary lines, labels, colours and geometry.
-- Network only: train and bus stops, routes, route types, colours and geometry.
-- Keep the existing full-map import and export option.
-- A partial import must preserve the part of the current map that is not being imported.
-- Clearly confirm before replacing an existing background or network.
-- Use files that identify their content type and remain compatible with full map projects.
-
 ## Background image import
 
 Allow users to import an image as a map background:
