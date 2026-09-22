@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, BusFront, Check, ChevronDown, CircleDot, Download, Layers3, Link2, Lock, MapPinPlus, Minus, MousePointer2, Plus, Printer, Redo2, RotateCcw, Trash2, Undo2, Unlock, Upload } from "lucide-react";
+import { AlertTriangle, BusFront, Check, ChevronDown, CircleDot, CircleHelp, Download, FileStack, Layers3, Link2, Lock, MapPinPlus, Minus, MousePointer2, Pencil, Plus, Printer, Redo2, RotateCcw, Save, Trash2, Undo2, Unlock, Upload } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
@@ -12,7 +13,8 @@ import { cn } from "@/lib/utils";
 import { colorLabels, emptyMap, initialMap, mapFormats, type BackgroundShape, type BackgroundType, type MapData, type MapFormat, type Point, type Route, type RouteType, routeColors, routeTypeMeta, STORAGE_KEY, type StopType, stopTypeMeta, W } from "./map-data";
 
 type Tool = "select" | "stop" | "route" | "background";
-type Danger = "reset" | "delete" | null;
+type Danger = "reset" | "delete" | "load-blank" | "load-example" | null;
+const GUIDE_SEEN_KEY = `${STORAGE_KEY}-guide-seen`;
 
 const cloneMap = (data: MapData): MapData => JSON.parse(JSON.stringify(data));
 const isMapFormat = (value: unknown): value is MapFormat => typeof value === "string" && value in mapFormats;
@@ -97,8 +99,9 @@ function automaticLabelPoint(shape: BackgroundShape, height: number): Point {
 }
 
 export function MapEditor() {
-  const [data, setData] = useState<MapData>(initialMap);
+  const [data, setData] = useState<MapData>(emptyMap);
   const [ready, setReady] = useState(false);
+  const [showGuide, setShowGuide] = useState(false);
   const [saved, setSaved] = useState(true);
   const [tool, setTool] = useState<Tool>("select");
   const [stopType, setStopType] = useState<StopType>("city");
@@ -124,7 +127,7 @@ export function MapEditor() {
   const panelWidthMm = Math.round(format.widthMm / format.columns);
   const panelHeightMm = Math.round(format.heightMm / format.rows);
 
-  useEffect(() => { queueMicrotask(() => { try { const stored = localStorage.getItem(STORAGE_KEY); if (stored) setData(normalizeMap(JSON.parse(stored))); } catch { /* ignore invalid local state */ } setReady(true); }); }, []);
+  useEffect(() => { queueMicrotask(() => { try { const stored = localStorage.getItem(STORAGE_KEY); if (stored) { setData(normalizeMap(JSON.parse(stored))); localStorage.setItem(GUIDE_SEEN_KEY, "1"); } else if (!localStorage.getItem(GUIDE_SEEN_KEY)) setShowGuide(true); } catch { /* ignore invalid local state */ } setReady(true); }); }, []);
   useEffect(() => { if (!ready) return; localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); const timer = window.setTimeout(() => setSaved(true), 0); return () => window.clearTimeout(timer); }, [data, ready]);
 
   const crossings = useMemo(() => crossingPairs(data), [data]);
@@ -135,6 +138,14 @@ export function MapEditor() {
   const clearSelection = () => { setSelectedStop(null); setSelectedRoute(null); setSelectedBackground(null); };
   const undo = () => { const previous = past.at(-1); if (!previous) return; setFuture((items) => [cloneMap(data), ...items]); setData(previous); setPast((items) => items.slice(0, -1)); clearSelection(); };
   const redo = () => { const next = future[0]; if (!next) return; setPast((items) => [...items, cloneMap(data)]); setData(next); setFuture((items) => items.slice(1)); clearSelection(); };
+
+  const hasContent = data.stops.length > 0 || data.routes.length > 0 || data.background.length > 0;
+  const dismissGuide = () => { try { localStorage.setItem(GUIDE_SEEN_KEY, "1"); } catch { /* ignore unavailable storage */ } setShowGuide(false); };
+  const applyGuideChoice = (map: MapData) => { change(() => cloneMap(map)); clearSelection(); setDraftPoints([]); setTool("select"); dismissGuide(); setDanger(null); };
+  const chooseFromGuide = (kind: "blank" | "example") => {
+    if (hasContent) { setDanger(kind === "blank" ? "load-blank" : "load-example"); return; }
+    applyGuideChoice(kind === "blank" ? emptyMap : initialMap);
+  };
 
   const chooseStop = (id: string) => {
     if (tool === "route") {
@@ -225,7 +236,7 @@ export function MapEditor() {
     <header className="topbar">
       <div className="brand"><span className="brand-mark"><BusFront /></span><div><p>Ticket to Ride</p><h1>Map editor</h1></div></div>
       <div className="map-title"><Label htmlFor="map-name" className="sr-only">Map name</Label><Input id="map-name" value={data.name} onChange={(event) => change((draft) => ({ ...draft, name: event.target.value }))} /><span className="save-state"><Check />{saved ? "Saved locally" : "Saving…"}</span></div>
-      <div className="header-actions"><Button variant="ghost" size="icon" aria-label="Undo" disabled={!past.length} onClick={undo}><Undo2 /></Button><Button variant="ghost" size="icon" aria-label="Redo" disabled={!future.length} onClick={redo}><Redo2 /></Button><Button variant="outline" size="sm" onClick={() => fileRef.current?.click()}><Upload />Import</Button><input ref={fileRef} hidden type="file" accept="application/json" onChange={(event) => importMap(event.target.files?.[0])} /><Button variant="outline" size="sm" onClick={() => window.print()}><Printer />Print {format.shortLabel}</Button><Button size="sm" onClick={exportMap}><Download />Export</Button></div>
+      <div className="header-actions"><Button variant="outline" size="sm" onClick={() => setShowGuide(true)}><CircleHelp />Help</Button><Button variant="ghost" size="icon" aria-label="Undo" disabled={!past.length} onClick={undo}><Undo2 /></Button><Button variant="ghost" size="icon" aria-label="Redo" disabled={!future.length} onClick={redo}><Redo2 /></Button><Button variant="outline" size="sm" onClick={() => fileRef.current?.click()}><Upload />Import</Button><input ref={fileRef} hidden type="file" accept="application/json" onChange={(event) => importMap(event.target.files?.[0])} /><Button variant="outline" size="sm" onClick={() => window.print()}><Printer />Print {format.shortLabel}</Button><Button size="sm" onClick={exportMap}><Download />Export</Button></div>
     </header>
     <div className="workspace">
       <aside className="tools-panel panel">
@@ -258,9 +269,30 @@ export function MapEditor() {
         {selectedR && <div className="property-form"><div className="route-names"><span>{stopById(data, selectedR.a)?.name}</span><ChevronDown /><span>{stopById(data, selectedR.b)?.name}</span></div><div><Label>Route type</Label><NativeSelect value={selectedR.type} onChange={(event) => change((draft) => { const route = draft.routes.find((item) => item.id === selectedR.id); if (route) route.type = event.target.value as RouteType; return draft; })}>{Object.entries(routeTypeMeta).map(([key, meta]) => <NativeSelectOption key={key} value={key}>{meta.label}</NativeSelectOption>)}</NativeSelect></div>{selectedR.type !== "rail" && selectedR.type !== "trail" && <><div><Label>Colour</Label><NativeSelect value={selectedR.color} onChange={(event) => change((draft) => { const route = draft.routes.find((item) => item.id === selectedR.id); if (route) route.color = event.target.value; return draft; })}>{Object.keys(routeColors).map((key) => <NativeSelectOption key={key} value={key}>{colorLabels[key]}</NativeSelectOption>)}</NativeSelect></div><div><Label>Vehicle spaces</Label><div className="length-stepper"><Button variant="outline" size="icon" aria-label="Decrease" disabled={selectedR.length <= 1} onClick={() => change((draft) => { const route = draft.routes.find((item) => item.id === selectedR.id); if (route) route.length = Math.max(1, route.length - 1); return draft; })}><Minus /></Button><strong>{selectedR.length}</strong><Button variant="outline" size="icon" aria-label="Increase" disabled={selectedR.length >= 8} onClick={() => change((draft) => { const route = draft.routes.find((item) => item.id === selectedR.id); if (route) route.length = Math.min(8, route.length + 1); return draft; })}><Plus /></Button></div><p className="helper">The change is shown directly on the route.</p></div></>}<Button variant="destructive" onClick={() => setDanger("delete")}><Trash2 />Delete route</Button></div>}
       </aside>
     </div>
-    <AlertDialog open={danger !== null} onOpenChange={(open) => !open && setDanger(null)}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{danger === "reset" ? "Clear the entire map?" : "Delete the selected object?"}</AlertDialogTitle><AlertDialogDescription>{danger === "reset" ? "All locally stored background objects, stops and routes will be removed. Export the map first if you want to keep it." : selectedStop ? "The stop and all connected routes will be deleted." : "The selected object will be deleted."}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => { if (danger === "reset") { change(() => cloneMap(emptyMap)); clearSelection(); setDanger(null); } else deleteSelected(); }}>Continue</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+    <AlertDialog open={danger !== null} onOpenChange={(open) => !open && setDanger(null)}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{danger === "reset" ? "Clear the entire map?" : danger === "load-blank" ? "Replace the current map with a blank one?" : danger === "load-example" ? "Replace the current map with the example?" : "Delete the selected object?"}</AlertDialogTitle><AlertDialogDescription>{danger === "reset" ? "All locally stored background objects, stops and routes will be removed. Export the map first if you want to keep it." : danger === "load-blank" ? "Your current background objects, stops and routes will be replaced with a blank map. Export the map first if you want to keep your work." : danger === "load-example" ? "Your current background objects, stops and routes will be replaced with the neutral example map. Export the map first if you want to keep your work." : selectedStop ? "The stop and all connected routes will be deleted." : "The selected object will be deleted."}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => { if (danger === "reset") { change(() => cloneMap(emptyMap)); clearSelection(); setDanger(null); } else if (danger === "load-blank") applyGuideChoice(emptyMap); else if (danger === "load-example") applyGuideChoice(initialMap); else deleteSelected(); }}>Continue</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+    <WelcomeGuide open={showGuide} onOpenChange={(open) => !open && dismissGuide()} onChooseBlank={() => chooseFromGuide("blank")} onChooseExample={() => chooseFromGuide("example")} />
     <PrintPages data={data} />
   </main>;
+}
+
+function WelcomeGuide({ open, onOpenChange, onChooseBlank, onChooseExample }: { open: boolean; onOpenChange: (open: boolean) => void; onChooseBlank: () => void; onChooseExample: () => void }) {
+  const steps: Array<{ icon: React.ReactNode; title: string; text: string }> = [
+    { icon: <FileStack />, title: "Choose a board format", text: "Pick a standard, large or extended board, or an A4/A3 test sheet sized for your printer." },
+    { icon: <Layers3 />, title: "Draw a background", text: "Sketch areas, boundaries and labels behind the network to show land, water and regions." },
+    { icon: <MapPinPlus />, title: "Add stops and connect routes", text: "Place stations and draw the routes that link them, with a length, type and colour." },
+    { icon: <Save />, title: "Save locally, export a backup", text: "The map saves automatically in this browser. Export a JSON backup regularly, since browser storage is not portable." },
+    { icon: <Printer />, title: "Print it out and play on paper", text: "This editor does not play the game for you. Print the finished map, gather around it, and use coloured pens to mark the routes each player builds instead of placing plastic trains." },
+  ];
+  return <Dialog open={open} onOpenChange={onOpenChange}>
+    <DialogContent className="welcome-guide">
+      <DialogHeader><DialogTitle>Welcome to the map editor</DialogTitle><DialogDescription>Design a custom Ticket to Ride-style map, then print it and play with pens instead of plastic trains.</DialogDescription></DialogHeader>
+      <ol className="guide-steps">{steps.map((step) => <li key={step.title}><span className="guide-step-icon">{step.icon}</span><div><strong>{step.title}</strong><p>{step.text}</p></div></li>)}</ol>
+      <DialogFooter>
+        <Button variant="outline" onClick={onChooseExample}><Pencil />Load the example map</Button>
+        <Button onClick={onChooseBlank}>Start with a blank map</Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>;
 }
 
 function PrintPages({ data }: { data: MapData }) {
