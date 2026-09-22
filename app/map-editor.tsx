@@ -404,7 +404,7 @@ function WelcomeGuide({ open, onOpenChange, onChooseBlank, onChooseExample }: { 
   ];
   return <Dialog open={open} onOpenChange={onOpenChange}>
     <DialogContent className="welcome-guide">
-      <DialogHeader><DialogTitle>Welcome to the map editor</DialogTitle><DialogDescription>Design a custom Ticket to Ride-style map, then print it and play with pens instead of plastic trains.</DialogDescription></DialogHeader>
+      <DialogHeader><DialogTitle>Welcome to the map editor</DialogTitle><DialogDescription>This tool is for testing and developing new maps and expansions for Ticket to Ride. Design a custom map, then print it and play with pens instead of plastic trains.</DialogDescription></DialogHeader>
       <ol className="guide-steps">{steps.map((step) => <li key={step.title}><span className="guide-step-icon">{step.icon}</span><div><strong>{step.title}</strong><p>{step.text}</p></div></li>)}</ol>
       <DialogFooter>
         <Button variant="outline" onClick={onChooseExample}><Pencil />Load the example map</Button>
