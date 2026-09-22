@@ -1,24 +1,5 @@
 # Backlog
 
-## Welcome guide and example controls
-
-- Show a short welcome dialog the first time the editor is opened.
-- Explain the basic flow: choose a board format, draw a background, add stops, connect routes, save locally and export a backup.
-- Keep the instructions concise and visual, with clear actions to start a blank map or open the example.
-- Remember when the guide has been dismissed so it does not appear on every visit.
-- Add a clearly visible Help action that opens the guide again.
-- Add an action for loading the neutral example map again after the first visit.
-- Load the example only after the user chooses it; never replace an existing map without confirmation.
-- Make it clear that the example is separate from the user's own work and can be reset or discarded.
-- Keep the example generic and suitable for any city or region.
-
-## US Letter test format
-
-- Add US Letter landscape as a board-format choice: 11 × 8.5 inches (279.4 × 215.9 mm).
-- Show both imperial and metric dimensions in the format details.
-- Treat it like the A4 and A3 test formats, with the complete map on one landscape sheet.
-- Include the selected format in local storage, full-map exports and print output.
-
 ## Selective import and export
 
 Allow users to import or export either part of a map independently:
