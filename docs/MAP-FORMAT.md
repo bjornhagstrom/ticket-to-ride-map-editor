@@ -25,6 +25,7 @@ There is currently no explicit `schemaVersion` field. Compatibility is handled b
 | `board-2x4` | 1,053 × 526 mm | Custom 4 columns × 2 rows |
 | `a4` | 297 × 210 mm | One landscape sheet |
 | `a3` | 420 × 297 mm | One landscape sheet |
+| `us-letter` | 279.4 × 215.9 mm (11 × 8.5 in) | One landscape sheet |
 
 Files without a recognized format open as `board-2x3`.
 

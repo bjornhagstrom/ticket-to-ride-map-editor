@@ -1,7 +1,7 @@
 export type StopType = "city" | "region" | "brt" | "rail" | "ferry" | "outing";
 export type RouteType = "city" | "region" | "brt" | "ferry" | "rail" | "trail";
 export type BackgroundType = "area" | "line" | "label";
-export type MapFormat = "board-2x3" | "board-2x3-large" | "board-2x4" | "a4" | "a3";
+export type MapFormat = "board-2x3" | "board-2x3-large" | "board-2x4" | "a4" | "a3" | "us-letter";
 export type Point = { x: number; y: number };
 export type Stop = Point & { id: string; name: string; type: StopType };
 export type Route = { id: string; a: string; b: string; length: number; type: RouteType; color: string; points?: Point[] };
@@ -30,6 +30,7 @@ export type MapFormatDefinition = {
   height: number;
   widthMm: number;
   heightMm: number;
+  imperial?: string;
   columns: number;
   rows: number;
   custom?: boolean;
@@ -41,6 +42,7 @@ export const mapFormats: Record<MapFormat, MapFormatDefinition> = {
   "board-2x4": { label: "Extended board 2×4 · 1,053 × 526 mm", shortLabel: "Extended board 2×4", note: "Custom size using standard-size square panels", width: W, height: Math.round(W * 526 / 1053), widthMm: 1053, heightMm: 526, columns: 4, rows: 2, custom: true },
   a4: { label: "A4 test sheet · 297 × 210 mm", shortLabel: "A4 test sheet", note: "One landscape test sheet", width: W, height: Math.round(W * 210 / 297), widthMm: 297, heightMm: 210, columns: 1, rows: 1 },
   a3: { label: "A3 test sheet · 420 × 297 mm", shortLabel: "A3 test sheet", note: "One landscape test sheet", width: W, height: Math.round(W * 297 / 420), widthMm: 420, heightMm: 297, columns: 1, rows: 1 },
+  "us-letter": { label: "US Letter test sheet · 11 × 8.5 in", shortLabel: "US Letter test sheet", note: "One landscape test sheet", width: W, height: Math.round(W * 215.9 / 279.4), widthMm: 279.4, heightMm: 215.9, imperial: "11 × 8.5 in", columns: 1, rows: 1 },
 };
 
 export const stopTypeMeta: Record<StopType, { label: string; fill: string; stroke: string }> = {
