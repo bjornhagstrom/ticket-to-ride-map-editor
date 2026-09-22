@@ -64,7 +64,7 @@ All geometry uses SVG editor coordinates, for example `{ "x": 420, "y": 345 }`. 
 }
 ```
 
-Supported stop types are `city`, `region`, `brt`, `rail`, `ferry` and `outing`.
+Supported stop types are `city`, `region`, `brt`, `rail`, `ferry` and `outing`. `size` is optional (`small`, `medium` or `large`; missing means `medium`) and only affects how large the stop is drawn — some expansions give meaning to stop size, such as marking major cities.
 
 ## Routes
 
@@ -76,11 +76,27 @@ Supported stop types are `city`, `region`, `brt`, `rail`, `ferry` and `outing`.
   "length": 4,
   "type": "city",
   "color": "red",
-  "points": [{ "x": 265, "y": 235 }]
+  "points": [{ "x": 265, "y": 235 }],
+  "locomotiveSlots": [1],
+  "lineStyle": "style-tunnel"
 }
 ```
 
 `a` and `b` reference stop IDs. `points` is optional and contains movable intermediate waypoints. Supported route types are `city`, `region`, `brt`, `ferry`, `rail` and `trail`.
+
+`locomotiveSlots` is optional and lists the zero-based wagon-slot indices (out of `length`) that must be covered with a locomotive card, drawn with a small engine icon. Toggle it by clicking a wagon slot on a selected route.
+
+`lineStyle` is optional and references the `id` of an entry in the map's `lineStyles` list (see below). It overrides the route's default line thickness and dash pattern to flag that the route follows some special rule, independent of its `type` and `color`, which still control the route's card colour and infrastructure behaviour.
+
+## Line styles
+
+`lineStyles` is a map-level array of reusable, user-defined line appearances:
+
+```json
+{ "id": "style-tunnel", "label": "Tunnel", "strokeWidth": 7, "dash": "2 5" }
+```
+
+`dash` is an SVG `stroke-dasharray` value (`""` for a solid line). Create, edit and delete styles from a route's Properties panel; deleting a style clears `lineStyle` on any route that used it, falling back to that route's default appearance. `lineStyles` travels with full-map and network-only exports (it is route-related, not background-related).
 
 ## Background objects
 
@@ -125,14 +141,34 @@ For an area, `points` defines a polygon. For a line it defines a polyline. A lab
 
 The image is embedded directly as a base64 `dataUrl`, so the project file stays a single portable JSON document — this can make it large, and the editor warns when an imported image is over about 2 MB. `x`/`y`/`width`/`height` place the image on the canvas in the same coordinate space as everything else, independent of `naturalWidth`/`naturalHeight` (the source image's real pixel size). `rotation` is in degrees around the image's own centre. `crop` insets are fractions (0–0.45) of the natural size cropped from each edge before the remaining area is stretched to fill the placement rectangle. `backgroundImage` is part of both full-map exports and background-only exports, and is replaced as a whole (not merged) whenever a background-only file is imported.
 
+## Notes
+
+`notes` is a map-level array of free-form evaluation annotations, shown on screen and in print but not part of the map itself:
+
+```json
+{
+  "id": "note-1",
+  "x": 760,
+  "y": 60,
+  "width": 250,
+  "height": 110,
+  "text": "Evaluation note: playtesters found this junction confusing.",
+  "locked": false
+}
+```
+
+Notes are only part of full-map exports, not background-only or network-only exports, since they are neither background art nor game network.
+
 ## Compatibility rules
 
 - Missing `background` becomes an empty array, supporting older map files.
+- Missing `notes` or `lineStyles` becomes an empty array.
 - Missing or unknown `format` becomes `board-2x3`.
 - Missing or unrecognized `kind` is treated as a full map (`"map"`).
 - Missing or invalid `backgroundImage` is dropped; a map with no image simply omits the field.
+- Missing `size` on a stop is treated as `medium`.
 - Unknown object types are not currently validated at runtime.
 - IDs must be unique within their object category.
-- Routes should reference existing stops.
+- Routes should reference existing stops, and `lineStyle` should reference an existing entry in `lineStyles`.
 
 Do not rename format IDs, object types or the local-storage key without providing a migration path.

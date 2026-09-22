@@ -7,8 +7,12 @@ Live site: <https://hagstrom.nu/ttr/>
 ## Current capabilities
 
 - Draw, move and edit stops and routes.
+- Choose one of three stop sizes, which can carry meaning in some expansions.
+- Mark specific wagon slots on a route as requiring a locomotive card.
+- Define reusable custom line styles (thickness and dash pattern) to flag routes that follow a special rule.
 - Add areas, boundaries and labels behind the route network.
 - Import a background image (PNG, JPEG or WebP) and move, scale, rotate, crop, fade or lock it behind the rest of the map.
+- Place resizable evaluation notes with explanatory text on the map, for reviewers and playtesters.
 - Choose standard, large and custom foldable board formats or A4/A3/US Letter test sheets.
 - Detect crossings between buildable routes.
 - Undo and redo up to 40 changes during the current session.

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, BusFront, Check, ChevronDown, CircleDot, CircleHelp, Download, FileStack, Image as ImageIcon, Layers3, Link2, Lock, MapPinPlus, Minus, MousePointer2, Pencil, Plus, Printer, Redo2, RotateCcw, Save, Trash2, Undo2, Unlock, Upload } from "lucide-react";
+import { AlertTriangle, BusFront, Check, ChevronDown, CircleDot, CircleHelp, Download, FileStack, Image as ImageIcon, Layers3, Link2, Lock, MapPinPlus, Minus, MousePointer2, Pencil, Plus, Printer, Redo2, RotateCcw, Save, StickyNote, TrainFront, Trash2, Undo2, Unlock, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
@@ -11,12 +11,13 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { colorLabels, emptyMap, initialMap, mapFormats, type BackgroundImage, type BackgroundShape, type BackgroundType, type ImageCrop, type MapData, type MapFormat, type Point, type Route, type RouteType, routeColors, routeTypeMeta, STORAGE_KEY, type Stop, type StopType, stopTypeMeta, W } from "./map-data";
+import { colorLabels, emptyMap, initialMap, type LineStyle, mapFormats, type BackgroundImage, type BackgroundShape, type BackgroundType, type ImageCrop, type MapData, type MapFormat, type NoteBox, type Point, type Route, type RouteType, routeColors, routeTypeMeta, STORAGE_KEY, type Stop, type StopSize, stopSizeMeta, type StopType, stopTypeMeta, W } from "./map-data";
 
-type Tool = "select" | "stop" | "route" | "background";
+type Tool = "select" | "stop" | "route" | "background" | "note";
 type Danger = "reset" | "delete" | "load-blank" | "load-example" | "import-background" | "import-network" | "import-image" | null;
-type PendingImport = { kind: "background"; background: BackgroundShape[]; backgroundImage?: BackgroundImage } | { kind: "network"; stops: Stop[]; routes: Route[] } | { kind: "image"; image: BackgroundImage };
+type PendingImport = { kind: "background"; background: BackgroundShape[]; backgroundImage?: BackgroundImage } | { kind: "network"; stops: Stop[]; routes: Route[]; lineStyles: LineStyle[] } | { kind: "image"; image: BackgroundImage };
 const GUIDE_SEEN_KEY = `${STORAGE_KEY}-guide-seen`;
 const MAX_IMAGE_WARN_BYTES = 2 * 1024 * 1024;
 
@@ -50,6 +51,8 @@ const normalizeMap = (value: Partial<MapData>): MapData => ({
   background: Array.isArray(value.background) ? value.background : [],
   stops: Array.isArray(value.stops) ? value.stops : [],
   routes: Array.isArray(value.routes) ? value.routes : [],
+  notes: Array.isArray(value.notes) ? value.notes : [],
+  lineStyles: Array.isArray(value.lineStyles) ? value.lineStyles : [],
   backgroundImage: normalizeBackgroundImage(value.backgroundImage),
 });
 const scalePointToHeight = (point: Point, fromHeight: number, toHeight: number): Point => ({ x: point.x, y: point.y * toHeight / fromHeight });
@@ -57,13 +60,14 @@ const scaleBackgroundToHeight = (shapes: BackgroundShape[], fromHeight: number, 
 const scaleStopsToHeight = (stops: Stop[], fromHeight: number, toHeight: number): Stop[] => stops.map((stop) => ({ ...stop, ...scalePointToHeight(stop, fromHeight, toHeight) }));
 const scaleRoutesToHeight = (routes: Route[], fromHeight: number, toHeight: number): Route[] => routes.map((route) => ({ ...route, points: route.points?.map((point) => scalePointToHeight(point, fromHeight, toHeight)) }));
 const scaleImageToHeight = (image: BackgroundImage, fromHeight: number, toHeight: number): BackgroundImage => ({ ...image, y: image.y * toHeight / fromHeight, height: image.height * toHeight / fromHeight });
+const scaleNotesToHeight = (notes: NoteBox[], fromHeight: number, toHeight: number): NoteBox[] => notes.map((note) => ({ ...note, y: note.y * toHeight / fromHeight, height: note.height * toHeight / fromHeight }));
 const sourceHeight = (value: { format?: unknown }): number => mapFormats[isMapFormat(value.format) ? value.format : "board-2x3"].height;
 const normalizeBackgroundFile = (value: { format?: unknown; background?: unknown; backgroundImage?: unknown }, toHeight: number): { background: BackgroundShape[]; backgroundImage?: BackgroundImage } => {
   const fromHeight = sourceHeight(value);
   const image = normalizeBackgroundImage(value.backgroundImage);
   return { background: scaleBackgroundToHeight(Array.isArray(value.background) ? value.background : [], fromHeight, toHeight), backgroundImage: image ? scaleImageToHeight(image, fromHeight, toHeight) : undefined };
 };
-const normalizeNetworkFile = (value: { format?: unknown; stops?: unknown; routes?: unknown }, toHeight: number): { stops: Stop[]; routes: Route[] } => { const fromHeight = sourceHeight(value); return { stops: scaleStopsToHeight(Array.isArray(value.stops) ? value.stops : [], fromHeight, toHeight), routes: scaleRoutesToHeight(Array.isArray(value.routes) ? value.routes : [], fromHeight, toHeight) }; };
+const normalizeNetworkFile = (value: { format?: unknown; stops?: unknown; routes?: unknown; lineStyles?: unknown }, toHeight: number): { stops: Stop[]; routes: Route[]; lineStyles: LineStyle[] } => { const fromHeight = sourceHeight(value); return { stops: scaleStopsToHeight(Array.isArray(value.stops) ? value.stops : [], fromHeight, toHeight), routes: scaleRoutesToHeight(Array.isArray(value.routes) ? value.routes : [], fromHeight, toHeight), lineStyles: Array.isArray(value.lineStyles) ? value.lineStyles : [] }; };
 const readBackgroundImage = (file: File): Promise<{ dataUrl: string; naturalWidth: number; naturalHeight: number }> => new Promise((resolve, reject) => {
   const reader = new FileReader();
   reader.onerror = () => reject(new Error("Could not read the file"));
@@ -160,6 +164,7 @@ export function MapEditor() {
   const [saved, setSaved] = useState(true);
   const [tool, setTool] = useState<Tool>("select");
   const [stopType, setStopType] = useState<StopType>("city");
+  const [stopSize, setStopSize] = useState<StopSize>("medium");
   const [routeType, setRouteType] = useState<RouteType>("city");
   const [routeColor, setRouteColor] = useState("neutral");
   const [backgroundType, setBackgroundType] = useState<BackgroundType>("area");
@@ -171,6 +176,7 @@ export function MapEditor() {
   const [selectedRoute, setSelectedRoute] = useState<string | null>(null);
   const [selectedBackground, setSelectedBackground] = useState<string | null>(null);
   const [imageSelected, setImageSelected] = useState(false);
+  const [selectedNote, setSelectedNote] = useState<string | null>(null);
   const [past, setPast] = useState<MapData[]>([]);
   const [future, setFuture] = useState<MapData[]>([]);
   const [danger, setDanger] = useState<Danger>(null);
@@ -180,6 +186,7 @@ export function MapEditor() {
   const dragBackgroundPointRef = useRef<{ shapeId: string; index: number } | null>(null);
   const dragBackgroundLabelRef = useRef<string | null>(null);
   const dragImageRef = useRef<"move" | "scale" | "rotate" | null>(null);
+  const dragNoteRef = useRef<{ id: string; mode: "move" | "resize" } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const imageFileRef = useRef<HTMLInputElement>(null);
   const format = mapFormats[data.format];
@@ -193,13 +200,15 @@ export function MapEditor() {
   const selectedS = data.stops.find((stop) => stop.id === selectedStop);
   const selectedR = data.routes.find((route) => route.id === selectedRoute);
   const selectedB = data.background.find((shape) => shape.id === selectedBackground);
+  const selectedN = data.notes.find((note) => note.id === selectedNote);
   const change = (fn: (draft: MapData) => MapData) => setData((previous) => { setPast((history) => [...history, cloneMap(previous)].slice(-40)); setFuture([]); setSaved(false); return fn(cloneMap(previous)); });
-  const clearSelection = () => { setSelectedStop(null); setSelectedRoute(null); setSelectedBackground(null); setImageSelected(false); };
-  const chooseImage = () => { setImageSelected(true); setSelectedStop(null); setSelectedRoute(null); setSelectedBackground(null); setTool("select"); };
+  const clearSelection = () => { setSelectedStop(null); setSelectedRoute(null); setSelectedBackground(null); setImageSelected(false); setSelectedNote(null); };
+  const chooseImage = () => { setImageSelected(true); setSelectedStop(null); setSelectedRoute(null); setSelectedBackground(null); setSelectedNote(null); setTool("select"); };
+  const chooseNote = (id: string) => { setSelectedNote(id); setSelectedStop(null); setSelectedRoute(null); setSelectedBackground(null); setImageSelected(false); setTool("select"); };
   const undo = () => { const previous = past.at(-1); if (!previous) return; setFuture((items) => [cloneMap(data), ...items]); setData(previous); setPast((items) => items.slice(0, -1)); clearSelection(); };
   const redo = () => { const next = future[0]; if (!next) return; setPast((items) => [...items, cloneMap(data)]); setData(next); setFuture((items) => items.slice(1)); clearSelection(); };
 
-  const hasContent = data.stops.length > 0 || data.routes.length > 0 || data.background.length > 0 || Boolean(data.backgroundImage);
+  const hasContent = data.stops.length > 0 || data.routes.length > 0 || data.background.length > 0 || data.notes.length > 0 || Boolean(data.backgroundImage);
   const dismissGuide = () => { try { localStorage.setItem(GUIDE_SEEN_KEY, "1"); } catch { /* ignore unavailable storage */ } setShowGuide(false); };
   const applyGuideChoice = (map: MapData) => { change(() => cloneMap(map)); clearSelection(); setDraftPoints([]); setTool("select"); dismissGuide(); setDanger(null); };
   const chooseFromGuide = (kind: "blank" | "example") => {
@@ -230,7 +239,7 @@ export function MapEditor() {
     if (target !== event.currentTarget && !target.classList.contains("map-bg")) return;
     const point = canvasPoint(event.currentTarget, event.clientX, event.clientY, format.height);
     if (tool === "stop") {
-      change((draft) => { draft.stops.push({ id: `s-${Date.now()}`, name: "New stop", type: stopType, ...point }); return draft; });
+      change((draft) => { draft.stops.push({ id: `s-${Date.now()}`, name: "New stop", type: stopType, size: stopSize, ...point }); return draft; });
       return;
     }
     if (tool === "background") {
@@ -241,10 +250,29 @@ export function MapEditor() {
       } else setDraftPoints((points) => [...points, point]);
       return;
     }
+    if (tool === "note") {
+      const id = `note-${Date.now()}`;
+      const width = 220, height = 110;
+      change((draft) => { draft.notes.push({ id, x: point.x - width / 2, y: point.y - height / 2, width, height, text: "Evaluation note" }); return draft; });
+      chooseNote(id);
+      return;
+    }
     clearSelection();
   };
   const onCanvasMove = (event: React.PointerEvent<SVGSVGElement>) => {
     const point = canvasPoint(event.currentTarget, event.clientX, event.clientY, format.height);
+    if (dragNoteRef.current) {
+      const { id, mode } = dragNoteRef.current;
+      setData((current) => ({
+        ...current,
+        notes: current.notes.map((note) => {
+          if (note.id !== id) return note;
+          if (mode === "move") return { ...note, x: point.x - note.width / 2, y: point.y - note.height / 2 };
+          return { ...note, width: Math.max(90, point.x - note.x), height: Math.max(50, point.y - note.y) };
+        }),
+      }));
+      setSaved(false); return;
+    }
     if (dragImageRef.current) {
       const mode = dragImageRef.current;
       setData((current) => {
@@ -277,10 +305,11 @@ export function MapEditor() {
     setData((current) => ({ ...current, stops: current.stops.map((stop) => stop.id === dragStopRef.current ? { ...stop, ...point } : stop) }));
     setSaved(false);
   };
-  const stopDragging = () => { dragStopRef.current = null; dragWaypointRef.current = null; dragBackgroundPointRef.current = null; dragBackgroundLabelRef.current = null; dragImageRef.current = null; };
+  const stopDragging = () => { dragStopRef.current = null; dragWaypointRef.current = null; dragBackgroundPointRef.current = null; dragBackgroundLabelRef.current = null; dragImageRef.current = null; dragNoteRef.current = null; };
   const deleteSelected = () => {
     change((draft) => {
       if (imageSelected) draft.backgroundImage = undefined;
+      if (selectedNote) draft.notes = draft.notes.filter((note) => note.id !== selectedNote);
       if (selectedBackground) draft.background = draft.background.filter((shape) => shape.id !== selectedBackground);
       if (selectedRoute) draft.routes = draft.routes.filter((route) => route.id !== selectedRoute);
       if (selectedStop) { draft.stops = draft.stops.filter((stop) => stop.id !== selectedStop); draft.routes = draft.routes.filter((route) => route.a !== selectedStop && route.b !== selectedStop); }
@@ -288,12 +317,26 @@ export function MapEditor() {
     });
     clearSelection(); setDanger(null);
   };
+  const toggleLocomotiveSlot = (routeId: string, index: number) => {
+    change((draft) => {
+      const route = draft.routes.find((item) => item.id === routeId);
+      if (!route) return draft;
+      const slots = new Set(route.locomotiveSlots ?? []);
+      if (slots.has(index)) slots.delete(index); else slots.add(index);
+      route.locomotiveSlots = [...slots].sort((a, b) => a - b);
+      return draft;
+    });
+  };
+  const setRouteLineStyle = (routeId: string, styleId: string | undefined) => change((draft) => { const route = draft.routes.find((item) => item.id === routeId); if (route) route.lineStyle = styleId; return draft; });
+  const addLineStyleToRoute = (routeId: string) => { const id = `style-${Date.now()}`; change((draft) => { draft.lineStyles.push({ id, label: "New style", strokeWidth: 6, dash: "10 6" }); const route = draft.routes.find((item) => item.id === routeId); if (route) route.lineStyle = id; return draft; }); };
+  const updateLineStyle = (styleId: string, values: Partial<LineStyle>) => change((draft) => { const style = draft.lineStyles.find((item) => item.id === styleId); if (style) Object.assign(style, values); return draft; });
+  const deleteLineStyle = (styleId: string) => change((draft) => { draft.lineStyles = draft.lineStyles.filter((item) => item.id !== styleId); draft.routes = draft.routes.map((route) => route.lineStyle === styleId ? { ...route, lineStyle: undefined } : route); return draft; });
   const downloadJson = (payload: unknown, filenameBase: string) => { const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }); const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = `${filenameBase.replace(/[^a-z0-9]+/gi, "-").toLowerCase() || "map"}-${formatTimestamp()}.json`; link.click(); URL.revokeObjectURL(url); };
   const exportMap = () => downloadJson({ kind: "map", ...data }, data.name);
   const exportBackground = () => downloadJson({ kind: "background", format: data.format, background: data.background, backgroundImage: data.backgroundImage }, `${data.name} background`);
-  const exportNetwork = () => downloadJson({ kind: "network", format: data.format, stops: data.stops, routes: data.routes }, `${data.name} network`);
+  const exportNetwork = () => downloadJson({ kind: "network", format: data.format, stops: data.stops, routes: data.routes, lineStyles: data.lineStyles }, `${data.name} network`);
   const applyBackgroundImport = (background: BackgroundShape[], backgroundImage?: BackgroundImage) => { change((draft) => ({ ...draft, background, backgroundImage })); clearSelection(); setDanger(null); setPendingImport(null); };
-  const applyNetworkImport = (stops: Stop[], routes: Route[]) => { change((draft) => ({ ...draft, stops, routes })); clearSelection(); setDanger(null); setPendingImport(null); };
+  const applyNetworkImport = (stops: Stop[], routes: Route[], lineStyles: LineStyle[]) => { change((draft) => ({ ...draft, stops, routes, lineStyles })); clearSelection(); setDanger(null); setPendingImport(null); };
   const applyImageImport = (image: BackgroundImage) => { change((draft) => ({ ...draft, backgroundImage: image })); chooseImage(); setDanger(null); setPendingImport(null); };
   const importMap = (file?: File) => {
     if (!file) return;
@@ -308,9 +351,9 @@ export function MapEditor() {
           return;
         }
         if (raw && raw.kind === "network") {
-          const { stops, routes } = normalizeNetworkFile(raw, format.height);
-          if (data.stops.length || data.routes.length) { setPendingImport({ kind: "network", stops, routes }); setDanger("import-network"); }
-          else applyNetworkImport(stops, routes);
+          const { stops, routes, lineStyles } = normalizeNetworkFile(raw, format.height);
+          if (data.stops.length || data.routes.length) { setPendingImport({ kind: "network", stops, routes, lineStyles }); setDanger("import-network"); }
+          else applyNetworkImport(stops, routes, lineStyles);
           return;
         }
         const incoming = normalizeMap(raw);
@@ -343,6 +386,7 @@ export function MapEditor() {
       draft.routes = scaleRoutesToHeight(draft.routes, fromHeight, toHeight);
       draft.background = scaleBackgroundToHeight(draft.background, fromHeight, toHeight);
       draft.backgroundImage = draft.backgroundImage ? scaleImageToHeight(draft.backgroundImage, fromHeight, toHeight) : draft.backgroundImage;
+      draft.notes = scaleNotesToHeight(draft.notes, fromHeight, toHeight);
       draft.format = nextFormat;
       return draft;
     });
@@ -362,11 +406,12 @@ export function MapEditor() {
         <div className="tool-list">
           <ToolButton active={tool === "select"} icon={<MousePointer2 />} title="Select & move" note="Edit stops, routes and shapes" onClick={() => { setTool("select"); setRouteStart(null); setDraftPoints([]); }} />
           <ToolButton active={tool === "stop"} icon={<MapPinPlus />} title="Add stop" note="Click the map to place it" onClick={() => { setTool("stop"); setRouteStart(null); setDraftPoints([]); }} />
-          {tool === "stop" && <div className="tool-options"><Label>Stop type</Label><NativeSelect value={stopType} onChange={(event) => setStopType(event.target.value as StopType)}>{Object.entries(stopTypeMeta).map(([key, meta]) => <NativeSelectOption key={key} value={key}>{meta.label}</NativeSelectOption>)}</NativeSelect></div>}
+          {tool === "stop" && <div className="tool-options grid-two"><div><Label>Stop type</Label><NativeSelect value={stopType} onChange={(event) => setStopType(event.target.value as StopType)}>{Object.entries(stopTypeMeta).map(([key, meta]) => <NativeSelectOption key={key} value={key}>{meta.label}</NativeSelectOption>)}</NativeSelect></div><div><Label>Stop size</Label><NativeSelect value={stopSize} onChange={(event) => setStopSize(event.target.value as StopSize)}>{Object.entries(stopSizeMeta).map(([key, meta]) => <NativeSelectOption key={key} value={key}>{meta.label}</NativeSelectOption>)}</NativeSelect></div></div>}
           <ToolButton active={tool === "route"} icon={<Link2 />} title="Draw route" note={routeStart ? `Start: ${stopById(data, routeStart)?.name} · choose end` : "Click two stops"} onClick={() => { setTool("route"); setRouteStart(null); setDraftPoints([]); }} />
           {tool === "route" && <div className="tool-options grid-two"><div><Label>Route type</Label><NativeSelect value={routeType} onChange={(event) => setRouteType(event.target.value as RouteType)}>{Object.entries(routeTypeMeta).map(([key, meta]) => <NativeSelectOption key={key} value={key}>{meta.label}</NativeSelectOption>)}</NativeSelect></div><div><Label>Colour</Label><NativeSelect value={routeColor} onChange={(event) => setRouteColor(event.target.value)}>{Object.keys(routeColors).map((key) => <NativeSelectOption key={key} value={key}>{colorLabels[key]}</NativeSelectOption>)}</NativeSelect></div></div>}
           <ToolButton active={tool === "background"} icon={<Layers3 />} title="Draw background" note="Areas, boundaries and labels" onClick={() => { setTool("background"); setRouteStart(null); clearSelection(); }} />
           {tool === "background" && <div className="tool-options background-tools"><div className="image-import-row"><Label>Background image</Label><div className="image-import-buttons"><Button size="sm" variant="outline" onClick={() => imageFileRef.current?.click()}><ImageIcon />{data.backgroundImage ? "Replace image" : "Import image"}</Button>{data.backgroundImage && <Button size="sm" variant="ghost" onClick={() => { chooseImage(); setDanger("delete"); }}><Trash2 />Remove</Button>}</div><input ref={imageFileRef} hidden type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => { importBackgroundImage(event.target.files?.[0]); event.target.value = ""; }} /></div><Label>Object</Label><NativeSelect value={backgroundType} onChange={(event) => { setBackgroundType(event.target.value as BackgroundType); setDraftPoints([]); }}><NativeSelectOption value="area">Area</NativeSelectOption><NativeSelectOption value="line">Line</NativeSelectOption><NativeSelectOption value="label">Label</NativeSelectOption></NativeSelect>{backgroundType !== "label" && <><div className="colour-row"><label>Fill <input type="color" value={backgroundFill} onChange={(event) => setBackgroundFill(event.target.value)} disabled={backgroundType === "line"} /></label><label>Outline <input type="color" value={backgroundStroke} onChange={(event) => setBackgroundStroke(event.target.value)} /></label></div><p className="helper">Click to add points. Finish when the shape is ready.</p><div className="draft-actions"><Button size="sm" disabled={draftPoints.length < (backgroundType === "area" ? 3 : 2)} onClick={finishBackground}>Finish shape</Button><Button size="sm" variant="ghost" disabled={!draftPoints.length} onClick={() => setDraftPoints([])}>Cancel</Button></div></>}</div>}
+          <ToolButton active={tool === "note"} icon={<StickyNote />} title="Add note" note="Click the map to place an evaluation note" onClick={() => { setTool("note"); setRouteStart(null); clearSelection(); }} />
         </div>
         <div className="format-control"><Label htmlFor="map-format">Board format</Label><NativeSelect id="map-format" value={data.format} onChange={(event) => changeFormat(event.target.value as MapFormat)}>{Object.entries(mapFormats).map(([key, item]) => <NativeSelectOption key={key} value={key}>{item.label}</NativeSelectOption>)}</NativeSelect><dl className="format-measurements"><div><dt>Finished size</dt><dd>{format.widthMm.toLocaleString("en-GB")} × {format.heightMm.toLocaleString("en-GB")} mm{format.imperial ? ` (${format.imperial})` : ""}</dd></div>{format.columns > 1 && <div><dt>Panel size</dt><dd>about {panelWidthMm} × {panelHeightMm} mm</dd></div>}</dl><p>{format.note}{format.custom ? ". This is not a verified commercial Ticket to Ride size" : ""}. Changing format keeps objects in the same relative positions.</p></div>
         <div className={cn("crossing-card", crossings.length && "has-warning")}><div className="crossing-icon">{crossings.length ? <AlertTriangle /> : <Check />}</div><div><strong>{crossings.length ? `${crossings.length} crossing${crossings.length === 1 ? "" : "s"}` : "No crossings"}</strong><p>{crossings.length ? "between buildable routes" : "The route network is geometrically clean"}</p></div></div>
@@ -374,21 +419,22 @@ export function MapEditor() {
         <Button variant="ghost" className="reset-button" onClick={() => setDanger("reset")}><RotateCcw />Clear map</Button>
       </aside>
       <section className="map-wrap">
-        <div className="map-status"><Badge variant="secondary">{format.shortLabel}</Badge><Badge variant="secondary">{format.widthMm.toLocaleString("en-GB")} × {format.heightMm.toLocaleString("en-GB")} mm</Badge><Badge variant="secondary">{data.stops.length} stops</Badge><Badge variant="secondary">{data.routes.length} routes</Badge><Badge variant="secondary">{data.background.length} background objects</Badge><span>Everything is stored in the exported map file</span></div>
+        <div className="map-status"><Badge variant="secondary">{format.shortLabel}</Badge><Badge variant="secondary">{format.widthMm.toLocaleString("en-GB")} × {format.heightMm.toLocaleString("en-GB")} mm</Badge><Badge variant="secondary">{data.stops.length} stops</Badge><Badge variant="secondary">{data.routes.length} routes</Badge><Badge variant="secondary">{data.background.length} background objects</Badge>{data.notes.length > 0 && <Badge variant="secondary">{data.notes.length} note{data.notes.length === 1 ? "" : "s"}</Badge>}<span>Everything is stored in the exported map file</span></div>
         <svg className={cn("map-canvas", `tool-${tool}`)} style={{ aspectRatio: `${W} / ${format.height}` }} viewBox={`0 0 ${W} ${format.height}`} onPointerDown={onCanvasDown} onPointerMove={onCanvasMove} onPointerUp={stopDragging} onPointerLeave={stopDragging}>
-          <MapArtwork data={data} selectedRoute={selectedRoute} selectedStop={selectedStop} selectedBackground={selectedBackground} imageSelected={imageSelected} routeStart={routeStart} draft={{ type: backgroundType, points: draftPoints, fill: backgroundFill, stroke: backgroundStroke }} onRoute={(id) => { setSelectedRoute(id); setSelectedStop(null); setSelectedBackground(null); setTool("select"); }} onStop={(id) => { chooseStop(id); if (tool === "select") dragStopRef.current = id; }} onWaypoint={(routeId, index) => { dragWaypointRef.current = { routeId, index }; }} onBackground={(id) => { setSelectedBackground(id); setSelectedRoute(null); setSelectedStop(null); setTool("select"); }} onBackgroundPoint={(shapeId, index) => { dragBackgroundPointRef.current = { shapeId, index }; }} onBackgroundLabel={(shapeId) => { dragBackgroundLabelRef.current = shapeId; }} onImageSelect={chooseImage} onImageMove={() => { chooseImage(); dragImageRef.current = "move"; }} onImageScale={() => { dragImageRef.current = "scale"; }} onImageRotate={() => { dragImageRef.current = "rotate"; }} />
+          <MapArtwork data={data} selectedRoute={selectedRoute} selectedStop={selectedStop} selectedBackground={selectedBackground} imageSelected={imageSelected} selectedNote={selectedNote} routeStart={routeStart} draft={{ type: backgroundType, points: draftPoints, fill: backgroundFill, stroke: backgroundStroke }} onRoute={(id) => { setSelectedRoute(id); setSelectedStop(null); setSelectedBackground(null); setSelectedNote(null); setTool("select"); }} onRouteSlot={toggleLocomotiveSlot} onStop={(id) => { chooseStop(id); if (tool === "select") dragStopRef.current = id; }} onWaypoint={(routeId, index) => { dragWaypointRef.current = { routeId, index }; }} onBackground={(id) => { setSelectedBackground(id); setSelectedRoute(null); setSelectedStop(null); setSelectedNote(null); setTool("select"); }} onBackgroundPoint={(shapeId, index) => { dragBackgroundPointRef.current = { shapeId, index }; }} onBackgroundLabel={(shapeId) => { dragBackgroundLabelRef.current = shapeId; }} onImageSelect={chooseImage} onImageMove={() => { chooseImage(); dragImageRef.current = "move"; }} onImageScale={() => { dragImageRef.current = "scale"; }} onImageRotate={() => { dragImageRef.current = "rotate"; }} onNoteSelect={chooseNote} onNoteMove={(id) => { chooseNote(id); dragNoteRef.current = { id, mode: "move" }; }} onNoteResize={(id) => { dragNoteRef.current = { id, mode: "resize" }; }} />
         </svg>
       </section>
       <aside className="properties panel">
-        <div className="panel-heading"><span>Properties</span><small>{imageSelected ? "Background image selected" : selectedB ? "Background object selected" : selectedR ? "Route selected" : selectedS ? "Stop selected" : "Select an object on the map"}</small></div>
-        {!imageSelected && !selectedB && !selectedR && !selectedS && <div className="empty-state"><CircleDot /><p>Edit names, types, colours, geometry and route length here.</p></div>}
+        <div className="panel-heading"><span>Properties</span><small>{imageSelected ? "Background image selected" : selectedN ? "Note selected" : selectedB ? "Background object selected" : selectedR ? "Route selected" : selectedS ? "Stop selected" : "Select an object on the map"}</small></div>
+        {!imageSelected && !selectedN && !selectedB && !selectedR && !selectedS && <div className="empty-state"><CircleDot /><p>Edit names, types, colours, geometry and route length here.</p></div>}
+        {selectedN && <NoteProperties note={selectedN} change={change} onDelete={() => setDanger("delete")} />}
         {imageSelected && data.backgroundImage && <BackgroundImageProperties image={data.backgroundImage} change={change} onDelete={() => setDanger("delete")} />}
         {selectedB && <BackgroundProperties shape={selectedB} change={change} onDelete={() => setDanger("delete")} />}
-        {selectedS && <div className="property-form"><div><Label htmlFor="stop-name">Name</Label><Input id="stop-name" value={selectedS.name} onChange={(event) => change((draft) => { const stop = stopById(draft, selectedS.id); if (stop) stop.name = event.target.value; return draft; })} /></div><div><Label>Stop type</Label><NativeSelect value={selectedS.type} onChange={(event) => change((draft) => { const stop = stopById(draft, selectedS.id); if (stop) stop.type = event.target.value as StopType; return draft; })}>{Object.entries(stopTypeMeta).map(([key, meta]) => <NativeSelectOption key={key} value={key}>{meta.label}</NativeSelectOption>)}</NativeSelect></div><Button variant="destructive" onClick={() => setDanger("delete")}><Trash2 />Delete stop</Button><p className="delete-note">Connected routes will also be deleted.</p></div>}
-        {selectedR && <div className="property-form"><div className="route-names"><span>{stopById(data, selectedR.a)?.name}</span><ChevronDown /><span>{stopById(data, selectedR.b)?.name}</span></div><div><Label>Route type</Label><NativeSelect value={selectedR.type} onChange={(event) => change((draft) => { const route = draft.routes.find((item) => item.id === selectedR.id); if (route) route.type = event.target.value as RouteType; return draft; })}>{Object.entries(routeTypeMeta).map(([key, meta]) => <NativeSelectOption key={key} value={key}>{meta.label}</NativeSelectOption>)}</NativeSelect></div>{selectedR.type !== "rail" && selectedR.type !== "trail" && <><div><Label>Colour</Label><NativeSelect value={selectedR.color} onChange={(event) => change((draft) => { const route = draft.routes.find((item) => item.id === selectedR.id); if (route) route.color = event.target.value; return draft; })}>{Object.keys(routeColors).map((key) => <NativeSelectOption key={key} value={key}>{colorLabels[key]}</NativeSelectOption>)}</NativeSelect></div><div><Label>Vehicle spaces</Label><div className="length-stepper"><Button variant="outline" size="icon" aria-label="Decrease" disabled={selectedR.length <= 1} onClick={() => change((draft) => { const route = draft.routes.find((item) => item.id === selectedR.id); if (route) route.length = Math.max(1, route.length - 1); return draft; })}><Minus /></Button><strong>{selectedR.length}</strong><Button variant="outline" size="icon" aria-label="Increase" disabled={selectedR.length >= 8} onClick={() => change((draft) => { const route = draft.routes.find((item) => item.id === selectedR.id); if (route) route.length = Math.min(8, route.length + 1); return draft; })}><Plus /></Button></div><p className="helper">The change is shown directly on the route.</p></div></>}<Button variant="destructive" onClick={() => setDanger("delete")}><Trash2 />Delete route</Button></div>}
+        {selectedS && <div className="property-form"><div><Label htmlFor="stop-name">Name</Label><Input id="stop-name" value={selectedS.name} onChange={(event) => change((draft) => { const stop = stopById(draft, selectedS.id); if (stop) stop.name = event.target.value; return draft; })} /></div><div className="grid-two"><div><Label>Stop type</Label><NativeSelect value={selectedS.type} onChange={(event) => change((draft) => { const stop = stopById(draft, selectedS.id); if (stop) stop.type = event.target.value as StopType; return draft; })}>{Object.entries(stopTypeMeta).map(([key, meta]) => <NativeSelectOption key={key} value={key}>{meta.label}</NativeSelectOption>)}</NativeSelect></div><div><Label>Stop size</Label><NativeSelect value={selectedS.size ?? "medium"} onChange={(event) => change((draft) => { const stop = stopById(draft, selectedS.id); if (stop) stop.size = event.target.value as StopSize; return draft; })}>{Object.entries(stopSizeMeta).map(([key, meta]) => <NativeSelectOption key={key} value={key}>{meta.label}</NativeSelectOption>)}</NativeSelect></div></div><p className="helper">Size can carry meaning in some expansions, such as marking major cities.</p><Button variant="destructive" onClick={() => setDanger("delete")}><Trash2 />Delete stop</Button><p className="delete-note">Connected routes will also be deleted.</p></div>}
+        {selectedR && <RouteProperties route={selectedR} stops={data.stops} lineStyles={data.lineStyles} change={change} onDelete={() => setDanger("delete")} onCreateStyle={addLineStyleToRoute} onUpdateStyle={updateLineStyle} onDeleteStyle={deleteLineStyle} onSetStyle={setRouteLineStyle} />}
       </aside>
     </div>
-    <AlertDialog open={danger !== null} onOpenChange={(open) => { if (!open) { setDanger(null); setPendingImport(null); } }}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{danger === "reset" ? "Clear the entire map?" : danger === "load-blank" ? "Replace the current map with a blank one?" : danger === "load-example" ? "Replace the current map with the example?" : danger === "import-background" ? "Replace the background?" : danger === "import-network" ? "Replace stops and routes?" : danger === "import-image" ? "Replace the background image?" : "Delete the selected object?"}</AlertDialogTitle><AlertDialogDescription>{danger === "reset" ? "All locally stored background objects, stops and routes will be removed. Export the map first if you want to keep it." : danger === "load-blank" ? "Your current background objects, stops and routes will be replaced with a blank map. Export the map first if you want to keep your work." : danger === "load-example" ? "Your current background objects, stops and routes will be replaced with the neutral example map. Export the map first if you want to keep your work." : danger === "import-background" ? "The imported background, including any background image, will replace the current one. Stops and routes are kept as they are." : danger === "import-network" ? "The imported stops and routes will replace the current network. Background objects are kept as they are." : danger === "import-image" ? "The new image will replace the current background image." : selectedStop ? "The stop and all connected routes will be deleted." : "The selected object will be deleted."}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => { if (danger === "reset") { change(() => cloneMap(emptyMap)); clearSelection(); setDanger(null); } else if (danger === "load-blank") applyGuideChoice(emptyMap); else if (danger === "load-example") applyGuideChoice(initialMap); else if (danger === "import-background" && pendingImport?.kind === "background") applyBackgroundImport(pendingImport.background, pendingImport.backgroundImage); else if (danger === "import-network" && pendingImport?.kind === "network") applyNetworkImport(pendingImport.stops, pendingImport.routes); else if (danger === "import-image" && pendingImport?.kind === "image") applyImageImport(pendingImport.image); else deleteSelected(); }}>Continue</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+    <AlertDialog open={danger !== null} onOpenChange={(open) => { if (!open) { setDanger(null); setPendingImport(null); } }}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{danger === "reset" ? "Clear the entire map?" : danger === "load-blank" ? "Replace the current map with a blank one?" : danger === "load-example" ? "Replace the current map with the example?" : danger === "import-background" ? "Replace the background?" : danger === "import-network" ? "Replace stops and routes?" : danger === "import-image" ? "Replace the background image?" : "Delete the selected object?"}</AlertDialogTitle><AlertDialogDescription>{danger === "reset" ? "All locally stored background objects, stops and routes will be removed. Export the map first if you want to keep it." : danger === "load-blank" ? "Your current background objects, stops and routes will be replaced with a blank map. Export the map first if you want to keep your work." : danger === "load-example" ? "Your current background objects, stops and routes will be replaced with the neutral example map. Export the map first if you want to keep your work." : danger === "import-background" ? "The imported background, including any background image, will replace the current one. Stops and routes are kept as they are." : danger === "import-network" ? "The imported stops and routes will replace the current network. Background objects are kept as they are." : danger === "import-image" ? "The new image will replace the current background image." : selectedStop ? "The stop and all connected routes will be deleted." : "The selected object will be deleted."}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => { if (danger === "reset") { change(() => cloneMap(emptyMap)); clearSelection(); setDanger(null); } else if (danger === "load-blank") applyGuideChoice(emptyMap); else if (danger === "load-example") applyGuideChoice(initialMap); else if (danger === "import-background" && pendingImport?.kind === "background") applyBackgroundImport(pendingImport.background, pendingImport.backgroundImage); else if (danger === "import-network" && pendingImport?.kind === "network") applyNetworkImport(pendingImport.stops, pendingImport.routes, pendingImport.lineStyles); else if (danger === "import-image" && pendingImport?.kind === "image") applyImageImport(pendingImport.image); else deleteSelected(); }}>Continue</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
     <WelcomeGuide open={showGuide} onOpenChange={(open) => !open && dismissGuide()} onChooseBlank={() => chooseFromGuide("blank")} onChooseExample={() => chooseFromGuide("example")} />
     <PrintPages data={data} />
   </main>;
@@ -426,12 +472,64 @@ function PrintPages({ data }: { data: MapData }) {
   })}</div>;
 }
 
+const dashPresets: Array<{ value: string; label: string }> = [
+  { value: "", label: "Solid" },
+  { value: "4 4", label: "Fine dashes" },
+  { value: "10 6", label: "Dashes" },
+  { value: "2 5", label: "Dotted" },
+  { value: "14 4 2 4", label: "Dash-dot" },
+];
+
+function RouteProperties({ route, stops, lineStyles, change, onDelete, onCreateStyle, onUpdateStyle, onDeleteStyle, onSetStyle }: { route: Route; stops: Stop[]; lineStyles: LineStyle[]; change: (fn: (draft: MapData) => MapData) => void; onDelete: () => void; onCreateStyle: (routeId: string) => void; onUpdateStyle: (styleId: string, values: Partial<LineStyle>) => void; onDeleteStyle: (styleId: string) => void; onSetStyle: (routeId: string, styleId: string | undefined) => void }) {
+  const update = (values: Partial<Route>) => change((draft) => { const item = draft.routes.find((entry) => entry.id === route.id); if (item) Object.assign(item, values); return draft; });
+  const infrastructure = route.type === "rail" || route.type === "trail";
+  const activeStyle = lineStyles.find((style) => style.id === route.lineStyle);
+  const stopName = (id: string) => stops.find((stop) => stop.id === id)?.name ?? "";
+  return <div className="property-form">
+    <div className="route-names"><span>{stopName(route.a)}</span><ChevronDown /><span>{stopName(route.b)}</span></div>
+    <div><Label>Route type</Label><NativeSelect value={route.type} onChange={(event) => update({ type: event.target.value as RouteType })}>{Object.entries(routeTypeMeta).map(([key, meta]) => <NativeSelectOption key={key} value={key}>{meta.label}</NativeSelectOption>)}</NativeSelect></div>
+    {!infrastructure && <>
+      <div><Label>Colour</Label><NativeSelect value={route.color} onChange={(event) => update({ color: event.target.value })}>{Object.keys(routeColors).map((key) => <NativeSelectOption key={key} value={key}>{colorLabels[key]}</NativeSelectOption>)}</NativeSelect></div>
+      <div><Label>Vehicle spaces</Label><div className="length-stepper"><Button variant="outline" size="icon" aria-label="Decrease" disabled={route.length <= 1} onClick={() => update({ length: Math.max(1, route.length - 1), locomotiveSlots: route.locomotiveSlots?.filter((index) => index < route.length - 1) })}><Minus /></Button><strong>{route.length}</strong><Button variant="outline" size="icon" aria-label="Increase" disabled={route.length >= 8} onClick={() => update({ length: Math.min(8, route.length + 1) })}><Plus /></Button></div><p className="helper">The change is shown directly on the route.</p></div>
+      <div><Label>Locomotives required · {route.locomotiveSlots?.length ?? 0} of {route.length}</Label><p className="helper">Click a wagon slot directly on the selected route to toggle it.</p>{Boolean(route.locomotiveSlots?.length) && <Button size="sm" variant="ghost" onClick={() => update({ locomotiveSlots: [] })}><TrainFront />Clear locomotives</Button>}</div>
+    </>}
+    <div className="line-style-section">
+      <Label>Special rule style</Label>
+      <div className="line-style-row">
+        <NativeSelect value={route.lineStyle ?? ""} onChange={(event) => onSetStyle(route.id, event.target.value || undefined)}>
+          <NativeSelectOption value="">Default appearance</NativeSelectOption>
+          {lineStyles.map((style) => <NativeSelectOption key={style.id} value={style.id}>{style.label}</NativeSelectOption>)}
+        </NativeSelect>
+        <Button size="sm" variant="outline" onClick={() => onCreateStyle(route.id)}>New style</Button>
+      </div>
+      <p className="helper">Give a route a thicker or dashed line to show it follows a special rule, and reuse the same style on other routes.</p>
+      {activeStyle && <div className="line-style-editor">
+        <div><Label>Style name</Label><Input value={activeStyle.label} onChange={(event) => onUpdateStyle(activeStyle.id, { label: event.target.value })} /></div>
+        <div><Label>Thickness · {activeStyle.strokeWidth}px</Label><input className="range-input" type="range" min="2" max="14" value={activeStyle.strokeWidth} onChange={(event) => onUpdateStyle(activeStyle.id, { strokeWidth: Number(event.target.value) })} /></div>
+        <div><Label>Dash pattern</Label><NativeSelect value={activeStyle.dash} onChange={(event) => onUpdateStyle(activeStyle.id, { dash: event.target.value })}>{dashPresets.map((preset) => <NativeSelectOption key={preset.label} value={preset.value}>{preset.label}</NativeSelectOption>)}</NativeSelect></div>
+        <Button size="sm" variant="ghost" onClick={() => onDeleteStyle(activeStyle.id)}>Delete this style</Button>
+      </div>}
+    </div>
+    <Button variant="destructive" onClick={onDelete}><Trash2 />Delete route</Button>
+  </div>;
+}
+
+function NoteProperties({ note, change, onDelete }: { note: NoteBox; change: (fn: (draft: MapData) => MapData) => void; onDelete: () => void }) {
+  const update = (values: Partial<NoteBox>) => change((draft) => { const item = draft.notes.find((entry) => entry.id === note.id); if (item) Object.assign(item, values); return draft; });
+  return <div className="property-form">
+    <div><Label htmlFor="note-text">Evaluation note</Label><Textarea id="note-text" rows={5} value={note.text} onChange={(event) => update({ text: event.target.value })} /></div>
+    <p className="helper">Shown on screen and in print, for reviewers evaluating the map. Drag the corner handle on the map to resize it.</p>
+    <Button variant="outline" onClick={() => update({ locked: !note.locked })}>{note.locked ? <Unlock /> : <Lock />}{note.locked ? "Unlock note" : "Lock note"}</Button>
+    <Button variant="destructive" onClick={onDelete}><Trash2 />Delete note</Button>
+  </div>;
+}
+
 function BackgroundProperties({ shape, change, onDelete }: { shape: BackgroundShape; change: (fn: (draft: MapData) => MapData) => void; onDelete: () => void }) {
   const update = (values: Partial<BackgroundShape>) => change((draft) => { const item = draft.background.find((entry) => entry.id === shape.id); if (item) Object.assign(item, values); return draft; });
   return <div className="property-form"><div><Label htmlFor="background-label">Label</Label><Input id="background-label" value={shape.label} onChange={(event) => update({ label: event.target.value })} /></div>{shape.type === "area" && <div><Label>Fill colour</Label><input className="colour-input" type="color" value={shape.fill} onChange={(event) => update({ fill: event.target.value })} /></div>}<div><Label>{shape.type === "label" ? "Text colour" : "Line colour"}</Label><input className="colour-input" type="color" value={shape.stroke} onChange={(event) => update({ stroke: event.target.value })} /></div><div><Label>Opacity · {Math.round(shape.opacity * 100)}%</Label><input className="range-input" type="range" min="0.1" max="1" step="0.05" value={shape.opacity} onChange={(event) => update({ opacity: Number(event.target.value) })} /></div>{shape.type !== "label" && <><div><Label>Line width</Label><Input type="number" min="1" max="16" value={shape.strokeWidth} onChange={(event) => update({ strokeWidth: Math.max(1, Math.min(16, Number(event.target.value))) })} /></div><Button variant="outline" onClick={() => update({ labelPoint: undefined })}>Reset label position</Button><p className="helper label-helper">Drag the green handle to position the label freely.</p></>}<Button variant="outline" onClick={() => update({ locked: !shape.locked })}>{shape.locked ? <Unlock /> : <Lock />}{shape.locked ? "Unlock geometry" : "Lock geometry"}</Button><Button variant="destructive" onClick={onDelete}><Trash2 />Delete background object</Button></div>;
 }
 
-function MapArtwork({ data, selectedRoute, selectedStop, selectedBackground, imageSelected, routeStart, draft, onRoute, onStop, onWaypoint, onBackground, onBackgroundPoint, onBackgroundLabel, onImageSelect, onImageMove, onImageScale, onImageRotate, print = false }: { data: MapData; selectedRoute?: string | null; selectedStop?: string | null; selectedBackground?: string | null; imageSelected?: boolean; routeStart?: string | null; draft?: { type: BackgroundType; points: Point[]; fill: string; stroke: string }; onRoute?: (id: string) => void; onStop?: (id: string) => void; onWaypoint?: (routeId: string, index: number) => void; onBackground?: (id: string) => void; onBackgroundPoint?: (shapeId: string, index: number) => void; onBackgroundLabel?: (shapeId: string) => void; onImageSelect?: () => void; onImageMove?: () => void; onImageScale?: () => void; onImageRotate?: () => void; print?: boolean }) {
+function MapArtwork({ data, selectedRoute, selectedStop, selectedBackground, imageSelected, selectedNote, routeStart, draft, onRoute, onRouteSlot, onStop, onWaypoint, onBackground, onBackgroundPoint, onBackgroundLabel, onImageSelect, onImageMove, onImageScale, onImageRotate, onNoteSelect, onNoteMove, onNoteResize, print = false }: { data: MapData; selectedRoute?: string | null; selectedStop?: string | null; selectedBackground?: string | null; imageSelected?: boolean; selectedNote?: string | null; routeStart?: string | null; draft?: { type: BackgroundType; points: Point[]; fill: string; stroke: string }; onRoute?: (id: string) => void; onRouteSlot?: (routeId: string, index: number) => void; onStop?: (id: string) => void; onWaypoint?: (routeId: string, index: number) => void; onBackground?: (id: string) => void; onBackgroundPoint?: (shapeId: string, index: number) => void; onBackgroundLabel?: (shapeId: string) => void; onImageSelect?: () => void; onImageMove?: () => void; onImageScale?: () => void; onImageRotate?: () => void; onNoteSelect?: (id: string) => void; onNoteMove?: (id: string) => void; onNoteResize?: (id: string) => void; print?: boolean }) {
   const format = mapFormats[data.format];
   return <>
     <defs><pattern id="grid" width="24" height="24" patternUnits="userSpaceOnUse"><path d="M24 0L0 0 0 24" fill="none" stroke="#6b675f" strokeOpacity=".11" /></pattern><filter id="shadow" x="-50%" y="-50%" width="200%" height="200%"><feDropShadow dx="0" dy="2" stdDeviation="2" floodOpacity=".18" /></filter></defs>
@@ -439,8 +537,9 @@ function MapArtwork({ data, selectedRoute, selectedStop, selectedBackground, ima
     {data.backgroundImage && <BackgroundImageObject image={data.backgroundImage} selected={Boolean(imageSelected)} print={print} onSelect={onImageSelect} onMove={onImageMove} onScale={onImageScale} onRotate={onImageRotate} />}
     {data.background.map((shape) => <BackgroundObject key={shape.id} shape={shape} height={format.height} selected={shape.id === selectedBackground} print={print} onSelect={onBackground} onPoint={onBackgroundPoint} onLabel={onBackgroundLabel} />)}
     {!print && draft && draft.points.length > 0 && <g className="background-draft">{draft.type === "area" ? <polygon points={draft.points.map((p) => `${p.x},${p.y}`).join(" ")} fill={draft.fill} fillOpacity=".35" stroke={draft.stroke} /> : <polyline points={draft.points.map((p) => `${p.x},${p.y}`).join(" ")} fill="none" stroke={draft.stroke} />}{draft.points.map((point, index) => <circle key={index} cx={point.x} cy={point.y} r="6" />)}</g>}
-    {data.routes.map((route) => { const meta = routeTypeMeta[route.type]; const points = parallelPoints(data, route); const path = pathFromPoints(points); const infrastructure = route.type === "rail" || route.type === "trail"; const routeColor = route.type === "city" || route.type === "region" ? (route.color === "neutral" ? "#736d64" : routeColors[route.color]) : meta.stroke; return <g key={route.id} className={cn("route-group", route.id === selectedRoute && "selected")} onPointerDown={onRoute ? (event) => { event.stopPropagation(); onRoute(route.id); } : undefined}><path d={path} className="route-hit" /><path d={path} className={cn("route-guide", infrastructure && "infrastructure")} fill="none" stroke={routeColor} strokeWidth={infrastructure ? (route.type === "rail" ? 4 : 5) : 3} strokeDasharray={meta.dash} strokeLinecap="round" strokeLinejoin="round" />{!infrastructure && Array.from({ length: route.length }, (_, index) => { const position = pointAlong(points, (index + .5) / route.length); return <g key={index} className="wagon-slot" transform={`translate(${position.x},${position.y}) rotate(${position.angle})`} filter={print ? undefined : "url(#shadow)"}><rect className="wagon-slot-outline" x={-13} y={-7} width="26" height="14" rx="4" /><rect x={-12} y={-6} width="24" height="12" rx="3" fill="#fffaf0" stroke={routeColor} strokeWidth="3" /></g>; })}</g>; })}
-    {data.stops.map((stop) => { const meta = stopTypeMeta[stop.type]; const active = stop.id === selectedStop || stop.id === routeStart; return <g key={stop.id} className={cn("stop", active && "active")} transform={`translate(${stop.x},${stop.y})`} onPointerDown={onStop ? (event) => { event.stopPropagation(); onStop(stop.id); } : undefined}><circle r={active ? 12 : 9} fill={meta.fill} stroke={meta.stroke} strokeWidth={active ? 4 : 3} />{stop.type === "rail" && <rect x={-4} y={-4} width="8" height="8" fill={meta.stroke} />}<text x={stop.x > 900 ? -14 : 14} y={stop.y > format.height - 100 ? -13 : -12} textAnchor={stop.x > 900 ? "end" : "start"}>{stop.name}</text></g>; })}
+    {data.routes.map((route) => { const meta = routeTypeMeta[route.type]; const style = route.lineStyle ? data.lineStyles.find((item) => item.id === route.lineStyle) : undefined; const points = parallelPoints(data, route); const path = pathFromPoints(points); const infrastructure = route.type === "rail" || route.type === "trail"; const routeColor = route.type === "city" || route.type === "region" ? (route.color === "neutral" ? "#736d64" : routeColors[route.color]) : meta.stroke; const routeSelected = route.id === selectedRoute; return <g key={route.id} className={cn("route-group", routeSelected && "selected", style && "custom-style")} onPointerDown={onRoute ? (event) => { event.stopPropagation(); onRoute(route.id); } : undefined}><path d={path} className="route-hit" /><path d={path} className={cn("route-guide", infrastructure && "infrastructure")} fill="none" stroke={routeColor} strokeWidth={style ? style.strokeWidth : (infrastructure ? (route.type === "rail" ? 4 : 5) : 3)} strokeDasharray={style ? style.dash : meta.dash} strokeLinecap="round" strokeLinejoin="round" />{!infrastructure && Array.from({ length: route.length }, (_, index) => { const position = pointAlong(points, (index + .5) / route.length); const isLocomotive = route.locomotiveSlots?.includes(index); const interactive = !print && routeSelected; return <g key={index} className={cn("wagon-slot", isLocomotive && "locomotive")} transform={`translate(${position.x},${position.y}) rotate(${position.angle})`} filter={print ? undefined : "url(#shadow)"} onPointerDown={interactive ? (event) => { event.stopPropagation(); onRouteSlot?.(route.id, index); } : undefined}><rect className="wagon-slot-outline" x={-13} y={-7} width="26" height="14" rx="4" /><rect x={-12} y={-6} width="24" height="12" rx="3" fill="#fffaf0" stroke={routeColor} strokeWidth="3" />{isLocomotive && <g className="locomotive-icon"><rect x={-8} y={-3.5} width="11" height="7" rx="1.5" /><rect x={2} y={-1.5} width="4.5" height="5" rx="1" /><rect x={-2.5} y={-6.5} width="2.5" height="3.5" /><circle cx={-4.5} cy={4} r="1.6" /><circle cx={1.5} cy={4} r="1.6" /></g>}</g>; })}</g>; })}
+    {data.stops.map((stop) => { const meta = stopTypeMeta[stop.type]; const active = stop.id === selectedStop || stop.id === routeStart; const radius = stopSizeMeta[stop.size ?? "medium"].radius; return <g key={stop.id} className={cn("stop", active && "active")} transform={`translate(${stop.x},${stop.y})`} onPointerDown={onStop ? (event) => { event.stopPropagation(); onStop(stop.id); } : undefined}><circle r={active ? radius + 3 : radius} fill={meta.fill} stroke={meta.stroke} strokeWidth={active ? 4 : 3} />{stop.type === "rail" && <rect x={-4} y={-4} width="8" height="8" fill={meta.stroke} />}<text x={stop.x > 900 ? -14 : 14} y={stop.y > format.height - 100 ? -13 : -12} textAnchor={stop.x > 900 ? "end" : "start"}>{stop.name}</text></g>; })}
+    {data.notes.map((note) => <NoteBoxObject key={note.id} note={note} selected={note.id === selectedNote} print={print} onSelect={onNoteSelect} onMove={onNoteMove} onResize={onNoteResize} />)}
     {!print && selectedRoute && data.routes.find((route) => route.id === selectedRoute)?.points?.map((point, index) => <g key={index} className="waypoint-handle" transform={`translate(${point.x},${point.y})`} onPointerDown={(event) => { event.stopPropagation(); onWaypoint?.(selectedRoute, index); }}><circle className="waypoint-hit" r="19" /><rect x="-8" y="-8" width="16" height="16" rx="3" transform="rotate(45)" /><circle r="3" /></g>)}
     {format.columns > 1 && <g className="fold-guides">{Array.from({ length: format.columns - 1 }, (_, index) => <line key={`v-${index}`} x1={W * (index + 1) / format.columns} y1="0" x2={W * (index + 1) / format.columns} y2={format.height} />)}{Array.from({ length: format.rows - 1 }, (_, index) => <line key={`h-${index}`} x1="0" y1={format.height * (index + 1) / format.rows} x2={W} y2={format.height * (index + 1) / format.rows} />)}</g>}
   </>;
@@ -482,6 +581,14 @@ function BackgroundImageProperties({ image, change, onDelete }: { image: Backgro
     <Button variant="outline" onClick={() => update({ locked: !image.locked })}>{image.locked ? <Unlock /> : <Lock />}{image.locked ? "Unlock image" : "Lock image"}</Button>
     <Button variant="destructive" onClick={onDelete}><Trash2 />Remove image</Button>
   </div>;
+}
+
+function NoteBoxObject({ note, selected, print, onSelect, onMove, onResize }: { note: NoteBox; selected: boolean; print: boolean; onSelect?: (id: string) => void; onMove?: (id: string) => void; onResize?: (id: string) => void }) {
+  return <g className={cn("note-box", selected && "selected", note.locked && "locked")} transform={`translate(${note.x},${note.y})`} onPointerDown={!print ? (event) => { event.stopPropagation(); onSelect?.(note.id); if (!note.locked) onMove?.(note.id); } : undefined}>
+    <rect className="note-box-bg" width={note.width} height={note.height} rx="8" />
+    <foreignObject x="0" y="0" width={note.width} height={note.height}><div {...{ xmlns: "http://www.w3.org/1999/xhtml" }} className="note-box-text">{note.text}</div></foreignObject>
+    {!print && selected && !note.locked && <g className="note-resize-handle" transform={`translate(${note.width},${note.height})`} onPointerDown={(event) => { event.stopPropagation(); onResize?.(note.id); }}><circle className="point-hit" r="18" /><rect x="-7" y="-7" width="14" height="14" rx="2" /></g>}
+  </g>;
 }
 
 function BackgroundObject({ shape, height, selected, print, onSelect, onPoint, onLabel }: { shape: BackgroundShape; height: number; selected: boolean; print: boolean; onSelect?: (id: string) => void; onPoint?: (id: string, index: number) => void; onLabel?: (id: string) => void }) {

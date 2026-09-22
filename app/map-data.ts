@@ -1,10 +1,12 @@
 export type StopType = "city" | "region" | "brt" | "rail" | "ferry" | "outing";
+export type StopSize = "small" | "medium" | "large";
 export type RouteType = "city" | "region" | "brt" | "ferry" | "rail" | "trail";
 export type BackgroundType = "area" | "line" | "label";
 export type MapFormat = "board-2x3" | "board-2x3-large" | "board-2x4" | "a4" | "a3" | "us-letter";
 export type Point = { x: number; y: number };
-export type Stop = Point & { id: string; name: string; type: StopType };
-export type Route = { id: string; a: string; b: string; length: number; type: RouteType; color: string; points?: Point[] };
+export type Stop = Point & { id: string; name: string; type: StopType; size?: StopSize };
+export type Route = { id: string; a: string; b: string; length: number; type: RouteType; color: string; points?: Point[]; locomotiveSlots?: number[]; lineStyle?: string };
+export type LineStyle = { id: string; label: string; strokeWidth: number; dash: string };
 export type BackgroundShape = {
   id: string;
   type: BackgroundType;
@@ -31,7 +33,16 @@ export type BackgroundImage = {
   crop: ImageCrop;
   locked?: boolean;
 };
-export type MapData = { name: string; format: MapFormat; background: BackgroundShape[]; stops: Stop[]; routes: Route[]; backgroundImage?: BackgroundImage };
+export type NoteBox = {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  text: string;
+  locked?: boolean;
+};
+export type MapData = { name: string; format: MapFormat; background: BackgroundShape[]; stops: Stop[]; routes: Route[]; backgroundImage?: BackgroundImage; notes: NoteBox[]; lineStyles: LineStyle[] };
 
 export const W = 1100;
 export const STORAGE_KEY = "orebro-map-editor-public-v2";
@@ -57,6 +68,12 @@ export const mapFormats: Record<MapFormat, MapFormatDefinition> = {
   a4: { label: "A4 test sheet · 297 × 210 mm", shortLabel: "A4 test sheet", note: "One landscape test sheet", width: W, height: Math.round(W * 210 / 297), widthMm: 297, heightMm: 210, columns: 1, rows: 1 },
   a3: { label: "A3 test sheet · 420 × 297 mm", shortLabel: "A3 test sheet", note: "One landscape test sheet", width: W, height: Math.round(W * 297 / 420), widthMm: 420, heightMm: 297, columns: 1, rows: 1 },
   "us-letter": { label: "US Letter test sheet · 11 × 8.5 in", shortLabel: "US Letter test sheet", note: "One landscape test sheet", width: W, height: Math.round(W * 215.9 / 279.4), widthMm: 279.4, heightMm: 215.9, imperial: "11 × 8.5 in", columns: 1, rows: 1 },
+};
+
+export const stopSizeMeta: Record<StopSize, { label: string; radius: number }> = {
+  small: { label: "Small", radius: 6 },
+  medium: { label: "Medium", radius: 9 },
+  large: { label: "Large", radius: 13 },
 };
 
 export const stopTypeMeta: Record<StopType, { label: string; fill: string; stroke: string }> = {
@@ -93,11 +110,26 @@ export const emptyMap: MapData = {
   background: [],
   stops: [],
   routes: [],
+  notes: [],
+  lineStyles: [],
 };
 
 export const initialMap: MapData = {
   name: "Example map",
   format: "board-2x3",
+  notes: [
+    {
+      id: "example-note",
+      x: 760,
+      y: 60,
+      width: 250,
+      height: 110,
+      text: "Evaluation note: use notes like this to record playtesting feedback. They show on screen and in print, but are not part of the finished map.",
+    },
+  ],
+  lineStyles: [
+    { id: "example-tunnel", label: "Tunnel", strokeWidth: 7, dash: "2 5" },
+  ],
   background: [
     {
       id: "example-lake",
@@ -149,21 +181,21 @@ export const initialMap: MapData = {
   ],
   stops: [
     { id: "example-westport", name: "Westport", type: "city", x: 130, y: 205 },
-    { id: "example-pine-hill", name: "Pine Hill", type: "outing", x: 280, y: 575 },
+    { id: "example-pine-hill", name: "Pine Hill", type: "outing", x: 280, y: 575, size: "small" },
     { id: "example-central", name: "Central", type: "rail", x: 420, y: 345 },
     { id: "example-lakeside", name: "Lakeside", type: "city", x: 640, y: 185 },
     { id: "example-old-town", name: "Old Town", type: "region", x: 690, y: 600 },
     { id: "example-harbour", name: "Harbour", type: "ferry", x: 875, y: 455 },
-    { id: "example-eastgate", name: "Eastgate", type: "brt", x: 980, y: 210 },
+    { id: "example-eastgate", name: "Eastgate", type: "brt", x: 980, y: 210, size: "large" },
   ],
   routes: [
     { id: "example-route-1", a: "example-westport", b: "example-central", length: 4, type: "city", color: "red", points: [{ x: 265, y: 235 }] },
     { id: "example-route-2", a: "example-westport", b: "example-pine-hill", length: 3, type: "region", color: "orange", points: [{ x: 170, y: 420 }] },
     { id: "example-route-3", a: "example-pine-hill", b: "example-central", length: 3, type: "trail", color: "neutral", points: [{ x: 350, y: 500 }] },
     { id: "example-route-4", a: "example-central", b: "example-lakeside", length: 3, type: "rail", color: "neutral", points: [{ x: 525, y: 225 }] },
-    { id: "example-route-5", a: "example-central", b: "example-old-town", length: 4, type: "city", color: "blue", points: [{ x: 545, y: 485 }] },
+    { id: "example-route-5", a: "example-central", b: "example-old-town", length: 4, type: "city", color: "blue", points: [{ x: 545, y: 485 }], lineStyle: "example-tunnel" },
     { id: "example-route-6", a: "example-lakeside", b: "example-eastgate", length: 4, type: "brt", color: "neutral", points: [{ x: 815, y: 165 }] },
-    { id: "example-route-7", a: "example-lakeside", b: "example-harbour", length: 3, type: "ferry", color: "neutral", points: [{ x: 770, y: 315 }] },
+    { id: "example-route-7", a: "example-lakeside", b: "example-harbour", length: 3, type: "ferry", color: "neutral", points: [{ x: 770, y: 315 }], locomotiveSlots: [1] },
     { id: "example-route-8", a: "example-old-town", b: "example-harbour", length: 3, type: "region", color: "green", points: [{ x: 790, y: 585 }] },
     { id: "example-route-9", a: "example-harbour", b: "example-eastgate", length: 3, type: "city", color: "yellow", points: [{ x: 950, y: 335 }] },
   ],
