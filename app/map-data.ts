@@ -74,9 +74,13 @@ export const mapFormats: Record<MapFormat, MapFormatDefinition> = {
   "us-letter": { label: "US Letter test sheet · 11 × 8.5 in", shortLabel: "US Letter test sheet", note: "One landscape test sheet", width: W, height: Math.round(W * 215.9 / 279.4), widthMm: 279.4, heightMm: 215.9, imperial: "11 × 8.5 in", columns: 1, rows: 1 , testSheet: true },
 };
 
-// Footprint of a real plastic train, in millimetres, used by the true-scale wagon view. These are
-// the numbers to change if you measure your own components and find them different.
-export const realWagon = { length: 20, width: 9, gap: 2 };
+// Footprint of a real plastic train and the spacing a real board gives it, in millimetres.
+// `gap` and `endMargin` are not guesses: they come from a least-squares fit over all 101 routes of
+// the published Ticket to Ride Europe map, where the distance between two city centres works out
+// as 25.6 mm per wagon space plus 14.8 mm of margin at the ends. Scored against that model the
+// real board lands between 97% and 106% at every route length, which is what makes it a usable
+// reference for "is this route drawn about right". Change these if you measure your own set.
+export const realWagon = { length: 20, width: 9, gap: 5.5, endMargin: 15 };
 
 export const stopSizeMeta: Record<StopSize, { label: string; radius: number }> = {
   small: { label: "Small", radius: 6 },

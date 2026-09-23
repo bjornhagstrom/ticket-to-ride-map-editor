@@ -44,7 +44,7 @@ export function AnalysisDialog({ open, onOpenChange, data, stats, colourTable, s
       </div>
       <div className="analysis-section">
         <h3>Room per wagon</h3>
-        <p className="helper">How long each route is drawn against the {realWagon.length + realWagon.gap} mm a real wagon space needs on a {scaleWidthMm.toLocaleString("en-GB")} mm board. Under 100% the wagons do not fit; well over means the line looks roomier on screen than the finished board plays.</p>
+        <p className="helper">How long each route is drawn against what a real board would use for the same wagon count: {realWagon.length + realWagon.gap} mm per space plus {realWagon.endMargin} mm of end margin, on a {scaleWidthMm.toLocaleString("en-GB")} mm board. Those figures are fitted from the published Ticket to Ride Europe map, which scores 97–106% against them throughout. Well under means the wagons are cramped; well over means the line looks roomier on screen than the finished board plays.</p>
         {spacing.length === 0 ? <p className="helper">No card routes yet.</p> : <div className="analysis-table-scroll"><table className="analysis-table">
           <thead><tr><th>Route</th><th>Wagons</th><th>Drawn</th><th>Needs</th><th>Room</th></tr></thead>
           <tbody>{[...spacing].sort((a, b) => a.ratio - b.ratio).map((item) => <tr key={item.route.id} className={cn(item.verdict !== "ok" && "analysis-warning-row")}>

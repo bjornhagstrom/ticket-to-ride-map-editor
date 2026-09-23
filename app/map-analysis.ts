@@ -4,7 +4,7 @@ import { type MapData, type Point, realWagon, type Route, routeColors, type Stop
 import { curvedSamples, intersects, parallelPoints, pointsFor, polylineLength, stopById } from "./map-geometry";
 
 export type RouteSpacing = { route: Route; drawnMm: number; neededMm: number; ratio: number; verdict: "short" | "long" | "ok" };
-const SPACING_SHORT = 1, SPACING_LONG = 1.3;
+const SPACING_SHORT = .85, SPACING_LONG = 1.35;
 export function routeSpacing(data: MapData, scaleWidthMm: number): RouteSpacing[] {
   const unitMm = scaleWidthMm / W;
   const pitchMm = realWagon.length + realWagon.gap;
@@ -13,7 +13,7 @@ export function routeSpacing(data: MapData, scaleWidthMm: number): RouteSpacing[
     const geometry = parallelPoints(data, route);
     const points = route.curved && geometry.length > 2 ? curvedSamples(geometry) : geometry;
     const drawnMm = (polylineLength(points) || 1) * unitMm;
-    const neededMm = route.length * pitchMm;
+    const neededMm = route.length * pitchMm + realWagon.endMargin;
     const ratio = drawnMm / neededMm;
     return { route, drawnMm, neededMm, ratio, verdict: ratio < SPACING_SHORT ? "short" : ratio > SPACING_LONG ? "long" : "ok" } as RouteSpacing;
   });
