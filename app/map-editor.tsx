@@ -429,6 +429,13 @@ export function MapEditor() {
   const suggestions = useMemo(() => suggestRoutes(data, stats, colourTable), [data, stats, colourTable]);
   const selectedS = data.stops.find((stop) => stop.id === selectedStop);
   const selectedR = data.routes.find((route) => route.id === selectedRoute);
+  // Put the shape hint on whichever edge of the board the selected route is furthest from,
+  // so it never covers the bend points you are about to drag.
+  const routeHintAtTop = selectedR ? (() => {
+    const points = pointsFor(data, selectedR);
+    if (!points.length) return false;
+    return points.reduce((sum, point) => sum + point.y, 0) / points.length > format.height / 2;
+  })() : false;
   const selectedB = data.background.find((shape) => shape.id === selectedBackground);
   const selectedN = data.notes.find((note) => note.id === selectedNote);
   const change = (fn: (draft: MapData) => MapData) => setData((previous) => { setPast((history) => [...history, cloneForHistory(previous)].slice(-HISTORY_LIMIT)); setFuture([]); setSaved(false); return fn(cloneMap(previous)); });
@@ -665,7 +672,7 @@ export function MapEditor() {
     clearSelection();
   };
 
-  return <TooltipProvider delayDuration={0}><main className="app-shell">
+  return <TooltipProvider delayDuration={0} disableHoverableContent><main className="app-shell">
     <header className="topbar">
       <div className="brand"><span className="brand-mark"><BusFront /></span><div><p>Ticket to Ride</p><h1>Map editor – Print and draw</h1></div></div>
       <div className="map-title"><Label htmlFor="map-name" className="sr-only">Map name</Label><Input id="map-name" value={data.name} onChange={(event) => change((draft) => ({ ...draft, name: event.target.value }))} /><span className="save-state"><Check />{saved ? "Saved locally" : "Saving…"}</span></div>
@@ -704,9 +711,11 @@ export function MapEditor() {
       </aside>
       <section className="map-wrap">
         <div className="map-status"><Badge variant="secondary">{format.shortLabel}</Badge><Badge variant="secondary">{format.widthMm.toLocaleString("en-GB")} × {format.heightMm.toLocaleString("en-GB")} mm</Badge><Badge variant="secondary">{data.stops.length} stops</Badge><Badge variant="secondary">{data.routes.length} routes</Badge><Badge variant="secondary">{data.background.length} background objects</Badge>{data.notes.length > 0 && <Badge variant="secondary">{data.notes.length} note{data.notes.length === 1 ? "" : "s"}</Badge>}<span>Everything is stored in the exported map file</span></div>
+        {selectedR && routeHintAtTop && <RouteHint atTop />}
         <svg className={cn("map-canvas", `tool-${tool}`)} style={{ aspectRatio: `${W} / ${format.height}` }} viewBox={`0 0 ${W} ${format.height}`} onPointerDown={onCanvasDown} onPointerMove={onCanvasMove} onPointerUp={stopDragging} onPointerLeave={stopDragging}>
           <MapArtwork data={data} tool={tool} selectedRoute={selectedRoute} selectedStop={selectedStop} selectedBackground={selectedBackground} imageSelected={imageSelected} selectedNote={selectedNote} routeStart={routeStart} draft={{ type: backgroundType, points: draftPoints, fill: backgroundFill, stroke: backgroundStroke }} onRoute={(id) => { setSelectedRoute(id); setSelectedStop(null); setSelectedBackground(null); setSelectedNote(null); setTool("select"); }} onRouteSlot={toggleLocomotiveSlot} onRouteBendInsert={insertRouteBend} onRouteBendRemove={removeRouteBend} onStop={(id) => { chooseStop(id); if (tool === "select") { beginDrag(); dragStopRef.current = id; } }} onWaypoint={(routeId, index) => { beginDrag(); dragWaypointRef.current = { routeId, index }; }} onBackground={(id) => { setSelectedBackground(id); setSelectedRoute(null); setSelectedStop(null); setSelectedNote(null); setTool("select"); }} onBackgroundPoint={(shapeId, index) => { beginDrag(); dragBackgroundPointRef.current = { shapeId, index }; }} onBackgroundLabel={(shapeId) => { beginDrag(); dragBackgroundLabelRef.current = shapeId; }} onImageSelect={chooseImage} onImageMove={(point) => { chooseImage(); const img = data.backgroundImage; if (img) { beginDrag(); dragImageRef.current = { mode: "move", offsetX: point.x - img.x, offsetY: point.y - img.y }; } }} onImageScale={() => { beginDrag(); dragImageRef.current = { mode: "scale" }; }} onImageRotate={() => { beginDrag(); dragImageRef.current = { mode: "rotate" }; }} onNoteSelect={chooseNote} onNoteMove={(id, point) => { chooseNote(id); const note = data.notes.find((item) => item.id === id); if (note) { beginDrag(); dragNoteRef.current = { id, mode: "move", offsetX: point.x - note.x, offsetY: point.y - note.y }; } }} onNoteResize={(id) => { beginDrag(); dragNoteRef.current = { id, mode: "resize" }; }} />
         </svg>
+        {selectedR && !routeHintAtTop && <RouteHint atTop={false} />}
       </section>
       <aside className="properties panel">
         <div className="panel-heading"><span>Properties</span><small>{imageSelected ? "Background image selected" : selectedN ? "Note selected" : selectedB ? "Background object selected" : selectedR ? "Route selected" : selectedS ? "Stop selected" : "Select an object on the map"}</small></div>
@@ -1034,8 +1043,19 @@ const toolDefinitions: Array<{ id: Tool; icon: React.ReactNode; title: string; n
   { id: "measure", icon: <Ruler />, title: "Measure distance", note: "Click two stops to see the shortest path between them, counted in wagon spaces rather than straight-line distance." },
 ];
 
+// A zero-height sticky slot so the hint stays in view even when the board is taller than the
+// window, without pushing the canvas around when a route is selected.
+function RouteHint({ atTop }: { atTop: boolean }) {
+  return <div className={cn("route-hint-slot", atTop && "at-top")}>
+    <div className="route-hint">
+      <strong>Shaping this route</strong>
+      <span>Click a <b>+</b> to add a bend point anywhere along it · drag a bend point to move it · <b>double-click a bend point to remove it</b> · tick <b>Draw as a smooth curve</b> under Properties to bend it into an arc</span>
+    </div>
+  </div>;
+}
+
 function ToolButton({ active, icon, title, note, onClick }: { active: boolean; icon: React.ReactNode; title: string; note: string; onClick: () => void }) {
   return <Tooltip><TooltipTrigger asChild>
     <button type="button" className={cn("tool-button", active && "active")} onClick={onClick} aria-label={title} aria-pressed={active}>{icon}</button>
-  </TooltipTrigger><TooltipContent side="bottom" className="tool-tooltip"><strong>{title}</strong><span>{note}</span></TooltipContent></Tooltip>;
+  </TooltipTrigger><TooltipContent side="bottom" sideOffset={6} className="tool-tooltip"><strong>{title}</strong><span>{note}</span></TooltipContent></Tooltip>;
 }
