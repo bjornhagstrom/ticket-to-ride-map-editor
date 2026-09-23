@@ -10,6 +10,8 @@ import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import { Textarea } from "@/components/ui/textarea";
 import { colorLabels, type ImageCrop, type LineStyle, type MapData, type NoteBox, type RouteTypeStyle, type BackgroundImage, type BackgroundShape, type Route, routeColors, type Stop, stopSizeMeta, stopSymbolMeta, type StopSize, type StopSymbol, type StopType, stopTypeMeta, W } from "./map-data";
 import { samePair, stopById } from "./map-geometry";
+import { labelAngleOf } from "./map-analysis";
+import { cn } from "@/lib/utils";
 
 const dashPresets: Array<{ value: string; label: string }> = [
   { value: "", label: "Solid" },
@@ -24,7 +26,7 @@ const dashOptions = (current: string) => dashPresets.some((preset) => preset.val
   ? dashPresets
   : [...dashPresets, { value: current, label: `Custom (${current})` }];
 
-export function StopProperties({ stop, change, onDelete }: { stop: Stop; change: (fn: (draft: MapData) => MapData) => void; onDelete: () => void }) {
+export function StopProperties({ stop, change, onDelete, labelState }: { stop: Stop; change: (fn: (draft: MapData) => MapData) => void; onDelete: () => void; labelState: { covers: boolean; clear: number[]; best: number } }) {
   const update = (values: Partial<Stop>) => change((draft) => { const item = stopById(draft, stop.id); if (item) Object.assign(item, values); return draft; });
   const symbol = stop.symbol ?? "none";
   return <div className="property-form">
@@ -39,6 +41,21 @@ export function StopProperties({ stop, change, onDelete }: { stop: Stop; change:
       {symbol === "letter" && <div><Label>Letter</Label><Input maxLength={2} value={stop.letter ?? ""} onChange={(event) => update({ letter: event.target.value })} /></div>}
     </div>
     <p className="helper">Mark a stop with a symbol or short code for rules of your own, independent of its type.</p>
+    <div className="label-angle">
+      <Label>Name position · {Math.round(labelAngleOf(stop))}°</Label>
+      <input className="range-input" type="range" min="0" max="345" step="15" value={Math.round(labelAngleOf(stop))} onChange={(event) => update({ labelAngle: Number(event.target.value) })} />
+      <p className={cn("helper", labelState.covers && "helper-warning")}>
+        {labelState.covers
+          ? labelState.clear.length
+            ? `This name sits on a route. ${labelState.clear.length} of 24 positions around the stop are clear.`
+            : "This name sits on a route, and so would every other position around this stop — it is hemmed in. Move the stop, bend the route away, or accept the overlap."
+          : "Turn the name around the stop to keep it clear of the routes. It stays attached to the stop wherever you move it."}
+      </p>
+      <div className="label-angle-actions">
+        {labelState.covers && <Button size="sm" variant="outline" onClick={() => update({ labelAngle: labelState.best })}>{labelState.clear.length ? "Move the name clear" : "Use the least covered position"}</Button>}
+        {stop.labelAngle !== undefined && <Button size="sm" variant="ghost" onClick={() => update({ labelAngle: undefined })}>Reset</Button>}
+      </div>
+    </div>
     <Button variant="destructive" onClick={onDelete}><Trash2 />Delete stop</Button>
     <p className="delete-note">Connected routes will also be deleted.</p>
   </div>;

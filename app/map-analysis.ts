@@ -1,6 +1,6 @@
 // The balance layer: everything derived from the stops and routes themselves. All of it is pure,
 // computed on demand from MapData, and none of it is stored in a map file.
-import { type MapData, type Point, realWagon, type Route, routeColors, type Stop, W } from "./map-data";
+import { defaultLabelAngle, stopSizeMeta, type MapData, type Point, realWagon, type Route, routeColors, type Stop, W } from "./map-data";
 import { curvedSamples, intersects, parallelPoints, pointsFor, polylineLength, stopById } from "./map-geometry";
 
 export type RouteSpacing = { route: Route; drawnMm: number; neededMm: number; ratio: number; verdict: "short" | "long" | "ok" };
@@ -174,4 +174,57 @@ export function suggestRoutes(data: MapData, stats: NetworkStats, colourTable: C
     });
   scored.sort((x, y) => x.hubSum - y.hubSum || x.distance - y.distance);
   return scored.slice(0, maxSuggestions);
+}
+
+// --- Stop-name placement -------------------------------------------------------------------
+// Whether a stop's name covers a route, and which bearings would keep it clear. Text width is
+// estimated from the character count rather than measured in the DOM, so this layer stays pure;
+// it is a warning aid, not a typesetter, and errs slightly wide.
+const LABEL_CHAR_WIDTH = 6.2, LABEL_HEIGHT = 12, LABEL_PAD = 2;
+
+const labelBox = (stop: Stop, angle: number, radius: number) => {
+  const width = Math.max(1, stop.name.length) * LABEL_CHAR_WIDTH;
+  const rad = angle * Math.PI / 180, distance = radius + 9;
+  const dx = Math.cos(rad) * distance, dy = Math.sin(rad) * distance;
+  const left = dx < -1 ? stop.x + dx - width : dx > 1 ? stop.x + dx : stop.x + dx - width / 2;
+  const top = dy < -3 ? stop.y + dy - LABEL_HEIGHT : dy > 3 ? stop.y + dy : stop.y + dy - LABEL_HEIGHT / 2;
+  return { left: left - LABEL_PAD, top: top - LABEL_PAD, right: left + width + LABEL_PAD, bottom: top + LABEL_HEIGHT + LABEL_PAD };
+};
+
+export function routeSamplePoints(data: MapData): Point[] {
+  const points: Point[] = [];
+  for (const route of data.routes) {
+    const geometry = parallelPoints(data, route);
+    const drawn = route.curved && geometry.length > 2 ? curvedSamples(geometry) : geometry;
+    for (let i = 0; i < drawn.length - 1; i++) {
+      const a = drawn[i], b = drawn[i + 1];
+      const steps = Math.max(2, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / 6));
+      for (let step = 0; step <= steps; step++) points.push({ x: a.x + (b.x - a.x) * step / steps, y: a.y + (b.y - a.y) * step / steps });
+    }
+  }
+  return points;
+}
+
+const overlapCount = (box: ReturnType<typeof labelBox>, samples: Point[]) =>
+  samples.reduce((count, point) => count + (point.x >= box.left && point.x <= box.right && point.y >= box.top && point.y <= box.bottom ? 1 : 0), 0);
+
+export const labelAngleOf = (stop: Stop) => stop.labelAngle ?? defaultLabelAngle(stop);
+
+export function labelCovers(data: MapData, stop: Stop, samples: Point[]): boolean {
+  const radius = stopSizeMeta[stop.size ?? "medium"].radius;
+  return overlapCount(labelBox(stop, labelAngleOf(stop), radius), samples) > 0;
+}
+
+// Every bearing, with how much of a route each one would sit on. The caller picks the first clear
+// one, or the least bad when the stop is so hemmed in that nothing is clear.
+export function labelAngleOptions(data: MapData, stop: Stop, samples: Point[]): { angle: number; overlap: number }[] {
+  const radius = stopSizeMeta[stop.size ?? "medium"].radius;
+  const options = [];
+  for (let angle = 0; angle < 360; angle += 15) options.push({ angle, overlap: overlapCount(labelBox(stop, angle, radius), samples) });
+  return options;
+}
+
+export function coveredLabels(data: MapData): Stop[] {
+  const samples = routeSamplePoints(data);
+  return data.stops.filter((stop) => labelCovers(data, stop, samples));
 }

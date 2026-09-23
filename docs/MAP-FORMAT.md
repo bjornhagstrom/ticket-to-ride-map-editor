@@ -60,11 +60,14 @@ All geometry uses SVG editor coordinates, for example `{ "x": 420, "y": 345 }`. 
   "name": "Central",
   "type": "rail",
   "x": 420,
-  "y": 345
+  "y": 345,
+  "labelAngle": 165
 }
 ```
 
 Supported stop types are `city`, `region`, `brt`, `rail`, `ferry` and `outing`. `size` is optional (`small`, `medium` or `large`; missing means `medium`) and only affects how large the stop is drawn — some expansions give meaning to stop size, such as marking major cities.
+
+`labelAngle` is optional and places the stop's name around the stop, as a bearing in degrees where 0 is to the right and 90 is below. The name stays attached to the stop wherever it is turned, so it follows the stop when the stop is moved. Leaving it out keeps the original placement (up and to the right, flipping to the left near the right edge), so older files are unaffected. Turn it with the Name position slider in a selected stop's Properties panel, which is how you move a name clear of a route that runs under it. The editor flags names that cover a route and can pick a clear bearing for you; where a stop is hemmed in and no bearing is clear, it says so rather than pretending otherwise.
 
 `symbol` is optional (`none`, `dot`, `dash`, `cross` or `letter`; missing means `none`) and draws a small marker centred on the stop, independent of its type, for rules of your own. When `symbol` is `letter`, `letter` holds the one- or two-character text to draw (falls back to `"A"` if empty).
 

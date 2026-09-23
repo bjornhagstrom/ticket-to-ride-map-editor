@@ -16,7 +16,7 @@ import { MapArtwork, type Tool } from "./map-artwork";
 import { AnalysisDialog, SuggestionsDialog, WelcomeGuide } from "./map-dialogs";
 import { BackgroundImageProperties, BackgroundProperties, LineStylePicker, NoteProperties, RouteProperties, RouteTypeEditor, StopProperties } from "./map-properties";
 import { PrintPages } from "./map-print";
-import { type RouteSuggestion, colourLengthTable, crossingPairs, buildAdjacency, networkStats, routeSpacing, shortestPath, suggestRoutes } from "./map-analysis";
+import { type RouteSuggestion, labelCovers, labelAngleOptions, routeSamplePoints, colourLengthTable, crossingPairs, buildAdjacency, networkStats, routeSpacing, shortestPath, suggestRoutes } from "./map-analysis";
 import { canvasPoint, pointsFor, samePair, stopById } from "./map-geometry";
 import { cloneForHistory, cloneMap, formatTimestamp, GUIDE_SEEN_KEY, HISTORY_LIMIT, MAX_IMAGE_WARN_BYTES, normalizeBackgroundFile, normalizeMap, normalizeNetworkFile, readBackgroundImage, rescaleMapToFormat, ROUTE_HINT_KEY, ROUTE_HINT_X_KEY } from "./map-storage";
 import { colorLabels, emptyMap, initialMap, type LineStyle, mapFormats, type BackgroundImage, type BackgroundShape, type BackgroundType, type MapData, type MapFormat, type Point, realWagon, type Route, type RouteType, type RouteTypeStyle, routeColors, STORAGE_KEY, type Stop, type StopSize, stopSizeMeta, type StopSymbol, stopSymbolMeta, type StopType, stopTypeMeta, W } from "./map-data";
@@ -119,6 +119,9 @@ export function MapEditor() {
   const crossings = useMemo(() => crossingPairs(data), [data]);
   // Routes drawn too short to hold their own wagons at real component size.
   const spacing = useMemo(() => routeSpacing(data, scaleWidthMm), [data, scaleWidthMm]);
+  const routeSamples = useMemo(() => routeSamplePoints(data), [data]);
+  const coveredNames = useMemo(() => data.stops.filter((stop) => labelCovers(data, stop, routeSamples)), [data, routeSamples]);
+
   const tightRoutes = spacing.filter((item) => item.verdict === "short");
   const looseRoutes = spacing.filter((item) => item.verdict === "long");
   const adjacency = useMemo(() => buildAdjacency(data), [data]);
@@ -128,6 +131,14 @@ export function MapEditor() {
   const avgHubDegree = data.stops.length ? Array.from(stats.hubDegree.values()).reduce((sum, value) => sum + value, 0) / data.stops.length : 0;
   const suggestions = useMemo(() => suggestRoutes(data, stats, colourTable), [data, stats, colourTable]);
   const selectedS = data.stops.find((stop) => stop.id === selectedStop);
+  // For the selected stop: is its name on a route, which bearings are clear, and which is best.
+  const selectedLabelState = useMemo(() => {
+    if (!selectedS) return { covers: false, clear: [] as number[], best: 0 };
+    const options = labelAngleOptions(data, selectedS, routeSamples);
+    const clear = options.filter((option) => option.overlap === 0).map((option) => option.angle);
+    const best = [...options].sort((a, b) => a.overlap - b.overlap)[0]?.angle ?? 0;
+    return { covers: labelCovers(data, selectedS, routeSamples), clear, best };
+  }, [data, routeSamples, selectedS]);
   const selectedR = data.routes.find((route) => route.id === selectedRoute);
   // Put the shape hint on whichever edge of the board the selected route is furthest from,
   // so it never covers the bend points you are about to drag.
@@ -419,6 +430,13 @@ export function MapEditor() {
           {format.testSheet && <div><Label htmlFor="scale-target">Printed as a proof of</Label><NativeSelect id="scale-target" value={scaleTarget} onChange={(event) => setScaleTarget(event.target.value as MapFormat)}>{Object.entries(mapFormats).filter(([, item]) => !item.testSheet).map(([key, item]) => <NativeSelectOption key={key} value={key}>{item.shortLabel}</NativeSelectOption>)}</NativeSelect></div>}
           <p className="helper">Sizes the wagon spaces from a real {realWagon.length} × {realWagon.width} mm train on a {scaleWidthMm.toLocaleString("en-GB")} mm board{format.testSheet ? `, shrunk with the sheet to about ${(realWagon.length / scaleWidthMm * format.widthMm).toFixed(1)} mm each in print` : ", so printing this format at full size gives real-size wagons"}. {tightRoutes.length || looseRoutes.length ? `${[tightRoutes.length && `${tightRoutes.length} too short`, looseRoutes.length && `${looseRoutes.length} roomier than needed`].filter(Boolean).join(", ")} — see Analyze balance.` : "Every route is drawn about the length its wagon count needs."}</p>
         </div>
+        {coveredNames.length > 0 && <Tooltip><TooltipTrigger asChild>
+          <div className="crossing-card has-warning" tabIndex={0}><div className="crossing-icon"><AlertTriangle /></div><div><strong>{coveredNames.length} stop name{coveredNames.length === 1 ? "" : "s"} on a route</strong><p>{coveredNames.slice(0, 3).map((stop) => stop.name).join(", ")}{coveredNames.length > 3 ? ` and ${coveredNames.length - 3} more` : ""}</p></div></div>
+        </TooltipTrigger><TooltipContent side="right" className="balance-tooltip">
+          <p>A stop&apos;s name is drawn over a route line, which is hard to read in print.</p>
+          <p>Select the stop and use <strong>Name position</strong> to turn the name around it. If the stop is so hemmed in that no position is clear, the panel says so — then move the stop, bend the route away, or accept it.</p>
+          <p>Text width is estimated rather than measured, so this errs slightly on the cautious side.</p>
+        </TooltipContent></Tooltip>}
         <Tooltip><TooltipTrigger asChild>
           <div className={cn("crossing-card", crossings.length && "has-warning")} tabIndex={0}><div className="crossing-icon">{crossings.length ? <AlertTriangle /> : <Check />}</div><div><strong>{crossings.length ? `${crossings.length} crossing${crossings.length === 1 ? "" : "s"}` : "No crossings"}</strong><p>{crossings.length ? "between buildable routes" : "The route network is geometrically clean"}</p></div></div>
         </TooltipTrigger><TooltipContent side="right" className="balance-tooltip">
@@ -452,7 +470,7 @@ export function MapEditor() {
         {selectedN && <NoteProperties note={selectedN} change={change} onDelete={() => setDanger("delete")} />}
         {imageSelected && data.backgroundImage && <BackgroundImageProperties image={data.backgroundImage} formatHeight={format.height} change={change} onDelete={() => setDanger("delete")} />}
         {selectedB && <BackgroundProperties shape={selectedB} change={change} onDelete={() => setDanger("delete")} />}
-        {selectedS && <StopProperties stop={selectedS} change={change} onDelete={() => setDanger("delete")} />}
+        {selectedS && <StopProperties stop={selectedS} change={change} onDelete={() => setDanger("delete")} labelState={selectedLabelState} />}
         {selectedR && <RouteProperties route={selectedR} stops={data.stops} routes={data.routes} lineStyles={data.lineStyles} routeTypeStyles={data.routeTypeStyles} change={change} onDelete={() => setDanger("delete")} onCreateStyle={addLineStyleToRoute} onUpdateStyle={updateLineStyle} onDeleteStyle={deleteLineStyle} onSetStyle={assignRouteLineStyle} onCreateType={addRouteTypeToRoute} onUpdateType={updateRouteType} onDeleteType={deleteRouteType} onAddParallel={addParallelRoute} onStraighten={straightenRoute} onSetCurved={setRouteCurved} linkParallel={linkParallel} onLinkParallel={setLinkParallel} />}
       </aside>
     </div>

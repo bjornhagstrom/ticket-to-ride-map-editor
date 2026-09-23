@@ -5,7 +5,11 @@ export type RouteType = string;
 export type BackgroundType = "area" | "line" | "label";
 export type MapFormat = "board-2x3" | "board-2x3-large" | "board-2x4" | "a4" | "a3" | "us-letter";
 export type Point = { x: number; y: number };
-export type Stop = Point & { id: string; name: string; type: StopType; size?: StopSize; symbol?: StopSymbol; letter?: string };
+export type Stop = Point & { id: string; name: string; type: StopType; size?: StopSize; symbol?: StopSymbol; letter?: string; labelAngle?: number };
+
+// Where a stop's name sits, as a compass bearing around the stop in degrees (0 = right, 90 = below).
+// Undefined keeps the original behaviour: up and to the right, flipping left near the right edge.
+export const defaultLabelAngle = (stop: Point) => (stop.x > 900 ? 215 : 325);
 export type Route = { id: string; a: string; b: string; length: number; type: RouteType; color: string; points?: Point[]; locomotiveSlots?: number[]; lineStyle?: string; curved?: boolean };
 export type LineStyle = { id: string; label: string; strokeWidth: number; dash: string };
 export type RouteTypeStyle = { id: string; label: string; stroke: string; dash: string; strokeWidth: number; infrastructure: boolean };
@@ -143,8 +147,8 @@ export const initialMap: MapData = {
   notes: [
     {
       id: "example-note",
-      x: 760,
-      y: 60,
+      x: 815,
+      y: 28,
       width: 250,
       height: 110,
       text: "Evaluation note: use notes like this to record playtesting feedback. They show on screen and in print, but are not part of the finished map.",
@@ -204,14 +208,14 @@ export const initialMap: MapData = {
     },
   ],
   stops: [
-    { id: "example-westport", name: "Westport", type: "city", x: 130, y: 205, symbol: "dot" },
-    { id: "example-pine-hill", name: "Pine Hill", type: "outing", x: 280, y: 575, size: "small" },
-    { id: "example-central", name: "Central", type: "rail", x: 420, y: 345 },
-    { id: "example-lakeside", name: "Lakeside", type: "city", x: 640, y: 185 },
-    { id: "example-old-town", name: "Old Town", type: "region", x: 690, y: 600 },
-    { id: "example-harbour", name: "Harbour", type: "ferry", x: 875, y: 455, symbol: "letter", letter: "F" },
-    { id: "example-eastgate", name: "Eastgate", type: "brt", x: 980, y: 210, size: "large" },
-    { id: "example-quarry", name: "Quarry", type: "outing", x: 1010, y: 625, size: "small" },
+    { id: "example-westport", name: "Westport", type: "city", x: 130, y: 205, symbol: "dot", labelAngle: 195 },
+    { id: "example-pine-hill", name: "Pine Hill", type: "outing", x: 280, y: 575, size: "small", labelAngle: 105 },
+    { id: "example-central", name: "Central", type: "rail", x: 420, y: 345, labelAngle: 165 },
+    { id: "example-lakeside", name: "Lakeside", type: "city", x: 640, y: 185, labelAngle: 270 },
+    { id: "example-old-town", name: "Old Town", type: "region", x: 690, y: 600, labelAngle: 120 },
+    { id: "example-harbour", name: "Harbour", type: "ferry", x: 875, y: 455, symbol: "letter", letter: "F", labelAngle: 345 },
+    { id: "example-eastgate", name: "Eastgate", type: "brt", x: 980, y: 210, size: "large", labelAngle: 300 },
+    { id: "example-quarry", name: "Quarry", type: "outing", x: 1010, y: 625, size: "small", labelAngle: 210 },
   ],
   routes: [
     { id: "example-route-1", a: "example-westport", b: "example-central", length: 4, type: "city", color: "red", points: [{ x: 265, y: 235 }] },
@@ -220,7 +224,7 @@ export const initialMap: MapData = {
     { id: "example-route-4", a: "example-central", b: "example-lakeside", length: 3, type: "rail", color: "neutral", points: [{ x: 525, y: 225 }] },
     { id: "example-route-5", a: "example-central", b: "example-old-town", length: 4, type: "city", color: "blue", points: [{ x: 545, y: 485 }], lineStyle: "example-tunnel" },
     { id: "example-route-6", a: "example-lakeside", b: "example-eastgate", length: 4, type: "brt", color: "neutral", points: [{ x: 815, y: 165 }] },
-    { id: "example-route-7", a: "example-lakeside", b: "example-harbour", length: 3, type: "ferry", color: "neutral", points: [{ x: 800, y: 270 }, { x: 855, y: 370 }], locomotiveSlots: [1], curved: true },
+    { id: "example-route-7", a: "example-lakeside", b: "example-harbour", length: 3, type: "ferry", color: "neutral", points: [{ x: 800, y: 270 }, { x: 855, y: 370 }], locomotiveSlots: [0], curved: true },
     { id: "example-route-8", a: "example-old-town", b: "example-harbour", length: 3, type: "region", color: "green", points: [{ x: 790, y: 585 }] },
     { id: "example-route-9", a: "example-harbour", b: "example-eastgate", length: 3, type: "city", color: "yellow", points: [{ x: 950, y: 335 }] },
     { id: "example-route-10", a: "example-old-town", b: "example-quarry", length: 2, type: "region", color: "purple", points: [{ x: 850, y: 645 }] },

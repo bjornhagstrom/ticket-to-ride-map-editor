@@ -12,6 +12,7 @@ Live site: <https://hagstrom.nu/ttr/>
 - Build double routes: two or more parallel lines between the same pair of stops, each in its own colour, drawn side by side automatically.
 - Choose one of three stop sizes, which can carry meaning in some expansions.
 - Mark a stop with a dot, dash, cross or a short letter code, independent of its type.
+- Turn a stop's name around the stop to keep it clear of the routes running past it, with a warning listing names that cover a route and a one-click move to a clear position.
 - Mark specific wagon slots on a route as requiring a locomotive card.
 - Switch on true-scale wagons to draw the spaces edge to edge at the size a real 20 × 9 mm train takes up, so you can judge how crowded the finished board will actually be. A board format printed at full size gives exactly real-size wagons; a test sheet is treated as a shrunken proof of whichever board you pick, so the layout matches the board and simply prints smaller. Routes drawn too short for their own wagon count are outlined in red.
 - Define reusable custom line styles (thickness and dash pattern) to flag routes that follow a special rule, and set a default style so new routes pick it up automatically.
