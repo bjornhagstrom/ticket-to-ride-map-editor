@@ -22,8 +22,21 @@ type Danger = "reset" | "delete" | "load-blank" | "load-example" | "import-backg
 type PendingImport = { kind: "background"; background: BackgroundShape[]; backgroundImage?: BackgroundImage } | { kind: "network"; stops: Stop[]; routes: Route[]; lineStyles: LineStyle[]; routeTypeStyles: RouteTypeStyle[] } | { kind: "image"; image: BackgroundImage };
 const GUIDE_SEEN_KEY = `${STORAGE_KEY}-guide-seen`;
 const MAX_IMAGE_WARN_BYTES = 2 * 1024 * 1024;
+// Snapshots are geometry-only (see cloneForHistory), so a deep stack stays in the low megabytes
+// even for a large map. Kept in memory for the session only, never written to local storage.
+const HISTORY_LIMIT = 200;
 
 const cloneMap = (data: MapData): MapData => JSON.parse(JSON.stringify(data));
+// History snapshots deep-clone everything except the background image's base64 payload, which is
+// re-attached by reference. Strings are immutable, so every snapshot shares one copy of the image
+// instead of carrying its own — without this a single 2 MB image would cost 2 MB per undo step.
+const cloneForHistory = (data: MapData): MapData => {
+  const image = data.backgroundImage;
+  if (!image) return cloneMap(data);
+  const clone = cloneMap({ ...data, backgroundImage: { ...image, dataUrl: "" } });
+  if (clone.backgroundImage) clone.backgroundImage.dataUrl = image.dataUrl;
+  return clone;
+};
 const isMapFormat = (value: unknown): value is MapFormat => typeof value === "string" && value in mapFormats;
 const clamp01 = (value: unknown): number => typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : 0;
 const normalizeBackgroundImage = (value: unknown): BackgroundImage | undefined => {
@@ -341,6 +354,10 @@ export function MapEditor() {
   const dragBackgroundLabelRef = useRef<string | null>(null);
   const dragImageRef = useRef<{ mode: "move"; offsetX: number; offsetY: number } | { mode: "scale" | "rotate" } | null>(null);
   const dragNoteRef = useRef<{ id: string; mode: "move"; offsetX: number; offsetY: number } | { id: string; mode: "resize" } | null>(null);
+  const dragSnapshotRef = useRef<MapData | null>(null);
+  const draggedRef = useRef(false);
+  const undoRef = useRef<() => void>(() => {});
+  const redoRef = useRef<() => void>(() => {});
   const fileRef = useRef<HTMLInputElement>(null);
   const imageFileRef = useRef<HTMLInputElement>(null);
   const format = mapFormats[data.format];
@@ -349,6 +366,20 @@ export function MapEditor() {
 
   useEffect(() => { queueMicrotask(() => { try { const stored = localStorage.getItem(STORAGE_KEY); if (stored) { setData(normalizeMap(JSON.parse(stored))); localStorage.setItem(GUIDE_SEEN_KEY, "1"); } else if (!localStorage.getItem(GUIDE_SEEN_KEY)) setShowGuide(true); } catch { /* ignore invalid local state */ } setReady(true); }); }, []);
   useEffect(() => { if (!ready) return; localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); const timer = window.setTimeout(() => setSaved(true), 0); return () => window.clearTimeout(timer); }, [data, ready]);
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey)) return;
+      const key = event.key.toLowerCase();
+      if (key !== "z" && key !== "y") return;
+      const target = event.target as HTMLElement | null;
+      // Leave the browser's own text undo alone while typing in a field.
+      if (target && (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName))) return;
+      event.preventDefault();
+      if (key === "y" || event.shiftKey) redoRef.current(); else undoRef.current();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   const crossings = useMemo(() => crossingPairs(data), [data]);
   const adjacency = useMemo(() => buildAdjacency(data), [data]);
@@ -361,12 +392,24 @@ export function MapEditor() {
   const selectedR = data.routes.find((route) => route.id === selectedRoute);
   const selectedB = data.background.find((shape) => shape.id === selectedBackground);
   const selectedN = data.notes.find((note) => note.id === selectedNote);
-  const change = (fn: (draft: MapData) => MapData) => setData((previous) => { setPast((history) => [...history, cloneMap(previous)].slice(-40)); setFuture([]); setSaved(false); return fn(cloneMap(previous)); });
+  const change = (fn: (draft: MapData) => MapData) => setData((previous) => { setPast((history) => [...history, cloneForHistory(previous)].slice(-HISTORY_LIMIT)); setFuture([]); setSaved(false); return fn(cloneMap(previous)); });
+  const pushHistory = (snapshot: MapData) => { setPast((history) => [...history, snapshot].slice(-HISTORY_LIMIT)); setFuture([]); setSaved(false); };
+  const beginDrag = () => { dragSnapshotRef.current = cloneForHistory(data); draggedRef.current = false; };
   const clearSelection = () => { setSelectedStop(null); setSelectedRoute(null); setSelectedBackground(null); setImageSelected(false); setSelectedNote(null); };
   const chooseImage = () => { setImageSelected(true); setSelectedStop(null); setSelectedRoute(null); setSelectedBackground(null); setSelectedNote(null); setTool("select"); };
   const chooseNote = (id: string) => { setSelectedNote(id); setSelectedStop(null); setSelectedRoute(null); setSelectedBackground(null); setImageSelected(false); setTool("select"); };
-  const undo = () => { const previous = past.at(-1); if (!previous) return; setFuture((items) => [cloneMap(data), ...items]); setData(previous); setPast((items) => items.slice(0, -1)); clearSelection(); };
-  const redo = () => { const next = future[0]; if (!next) return; setPast((items) => [...items, cloneMap(data)]); setData(next); setFuture((items) => items.slice(1)); clearSelection(); };
+  const selectTool = (next: Tool) => {
+    setTool(next);
+    setRouteStart(null);
+    setDraftPoints([]);
+    setMeasureStart(null);
+    if (next === "measure") setMeasureResult(null);
+    if (next !== "select") clearSelection();
+  };
+  const undo = () => { const previous = past.at(-1); if (!previous) return; setFuture((items) => [cloneForHistory(data), ...items]); setData(previous); setPast((items) => items.slice(0, -1)); clearSelection(); };
+  const redo = () => { const next = future[0]; if (!next) return; setPast((items) => [...items, cloneForHistory(data)]); setData(next); setFuture((items) => items.slice(1)); clearSelection(); };
+  undoRef.current = undo;
+  redoRef.current = redo;
 
   const hasContent = data.stops.length > 0 || data.routes.length > 0 || data.background.length > 0 || data.notes.length > 0 || Boolean(data.backgroundImage);
   const dismissGuide = () => { try { localStorage.setItem(GUIDE_SEEN_KEY, "1"); } catch { /* ignore unavailable storage */ } setShowGuide(false); };
@@ -429,6 +472,7 @@ export function MapEditor() {
   };
   const onCanvasMove = (event: React.PointerEvent<SVGSVGElement>) => {
     const point = canvasPoint(event.currentTarget, event.clientX, event.clientY, format.height);
+    if (dragNoteRef.current || dragImageRef.current || dragBackgroundLabelRef.current || dragBackgroundPointRef.current || dragWaypointRef.current || dragStopRef.current) draggedRef.current = true;
     if (dragNoteRef.current) {
       const drag = dragNoteRef.current;
       setData((current) => ({
@@ -473,7 +517,14 @@ export function MapEditor() {
     setData((current) => ({ ...current, stops: current.stops.map((stop) => stop.id === dragStopRef.current ? { ...stop, ...point } : stop) }));
     setSaved(false);
   };
-  const stopDragging = () => { dragStopRef.current = null; dragWaypointRef.current = null; dragBackgroundPointRef.current = null; dragBackgroundLabelRef.current = null; dragImageRef.current = null; dragNoteRef.current = null; };
+  const stopDragging = () => {
+    // Only a drag that actually moved something becomes an undo step — a plain click to select
+    // sets the same refs and should not fill the history with no-ops.
+    if (draggedRef.current && dragSnapshotRef.current) pushHistory(dragSnapshotRef.current);
+    dragSnapshotRef.current = null;
+    draggedRef.current = false;
+    dragStopRef.current = null; dragWaypointRef.current = null; dragBackgroundPointRef.current = null; dragBackgroundLabelRef.current = null; dragImageRef.current = null; dragNoteRef.current = null;
+  };
   const deleteSelected = () => {
     change((draft) => {
       if (imageSelected) draft.backgroundImage = undefined;
@@ -575,26 +626,29 @@ export function MapEditor() {
 
   return <main className="app-shell">
     <header className="topbar">
-      <div className="brand"><span className="brand-mark"><BusFront /></span><div><p>Ticket to Ride</p><h1>Map editor</h1></div></div>
+      <div className="brand"><span className="brand-mark"><BusFront /></span><div><p>Ticket to Ride</p><h1>Map editor – Print and draw</h1></div></div>
       <div className="map-title"><Label htmlFor="map-name" className="sr-only">Map name</Label><Input id="map-name" value={data.name} onChange={(event) => change((draft) => ({ ...draft, name: event.target.value }))} /><span className="save-state"><Check />{saved ? "Saved locally" : "Saving…"}</span></div>
-      <div className="header-actions"><Button variant="outline" size="sm" onClick={() => setShowGuide(true)}><CircleHelp />Help</Button><Button variant="ghost" size="icon" aria-label="Undo" disabled={!past.length} onClick={undo}><Undo2 /></Button><Button variant="ghost" size="icon" aria-label="Redo" disabled={!future.length} onClick={redo}><Redo2 /></Button><DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" size="sm"><Upload />Import</Button></DropdownMenuTrigger><DropdownMenuContent align="start"><DropdownMenuItem onClick={() => fileRef.current?.click()}><Upload />Map project</DropdownMenuItem><DropdownMenuItem onClick={() => imageFileRef.current?.click()}><ImageIcon />Background image</DropdownMenuItem></DropdownMenuContent></DropdownMenu><input ref={fileRef} hidden type="file" accept="application/json" onChange={(event) => { importMap(event.target.files?.[0]); event.target.value = ""; }} /><input ref={imageFileRef} hidden type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => { importBackgroundImage(event.target.files?.[0]); event.target.value = ""; }} /><Button variant="outline" size="sm" onClick={() => window.print()}><Printer />Print {format.shortLabel}</Button><DropdownMenu><DropdownMenuTrigger asChild><Button size="sm"><Download />Export</Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onClick={exportMap}><Download />Full map</DropdownMenuItem><DropdownMenuItem onClick={exportBackground}><Layers3 />Background only</DropdownMenuItem><DropdownMenuItem onClick={exportNetwork}><Link2 />Network only</DropdownMenuItem></DropdownMenuContent></DropdownMenu></div>
+      <div className="header-actions"><Button variant="outline" size="sm" onClick={() => setShowGuide(true)}><CircleHelp />Help</Button><Button variant="ghost" size="icon" aria-label="Undo" title="Undo (Ctrl/Cmd+Z)" disabled={!past.length} onClick={undo}><Undo2 /></Button><Button variant="ghost" size="icon" aria-label="Redo" title="Redo (Ctrl/Cmd+Shift+Z)" disabled={!future.length} onClick={redo}><Redo2 /></Button><DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" size="sm"><Upload />Import</Button></DropdownMenuTrigger><DropdownMenuContent align="start"><DropdownMenuItem onClick={() => fileRef.current?.click()}><Upload />Map project</DropdownMenuItem><DropdownMenuItem onClick={() => imageFileRef.current?.click()}><ImageIcon />Background image</DropdownMenuItem></DropdownMenuContent></DropdownMenu><input ref={fileRef} hidden type="file" accept="application/json" onChange={(event) => { importMap(event.target.files?.[0]); event.target.value = ""; }} /><input ref={imageFileRef} hidden type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => { importBackgroundImage(event.target.files?.[0]); event.target.value = ""; }} /><Button variant="outline" size="sm" onClick={() => window.print()}><Printer />Print {format.shortLabel}</Button><DropdownMenu><DropdownMenuTrigger asChild><Button size="sm"><Download />Export</Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onClick={exportMap}><Download />Full map</DropdownMenuItem><DropdownMenuItem onClick={exportBackground}><Layers3 />Background only</DropdownMenuItem><DropdownMenuItem onClick={exportNetwork}><Link2 />Network only</DropdownMenuItem></DropdownMenuContent></DropdownMenu></div>
     </header>
     <div className="workspace">
       <aside className="tools-panel panel">
         <div className="panel-heading"><span>Tools</span><small>Work directly on the map</small></div>
-        <div className="tool-list">
-          <ToolButton active={tool === "select"} icon={<MousePointer2 />} title="Select & move" note="Edit stops, routes and shapes" onClick={() => { setTool("select"); setRouteStart(null); setDraftPoints([]); }} />
-          <ToolButton active={tool === "stop"} icon={<MapPinPlus />} title="Add stop" note="Click the map to place it" onClick={() => { setTool("stop"); setRouteStart(null); setDraftPoints([]); }} />
+        <div className="tool-row"><TooltipProvider>{toolDefinitions.map((item) => <ToolButton key={item.id} active={tool === item.id} icon={item.icon} title={item.title} note={item.note} onClick={() => selectTool(item.id)} />)}</TooltipProvider></div>
+        <div className="tool-panel">
+          {tool === "route" && <p className="tool-status">{routeStart ? `Start: ${stopById(data, routeStart)?.name} · now click the destination stop` : "Click two stops to connect them."}</p>}
+          {tool === "measure" && <p className="tool-status">{measureStart ? `From ${stopById(data, measureStart)?.name} · now click the destination stop` : measureResult ? ("unreachable" in measureResult ? `${stopById(data, measureResult.from)?.name} → ${stopById(data, measureResult.to)?.name}: no connected path` : `${stopById(data, measureResult.from)?.name} → ${stopById(data, measureResult.to)?.name}: ${measureResult.distance} wagon spaces`) : "Click two stops for the shortest path."}</p>}
           {tool === "stop" && <div className="tool-options"><div className="grid-two"><div><Label>Stop type</Label><NativeSelect value={stopType} onChange={(event) => setStopType(event.target.value as StopType)}>{Object.entries(stopTypeMeta).map(([key, meta]) => <NativeSelectOption key={key} value={key}>{meta.label}</NativeSelectOption>)}</NativeSelect></div><div><Label>Stop size</Label><NativeSelect value={stopSize} onChange={(event) => setStopSize(event.target.value as StopSize)}>{Object.entries(stopSizeMeta).map(([key, meta]) => <NativeSelectOption key={key} value={key}>{meta.label}</NativeSelectOption>)}</NativeSelect></div></div><div className="grid-two"><div><Label>Symbol</Label><NativeSelect value={stopSymbol} onChange={(event) => setStopSymbol(event.target.value as StopSymbol)}>{Object.entries(stopSymbolMeta).map(([key, meta]) => <NativeSelectOption key={key} value={key}>{meta.label}</NativeSelectOption>)}</NativeSelect></div>{stopSymbol === "letter" && <div><Label>Letter</Label><Input maxLength={2} value={stopLetter} onChange={(event) => setStopLetter(event.target.value)} /></div>}</div></div>}
-          <ToolButton active={tool === "route"} icon={<Link2 />} title="Draw route" note={routeStart ? `Start: ${stopById(data, routeStart)?.name} · choose end` : "Click two stops"} onClick={() => { setTool("route"); setRouteStart(null); setDraftPoints([]); }} />
           {tool === "route" && <div className="tool-options"><RouteTypeEditor typeId={routeType} routeTypeStyles={data.routeTypeStyles} routes={data.routes} onSelectType={setRouteType} onCreateType={() => setRouteType(createRouteType())} onUpdateType={updateRouteType} onDeleteType={deleteRouteType} /><div><Label>Colour</Label><NativeSelect value={routeColor} onChange={(event) => setRouteColor(event.target.value)}>{Object.keys(routeColors).map((key) => <NativeSelectOption key={key} value={key}>{colorLabels[key]}</NativeSelectOption>)}</NativeSelect></div><LineStylePicker value={routeLineStyle} lineStyles={data.lineStyles} onChange={setRouteLineStyle} onCreate={() => setRouteLineStyle(createLineStyle())} onUpdate={updateLineStyle} onDelete={deleteLineStyle} helper="New routes you draw will use this style. Change it anytime for an existing route from its Properties panel." /></div>}
-          <ToolButton active={tool === "background"} icon={<Layers3 />} title="Draw background" note="Areas, boundaries and labels" onClick={() => { setTool("background"); setRouteStart(null); clearSelection(); }} />
           {tool === "background" && <div className="tool-options background-tools"><div className="image-import-row"><Label>Background image</Label><div className="image-import-buttons"><Button size="sm" variant="outline" onClick={() => imageFileRef.current?.click()}><ImageIcon />{data.backgroundImage ? "Replace image" : "Import image"}</Button>{data.backgroundImage && <Button size="sm" variant="ghost" onClick={() => { chooseImage(); setDanger("delete"); }}><Trash2 />Remove</Button>}</div></div><Label>Object</Label><NativeSelect value={backgroundType} onChange={(event) => { setBackgroundType(event.target.value as BackgroundType); setDraftPoints([]); }}><NativeSelectOption value="area">Area</NativeSelectOption><NativeSelectOption value="line">Line</NativeSelectOption><NativeSelectOption value="label">Label</NativeSelectOption></NativeSelect>{backgroundType !== "label" && <><div className="colour-row"><label>Fill <input type="color" value={backgroundFill} onChange={(event) => setBackgroundFill(event.target.value)} disabled={backgroundType === "line"} /></label><label>Outline <input type="color" value={backgroundStroke} onChange={(event) => setBackgroundStroke(event.target.value)} /></label></div><p className="helper">Click to add points. Finish when the shape is ready.</p><div className="draft-actions"><Button size="sm" disabled={draftPoints.length < (backgroundType === "area" ? 3 : 2)} onClick={finishBackground}>Finish shape</Button><Button size="sm" variant="ghost" disabled={!draftPoints.length} onClick={() => setDraftPoints([])}>Cancel</Button></div></>}</div>}
-          <ToolButton active={tool === "note"} icon={<StickyNote />} title="Add note" note="Click the map to place an evaluation note" onClick={() => { setTool("note"); setRouteStart(null); clearSelection(); }} />
-          <ToolButton active={tool === "measure"} icon={<Ruler />} title="Measure distance" note={measureStart ? `From ${stopById(data, measureStart)?.name} · choose destination` : measureResult ? ("unreachable" in measureResult ? `${stopById(data, measureResult.from)?.name} → ${stopById(data, measureResult.to)?.name}: no path` : `${stopById(data, measureResult.from)?.name} → ${stopById(data, measureResult.to)?.name}: ${measureResult.distance} units`) : "Click two stops for the shortest path"} onClick={() => { setTool("measure"); setMeasureStart(null); setMeasureResult(null); clearSelection(); }} />
         </div>
         <div className="format-control"><Label htmlFor="map-format">Board format</Label><NativeSelect id="map-format" value={data.format} onChange={(event) => changeFormat(event.target.value as MapFormat)}>{Object.entries(mapFormats).map(([key, item]) => <NativeSelectOption key={key} value={key}>{item.label}</NativeSelectOption>)}</NativeSelect><dl className="format-measurements"><div><dt>Finished size</dt><dd>{format.widthMm.toLocaleString("en-GB")} × {format.heightMm.toLocaleString("en-GB")} mm{format.imperial ? ` (${format.imperial})` : ""}</dd></div>{format.columns > 1 && <div><dt>Panel size</dt><dd>about {panelWidthMm} × {panelHeightMm} mm</dd></div>}</dl><p>{format.note}{format.custom ? ". This is not a verified commercial Ticket to Ride size" : ""}. Changing format keeps objects in the same relative positions.</p></div>
-        <div className={cn("crossing-card", crossings.length && "has-warning")}><div className="crossing-icon">{crossings.length ? <AlertTriangle /> : <Check />}</div><div><strong>{crossings.length ? `${crossings.length} crossing${crossings.length === 1 ? "" : "s"}` : "No crossings"}</strong><p>{crossings.length ? "between buildable routes" : "The route network is geometrically clean"}</p></div></div>
+        <TooltipProvider><Tooltip><TooltipTrigger asChild>
+          <div className={cn("crossing-card", crossings.length && "has-warning")} tabIndex={0}><div className="crossing-icon">{crossings.length ? <AlertTriangle /> : <Check />}</div><div><strong>{crossings.length ? `${crossings.length} crossing${crossings.length === 1 ? "" : "s"}` : "No crossings"}</strong><p>{crossings.length ? "between buildable routes" : "The route network is geometrically clean"}</p></div></div>
+        </TooltipTrigger><TooltipContent side="right" className="balance-tooltip">
+          <p><strong>Crossings</strong> are places where two buildable routes pass over each other without meeting at a stop.</p>
+          <p>Aim for zero. On a printed board a crossing is ambiguous: players can&apos;t tell which line a marked wagon space belongs to, and it usually means the geometry needs a stop at the junction or a route routed around.</p>
+          <p>Drag a stop, or add a bend point to a selected route, to pull the lines apart. Pre-built infrastructure routes are ignored here, since those are drawn as continuous lines that nobody claims.</p>
+        </TooltipContent></Tooltip></TooltipProvider>
         {data.stops.length > 0 && <TooltipProvider><Tooltip><TooltipTrigger asChild>
           <div className={cn("crossing-card", lowConnectionStops.length && "has-warning")} tabIndex={0}><div className="crossing-icon">{lowConnectionStops.length ? <AlertTriangle /> : <Check />}</div><div><strong>{lowConnectionStops.length ? `${lowConnectionStops.length} low-connection stop${lowConnectionStops.length === 1 ? "" : "s"}` : "Well connected"}</strong><p>avg hub degree {avgHubDegree.toFixed(1)}{lowConnectionStops.length ? " · some stops are dead ends" : ""}</p></div></div>
         </TooltipTrigger><TooltipContent side="right" className="balance-tooltip">
@@ -610,7 +664,7 @@ export function MapEditor() {
       <section className="map-wrap">
         <div className="map-status"><Badge variant="secondary">{format.shortLabel}</Badge><Badge variant="secondary">{format.widthMm.toLocaleString("en-GB")} × {format.heightMm.toLocaleString("en-GB")} mm</Badge><Badge variant="secondary">{data.stops.length} stops</Badge><Badge variant="secondary">{data.routes.length} routes</Badge><Badge variant="secondary">{data.background.length} background objects</Badge>{data.notes.length > 0 && <Badge variant="secondary">{data.notes.length} note{data.notes.length === 1 ? "" : "s"}</Badge>}<span>Everything is stored in the exported map file</span></div>
         <svg className={cn("map-canvas", `tool-${tool}`)} style={{ aspectRatio: `${W} / ${format.height}` }} viewBox={`0 0 ${W} ${format.height}`} onPointerDown={onCanvasDown} onPointerMove={onCanvasMove} onPointerUp={stopDragging} onPointerLeave={stopDragging}>
-          <MapArtwork data={data} tool={tool} selectedRoute={selectedRoute} selectedStop={selectedStop} selectedBackground={selectedBackground} imageSelected={imageSelected} selectedNote={selectedNote} routeStart={routeStart} draft={{ type: backgroundType, points: draftPoints, fill: backgroundFill, stroke: backgroundStroke }} onRoute={(id) => { setSelectedRoute(id); setSelectedStop(null); setSelectedBackground(null); setSelectedNote(null); setTool("select"); }} onRouteSlot={toggleLocomotiveSlot} onStop={(id) => { chooseStop(id); if (tool === "select") dragStopRef.current = id; }} onWaypoint={(routeId, index) => { dragWaypointRef.current = { routeId, index }; }} onBackground={(id) => { setSelectedBackground(id); setSelectedRoute(null); setSelectedStop(null); setSelectedNote(null); setTool("select"); }} onBackgroundPoint={(shapeId, index) => { dragBackgroundPointRef.current = { shapeId, index }; }} onBackgroundLabel={(shapeId) => { dragBackgroundLabelRef.current = shapeId; }} onImageSelect={chooseImage} onImageMove={(point) => { chooseImage(); const img = data.backgroundImage; if (img) dragImageRef.current = { mode: "move", offsetX: point.x - img.x, offsetY: point.y - img.y }; }} onImageScale={() => { dragImageRef.current = { mode: "scale" }; }} onImageRotate={() => { dragImageRef.current = { mode: "rotate" }; }} onNoteSelect={chooseNote} onNoteMove={(id, point) => { chooseNote(id); const note = data.notes.find((item) => item.id === id); if (note) dragNoteRef.current = { id, mode: "move", offsetX: point.x - note.x, offsetY: point.y - note.y }; }} onNoteResize={(id) => { dragNoteRef.current = { id, mode: "resize" }; }} />
+          <MapArtwork data={data} tool={tool} selectedRoute={selectedRoute} selectedStop={selectedStop} selectedBackground={selectedBackground} imageSelected={imageSelected} selectedNote={selectedNote} routeStart={routeStart} draft={{ type: backgroundType, points: draftPoints, fill: backgroundFill, stroke: backgroundStroke }} onRoute={(id) => { setSelectedRoute(id); setSelectedStop(null); setSelectedBackground(null); setSelectedNote(null); setTool("select"); }} onRouteSlot={toggleLocomotiveSlot} onStop={(id) => { chooseStop(id); if (tool === "select") { beginDrag(); dragStopRef.current = id; } }} onWaypoint={(routeId, index) => { beginDrag(); dragWaypointRef.current = { routeId, index }; }} onBackground={(id) => { setSelectedBackground(id); setSelectedRoute(null); setSelectedStop(null); setSelectedNote(null); setTool("select"); }} onBackgroundPoint={(shapeId, index) => { beginDrag(); dragBackgroundPointRef.current = { shapeId, index }; }} onBackgroundLabel={(shapeId) => { beginDrag(); dragBackgroundLabelRef.current = shapeId; }} onImageSelect={chooseImage} onImageMove={(point) => { chooseImage(); const img = data.backgroundImage; if (img) { beginDrag(); dragImageRef.current = { mode: "move", offsetX: point.x - img.x, offsetY: point.y - img.y }; } }} onImageScale={() => { beginDrag(); dragImageRef.current = { mode: "scale" }; }} onImageRotate={() => { beginDrag(); dragImageRef.current = { mode: "rotate" }; }} onNoteSelect={chooseNote} onNoteMove={(id, point) => { chooseNote(id); const note = data.notes.find((item) => item.id === id); if (note) { beginDrag(); dragNoteRef.current = { id, mode: "move", offsetX: point.x - note.x, offsetY: point.y - note.y }; } }} onNoteResize={(id) => { beginDrag(); dragNoteRef.current = { id, mode: "resize" }; }} />
         </svg>
       </section>
       <aside className="properties panel">
@@ -908,4 +962,17 @@ function StopSymbolGlyph({ stop, radius, color }: { stop: Stop; radius: number; 
   return null;
 }
 
-function ToolButton({ active, icon, title, note, onClick }: { active: boolean; icon: React.ReactNode; title: string; note: string; onClick: () => void }) { return <button className={cn("tool-button", active && "active")} onClick={onClick}><span>{icon}</span><div><strong>{title}</strong><small>{note}</small></div></button>; }
+const toolDefinitions: Array<{ id: Tool; icon: React.ReactNode; title: string; note: string }> = [
+  { id: "select", icon: <MousePointer2 />, title: "Select & move", note: "Click anything on the map to select it, then edit it in the Properties panel or drag it somewhere else." },
+  { id: "stop", icon: <MapPinPlus />, title: "Add stop", note: "Click the map to place a stop, using the type, size and symbol set below." },
+  { id: "route", icon: <Link2 />, title: "Draw route", note: "Click two stops to connect them, using the route type, colour and special-rule style set below." },
+  { id: "background", icon: <Layers3 />, title: "Draw background", note: "Draw areas, boundaries and labels behind the network, or import a background map image." },
+  { id: "note", icon: <StickyNote />, title: "Add note", note: "Click the map to drop an evaluation note. Notes show on screen and in print, but aren't part of the map itself." },
+  { id: "measure", icon: <Ruler />, title: "Measure distance", note: "Click two stops to see the shortest path between them, counted in wagon spaces rather than straight-line distance." },
+];
+
+function ToolButton({ active, icon, title, note, onClick }: { active: boolean; icon: React.ReactNode; title: string; note: string; onClick: () => void }) {
+  return <Tooltip><TooltipTrigger asChild>
+    <button type="button" className={cn("tool-button", active && "active")} onClick={onClick} aria-label={title} aria-pressed={active}>{icon}</button>
+  </TooltipTrigger><TooltipContent side="bottom" className="tool-tooltip"><strong>{title}</strong><span>{note}</span></TooltipContent></Tooltip>;
+}
