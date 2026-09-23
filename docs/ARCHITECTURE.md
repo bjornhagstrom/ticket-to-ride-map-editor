@@ -61,6 +61,17 @@ Changing this order can alter pointer behaviour as well as appearance. Notes are
 
 Route appearance is data, not code. `MapData.routeTypeStyles` is a user-editable array (label, line colour, thickness, dash pattern, and an `infrastructure` flag that hides the colour picker and wagon slots for pre-built types like rail/trail). `Route.type` is a plain `string` id into that array rather than a fixed TypeScript union, so a map can rename, restyle or delete the six default types and add its own. `MapData.lineStyles` is a separate, similarly user-editable array for one-off per-route overrides (thickness/dash only, no colour), letting a single route be flagged as a special case on top of its type's normal appearance. Both arrays travel with full-map and network-only exports; `defaultRouteTypeStyles` in `map-data.ts` is the fallback seed for older files and new maps.
 
+## Balance analysis and route suggestions
+
+`app/map-editor.tsx` includes a small graph layer computed purely from `data.stops`/`data.routes`, with no separate module and no new persisted data:
+
+- `buildAdjacency`/`networkStats` treat stops as nodes and routes as weighted edges (weight = `route.length`) to compute, per stop, neighbour count, a weighted "links" degree (parallel `Route` records between the same pair count extra — the app's stand-in for a spreadsheet-style `Double` flag, since routes don't carry one), and a combined "hub degree". Infrastructure-type routes count as real, traversable edges here; they are only excluded from crossing detection.
+- `shortestPath` is a plain O(V²) Dijkstra (no heap, no dependency — the graphs this app deals with are small) used by the Measure tool to report the shortest route-length distance between two clicked stops.
+- `colourLengthTable` cross-tabulates non-infrastructure routes by colour and length, mirroring a classic hand-built balance check (are all the length-3 routes the same colour?).
+- `suggestRoutes` proposes new routes: k-nearest-neighbour candidates by canvas distance, filtered to exclude already-connected pairs and any pair whose straight line would cross an existing route (reusing the same `intersects`/`orient` primitives as `crossingPairs`), then ranked by combined hub degree of the two endpoints so suggestions favour filling in under-connected stops first. A suggested length is scaled from the map's own existing distance-to-length ratio; a suggested colour is whichever colour is least represented at that length in `colourLengthTable`.
+
+All of this is `useMemo`d off `data` exactly like `crossingPairs`, and surfaces as: an always-visible sidebar card (low-connection-stop count), an "Analyze balance" dialog (the hub-degree table and colour×length table), a "Measure distance" tool mode, and a "Suggest routes" dialog with one-click "Add" buttons that create ordinary `Route` records — suggestions are never auto-applied.
+
 ## Persistence boundary
 
 Current persistence is deliberately device-local:

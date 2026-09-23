@@ -17,6 +17,9 @@ Live site: <https://hagstrom.nu/ttr/>
 - Place resizable evaluation notes with explanatory text on the map, for reviewers and playtesters.
 - Choose standard, large and custom foldable board formats or A4/A3/US Letter test sheets.
 - Detect crossings between buildable routes.
+- Analyse how balanced the network is: hub degree and neighbour count per stop, a colour-by-length distribution table, and a flag for under-connected stops.
+- Measure the shortest travel distance between any two stops (by route length, not straight-line distance).
+- Get automatic route suggestions between nearby, unconnected, poorly-connected stops, with a starting length and colour guess drawn from the balance analysis, that you can add with one click and then adjust.
 - Undo and redo up to 40 changes during the current session.
 - Save automatically in the current browser.
 - Import and export complete maps as JSON, or just the background or the route network on their own.

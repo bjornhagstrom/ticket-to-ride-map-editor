@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, BusFront, Check, ChevronDown, CircleDot, CircleHelp, Crosshair, Download, FileStack, Image as ImageIcon, Layers3, Link2, Lock, MapPinPlus, Maximize2, Minus, MousePointer2, Pencil, Plus, Printer, Redo2, RotateCcw, Save, StickyNote, TrainFront, Trash2, Undo2, Unlock, Upload } from "lucide-react";
+import { AlertTriangle, BarChart3, BusFront, Check, ChevronDown, CircleDot, CircleHelp, Crosshair, Download, FileStack, Image as ImageIcon, Layers3, Lightbulb, Link2, Lock, MapPinPlus, Maximize2, Minus, MousePointer2, Pencil, Plus, Printer, Redo2, RotateCcw, Ruler, Save, StickyNote, TrainFront, Trash2, Undo2, Unlock, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
@@ -15,7 +15,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { colorLabels, defaultRouteTypeStyles, emptyMap, initialMap, type LineStyle, mapFormats, type BackgroundImage, type BackgroundShape, type BackgroundType, type ImageCrop, type MapData, type MapFormat, type NoteBox, type Point, type Route, type RouteType, type RouteTypeStyle, routeColors, STORAGE_KEY, type Stop, type StopSize, stopSizeMeta, type StopSymbol, stopSymbolMeta, type StopType, stopTypeMeta, W } from "./map-data";
 
-type Tool = "select" | "stop" | "route" | "background" | "note";
+type Tool = "select" | "stop" | "route" | "background" | "note" | "measure";
+type MeasureResult = { from: string; to: string; distance: number; routeIds: string[] } | { from: string; to: string; unreachable: true };
 type Danger = "reset" | "delete" | "load-blank" | "load-example" | "import-background" | "import-network" | "import-image" | null;
 type PendingImport = { kind: "background"; background: BackgroundShape[]; backgroundImage?: BackgroundImage } | { kind: "network"; stops: Stop[]; routes: Route[]; lineStyles: LineStyle[]; routeTypeStyles: RouteTypeStyle[] } | { kind: "image"; image: BackgroundImage };
 const GUIDE_SEEN_KEY = `${STORAGE_KEY}-guide-seen`;
@@ -130,6 +131,149 @@ function crossingPairs(data: MapData) {
   }
   return found;
 }
+type NetworkEdge = { to: string; weight: number; routeId: string };
+function buildAdjacency(data: MapData): Map<string, NetworkEdge[]> {
+  const adjacency = new Map<string, NetworkEdge[]>();
+  for (const stop of data.stops) adjacency.set(stop.id, []);
+  for (const route of data.routes) {
+    if (!adjacency.has(route.a) || !adjacency.has(route.b)) continue;
+    adjacency.get(route.a)!.push({ to: route.b, weight: route.length, routeId: route.id });
+    adjacency.get(route.b)!.push({ to: route.a, weight: route.length, routeId: route.id });
+  }
+  return adjacency;
+}
+type NetworkStats = { neighbours: Map<string, number>; links: Map<string, number>; hubDegree: Map<string, number> };
+function networkStats(data: MapData): NetworkStats {
+  const neighbourSets = new Map<string, Set<string>>();
+  const links = new Map<string, number>();
+  for (const stop of data.stops) { neighbourSets.set(stop.id, new Set()); links.set(stop.id, 0); }
+  for (const route of data.routes) {
+    if (!neighbourSets.has(route.a) || !neighbourSets.has(route.b)) continue;
+    neighbourSets.get(route.a)!.add(route.b);
+    neighbourSets.get(route.b)!.add(route.a);
+    links.set(route.a, (links.get(route.a) ?? 0) + 1);
+    links.set(route.b, (links.get(route.b) ?? 0) + 1);
+  }
+  const neighbours = new Map<string, number>();
+  const hubDegree = new Map<string, number>();
+  for (const stop of data.stops) {
+    const n = neighbourSets.get(stop.id)!.size;
+    const l = links.get(stop.id) ?? 0;
+    neighbours.set(stop.id, n);
+    hubDegree.set(stop.id, n + l);
+  }
+  return { neighbours, links, hubDegree };
+}
+function shortestPath(adjacency: Map<string, NetworkEdge[]>, fromId: string, toId: string): { distance: number; routeIds: string[] } | null {
+  const dist = new Map<string, number>();
+  const prev = new Map<string, { stopId: string; routeId: string }>();
+  const visited = new Set<string>();
+  for (const id of adjacency.keys()) dist.set(id, Infinity);
+  if (!dist.has(fromId)) return null;
+  dist.set(fromId, 0);
+  for (;;) {
+    let current: string | null = null;
+    let currentDist = Infinity;
+    for (const [id, d] of dist) if (!visited.has(id) && d < currentDist) { current = id; currentDist = d; }
+    if (current === null || current === toId) break;
+    visited.add(current);
+    for (const edge of adjacency.get(current) ?? []) {
+      if (visited.has(edge.to)) continue;
+      const next = currentDist + edge.weight;
+      if (next < (dist.get(edge.to) ?? Infinity)) { dist.set(edge.to, next); prev.set(edge.to, { stopId: current, routeId: edge.routeId }); }
+    }
+  }
+  const total = dist.get(toId);
+  if (total === undefined || total === Infinity) return null;
+  const routeIds: string[] = [];
+  let cursor = toId;
+  while (cursor !== fromId) {
+    const step = prev.get(cursor);
+    if (!step) return null;
+    routeIds.unshift(step.routeId);
+    cursor = step.stopId;
+  }
+  return { distance: total, routeIds };
+}
+type ColourLengthTable = { lengths: number[]; colours: string[]; counts: Map<number, Map<string, number>>; colourTotals: Map<string, number>; lengthTotals: Map<number, number>; grandTotal: number };
+function colourLengthTable(data: MapData): ColourLengthTable {
+  const infrastructureTypes = new Set(data.routeTypeStyles.filter((style) => style.infrastructure).map((style) => style.id));
+  const cardRoutes = data.routes.filter((route) => !infrastructureTypes.has(route.type));
+  const colours = Object.keys(routeColors);
+  const lengths = Array.from(new Set(cardRoutes.map((route) => route.length))).sort((a, b) => a - b);
+  const counts = new Map<number, Map<string, number>>();
+  const colourTotals = new Map<string, number>(colours.map((c) => [c, 0]));
+  const lengthTotals = new Map<number, number>(lengths.map((l) => [l, 0]));
+  for (const length of lengths) counts.set(length, new Map(colours.map((c) => [c, 0])));
+  for (const route of cardRoutes) {
+    const row = counts.get(route.length);
+    if (!row) continue;
+    row.set(route.color, (row.get(route.color) ?? 0) + 1);
+    colourTotals.set(route.color, (colourTotals.get(route.color) ?? 0) + 1);
+    lengthTotals.set(route.length, (lengthTotals.get(route.length) ?? 0) + 1);
+  }
+  return { lengths, colours, counts, colourTotals, lengthTotals, grandTotal: cardRoutes.length };
+}
+const pairKey = (a: string, b: string) => [a, b].sort().join("::");
+function averageLengthPerDistance(data: MapData): number {
+  let totalLength = 0, totalDistance = 0;
+  for (const route of data.routes) {
+    const a = stopById(data, route.a), b = stopById(data, route.b);
+    if (!a || !b) continue;
+    const distance = Math.hypot(b.x - a.x, b.y - a.y);
+    if (distance > 0) { totalLength += route.length; totalDistance += distance; }
+  }
+  return totalDistance > 0 ? totalLength / totalDistance : 0.01;
+}
+function leastUsedColourAtLength(table: ColourLengthTable, length: number): string {
+  const row = table.counts.get(length);
+  let best = table.colours[0] ?? "neutral", bestCount = Infinity;
+  for (const colour of table.colours) {
+    const count = row?.get(colour) ?? 0;
+    if (count < bestCount) { bestCount = count; best = colour; }
+  }
+  return best;
+}
+function routeCrossesExisting(data: MapData, a: Point, b: Point, excludeStopIds: [string, string]): boolean {
+  for (const route of data.routes) {
+    if (excludeStopIds.includes(route.a) || excludeStopIds.includes(route.b)) continue;
+    const points = pointsFor(data, route);
+    for (let i = 0; i < points.length - 1; i++) if (intersects(a, b, points[i], points[i + 1])) return true;
+  }
+  return false;
+}
+type RouteSuggestion = { a: string; b: string; aName: string; bName: string; distance: number; suggestedLength: number; suggestedColor: string; hubSum: number };
+function suggestRoutes(data: MapData, stats: NetworkStats, colourTable: ColourLengthTable, k = 5, maxSuggestions = 8): RouteSuggestion[] {
+  const existingPairs = new Set(data.routes.map((route) => pairKey(route.a, route.b)));
+  const seen = new Set<string>();
+  const candidates: Array<{ a: Stop; b: Stop; distance: number }> = [];
+  for (const stop of data.stops) {
+    const nearest = data.stops
+      .filter((other) => other.id !== stop.id)
+      .map((other) => ({ other, distance: Math.hypot(other.x - stop.x, other.y - stop.y) }))
+      .sort((x, y) => x.distance - y.distance)
+      .slice(0, k);
+    for (const { other, distance } of nearest) {
+      const key = pairKey(stop.id, other.id);
+      if (existingPairs.has(key) || seen.has(key)) continue;
+      seen.add(key);
+      candidates.push({ a: stop, b: other, distance });
+    }
+  }
+  const lengthPerUnit = averageLengthPerDistance(data);
+  const scored = candidates
+    .filter((candidate) => !routeCrossesExisting(data, candidate.a, candidate.b, [candidate.a.id, candidate.b.id]))
+    .map((candidate) => {
+      const suggestedLength = Math.max(1, Math.min(8, Math.round(candidate.distance * lengthPerUnit) || 1));
+      return {
+        a: candidate.a.id, b: candidate.b.id, aName: candidate.a.name, bName: candidate.b.name,
+        distance: candidate.distance, suggestedLength, suggestedColor: leastUsedColourAtLength(colourTable, suggestedLength),
+        hubSum: (stats.hubDegree.get(candidate.a.id) ?? 0) + (stats.hubDegree.get(candidate.b.id) ?? 0),
+      };
+    });
+  scored.sort((x, y) => x.hubSum - y.hubSum || x.distance - y.distance);
+  return scored.slice(0, maxSuggestions);
+}
 function pointAlong(points: Point[], fraction: number): Point & { angle: number } {
   const lengths = points.slice(1).map((q, i) => Math.hypot(q.x - points[i].x, q.y - points[i].y));
   const total = lengths.reduce((a, b) => a + b, 0);
@@ -177,6 +321,10 @@ export function MapEditor() {
   const [backgroundStroke, setBackgroundStroke] = useState("#4f8394");
   const [draftPoints, setDraftPoints] = useState<Point[]>([]);
   const [routeStart, setRouteStart] = useState<string | null>(null);
+  const [measureStart, setMeasureStart] = useState<string | null>(null);
+  const [measureResult, setMeasureResult] = useState<MeasureResult | null>(null);
+  const [showAnalysis, setShowAnalysis] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedStop, setSelectedStop] = useState<string | null>(null);
   const [selectedRoute, setSelectedRoute] = useState<string | null>(null);
   const [selectedBackground, setSelectedBackground] = useState<string | null>(null);
@@ -202,6 +350,12 @@ export function MapEditor() {
   useEffect(() => { if (!ready) return; localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); const timer = window.setTimeout(() => setSaved(true), 0); return () => window.clearTimeout(timer); }, [data, ready]);
 
   const crossings = useMemo(() => crossingPairs(data), [data]);
+  const adjacency = useMemo(() => buildAdjacency(data), [data]);
+  const stats = useMemo(() => networkStats(data), [data]);
+  const colourTable = useMemo(() => colourLengthTable(data), [data]);
+  const lowConnectionStops = useMemo(() => data.stops.filter((stop) => (stats.neighbours.get(stop.id) ?? 0) < 2), [data.stops, stats]);
+  const avgHubDegree = data.stops.length ? Array.from(stats.hubDegree.values()).reduce((sum, value) => sum + value, 0) / data.stops.length : 0;
+  const suggestions = useMemo(() => suggestRoutes(data, stats, colourTable), [data, stats, colourTable]);
   const selectedS = data.stops.find((stop) => stop.id === selectedStop);
   const selectedR = data.routes.find((route) => route.id === selectedRoute);
   const selectedB = data.background.find((shape) => shape.id === selectedBackground);
@@ -227,6 +381,14 @@ export function MapEditor() {
       if (routeStart === id) { setRouteStart(null); return; }
       change((draft) => { draft.routes.push({ id: `r-${Date.now()}`, a: routeStart, b: id, length: 2, type: routeType, color: routeColor, lineStyle: routeLineStyle }); return draft; });
       setRouteStart(null);
+      return;
+    }
+    if (tool === "measure") {
+      if (!measureStart) { setMeasureStart(id); setMeasureResult(null); return; }
+      if (measureStart === id) { setMeasureStart(null); return; }
+      const path = shortestPath(adjacency, measureStart, id);
+      setMeasureResult(path ? { from: measureStart, to: id, distance: path.distance, routeIds: path.routeIds } : { from: measureStart, to: id, unreachable: true });
+      setMeasureStart(null);
       return;
     }
     setSelectedStop(id); setSelectedRoute(null); setSelectedBackground(null);
@@ -333,6 +495,7 @@ export function MapEditor() {
     });
   };
   const assignRouteLineStyle = (routeId: string, styleId: string | undefined) => change((draft) => { const route = draft.routes.find((item) => item.id === routeId); if (route) route.lineStyle = styleId; return draft; });
+  const addSuggestedRoute = (suggestion: RouteSuggestion) => change((draft) => { draft.routes.push({ id: `r-${Date.now()}`, a: suggestion.a, b: suggestion.b, length: suggestion.suggestedLength, type: routeType, color: suggestion.suggestedColor }); return draft; });
   const addLineStyleToRoute = (routeId: string) => { const id = `style-${Date.now()}`; change((draft) => { draft.lineStyles.push({ id, label: "New style", strokeWidth: 6, dash: "10 6" }); const route = draft.routes.find((item) => item.id === routeId); if (route) route.lineStyle = id; return draft; }); };
   const createLineStyle = (): string => { const id = `style-${Date.now()}`; change((draft) => { draft.lineStyles.push({ id, label: "New style", strokeWidth: 6, dash: "10 6" }); return draft; }); return id; };
   const updateLineStyle = (styleId: string, values: Partial<LineStyle>) => change((draft) => { const style = draft.lineStyles.find((item) => item.id === styleId); if (style) Object.assign(style, values); return draft; });
@@ -427,9 +590,13 @@ export function MapEditor() {
           <ToolButton active={tool === "background"} icon={<Layers3 />} title="Draw background" note="Areas, boundaries and labels" onClick={() => { setTool("background"); setRouteStart(null); clearSelection(); }} />
           {tool === "background" && <div className="tool-options background-tools"><div className="image-import-row"><Label>Background image</Label><div className="image-import-buttons"><Button size="sm" variant="outline" onClick={() => imageFileRef.current?.click()}><ImageIcon />{data.backgroundImage ? "Replace image" : "Import image"}</Button>{data.backgroundImage && <Button size="sm" variant="ghost" onClick={() => { chooseImage(); setDanger("delete"); }}><Trash2 />Remove</Button>}</div></div><Label>Object</Label><NativeSelect value={backgroundType} onChange={(event) => { setBackgroundType(event.target.value as BackgroundType); setDraftPoints([]); }}><NativeSelectOption value="area">Area</NativeSelectOption><NativeSelectOption value="line">Line</NativeSelectOption><NativeSelectOption value="label">Label</NativeSelectOption></NativeSelect>{backgroundType !== "label" && <><div className="colour-row"><label>Fill <input type="color" value={backgroundFill} onChange={(event) => setBackgroundFill(event.target.value)} disabled={backgroundType === "line"} /></label><label>Outline <input type="color" value={backgroundStroke} onChange={(event) => setBackgroundStroke(event.target.value)} /></label></div><p className="helper">Click to add points. Finish when the shape is ready.</p><div className="draft-actions"><Button size="sm" disabled={draftPoints.length < (backgroundType === "area" ? 3 : 2)} onClick={finishBackground}>Finish shape</Button><Button size="sm" variant="ghost" disabled={!draftPoints.length} onClick={() => setDraftPoints([])}>Cancel</Button></div></>}</div>}
           <ToolButton active={tool === "note"} icon={<StickyNote />} title="Add note" note="Click the map to place an evaluation note" onClick={() => { setTool("note"); setRouteStart(null); clearSelection(); }} />
+          <ToolButton active={tool === "measure"} icon={<Ruler />} title="Measure distance" note={measureStart ? `From ${stopById(data, measureStart)?.name} · choose destination` : measureResult ? ("unreachable" in measureResult ? `${stopById(data, measureResult.from)?.name} → ${stopById(data, measureResult.to)?.name}: no path` : `${stopById(data, measureResult.from)?.name} → ${stopById(data, measureResult.to)?.name}: ${measureResult.distance} units`) : "Click two stops for the shortest path"} onClick={() => { setTool("measure"); setMeasureStart(null); setMeasureResult(null); clearSelection(); }} />
         </div>
         <div className="format-control"><Label htmlFor="map-format">Board format</Label><NativeSelect id="map-format" value={data.format} onChange={(event) => changeFormat(event.target.value as MapFormat)}>{Object.entries(mapFormats).map(([key, item]) => <NativeSelectOption key={key} value={key}>{item.label}</NativeSelectOption>)}</NativeSelect><dl className="format-measurements"><div><dt>Finished size</dt><dd>{format.widthMm.toLocaleString("en-GB")} × {format.heightMm.toLocaleString("en-GB")} mm{format.imperial ? ` (${format.imperial})` : ""}</dd></div>{format.columns > 1 && <div><dt>Panel size</dt><dd>about {panelWidthMm} × {panelHeightMm} mm</dd></div>}</dl><p>{format.note}{format.custom ? ". This is not a verified commercial Ticket to Ride size" : ""}. Changing format keeps objects in the same relative positions.</p></div>
         <div className={cn("crossing-card", crossings.length && "has-warning")}><div className="crossing-icon">{crossings.length ? <AlertTriangle /> : <Check />}</div><div><strong>{crossings.length ? `${crossings.length} crossing${crossings.length === 1 ? "" : "s"}` : "No crossings"}</strong><p>{crossings.length ? "between buildable routes" : "The route network is geometrically clean"}</p></div></div>
+        {data.stops.length > 0 && <div className={cn("crossing-card", lowConnectionStops.length && "has-warning")}><div className="crossing-icon">{lowConnectionStops.length ? <AlertTriangle /> : <Check />}</div><div><strong>{lowConnectionStops.length ? `${lowConnectionStops.length} low-connection stop${lowConnectionStops.length === 1 ? "" : "s"}` : "Well connected"}</strong><p>{lowConnectionStops.length ? "fewer than 2 direct neighbours" : `avg hub degree ${avgHubDegree.toFixed(1)}`}</p></div></div>}
+        {data.stops.length > 0 && <Button variant="outline" size="sm" className="analyze-button" onClick={() => setShowAnalysis(true)}><BarChart3 />Analyze balance</Button>}
+        {data.stops.length > 1 && <Button variant="outline" size="sm" className="analyze-button" onClick={() => setShowSuggestions(true)}><Lightbulb />Suggest routes</Button>}
         <div className="legend"><p className="eyebrow">Stop types</p>{Object.entries(stopTypeMeta).map(([key, meta]) => <div key={key}><i style={{ background: meta.fill, borderColor: meta.stroke }} />{meta.label}</div>)}</div>
         <Button variant="ghost" className="reset-button" onClick={() => setDanger("reset")}><RotateCcw />Clear map</Button>
       </aside>
@@ -451,6 +618,8 @@ export function MapEditor() {
     </div>
     <AlertDialog open={danger !== null} onOpenChange={(open) => { if (!open) { setDanger(null); setPendingImport(null); } }}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{danger === "reset" ? "Clear the entire map?" : danger === "load-blank" ? "Replace the current map with a blank one?" : danger === "load-example" ? "Replace the current map with the example?" : danger === "import-background" ? "Replace the background?" : danger === "import-network" ? "Replace stops and routes?" : danger === "import-image" ? "Replace the background image?" : "Delete the selected object?"}</AlertDialogTitle><AlertDialogDescription>{danger === "reset" ? "All locally stored background objects, stops and routes will be removed. Export the map first if you want to keep it." : danger === "load-blank" ? "Your current background objects, stops and routes will be replaced with a blank map. Export the map first if you want to keep your work." : danger === "load-example" ? "Your current background objects, stops and routes will be replaced with the neutral example map. Export the map first if you want to keep your work." : danger === "import-background" ? "The imported background, including any background image, will replace the current one. Stops and routes are kept as they are." : danger === "import-network" ? "The imported stops and routes will replace the current network. Background objects are kept as they are." : danger === "import-image" ? "The new image will replace the current background image." : selectedStop ? "The stop and all connected routes will be deleted." : "The selected object will be deleted."}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => { if (danger === "reset") { change(() => cloneMap(emptyMap)); clearSelection(); setDanger(null); } else if (danger === "load-blank") applyGuideChoice(emptyMap); else if (danger === "load-example") applyGuideChoice(initialMap); else if (danger === "import-background" && pendingImport?.kind === "background") applyBackgroundImport(pendingImport.background, pendingImport.backgroundImage); else if (danger === "import-network" && pendingImport?.kind === "network") applyNetworkImport(pendingImport.stops, pendingImport.routes, pendingImport.lineStyles, pendingImport.routeTypeStyles); else if (danger === "import-image" && pendingImport?.kind === "image") applyImageImport(pendingImport.image); else deleteSelected(); }}>Continue</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
     <WelcomeGuide open={showGuide} onOpenChange={(open) => !open && dismissGuide()} onChooseBlank={() => chooseFromGuide("blank")} onChooseExample={() => chooseFromGuide("example")} />
+    <AnalysisDialog open={showAnalysis} onOpenChange={setShowAnalysis} data={data} stats={stats} colourTable={colourTable} />
+    <SuggestionsDialog open={showSuggestions} onOpenChange={setShowSuggestions} suggestions={suggestions} onAdd={addSuggestedRoute} />
     <PrintPages data={data} />
   </main>;
 }
@@ -471,6 +640,48 @@ function WelcomeGuide({ open, onOpenChange, onChooseBlank, onChooseExample }: { 
         <Button variant="outline" onClick={onChooseExample}><Pencil />Load the example map</Button>
         <Button onClick={onChooseBlank}>Start with a blank map</Button>
       </DialogFooter>
+    </DialogContent>
+  </Dialog>;
+}
+
+function AnalysisDialog({ open, onOpenChange, data, stats, colourTable }: { open: boolean; onOpenChange: (open: boolean) => void; data: MapData; stats: NetworkStats; colourTable: ColourLengthTable }) {
+  const sortedStops = [...data.stops].sort((a, b) => (stats.hubDegree.get(b.id) ?? 0) - (stats.hubDegree.get(a.id) ?? 0));
+  return <Dialog open={open} onOpenChange={onOpenChange}>
+    <DialogContent className="analysis-dialog">
+      <DialogHeader><DialogTitle>Map balance</DialogTitle><DialogDescription>A quick read on how evenly connected and coloured the network is.</DialogDescription></DialogHeader>
+      <div className="analysis-section">
+        <h3>Hub degree per stop</h3>
+        <p className="helper">Neighbours + weighted links (parallel routes between the same pair count extra). Higher means more central; sorted from most to least connected.</p>
+        {sortedStops.length === 0 ? <p className="helper">No stops yet.</p> : <div className="analysis-table-scroll"><table className="analysis-table">
+          <thead><tr><th>Stop</th><th>Neighbours</th><th>Links</th><th>Hub degree</th></tr></thead>
+          <tbody>{sortedStops.map((stop) => <tr key={stop.id} className={cn((stats.neighbours.get(stop.id) ?? 0) < 2 && "analysis-warning-row")}><td>{stop.name}</td><td>{stats.neighbours.get(stop.id) ?? 0}</td><td>{stats.links.get(stop.id) ?? 0}</td><td>{stats.hubDegree.get(stop.id) ?? 0}</td></tr>)}</tbody>
+        </table></div>}
+      </div>
+      <div className="analysis-section">
+        <h3>Colour × length distribution</h3>
+        <p className="helper">Counts card-route colours by length. Pre-built infrastructure routes (no train cards) are excluded.</p>
+        {colourTable.grandTotal === 0 ? <p className="helper">No card routes yet.</p> : <div className="analysis-table-scroll"><table className="analysis-table">
+          <thead><tr><th>Length</th>{colourTable.colours.map((colour) => <th key={colour}>{colorLabels[colour]}</th>)}<th>Total</th></tr></thead>
+          <tbody>
+            {colourTable.lengths.map((length) => <tr key={length}><td>{length}</td>{colourTable.colours.map((colour) => <td key={colour}>{colourTable.counts.get(length)?.get(colour) ?? 0}</td>)}<td>{colourTable.lengthTotals.get(length) ?? 0}</td></tr>)}
+            <tr className="analysis-total-row"><td>Total</td>{colourTable.colours.map((colour) => <td key={colour}>{colourTable.colourTotals.get(colour) ?? 0}</td>)}<td>{colourTable.grandTotal}</td></tr>
+          </tbody>
+        </table></div>}
+      </div>
+    </DialogContent>
+  </Dialog>;
+}
+
+function SuggestionsDialog({ open, onOpenChange, suggestions, onAdd }: { open: boolean; onOpenChange: (open: boolean) => void; suggestions: RouteSuggestion[]; onAdd: (suggestion: RouteSuggestion) => void }) {
+  return <Dialog open={open} onOpenChange={onOpenChange}>
+    <DialogContent className="analysis-dialog">
+      <DialogHeader><DialogTitle>Suggested routes</DialogTitle><DialogDescription>Geometrically nearby stop pairs with no route yet, that don't cross existing routes, prioritised for the least-connected stops. Length and colour are starting guesses — adjust them afterwards like any other route.</DialogDescription></DialogHeader>
+      {suggestions.length === 0 ? <p className="helper">No good candidates right now — every nearby stop pair is already connected, would cross an existing route, or there aren't enough stops yet.</p> : <ul className="suggestion-list">
+        {suggestions.map((suggestion) => <li key={`${suggestion.a}-${suggestion.b}`} className="suggestion-row">
+          <div><strong>{suggestion.aName} ↔ {suggestion.bName}</strong><p className="helper">Suggested length {suggestion.suggestedLength} · {colorLabels[suggestion.suggestedColor]}</p></div>
+          <Button size="sm" onClick={() => onAdd(suggestion)}><Plus />Add</Button>
+        </li>)}
+      </ul>}
     </DialogContent>
   </Dialog>;
 }
