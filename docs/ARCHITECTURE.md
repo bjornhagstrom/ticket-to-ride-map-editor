@@ -91,6 +91,15 @@ Route appearance is data, not code. `MapData.routeTypeStyles` is a user-editable
 
 A route's shape is `Route.points`: any number of bend points between its two stops, each draggable, insertable at any segment via the `+` handles drawn beside a selected route, and removable by double-clicking. `Route.curved` switches the drawing from straight segments (`pathFromPoints`) to a Catmull-Rom spline converted to cubic Béziers (`curveControls`/`curvedPath`). Because wagon spaces are positioned by walking the polyline, a curved route is also flattened into a denser sample list (`curvedSamples`, 12 points per segment) before slot placement, so the spaces sit on the visible curve and rotate with it rather than following the underlying control polygon.
 
+## Board proportions
+
+Several sizes are set to print at roughly what a real board uses, all measured against
+`REFERENCE_BOARD_MM`: a wagon space is `realWagon`'s 20 × 9 mm, the lines of a double route sit
+`PARALLEL_SPACING_MM` apart (a wagon's width plus 2.5 mm), and a stop circle is about 9 mm across at
+the medium size. Stop circles used to be half again that, which pushed the first wagon of every
+route away from its stop and made double routes look detached. Because the circles are now small,
+each stop carries an invisible `stop-hit` circle so it stays comfortable to click.
+
 ## Wagon spacing
 
 Wagon spaces are laid out in millimetres, not in canvas units. The default view converts through a

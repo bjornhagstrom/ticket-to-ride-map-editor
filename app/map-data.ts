@@ -97,10 +97,18 @@ export const REFERENCE_BOARD_MM = 790;
 // `MapData.endGapMm` overrides it per map.
 export const DEFAULT_END_GAP_MM = 2;
 
+// Centre-to-centre distance between the lines of a double route, in millimetres on the reference
+// board: a wagon's width plus a small gap, so the two rows sit beside each other the way a real
+// board prints them rather than floating far apart.
+export const PARALLEL_SPACING_MM = realWagon.width + 2.5;
+
+// Radii in canvas units, chosen to print at roughly the size a real board's city dots do on the
+// reference board: about 3.2, 4.5 and 6.5 mm across the radius. Larger circles crowd the wagons and
+// push the first wagon of every route further from the stop than a real board does.
 export const stopSizeMeta: Record<StopSize, { label: string; radius: number }> = {
-  small: { label: "Small", radius: 6 },
-  medium: { label: "Medium", radius: 9 },
-  large: { label: "Large", radius: 13 },
+  small: { label: "Small", radius: 4.5 },
+  medium: { label: "Medium", radius: 6.3 },
+  large: { label: "Large", radius: 9 },
 };
 
 export const stopSymbolMeta: Record<StopSymbol, { label: string }> = {
@@ -229,17 +237,17 @@ export const initialMap: MapData = {
     { id: "example-quarry", name: "Quarry", type: "outing", x: 1010, y: 625, size: "small", labelAngle: 210 },
   ],
   routes: [
-    { id: "example-route-1", a: "example-westport", b: "example-central", length: 4, type: "city", color: "red", points: [{ x: 265, y: 235 }] },
-    { id: "example-route-2", a: "example-westport", b: "example-pine-hill", length: 3, type: "region", color: "orange", points: [{ x: 170, y: 420 }] },
-    { id: "example-route-3", a: "example-pine-hill", b: "example-central", length: 3, type: "trail", color: "neutral", points: [{ x: 350, y: 500 }] },
-    { id: "example-route-4", a: "example-central", b: "example-lakeside", length: 3, type: "rail", color: "neutral", points: [{ x: 525, y: 225 }] },
-    { id: "example-route-5", a: "example-central", b: "example-old-town", length: 4, type: "city", color: "blue", points: [{ x: 545, y: 485 }], lineStyle: "example-tunnel" },
-    { id: "example-route-6", a: "example-lakeside", b: "example-eastgate", length: 4, type: "brt", color: "neutral", points: [{ x: 815, y: 165 }] },
+    { id: "example-route-1", a: "example-westport", b: "example-central", length: 4, type: "city", color: "red", points: [{ x: 265, y: 235 }], curved: true },
+    { id: "example-route-2", a: "example-westport", b: "example-pine-hill", length: 3, type: "region", color: "orange", points: [{ x: 170, y: 420 }], curved: true },
+    { id: "example-route-3", a: "example-pine-hill", b: "example-central", length: 3, type: "trail", color: "neutral", points: [{ x: 350, y: 500 }], curved: true },
+    { id: "example-route-4", a: "example-central", b: "example-lakeside", length: 3, type: "rail", color: "neutral", points: [{ x: 525, y: 225 }], curved: true },
+    { id: "example-route-5", a: "example-central", b: "example-old-town", length: 4, type: "city", color: "blue", points: [{ x: 545, y: 485 }], lineStyle: "example-tunnel", curved: true },
+    { id: "example-route-6", a: "example-lakeside", b: "example-eastgate", length: 4, type: "brt", color: "neutral", points: [{ x: 815, y: 165 }], curved: true },
     { id: "example-route-7", a: "example-lakeside", b: "example-harbour", length: 3, type: "ferry", color: "neutral", points: [{ x: 800, y: 270 }, { x: 855, y: 370 }], locomotiveSlots: [0], curved: true },
-    { id: "example-route-8", a: "example-old-town", b: "example-harbour", length: 3, type: "region", color: "green", points: [{ x: 790, y: 585 }] },
-    { id: "example-route-9", a: "example-harbour", b: "example-eastgate", length: 3, type: "city", color: "yellow", points: [{ x: 950, y: 335 }] },
-    { id: "example-route-10", a: "example-old-town", b: "example-quarry", length: 2, type: "region", color: "purple", points: [{ x: 850, y: 645 }] },
+    { id: "example-route-8", a: "example-old-town", b: "example-harbour", length: 3, type: "region", color: "green", points: [{ x: 790, y: 585 }], curved: true },
+    { id: "example-route-9", a: "example-harbour", b: "example-eastgate", length: 3, type: "city", color: "yellow", points: [{ x: 950, y: 335 }], curved: true },
+    { id: "example-route-10", a: "example-old-town", b: "example-quarry", length: 2, type: "region", color: "purple", points: [{ x: 850, y: 645 }], curved: true },
     // A double route: same stops and type as route 1, different wagon colour, drawn alongside it.
-    { id: "example-route-11", a: "example-westport", b: "example-central", length: 4, type: "city", color: "black", points: [{ x: 265, y: 235 }] },
+    { id: "example-route-11", a: "example-westport", b: "example-central", length: 4, type: "city", color: "black", points: [{ x: 265, y: 235 }], curved: true },
   ],
 };
