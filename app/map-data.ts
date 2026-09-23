@@ -199,6 +199,7 @@ export const initialMap: MapData = {
     { id: "example-old-town", name: "Old Town", type: "region", x: 690, y: 600 },
     { id: "example-harbour", name: "Harbour", type: "ferry", x: 875, y: 455, symbol: "letter", letter: "F" },
     { id: "example-eastgate", name: "Eastgate", type: "brt", x: 980, y: 210, size: "large" },
+    { id: "example-quarry", name: "Quarry", type: "outing", x: 1010, y: 625, size: "small" },
   ],
   routes: [
     { id: "example-route-1", a: "example-westport", b: "example-central", length: 4, type: "city", color: "red", points: [{ x: 265, y: 235 }] },
@@ -210,5 +211,6 @@ export const initialMap: MapData = {
     { id: "example-route-7", a: "example-lakeside", b: "example-harbour", length: 3, type: "ferry", color: "neutral", points: [{ x: 770, y: 315 }], locomotiveSlots: [1] },
     { id: "example-route-8", a: "example-old-town", b: "example-harbour", length: 3, type: "region", color: "green", points: [{ x: 790, y: 585 }] },
     { id: "example-route-9", a: "example-harbour", b: "example-eastgate", length: 3, type: "city", color: "yellow", points: [{ x: 950, y: 335 }] },
+    { id: "example-route-10", a: "example-old-town", b: "example-quarry", length: 2, type: "region", color: "purple", points: [{ x: 850, y: 645 }] },
   ],
 };
