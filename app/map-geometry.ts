@@ -50,13 +50,20 @@ export const curvedSamples = (points: Point[], perSegment = 12): Point[] => {
 };
 
 export const samePair = (one: Route, other: Route) => (one.a === other.a && one.b === other.b) || (one.a === other.b && one.b === other.a);
-export function parallelPoints(data: MapData, route: Route): Point[] {
+// How far to the side of the centre line this route is actually drawn. Zero unless it is one of
+// several routes between the same two stops. Editing handles need it so they land beside the line
+// the user can see rather than beside the invisible centre line.
+export function parallelOffset(data: MapData, route: Route): number {
   const siblings = data.routes.filter((item) => samePair(item, route));
-  const points = pointsFor(data, route);
-  if (siblings.length < 2 || points.length < 2) return points;
+  if (siblings.length < 2) return 0;
   const index = siblings.findIndex((item) => item.id === route.id);
   const direction = route.a.localeCompare(route.b) <= 0 ? 1 : -1;
-  const offset = (index - (siblings.length - 1) / 2) * 26 * direction;
+  return (index - (siblings.length - 1) / 2) * 26 * direction;
+}
+export function parallelPoints(data: MapData, route: Route): Point[] {
+  const points = pointsFor(data, route);
+  const offset = parallelOffset(data, route);
+  if (!offset || points.length < 2) return points;
   const shifted = (point: Point, from: Point, to: Point, distance: number) => {
     const dx = to.x - from.x;
     const dy = to.y - from.y;

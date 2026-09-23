@@ -5,11 +5,16 @@
 
 import { cn } from "@/lib/utils";
 import { type BackgroundImage, type BackgroundShape, type BackgroundType, mapFormats, type MapData, type NoteBox, type Point, realWagon, routeColors, type Stop, stopSizeMeta, stopTypeMeta, W } from "./map-data";
-import { automaticLabelPoint, canvasPoint, curvedPath, curvedSamples, parallelPoints, pathFromPoints, pointAlong, pointsFor, polylineLength } from "./map-geometry";
+import { automaticLabelPoint, canvasPoint, parallelOffset, curvedPath, curvedSamples, parallelPoints, pathFromPoints, pointAlong, pointsFor, polylineLength } from "./map-geometry";
+
+// Editing handles sit this far to the side of the line, with this grab radius. The gap between
+// them (offset - hit) must stay wider than half a wagon space, or a handle swallows the click
+// that toggles a locomotive on the space beneath it.
+const HANDLE_OFFSET = 22, HANDLE_HIT = 12;
 
 export type Tool = "select" | "stop" | "route" | "background" | "note" | "measure";
 
-export function MapArtwork({ data, tool = "select", trueScale = false, scaleWidthMm = 790, selectedRoute, selectedStop, selectedBackground, imageSelected, selectedNote, routeStart, draft, onRoute, onRouteSlot, onRouteBendInsert, onRouteBendRemove, onStop, onWaypoint, onBackground, onBackgroundPoint, onBackgroundLabel, onImageSelect, onImageMove, onImageScale, onImageRotate, onNoteSelect, onNoteMove, onNoteResize, print = false }: { data: MapData; tool?: Tool; trueScale?: boolean; scaleWidthMm?: number; selectedRoute?: string | null; selectedStop?: string | null; selectedBackground?: string | null; imageSelected?: boolean; selectedNote?: string | null; routeStart?: string | null; draft?: { type: BackgroundType; points: Point[]; fill: string; stroke: string }; onRoute?: (id: string) => void; onRouteSlot?: (routeId: string, index: number) => void; onRouteBendInsert?: (routeId: string, index: number, point: Point) => void; onRouteBendRemove?: (routeId: string, index: number) => void; onStop?: (id: string) => void; onWaypoint?: (routeId: string, index: number) => void; onBackground?: (id: string) => void; onBackgroundPoint?: (shapeId: string, index: number) => void; onBackgroundLabel?: (shapeId: string) => void; onImageSelect?: () => void; onImageMove?: (point: Point) => void; onImageScale?: () => void; onImageRotate?: () => void; onNoteSelect?: (id: string) => void; onNoteMove?: (id: string, point: Point) => void; onNoteResize?: (id: string) => void; print?: boolean }) {
+export function MapArtwork({ data, tool = "select", trueScale = false, scaleWidthMm = 790, selectedRoute, selectedStop, selectedBackground, imageSelected, selectedNote, routeStart, draft, onRoute, onRouteSlot, onRouteBendInsert, onRouteBendRemove, onStop, onWaypoint, onBackground, onBackgroundPoint, onBackgroundLabel, onImageSelect, onImageMove, onImageScale, onImageRotate, onNoteSelect, onNoteMove, onNoteResize, print = false }: { data: MapData; tool?: Tool; trueScale?: boolean; scaleWidthMm?: number; selectedRoute?: string | null; selectedStop?: string | null; selectedBackground?: string | null; imageSelected?: boolean; selectedNote?: string | null; routeStart?: string | null; draft?: { type: BackgroundType; points: Point[]; fill: string; stroke: string }; onRoute?: (id: string) => void; onRouteSlot?: (routeId: string, index: number) => void; onRouteBendInsert?: (routeId: string, index: number, point: Point) => void; onRouteBendRemove?: (routeId: string, index: number) => void; onStop?: (id: string) => void; onWaypoint?: (routeId: string, index: number, grabOffset: Point) => void; onBackground?: (id: string) => void; onBackgroundPoint?: (shapeId: string, index: number) => void; onBackgroundLabel?: (shapeId: string) => void; onImageSelect?: () => void; onImageMove?: (point: Point) => void; onImageScale?: () => void; onImageRotate?: () => void; onNoteSelect?: (id: string) => void; onNoteMove?: (id: string, point: Point) => void; onNoteResize?: (id: string) => void; print?: boolean }) {
   const format = mapFormats[data.format];
   return <>
     <defs><pattern id="grid" width="24" height="24" patternUnits="userSpaceOnUse"><path d="M24 0L0 0 0 24" fill="none" stroke="#6b675f" strokeOpacity=".11" /></pattern><filter id="shadow" x="-50%" y="-50%" width="200%" height="200%"><feDropShadow dx="0" dy="2" stdDeviation="2" floodOpacity=".18" /></filter></defs>
@@ -24,17 +29,31 @@ export function MapArtwork({ data, tool = "select", trueScale = false, scaleWidt
       const route = data.routes.find((item) => item.id === selectedRoute);
       if (!route) return null;
       const base = pointsFor(data, route);
+      // Handles are measured from the line as drawn, which for a double route is offset sideways.
+      const drawnOffset = parallelOffset(data, route);
       return <>
         {base.slice(0, -1).map((from, index) => {
           const to = base[index + 1];
           const mid = { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 };
           const dx = to.x - from.x, dy = to.y - from.y;
           const length = Math.hypot(dx, dy) || 1;
-          // Sit the + beside the line so it doesn't fight with the wagon slot underneath it.
-          const handle = { x: mid.x - dy / length * 17, y: mid.y + dx / length * 17 };
-          return <g key={`insert-${index}`} className="bend-insert-handle" transform={`translate(${handle.x},${handle.y})`} onPointerDown={(event) => { event.stopPropagation(); onRouteBendInsert?.(route.id, index, mid); }}><circle className="point-hit" r="15" /><circle r="8" /><path d="M-4,0 H4 M0,-4 V4" /></g>;
+          // Sit the + beside the line, far enough out that its hit area clears the wagon space that
+          // shares the same midpoint. Offset minus hit radius has to stay above half a space's height.
+          const handle = { x: mid.x - dy / length * (drawnOffset + HANDLE_OFFSET), y: mid.y + dx / length * (drawnOffset + HANDLE_OFFSET) };
+          return <g key={`insert-${index}`} className="bend-insert-handle" transform={`translate(${handle.x},${handle.y})`} onPointerDown={(event) => { event.stopPropagation(); onRouteBendInsert?.(route.id, index, mid); }}><circle className="point-hit" r={HANDLE_HIT} /><circle r="8" /><path d="M-4,0 H4 M0,-4 V4" /></g>;
         })}
-        {route.points?.map((point, index) => <g key={index} className="waypoint-handle" transform={`translate(${point.x},${point.y})`} onPointerDown={(event) => { event.stopPropagation(); onWaypoint?.(selectedRoute, index); }} onDoubleClick={(event) => { event.stopPropagation(); onRouteBendRemove?.(route.id, index); }}><circle className="waypoint-hit" r="19" /><rect x="-8" y="-8" width="16" height="16" rx="3" transform="rotate(45)" /><circle r="3" /></g>)}
+        {route.points?.map((point, index) => {
+          // Offset the grab handle to the other side of the line from the + handles, so neither of
+          // them sits on top of a wagon space and swallows the click that toggles a locomotive.
+          const before = base[index] ?? point, after = base[index + 2] ?? point;
+          const dx = after.x - before.x, dy = after.y - before.y;
+          const length = Math.hypot(dx, dy) || 1;
+          const handle = { x: point.x - dy / length * (drawnOffset - HANDLE_OFFSET), y: point.y + dx / length * (drawnOffset - HANDLE_OFFSET) };
+          return <g key={index} className="waypoint-handle" onPointerDown={(event) => { event.stopPropagation(); onWaypoint?.(selectedRoute, index, { x: handle.x - point.x, y: handle.y - point.y }); }} onDoubleClick={(event) => { event.stopPropagation(); onRouteBendRemove?.(route.id, index); }}>
+            <line className="waypoint-leader" x1={point.x} y1={point.y} x2={handle.x} y2={handle.y} />
+            <g transform={`translate(${handle.x},${handle.y})`}><circle className="waypoint-hit" r={HANDLE_HIT} /><rect x="-8" y="-8" width="16" height="16" rx="3" transform="rotate(45)" /><circle r="3" /></g>
+          </g>;
+        })}
       </>;
     })()}
     {format.columns > 1 && <g className="fold-guides">{Array.from({ length: format.columns - 1 }, (_, index) => <line key={`v-${index}`} x1={W * (index + 1) / format.columns} y1="0" x2={W * (index + 1) / format.columns} y2={format.height} />)}{Array.from({ length: format.rows - 1 }, (_, index) => <line key={`h-${index}`} x1="0" y1={format.height * (index + 1) / format.rows} x2={W} y2={format.height * (index + 1) / format.rows} />)}</g>}
