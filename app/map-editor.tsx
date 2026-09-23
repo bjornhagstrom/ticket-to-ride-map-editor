@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, BarChart3, BusFront, Check, ChevronDown, ChevronUp, Copy, CircleDot, CircleHelp, Crosshair, Download, FileStack, Image as ImageIcon, Layers3, Lightbulb, Link2, Lock, MapPinPlus, Maximize2, Minus, MousePointer2, Pencil, Plus, Printer, Redo2, RotateCcw, Ruler, Save, StickyNote, TrainFront, Trash2, Undo2, Unlock, Upload } from "lucide-react";
+import { AlertTriangle, BarChart3, BusFront, Check, ChevronDown, ChevronUp, Copy, GripVertical, CircleDot, CircleHelp, Crosshair, Download, FileStack, Image as ImageIcon, Layers3, Lightbulb, Link2, Lock, MapPinPlus, Maximize2, Minus, MousePointer2, Pencil, Plus, Printer, Redo2, RotateCcw, Ruler, Save, StickyNote, TrainFront, Trash2, Undo2, Unlock, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
@@ -26,6 +26,7 @@ const MAX_IMAGE_WARN_BYTES = 2 * 1024 * 1024;
 // even for a large map. Kept in memory for the session only, never written to local storage.
 const HISTORY_LIMIT = 200;
 const ROUTE_HINT_KEY = `${STORAGE_KEY}-route-hint`;
+const ROUTE_HINT_X_KEY = `${STORAGE_KEY}-route-hint-x`;
 
 const cloneMap = (data: MapData): MapData => JSON.parse(JSON.stringify(data));
 // History snapshots deep-clone everything except the background image's base64 payload, which is
@@ -388,7 +389,18 @@ export function MapEditor() {
   const [linkParallel, setLinkParallel] = useState(true);
   // Collapsing the help is a lasting preference, not a per-selection one: reopening it on the next
   // route you click would defeat the point of hiding it.
-  useEffect(() => { try { if (window.localStorage.getItem(ROUTE_HINT_KEY) === "closed") setRouteHintOpen(false); } catch { /* private mode */ } }, []);
+  const [routeHintX, setRouteHintX] = useState(0);
+  useEffect(() => {
+    try {
+      if (window.localStorage.getItem(ROUTE_HINT_KEY) === "closed") setRouteHintOpen(false);
+      const x = Number(window.localStorage.getItem(ROUTE_HINT_X_KEY));
+      if (Number.isFinite(x) && x) setRouteHintX(x);
+    } catch { /* private mode */ }
+  }, []);
+  const moveRouteHint = (value: number) => {
+    setRouteHintX(value);
+    try { window.localStorage.setItem(ROUTE_HINT_X_KEY, String(Math.round(value))); } catch { /* private mode */ }
+  };
   const toggleRouteHint = () => setRouteHintOpen((open) => {
     try { window.localStorage.setItem(ROUTE_HINT_KEY, open ? "closed" : "open"); } catch { /* private mode */ }
     return !open;
@@ -782,11 +794,11 @@ export function MapEditor() {
       </aside>
       <section className="map-wrap">
         <div className="map-status"><Badge variant="secondary">{format.shortLabel}</Badge><Badge variant="secondary">{format.widthMm.toLocaleString("en-GB")} × {format.heightMm.toLocaleString("en-GB")} mm</Badge><Badge variant="secondary">{data.stops.length} stops</Badge><Badge variant="secondary">{data.routes.length} routes</Badge><Badge variant="secondary">{data.background.length} background objects</Badge>{data.notes.length > 0 && <Badge variant="secondary">{data.notes.length} note{data.notes.length === 1 ? "" : "s"}</Badge>}<span>Everything is stored in the exported map file</span></div>
-        {selectedR && routeHintAtTop && <RouteHint atTop locomotives={selectedRouteHasSlots} open={routeHintOpen} onToggle={toggleRouteHint} />}
+        {selectedR && routeHintAtTop && <RouteHint atTop locomotives={selectedRouteHasSlots} open={routeHintOpen} onToggle={toggleRouteHint} offsetX={routeHintX} onOffsetChange={moveRouteHint} />}
         <svg className={cn("map-canvas", `tool-${tool}`)} style={{ aspectRatio: `${W} / ${format.height}` }} viewBox={`0 0 ${W} ${format.height}`} onPointerDown={onCanvasDown} onPointerMove={onCanvasMove} onPointerUp={stopDragging} onPointerLeave={stopDragging}>
           <MapArtwork data={data} tool={tool} trueScale={trueScale} scaleWidthMm={scaleWidthMm} selectedRoute={selectedRoute} selectedStop={selectedStop} selectedBackground={selectedBackground} imageSelected={imageSelected} selectedNote={selectedNote} routeStart={routeStart} draft={{ type: backgroundType, points: draftPoints, fill: backgroundFill, stroke: backgroundStroke }} onRoute={(id) => { setSelectedRoute(id); setSelectedStop(null); setSelectedBackground(null); setSelectedNote(null); setTool("select"); }} onRouteSlot={toggleLocomotiveSlot} onRouteBendInsert={insertRouteBend} onRouteBendRemove={removeRouteBend} onStop={(id) => { chooseStop(id); if (tool === "select") { beginDrag(); dragStopRef.current = id; } }} onWaypoint={(routeId, index) => { beginDrag(); dragWaypointRef.current = { routeId, index }; }} onBackground={(id) => { setSelectedBackground(id); setSelectedRoute(null); setSelectedStop(null); setSelectedNote(null); setTool("select"); }} onBackgroundPoint={(shapeId, index) => { beginDrag(); dragBackgroundPointRef.current = { shapeId, index }; }} onBackgroundLabel={(shapeId) => { beginDrag(); dragBackgroundLabelRef.current = shapeId; }} onImageSelect={chooseImage} onImageMove={(point) => { chooseImage(); const img = data.backgroundImage; if (img) { beginDrag(); dragImageRef.current = { mode: "move", offsetX: point.x - img.x, offsetY: point.y - img.y }; } }} onImageScale={() => { beginDrag(); dragImageRef.current = { mode: "scale" }; }} onImageRotate={() => { beginDrag(); dragImageRef.current = { mode: "rotate" }; }} onNoteSelect={chooseNote} onNoteMove={(id, point) => { chooseNote(id); const note = data.notes.find((item) => item.id === id); if (note) { beginDrag(); dragNoteRef.current = { id, mode: "move", offsetX: point.x - note.x, offsetY: point.y - note.y }; } }} onNoteResize={(id) => { beginDrag(); dragNoteRef.current = { id, mode: "resize" }; }} />
         </svg>
-        {selectedR && !routeHintAtTop && <RouteHint atTop={false} locomotives={selectedRouteHasSlots} open={routeHintOpen} onToggle={toggleRouteHint} />}
+        {selectedR && !routeHintAtTop && <RouteHint atTop={false} locomotives={selectedRouteHasSlots} open={routeHintOpen} onToggle={toggleRouteHint} offsetX={routeHintX} onOffsetChange={moveRouteHint} />}
       </section>
       <aside className="properties panel">
         <div className="panel-heading"><span>Properties</span><small>{imageSelected ? "Background image selected" : selectedN ? "Note selected" : selectedB ? "Background object selected" : selectedR ? "Route selected" : selectedS ? "Stop selected" : "Select an object on the map"}</small></div>
@@ -1130,15 +1142,56 @@ const toolDefinitions: Array<{ id: Tool; icon: React.ReactNode; title: string; n
 
 // A zero-height sticky slot so the hint stays in view even when the board is taller than the
 // window, without pushing the canvas around when a route is selected.
-function RouteHint({ atTop, locomotives, open, onToggle }: { atTop: boolean; locomotives: boolean; open: boolean; onToggle: () => void }) {
+function RouteHint({ atTop, locomotives, open, onToggle, offsetX, onOffsetChange }: { atTop: boolean; locomotives: boolean; open: boolean; onToggle: () => void; offsetX: number; onOffsetChange: (value: number) => void }) {
+  const boxRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef<{ pointerId: number; startX: number; startOffset: number } | null>(null);
+  // Only the grip is draggable; the rest of the box stays click-through so the map underneath
+  // keeps working.
+  const grip = {
+    onPointerDown: (event: React.PointerEvent<HTMLElement>) => {
+      event.preventDefault();
+      event.currentTarget.setPointerCapture(event.pointerId);
+      dragRef.current = { pointerId: event.pointerId, startX: event.clientX, startOffset: offsetX };
+    },
+    onPointerMove: (event: React.PointerEvent<HTMLElement>) => {
+      const drag = dragRef.current;
+      if (!drag || drag.pointerId !== event.pointerId) return;
+      const box = boxRef.current;
+      const scrollport = box?.parentElement?.parentElement;
+      const limit = box && scrollport ? Math.max(0, (scrollport.clientWidth - box.offsetWidth) / 2 - 6) : 0;
+      onOffsetChange(Math.max(-limit, Math.min(limit, drag.startOffset + event.clientX - drag.startX)));
+    },
+    onPointerUp: (event: React.PointerEvent<HTMLElement>) => {
+      if (dragRef.current?.pointerId === event.pointerId) dragRef.current = null;
+    },
+  };
+  // The collapsed bar can be parked further out than the expanded box fits, so re-clamp whenever
+  // the box changes size or the window does.
+  useEffect(() => {
+    const clamp = () => {
+      const box = boxRef.current;
+      const scrollport = box?.parentElement?.parentElement;
+      if (!box || !scrollport) return;
+      const limit = Math.max(0, (scrollport.clientWidth - box.offsetWidth) / 2 - 6);
+      if (Math.abs(offsetX) > limit) onOffsetChange(Math.max(-limit, Math.min(limit, offsetX)));
+    };
+    clamp();
+    window.addEventListener("resize", clamp);
+    return () => window.removeEventListener("resize", clamp);
+  }, [open, offsetX, onOffsetChange]);
+  const shift = { transform: `translateX(${offsetX}px)` };
   return <div className={cn("route-hint-slot", atTop && "at-top", !open && "collapsed")}>
     {open
-      ? <div className="route-hint">
+      ? <div className="route-hint" ref={boxRef} style={shift}>
+        <span className="route-hint-grip" title="Drag to move the box sideways" {...grip}><GripVertical /></span>
         <button type="button" className="route-hint-toggle" onClick={onToggle} aria-label="Collapse the route help"><ChevronDown /></button>
         <strong>Editing this route</strong>
         <span>Click a <b>+</b> to add a bend point anywhere along it · drag a bend point to move it · <b>double-click a bend point to remove it</b> · tick <b>Draw as a smooth curve</b> under Properties to bend it into an arc{locomotives ? <> · <b>click a wagon space to mark it as needing a locomotive</b>, and click it again to clear it</> : null}</span>
       </div>
-      : <button type="button" className="route-hint-bar" onClick={onToggle}><ChevronUp />Editing this route · show the shortcuts</button>}
+      : <div className="route-hint-bar" ref={boxRef} style={shift}>
+        <span className="route-hint-grip" title="Drag to move the bar sideways" {...grip}><GripVertical /></span>
+        <button type="button" onClick={onToggle}><ChevronUp />Editing this route · show the shortcuts</button>
+      </div>}
   </div>;
 }
 
