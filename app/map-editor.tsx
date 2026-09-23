@@ -174,6 +174,24 @@ function parallelPoints(data: MapData, route: Route): Point[] {
   return [points[0], runIn(sideways[0], sideways[1]), ...sideways.slice(1, last), runIn(sideways[last], sideways[last - 1]), points[last]];
 }
 
+// How much room each route actually gives its wagons, against how much a real set needs. A route
+// drawn much longer than its wagon count looks roomier on screen than the finished board plays;
+// one drawn shorter cannot physically hold its own wagons.
+export type RouteSpacing = { route: Route; drawnMm: number; neededMm: number; ratio: number; verdict: "short" | "long" | "ok" };
+const SPACING_SHORT = 1, SPACING_LONG = 1.3;
+function routeSpacing(data: MapData, scaleWidthMm: number): RouteSpacing[] {
+  const unitMm = scaleWidthMm / W;
+  const pitchMm = realWagon.length + realWagon.gap;
+  const infrastructureTypes = new Set(data.routeTypeStyles.filter((style) => style.infrastructure).map((style) => style.id));
+  return data.routes.filter((route) => !infrastructureTypes.has(route.type)).map((route) => {
+    const geometry = parallelPoints(data, route);
+    const points = route.curved && geometry.length > 2 ? curvedSamples(geometry) : geometry;
+    const drawnMm = (polylineLength(points) || 1) * unitMm;
+    const neededMm = route.length * pitchMm;
+    const ratio = drawnMm / neededMm;
+    return { route, drawnMm, neededMm, ratio, verdict: ratio < SPACING_SHORT ? "short" : ratio > SPACING_LONG ? "long" : "ok" } as RouteSpacing;
+  });
+}
 const orient = (a: Point, b: Point, c: Point) => (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
 const intersects = (a: Point, b: Point, c: Point, d: Point) => {
   const o1 = orient(a, b, c), o2 = orient(a, b, d), o3 = orient(c, d, a), o4 = orient(c, d, b);
@@ -457,17 +475,9 @@ export function MapEditor() {
   const scaleWidthMm = mapFormats[data.format].testSheet ? mapFormats[scaleTarget].widthMm : mapFormats[data.format].widthMm;
   const crossings = useMemo(() => crossingPairs(data), [data]);
   // Routes drawn too short to hold their own wagons at real component size.
-  const tightRoutes = useMemo(() => {
-    const unitMm = scaleWidthMm / W;
-    const pitch = (realWagon.length + realWagon.gap) / unitMm;
-    const infrastructureTypes = new Set(data.routeTypeStyles.filter((style) => style.infrastructure).map((style) => style.id));
-    return data.routes.filter((route) => {
-      if (infrastructureTypes.has(route.type)) return false;
-      const geometry = parallelPoints(data, route);
-      const points = route.curved && geometry.length > 2 ? curvedSamples(geometry) : geometry;
-      return route.length * pitch > (polylineLength(points) || 1);
-    });
-  }, [data]);
+  const spacing = useMemo(() => routeSpacing(data, scaleWidthMm), [data, scaleWidthMm]);
+  const tightRoutes = spacing.filter((item) => item.verdict === "short");
+  const looseRoutes = spacing.filter((item) => item.verdict === "long");
   const adjacency = useMemo(() => buildAdjacency(data), [data]);
   const stats = useMemo(() => networkStats(data), [data]);
   const colourTable = useMemo(() => colourLengthTable(data), [data]);
@@ -771,7 +781,7 @@ export function MapEditor() {
         <div className="scale-control">
           <label className="checkbox-row"><input type="checkbox" checked={trueScale} onChange={(event) => setTrueScale(event.target.checked)} />True-scale wagons</label>
           {format.testSheet && <div><Label htmlFor="scale-target">Printed as a proof of</Label><NativeSelect id="scale-target" value={scaleTarget} onChange={(event) => setScaleTarget(event.target.value as MapFormat)}>{Object.entries(mapFormats).filter(([, item]) => !item.testSheet).map(([key, item]) => <NativeSelectOption key={key} value={key}>{item.shortLabel}</NativeSelectOption>)}</NativeSelect></div>}
-          <p className="helper">Sizes the wagon spaces from a real {realWagon.length} × {realWagon.width} mm train on a {scaleWidthMm.toLocaleString("en-GB")} mm board{format.testSheet ? `, shrunk with the sheet to about ${(realWagon.length / scaleWidthMm * format.widthMm).toFixed(1)} mm each in print` : ", so printing this format at full size gives real-size wagons"}. {tightRoutes.length ? `${tightRoutes.length} route${tightRoutes.length === 1 ? " is" : "s are"} too short for its wagons.` : "Lines with big gaps are drawn longer than their wagon count needs."}</p>
+          <p className="helper">Sizes the wagon spaces from a real {realWagon.length} × {realWagon.width} mm train on a {scaleWidthMm.toLocaleString("en-GB")} mm board{format.testSheet ? `, shrunk with the sheet to about ${(realWagon.length / scaleWidthMm * format.widthMm).toFixed(1)} mm each in print` : ", so printing this format at full size gives real-size wagons"}. {tightRoutes.length || looseRoutes.length ? `${[tightRoutes.length && `${tightRoutes.length} too short`, looseRoutes.length && `${looseRoutes.length} roomier than needed`].filter(Boolean).join(", ")} — see Analyze balance.` : "Every route is drawn about the length its wagon count needs."}</p>
         </div>
         <Tooltip><TooltipTrigger asChild>
           <div className={cn("crossing-card", crossings.length && "has-warning")} tabIndex={0}><div className="crossing-icon">{crossings.length ? <AlertTriangle /> : <Check />}</div><div><strong>{crossings.length ? `${crossings.length} crossing${crossings.length === 1 ? "" : "s"}` : "No crossings"}</strong><p>{crossings.length ? "between buildable routes" : "The route network is geometrically clean"}</p></div></div>
@@ -812,7 +822,7 @@ export function MapEditor() {
     </div>
     <AlertDialog open={danger !== null} onOpenChange={(open) => { if (!open) { setDanger(null); setPendingImport(null); } }}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{danger === "reset" ? "Clear the entire map?" : danger === "load-blank" ? "Replace the current map with a blank one?" : danger === "load-example" ? "Replace the current map with the example?" : danger === "import-background" ? "Replace the background?" : danger === "import-network" ? "Replace stops and routes?" : danger === "import-image" ? "Replace the background image?" : "Delete the selected object?"}</AlertDialogTitle><AlertDialogDescription>{danger === "reset" ? "All locally stored background objects, stops and routes will be removed. Export the map first if you want to keep it." : danger === "load-blank" ? "Your current background objects, stops and routes will be replaced with a blank map. Export the map first if you want to keep your work." : danger === "load-example" ? "Your current background objects, stops and routes will be replaced with the neutral example map. Export the map first if you want to keep your work." : danger === "import-background" ? "The imported background, including any background image, will replace the current one. Stops and routes are kept as they are." : danger === "import-network" ? "The imported stops and routes will replace the current network. Background objects are kept as they are." : danger === "import-image" ? "The new image will replace the current background image." : selectedStop ? "The stop and all connected routes will be deleted." : "The selected object will be deleted."}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => { if (danger === "reset") { change(() => cloneMap(emptyMap)); clearSelection(); setDanger(null); } else if (danger === "load-blank") applyGuideChoice(emptyMap); else if (danger === "load-example") applyGuideChoice(initialMap); else if (danger === "import-background" && pendingImport?.kind === "background") applyBackgroundImport(pendingImport.background, pendingImport.backgroundImage); else if (danger === "import-network" && pendingImport?.kind === "network") applyNetworkImport(pendingImport.stops, pendingImport.routes, pendingImport.lineStyles, pendingImport.routeTypeStyles); else if (danger === "import-image" && pendingImport?.kind === "image") applyImageImport(pendingImport.image); else deleteSelected(); }}>Continue</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
     <WelcomeGuide open={showGuide} onOpenChange={(open) => !open && dismissGuide()} onChooseBlank={() => chooseFromGuide("blank")} onChooseExample={() => chooseFromGuide("example")} />
-    <AnalysisDialog open={showAnalysis} onOpenChange={setShowAnalysis} data={data} stats={stats} colourTable={colourTable} />
+    <AnalysisDialog open={showAnalysis} onOpenChange={setShowAnalysis} data={data} stats={stats} colourTable={colourTable} spacing={spacing} scaleWidthMm={scaleWidthMm} />
     <SuggestionsDialog open={showSuggestions} onOpenChange={setShowSuggestions} suggestions={suggestions} onAdd={addSuggestedRoute} />
     <PrintPages data={data} trueScale={trueScale} scaleWidthMm={scaleWidthMm} />
   </main></TooltipProvider>;
@@ -838,7 +848,8 @@ function WelcomeGuide({ open, onOpenChange, onChooseBlank, onChooseExample }: { 
   </Dialog>;
 }
 
-function AnalysisDialog({ open, onOpenChange, data, stats, colourTable }: { open: boolean; onOpenChange: (open: boolean) => void; data: MapData; stats: NetworkStats; colourTable: ColourLengthTable }) {
+function AnalysisDialog({ open, onOpenChange, data, stats, colourTable, spacing, scaleWidthMm }: { open: boolean; onOpenChange: (open: boolean) => void; data: MapData; stats: NetworkStats; colourTable: ColourLengthTable; spacing: RouteSpacing[]; scaleWidthMm: number }) {
+  const stopName = (id: string) => data.stops.find((stop) => stop.id === id)?.name ?? "";
   const sortedStops = [...data.stops].sort((a, b) => (stats.hubDegree.get(b.id) ?? 0) - (stats.hubDegree.get(a.id) ?? 0));
   return <Dialog open={open} onOpenChange={onOpenChange}>
     <DialogContent className="analysis-dialog">
@@ -849,6 +860,20 @@ function AnalysisDialog({ open, onOpenChange, data, stats, colourTable }: { open
         {sortedStops.length === 0 ? <p className="helper">No stops yet.</p> : <div className="analysis-table-scroll"><table className="analysis-table">
           <thead><tr><th>Stop</th><th>Neighbours</th><th>Links</th><th>Hub degree</th></tr></thead>
           <tbody>{sortedStops.map((stop) => <tr key={stop.id} className={cn((stats.neighbours.get(stop.id) ?? 0) < 2 && "analysis-warning-row")}><td>{stop.name}</td><td>{stats.neighbours.get(stop.id) ?? 0}</td><td>{stats.links.get(stop.id) ?? 0}</td><td>{stats.hubDegree.get(stop.id) ?? 0}</td></tr>)}</tbody>
+        </table></div>}
+      </div>
+      <div className="analysis-section">
+        <h3>Room per wagon</h3>
+        <p className="helper">How long each route is drawn against the {realWagon.length + realWagon.gap} mm a real wagon space needs on a {scaleWidthMm.toLocaleString("en-GB")} mm board. Under 100% the wagons do not fit; well over means the line looks roomier on screen than the finished board plays.</p>
+        {spacing.length === 0 ? <p className="helper">No card routes yet.</p> : <div className="analysis-table-scroll"><table className="analysis-table">
+          <thead><tr><th>Route</th><th>Wagons</th><th>Drawn</th><th>Needs</th><th>Room</th></tr></thead>
+          <tbody>{[...spacing].sort((a, b) => a.ratio - b.ratio).map((item) => <tr key={item.route.id} className={cn(item.verdict !== "ok" && "analysis-warning-row")}>
+            <td>{stopName(item.route.a)} → {stopName(item.route.b)}</td>
+            <td>{item.route.length}</td>
+            <td>{Math.round(item.drawnMm)} mm</td>
+            <td>{Math.round(item.neededMm)} mm</td>
+            <td>{Math.round(item.ratio * 100)}%{item.verdict === "short" ? " · too short" : item.verdict === "long" ? " · roomy" : ""}</td>
+          </tr>)}</tbody>
         </table></div>}
       </div>
       <div className="analysis-section">
