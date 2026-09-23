@@ -385,6 +385,7 @@ export function MapEditor() {
   const [routeStart, setRouteStart] = useState<string | null>(null);
   const [trueScale, setTrueScale] = useState(false);
   const [routeHintOpen, setRouteHintOpen] = useState(true);
+  const [linkParallel, setLinkParallel] = useState(true);
   // Collapsing the help is a lasting preference, not a per-selection one: reopening it on the next
   // route you click would defeat the point of hiding it.
   useEffect(() => { try { if (window.localStorage.getItem(ROUTE_HINT_KEY) === "closed") setRouteHintOpen(false); } catch { /* private mode */ } }, []);
@@ -591,7 +592,11 @@ export function MapEditor() {
     }
     if (dragWaypointRef.current) {
       const target = dragWaypointRef.current;
-      setData((current) => ({ ...current, routes: current.routes.map((route) => route.id === target.routeId ? { ...route, points: (route.points ?? []).map((item, index) => index === target.index ? point : item) } : route) }));
+      setData((current) => {
+        const dragged = current.routes.find((route) => route.id === target.routeId);
+        const linked = new Set((dragged && linkParallel ? current.routes.filter((route) => samePair(route, dragged)) : dragged ? [dragged] : []).map((route) => route.id));
+        return { ...current, routes: current.routes.map((route) => linked.has(route.id) && (route.points?.length ?? 0) > target.index ? { ...route, points: (route.points ?? []).map((item, index) => index === target.index ? point : item) } : route) };
+      });
       setSaved(false); return;
     }
     if (!dragStopRef.current) return;
@@ -643,8 +648,18 @@ export function MapEditor() {
     });
     setSelectedRoute(id);
   };
-  const insertRouteBend = (routeId: string, index: number, point: Point) => change((draft) => { const route = draft.routes.find((item) => item.id === routeId); if (!route) return draft; const points = [...(route.points ?? [])]; points.splice(index, 0, point); route.points = points; return draft; });
-  const removeRouteBend = (routeId: string, index: number) => change((draft) => { const route = draft.routes.find((item) => item.id === routeId); if (!route?.points) return draft; const points = route.points.filter((_, item) => item !== index); route.points = points.length ? points : undefined; return draft; });
+  // Bending one line of a double route normally has to move the other with it, or the two stop
+  // being parallel the moment you shape them. Unticking the link is how you split them up.
+  const bendTargets = (draft: MapData, routeId: string) => {
+    const route = draft.routes.find((item) => item.id === routeId);
+    if (!route) return [];
+    if (!linkParallel) return [route];
+    return draft.routes.filter((item) => samePair(item, route));
+  };
+  const straightenRoute = (routeId: string) => change((draft) => { for (const route of bendTargets(draft, routeId)) route.points = undefined; return draft; });
+  const setRouteCurved = (routeId: string, curved: boolean) => change((draft) => { for (const route of bendTargets(draft, routeId)) route.curved = curved || undefined; return draft; });
+  const insertRouteBend = (routeId: string, index: number, point: Point) => change((draft) => { for (const route of bendTargets(draft, routeId)) { const points = [...(route.points ?? [])]; points.splice(index, 0, { ...point }); route.points = points; } return draft; });
+  const removeRouteBend = (routeId: string, index: number) => change((draft) => { for (const route of bendTargets(draft, routeId)) { if (!route.points) continue; const points = route.points.filter((_, item) => item !== index); route.points = points.length ? points : undefined; } return draft; });
   const assignRouteLineStyle = (routeId: string, styleId: string | undefined) => change((draft) => { const route = draft.routes.find((item) => item.id === routeId); if (route) route.lineStyle = styleId; return draft; });
   const addSuggestedRoute = (suggestion: RouteSuggestion) => change((draft) => { draft.routes.push({ id: `r-${Date.now()}`, a: suggestion.a, b: suggestion.b, length: suggestion.suggestedLength, type: routeType, color: suggestion.suggestedColor }); return draft; });
   const addLineStyleToRoute = (routeId: string) => { const id = `style-${Date.now()}`; change((draft) => { draft.lineStyles.push({ id, label: "New style", strokeWidth: 6, dash: "10 6" }); const route = draft.routes.find((item) => item.id === routeId); if (route) route.lineStyle = id; return draft; }); };
@@ -780,7 +795,7 @@ export function MapEditor() {
         {imageSelected && data.backgroundImage && <BackgroundImageProperties image={data.backgroundImage} formatHeight={format.height} change={change} onDelete={() => setDanger("delete")} />}
         {selectedB && <BackgroundProperties shape={selectedB} change={change} onDelete={() => setDanger("delete")} />}
         {selectedS && <StopProperties stop={selectedS} change={change} onDelete={() => setDanger("delete")} />}
-        {selectedR && <RouteProperties route={selectedR} stops={data.stops} routes={data.routes} lineStyles={data.lineStyles} routeTypeStyles={data.routeTypeStyles} change={change} onDelete={() => setDanger("delete")} onCreateStyle={addLineStyleToRoute} onUpdateStyle={updateLineStyle} onDeleteStyle={deleteLineStyle} onSetStyle={assignRouteLineStyle} onCreateType={addRouteTypeToRoute} onUpdateType={updateRouteType} onDeleteType={deleteRouteType} onAddParallel={addParallelRoute} />}
+        {selectedR && <RouteProperties route={selectedR} stops={data.stops} routes={data.routes} lineStyles={data.lineStyles} routeTypeStyles={data.routeTypeStyles} change={change} onDelete={() => setDanger("delete")} onCreateStyle={addLineStyleToRoute} onUpdateStyle={updateLineStyle} onDeleteStyle={deleteLineStyle} onSetStyle={assignRouteLineStyle} onCreateType={addRouteTypeToRoute} onUpdateType={updateRouteType} onDeleteType={deleteRouteType} onAddParallel={addParallelRoute} onStraighten={straightenRoute} onSetCurved={setRouteCurved} linkParallel={linkParallel} onLinkParallel={setLinkParallel} />}
       </aside>
     </div>
     <AlertDialog open={danger !== null} onOpenChange={(open) => { if (!open) { setDanger(null); setPendingImport(null); } }}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{danger === "reset" ? "Clear the entire map?" : danger === "load-blank" ? "Replace the current map with a blank one?" : danger === "load-example" ? "Replace the current map with the example?" : danger === "import-background" ? "Replace the background?" : danger === "import-network" ? "Replace stops and routes?" : danger === "import-image" ? "Replace the background image?" : "Delete the selected object?"}</AlertDialogTitle><AlertDialogDescription>{danger === "reset" ? "All locally stored background objects, stops and routes will be removed. Export the map first if you want to keep it." : danger === "load-blank" ? "Your current background objects, stops and routes will be replaced with a blank map. Export the map first if you want to keep your work." : danger === "load-example" ? "Your current background objects, stops and routes will be replaced with the neutral example map. Export the map first if you want to keep your work." : danger === "import-background" ? "The imported background, including any background image, will replace the current one. Stops and routes are kept as they are." : danger === "import-network" ? "The imported stops and routes will replace the current network. Background objects are kept as they are." : danger === "import-image" ? "The new image will replace the current background image." : selectedStop ? "The stop and all connected routes will be deleted." : "The selected object will be deleted."}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => { if (danger === "reset") { change(() => cloneMap(emptyMap)); clearSelection(); setDanger(null); } else if (danger === "load-blank") applyGuideChoice(emptyMap); else if (danger === "load-example") applyGuideChoice(initialMap); else if (danger === "import-background" && pendingImport?.kind === "background") applyBackgroundImport(pendingImport.background, pendingImport.backgroundImage); else if (danger === "import-network" && pendingImport?.kind === "network") applyNetworkImport(pendingImport.stops, pendingImport.routes, pendingImport.lineStyles, pendingImport.routeTypeStyles); else if (danger === "import-image" && pendingImport?.kind === "image") applyImageImport(pendingImport.image); else deleteSelected(); }}>Continue</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
@@ -944,7 +959,7 @@ function LineStylePicker({ value, lineStyles, onChange, onCreate, onUpdate, onDe
   </div>;
 }
 
-function RouteProperties({ route, stops, routes, lineStyles, routeTypeStyles, change, onDelete, onCreateStyle, onUpdateStyle, onDeleteStyle, onSetStyle, onCreateType, onUpdateType, onDeleteType, onAddParallel }: { route: Route; stops: Stop[]; routes: Route[]; lineStyles: LineStyle[]; routeTypeStyles: RouteTypeStyle[]; change: (fn: (draft: MapData) => MapData) => void; onDelete: () => void; onAddParallel: (routeId: string) => void; onCreateStyle: (routeId: string) => void; onUpdateStyle: (styleId: string, values: Partial<LineStyle>) => void; onDeleteStyle: (styleId: string) => void; onSetStyle: (routeId: string, styleId: string | undefined) => void; onCreateType: (routeId: string) => void; onUpdateType: (typeId: string, values: Partial<RouteTypeStyle>) => void; onDeleteType: (typeId: string) => void }) {
+function RouteProperties({ route, stops, routes, lineStyles, routeTypeStyles, change, onDelete, onCreateStyle, onUpdateStyle, onDeleteStyle, onSetStyle, onCreateType, onUpdateType, onDeleteType, onAddParallel, onStraighten, onSetCurved, linkParallel, onLinkParallel }: { route: Route; onStraighten: (routeId: string) => void; onSetCurved: (routeId: string, curved: boolean) => void; linkParallel: boolean; onLinkParallel: (value: boolean) => void; stops: Stop[]; routes: Route[]; lineStyles: LineStyle[]; routeTypeStyles: RouteTypeStyle[]; change: (fn: (draft: MapData) => MapData) => void; onDelete: () => void; onAddParallel: (routeId: string) => void; onCreateStyle: (routeId: string) => void; onUpdateStyle: (styleId: string, values: Partial<LineStyle>) => void; onDeleteStyle: (styleId: string) => void; onSetStyle: (routeId: string, styleId: string | undefined) => void; onCreateType: (routeId: string) => void; onUpdateType: (typeId: string, values: Partial<RouteTypeStyle>) => void; onDeleteType: (typeId: string) => void }) {
   const update = (values: Partial<Route>) => change((draft) => { const item = draft.routes.find((entry) => entry.id === route.id); if (item) Object.assign(item, values); return draft; });
   const infrastructure = routeTypeStyles.find((style) => style.id === route.type)?.infrastructure ?? false;
   const parallelCount = routes.filter((item) => samePair(item, route)).length;
@@ -965,8 +980,9 @@ function RouteProperties({ route, stops, routes, lineStyles, routeTypeStyles, ch
     <div className="bend-controls">
       <Label>Shape · {route.points?.length ?? 0} bend point{(route.points?.length ?? 0) === 1 ? "" : "s"}</Label>
       <p className="helper">Click a + beside the selected route to add a bend between any two wagon spaces, drag a bend to move it, double-click it to remove it.</p>
-      <label className="checkbox-row"><input type="checkbox" checked={Boolean(route.curved)} onChange={(event) => update({ curved: event.target.checked || undefined })} />Draw as a smooth curve</label>
-      {Boolean(route.points?.length) && <Button size="sm" variant="ghost" onClick={() => update({ points: undefined })}>Straighten route</Button>}
+      <label className="checkbox-row"><input type="checkbox" checked={Boolean(route.curved)} onChange={(event) => onSetCurved(route.id, event.target.checked)} />Draw as a smooth curve</label>
+      {parallelCount > 1 && <label className="checkbox-row"><input type="checkbox" checked={linkParallel} onChange={(event) => onLinkParallel(event.target.checked)} />Shape the parallel line{parallelCount > 2 ? "s" : ""} together with this one</label>}
+      {Boolean(route.points?.length) && <Button size="sm" variant="ghost" onClick={() => onStraighten(route.id)}>Straighten route</Button>}
     </div>
     <LineStylePicker value={route.lineStyle} lineStyles={lineStyles} onChange={(styleId) => onSetStyle(route.id, styleId)} onCreate={() => onCreateStyle(route.id)} onUpdate={onUpdateStyle} onDelete={onDeleteStyle} helper="Give this one route a thicker or dashed line to flag it individually, on top of its type's appearance." />
     <Button variant="destructive" onClick={onDelete}><Trash2 />Delete route</Button>
