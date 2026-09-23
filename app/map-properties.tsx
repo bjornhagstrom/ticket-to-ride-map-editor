@@ -62,6 +62,8 @@ export function StopProperties({ stop, change, onDelete, labelState, mapEndGapMm
         {stop.labelAngle !== undefined && <Button size="sm" variant="ghost" onClick={() => update({ labelAngle: undefined })}>Reset</Button>}
       </div>
     </div>
+    <Button variant="outline" onClick={() => update({ locked: !stop.locked || undefined })}>{stop.locked ? <Unlock /> : <Lock />}{stop.locked ? "Unlock position" : "Lock position"}</Button>
+    <p className="helper">A locked stop can still be selected and edited, it just cannot be dragged by accident. Hold Shift while dragging to move it anyway, without unlocking it first.</p>
     <Button variant="destructive" onClick={onDelete}><Trash2 />Delete stop</Button>
     <p className="delete-note">Connected routes will also be deleted.</p>
   </div>;
