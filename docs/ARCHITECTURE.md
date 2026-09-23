@@ -93,7 +93,13 @@ A route's shape is `Route.points`: any number of bend points between its two sto
 
 ## True-scale wagons
 
-By default the wagon spaces are spread evenly along a route at `(index + 0.5) / length`, which is good for sketching but says nothing about whether the route is physically long enough. The optional true-scale view instead sizes each space from `realWagon` (20 × 9 mm, 5.5 mm gap) and lays the spaces edge to edge from the centre of the route. The conversion divides by the width of the board the map is *for*, not the paper it is printed on: a board format is measured against itself, so printing it at full size yields exactly 20 mm wagons, while a format marked `testSheet` is a shrunken proof of a target board (chosen in the Tools panel, default the standard 2×3) and therefore shows the board's own layout, printing smaller along with everything else. This matches how the sheets are used — marked up with coloured pens, not played with real components.
+By default the wagon spaces are spread evenly along the part of the route that is left after an end
+margin is reserved at each stop, so the first and last wagon do not crowd the circle they run into.
+That margin is half of `realWagon.endMargin`, raised to the stop's own radius plus a little where
+the stop is large, and capped at a fifth of the route so a short route still fits its wagons. On the
+imported Europe map this moved the closest wagon from 2.6 mm to 8.8 mm from a stop edge, with nothing
+left under 8 mm. The even spread is good for sketching but says nothing about whether the route is
+physically long enough. The optional true-scale view instead sizes each space from `realWagon` (20 × 9 mm, 5.5 mm gap) and lays the spaces edge to edge from the centre of the route. The conversion divides by the width of the board the map is *for*, not the paper it is printed on: a board format is measured against itself, so printing it at full size yields exactly 20 mm wagons, while a format marked `testSheet` is a shrunken proof of a target board (chosen in the Tools panel, default the standard 2×3) and therefore shows the board's own layout, printing smaller along with everything else. This matches how the sheets are used — marked up with coloured pens, not played with real components.
 
 `realWagon`'s spacing figures are calibrated rather than guessed. Fitting `distance = pitch × wagons + margin`
 by least squares over all 101 routes of the published Ticket to Ride Europe map gives 25.6 mm per wagon
