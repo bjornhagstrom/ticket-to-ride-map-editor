@@ -87,6 +87,8 @@ Supported stop types are `city`, `region`, `brt`, `rail`, `ferry` and `outing`. 
 
 `a` and `b` reference stop IDs. `points` is optional and contains any number of movable bend points between the two stops. `type` references the `id` of an entry in the map's `routeTypeStyles` list (see below) — `city`, `region`, `brt`, `ferry`, `rail` and `trail` by default, but any map can rename, restyle, delete or add to that list.
 
+Two or more routes between the same pair of stops form a double route: they are automatically drawn side by side, each keeping its own `color`, `length` and type. Nothing in the file marks them as a pair — being between the same two stops is enough.
+
 `curved` is optional. When `true` the route is drawn as a smooth Catmull-Rom curve through its bend points instead of straight segments; the wagon slots are placed along the curve and rotate with it. A route needs at least one bend point for the setting to have a visible effect. Select a route and use the `+` handles beside it to add a bend anywhere along the line, drag a bend to move it, and double-click one to remove it.
 
 `locomotiveSlots` is optional and lists the zero-based wagon-slot indices (out of `length`) that must be covered with a locomotive card, drawn with a small engine icon. Toggle it by clicking a wagon slot on a selected route.
@@ -98,10 +100,10 @@ Supported stop types are `city`, `region`, `brt`, `rail`, `ferry` and `outing`. 
 `routeTypeStyles` is a map-level array defining every route type's default appearance — this is what makes, for example, a railway look different from a ferry:
 
 ```json
-{ "id": "rail", "label": "Railway", "stroke": "#292b2f", "dash": "3 6", "strokeWidth": 4, "infrastructure": true }
+{ "id": "rail", "label": "Railway", "stroke": "#292b2f", "dash": "4 4", "strokeWidth": 4, "infrastructure": true }
 ```
 
-`stroke` is the line's colour, used directly for every type except `city` and `region`, whose routes use each route's own `color` (from the standard nine-colour deck) instead — for those two, `stroke` is unused. `dash` is an SVG `stroke-dasharray` (`""` for solid) and `strokeWidth` the line thickness in canvas units. `infrastructure: true` marks a pre-built type with no train cards and no wagon slots (drawn as a continuous line, like the default `rail` and `trail`); `false` marks a type that shows wagon slots, a colour choice and can take locomotive requirements (like `city`, `region`, `brt` and `ferry`).
+A type is told apart by **thickness and dash pattern, never by colour**. Every route a player claims with train cards is drawn in its own `color` (from the standard nine-colour deck, with `neutral` drawn grey), so two routes of the same type can and normally do have different colours. `stroke` is therefore only drawn for types with `infrastructure: true`, which have no train cards and so no colour of their own; on any other type it is stored but unused. `dash` is an SVG `stroke-dasharray` (`""` for solid) and `strokeWidth` the line thickness in canvas units. `infrastructure: true` marks a pre-built type with no train cards and no wagon slots (drawn as a continuous line, like the default `rail` and `trail`); `false` marks a type that shows wagon slots, a colour choice and can take locomotive requirements (like `city`, `region`, `brt` and `ferry`).
 
 Create, rename, restyle and delete types from the Route type control in the Draw route tool (sets the default for new routes) or in a selected route's Properties panel (changes that route's type and, through it, every other route sharing it). A type cannot be deleted while any route still uses it, or if it is the map's only remaining type. `routeTypeStyles` travels with full-map and network-only exports.
 

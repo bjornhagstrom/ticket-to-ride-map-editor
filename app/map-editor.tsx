@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, BarChart3, BusFront, Check, ChevronDown, CircleDot, CircleHelp, Crosshair, Download, FileStack, Image as ImageIcon, Layers3, Lightbulb, Link2, Lock, MapPinPlus, Maximize2, Minus, MousePointer2, Pencil, Plus, Printer, Redo2, RotateCcw, Ruler, Save, StickyNote, TrainFront, Trash2, Undo2, Unlock, Upload } from "lucide-react";
+import { AlertTriangle, BarChart3, BusFront, Check, ChevronDown, Copy, CircleDot, CircleHelp, Crosshair, Download, FileStack, Image as ImageIcon, Layers3, Lightbulb, Link2, Lock, MapPinPlus, Maximize2, Minus, MousePointer2, Pencil, Plus, Printer, Redo2, RotateCcw, Ruler, Save, StickyNote, TrainFront, Trash2, Undo2, Unlock, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
@@ -143,8 +143,9 @@ const curvedSamples = (points: Point[], perSegment = 12): Point[] => {
   return samples;
 };
 
+const samePair = (one: Route, other: Route) => (one.a === other.a && one.b === other.b) || (one.a === other.b && one.b === other.a);
 function parallelPoints(data: MapData, route: Route): Point[] {
-  const siblings = data.routes.filter((item) => (item.a === route.a && item.b === route.b) || (item.a === route.b && item.b === route.a));
+  const siblings = data.routes.filter((item) => samePair(item, route));
   const points = pointsFor(data, route);
   if (siblings.length < 2 || points.length < 2) return points;
   const index = siblings.findIndex((item) => item.id === route.id);
@@ -592,6 +593,22 @@ export function MapEditor() {
       return draft;
     });
   };
+
+  // A classic double route: a second line between the same two stops, in a colour that pair does
+  // not use yet. Both lines are drawn side by side automatically by parallelPoints.
+  const addParallelRoute = (routeId: string) => {
+    const id = `r-${Date.now()}`;
+    change((draft) => {
+      const source = draft.routes.find((item) => item.id === routeId);
+      if (!source) return draft;
+      const siblings = draft.routes.filter((item) => samePair(item, source));
+      const used = new Set(siblings.map((item) => item.color));
+      const colour = Object.keys(routeColors).find((key) => key !== "neutral" && !used.has(key)) ?? source.color;
+      draft.routes.push({ ...source, id, color: colour, points: source.points?.map((point) => ({ ...point })) });
+      return draft;
+    });
+    setSelectedRoute(id);
+  };
   const insertRouteBend = (routeId: string, index: number, point: Point) => change((draft) => { const route = draft.routes.find((item) => item.id === routeId); if (!route) return draft; const points = [...(route.points ?? [])]; points.splice(index, 0, point); route.points = points; return draft; });
   const removeRouteBend = (routeId: string, index: number) => change((draft) => { const route = draft.routes.find((item) => item.id === routeId); if (!route?.points) return draft; const points = route.points.filter((_, item) => item !== index); route.points = points.length ? points : undefined; return draft; });
   const assignRouteLineStyle = (routeId: string, styleId: string | undefined) => change((draft) => { const route = draft.routes.find((item) => item.id === routeId); if (route) route.lineStyle = styleId; return draft; });
@@ -724,7 +741,7 @@ export function MapEditor() {
         {imageSelected && data.backgroundImage && <BackgroundImageProperties image={data.backgroundImage} formatHeight={format.height} change={change} onDelete={() => setDanger("delete")} />}
         {selectedB && <BackgroundProperties shape={selectedB} change={change} onDelete={() => setDanger("delete")} />}
         {selectedS && <StopProperties stop={selectedS} change={change} onDelete={() => setDanger("delete")} />}
-        {selectedR && <RouteProperties route={selectedR} stops={data.stops} routes={data.routes} lineStyles={data.lineStyles} routeTypeStyles={data.routeTypeStyles} change={change} onDelete={() => setDanger("delete")} onCreateStyle={addLineStyleToRoute} onUpdateStyle={updateLineStyle} onDeleteStyle={deleteLineStyle} onSetStyle={assignRouteLineStyle} onCreateType={addRouteTypeToRoute} onUpdateType={updateRouteType} onDeleteType={deleteRouteType} />}
+        {selectedR && <RouteProperties route={selectedR} stops={data.stops} routes={data.routes} lineStyles={data.lineStyles} routeTypeStyles={data.routeTypeStyles} change={change} onDelete={() => setDanger("delete")} onCreateStyle={addLineStyleToRoute} onUpdateStyle={updateLineStyle} onDeleteStyle={deleteLineStyle} onSetStyle={assignRouteLineStyle} onCreateType={addRouteTypeToRoute} onUpdateType={updateRouteType} onDeleteType={deleteRouteType} onAddParallel={addParallelRoute} />}
       </aside>
     </div>
     <AlertDialog open={danger !== null} onOpenChange={(open) => { if (!open) { setDanger(null); setPendingImport(null); } }}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{danger === "reset" ? "Clear the entire map?" : danger === "load-blank" ? "Replace the current map with a blank one?" : danger === "load-example" ? "Replace the current map with the example?" : danger === "import-background" ? "Replace the background?" : danger === "import-network" ? "Replace stops and routes?" : danger === "import-image" ? "Replace the background image?" : "Delete the selected object?"}</AlertDialogTitle><AlertDialogDescription>{danger === "reset" ? "All locally stored background objects, stops and routes will be removed. Export the map first if you want to keep it." : danger === "load-blank" ? "Your current background objects, stops and routes will be replaced with a blank map. Export the map first if you want to keep your work." : danger === "load-example" ? "Your current background objects, stops and routes will be replaced with the neutral example map. Export the map first if you want to keep your work." : danger === "import-background" ? "The imported background, including any background image, will replace the current one. Stops and routes are kept as they are." : danger === "import-network" ? "The imported stops and routes will replace the current network. Background objects are kept as they are." : danger === "import-image" ? "The new image will replace the current background image." : selectedStop ? "The stop and all connected routes will be deleted." : "The selected object will be deleted."}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => { if (danger === "reset") { change(() => cloneMap(emptyMap)); clearSelection(); setDanger(null); } else if (danger === "load-blank") applyGuideChoice(emptyMap); else if (danger === "load-example") applyGuideChoice(initialMap); else if (danger === "import-background" && pendingImport?.kind === "background") applyBackgroundImport(pendingImport.background, pendingImport.backgroundImage); else if (danger === "import-network" && pendingImport?.kind === "network") applyNetworkImport(pendingImport.stops, pendingImport.routes, pendingImport.lineStyles, pendingImport.routeTypeStyles); else if (danger === "import-image" && pendingImport?.kind === "image") applyImageImport(pendingImport.image); else deleteSelected(); }}>Continue</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
@@ -816,6 +833,11 @@ const dashPresets: Array<{ value: string; label: string }> = [
   { value: "2 5", label: "Dotted" },
   { value: "14 4 2 4", label: "Dash-dot" },
 ];
+// An imported map may carry a dash pattern we have no preset for; keep it selectable rather than
+// silently showing "Solid" and overwriting it the moment the user touches the field.
+const dashOptions = (current: string) => dashPresets.some((preset) => preset.value === current)
+  ? dashPresets
+  : [...dashPresets, { value: current, label: `Custom (${current})` }];
 
 function StopProperties({ stop, change, onDelete }: { stop: Stop; change: (fn: (draft: MapData) => MapData) => void; onDelete: () => void }) {
   const update = (values: Partial<Stop>) => change((draft) => { const item = stopById(draft, stop.id); if (item) Object.assign(item, values); return draft; });
@@ -839,7 +861,9 @@ function StopProperties({ stop, change, onDelete }: { stop: Stop; change: (fn: (
 
 function RouteTypeEditor({ typeId, routeTypeStyles, routes, onSelectType, onCreateType, onUpdateType, onDeleteType }: { typeId: string; routeTypeStyles: RouteTypeStyle[]; routes: Route[]; onSelectType: (typeId: string) => void; onCreateType: () => void; onUpdateType: (typeId: string, values: Partial<RouteTypeStyle>) => void; onDeleteType: (typeId: string) => void }) {
   const style = routeTypeStyles.find((item) => item.id === typeId);
-  const colourApplies = typeId !== "city" && typeId !== "region";
+  // A type's own colour only shows on pre-built infrastructure. Everything a player claims with
+  // train cards takes its colour from the route, so types are told apart by thickness and dash.
+  const colourApplies = routeTypeStyles.find((item) => item.id === typeId)?.infrastructure ?? false;
   const usageCount = style ? routes.filter((route) => route.type === style.id).length : 0;
   return <div className="line-style-section">
     <Label>Route type</Label>
@@ -851,9 +875,9 @@ function RouteTypeEditor({ typeId, routeTypeStyles, routes, onSelectType, onCrea
     </div>
     {style && <div className="line-style-editor">
       <div><Label>Type name</Label><Input value={style.label} onChange={(event) => onUpdateType(style.id, { label: event.target.value })} /></div>
-      {colourApplies ? <div><Label>Line colour</Label><input className="colour-input" type="color" value={style.stroke} onChange={(event) => onUpdateType(style.id, { stroke: event.target.value })} /></div> : <p className="helper">City and region routes use each route&apos;s own colour instead of the type&apos;s colour.</p>}
+      {colourApplies ? <div><Label>Line colour</Label><input className="colour-input" type="color" value={style.stroke} onChange={(event) => onUpdateType(style.id, { stroke: event.target.value })} /></div> : <p className="helper">Every route keeps its own wagon colour, so a type is told apart by thickness and dash pattern — not by colour.</p>}
       <div><Label>Thickness · {style.strokeWidth}px</Label><input className="range-input" type="range" min="2" max="14" value={style.strokeWidth} onChange={(event) => onUpdateType(style.id, { strokeWidth: Number(event.target.value) })} /></div>
-      <div><Label>Dash pattern</Label><NativeSelect value={style.dash} onChange={(event) => onUpdateType(style.id, { dash: event.target.value })}>{dashPresets.map((preset) => <NativeSelectOption key={preset.label} value={preset.value}>{preset.label}</NativeSelectOption>)}</NativeSelect></div>
+      <div><Label>Dash pattern</Label><NativeSelect value={style.dash} onChange={(event) => onUpdateType(style.id, { dash: event.target.value })}>{dashOptions(style.dash).map((preset) => <NativeSelectOption key={preset.value} value={preset.value}>{preset.label}</NativeSelectOption>)}</NativeSelect></div>
       <label className="checkbox-row"><input type="checkbox" checked={style.infrastructure} onChange={(event) => onUpdateType(style.id, { infrastructure: event.target.checked })} />Pre-built infrastructure (no train cards or wagon slots)</label>
       <Button size="sm" variant="ghost" disabled={usageCount > 0 || routeTypeStyles.length <= 1} onClick={() => onDeleteType(style.id)}>{usageCount > 0 ? `In use by ${usageCount} route${usageCount === 1 ? "" : "s"}` : "Delete this type"}</Button>
     </div>}
@@ -881,12 +905,18 @@ function LineStylePicker({ value, lineStyles, onChange, onCreate, onUpdate, onDe
   </div>;
 }
 
-function RouteProperties({ route, stops, routes, lineStyles, routeTypeStyles, change, onDelete, onCreateStyle, onUpdateStyle, onDeleteStyle, onSetStyle, onCreateType, onUpdateType, onDeleteType }: { route: Route; stops: Stop[]; routes: Route[]; lineStyles: LineStyle[]; routeTypeStyles: RouteTypeStyle[]; change: (fn: (draft: MapData) => MapData) => void; onDelete: () => void; onCreateStyle: (routeId: string) => void; onUpdateStyle: (styleId: string, values: Partial<LineStyle>) => void; onDeleteStyle: (styleId: string) => void; onSetStyle: (routeId: string, styleId: string | undefined) => void; onCreateType: (routeId: string) => void; onUpdateType: (typeId: string, values: Partial<RouteTypeStyle>) => void; onDeleteType: (typeId: string) => void }) {
+function RouteProperties({ route, stops, routes, lineStyles, routeTypeStyles, change, onDelete, onCreateStyle, onUpdateStyle, onDeleteStyle, onSetStyle, onCreateType, onUpdateType, onDeleteType, onAddParallel }: { route: Route; stops: Stop[]; routes: Route[]; lineStyles: LineStyle[]; routeTypeStyles: RouteTypeStyle[]; change: (fn: (draft: MapData) => MapData) => void; onDelete: () => void; onAddParallel: (routeId: string) => void; onCreateStyle: (routeId: string) => void; onUpdateStyle: (styleId: string, values: Partial<LineStyle>) => void; onDeleteStyle: (styleId: string) => void; onSetStyle: (routeId: string, styleId: string | undefined) => void; onCreateType: (routeId: string) => void; onUpdateType: (typeId: string, values: Partial<RouteTypeStyle>) => void; onDeleteType: (typeId: string) => void }) {
   const update = (values: Partial<Route>) => change((draft) => { const item = draft.routes.find((entry) => entry.id === route.id); if (item) Object.assign(item, values); return draft; });
   const infrastructure = routeTypeStyles.find((style) => style.id === route.type)?.infrastructure ?? false;
+  const parallelCount = routes.filter((item) => samePair(item, route)).length;
   const stopName = (id: string) => stops.find((stop) => stop.id === id)?.name ?? "";
   return <div className="property-form">
     <div className="route-names"><span>{stopName(route.a)}</span><ChevronDown /><span>{stopName(route.b)}</span></div>
+    <div className="parallel-controls">
+      <Label>Parallel lines · {parallelCount} between these stops</Label>
+      <Button size="sm" variant="outline" onClick={() => onAddParallel(route.id)}><Copy />Add parallel route</Button>
+      <p className="helper">A double route: a second line between the same two stops, in its own colour. Both lines are drawn side by side.</p>
+    </div>
     <RouteTypeEditor typeId={route.type} routeTypeStyles={routeTypeStyles} routes={routes} onSelectType={(typeId) => update({ type: typeId })} onCreateType={() => onCreateType(route.id)} onUpdateType={onUpdateType} onDeleteType={onDeleteType} />
     {!infrastructure && <>
       <div><Label>Colour</Label><NativeSelect value={route.color} onChange={(event) => update({ color: event.target.value })}>{Object.keys(routeColors).map((key) => <NativeSelectOption key={key} value={key}>{colorLabels[key]}</NativeSelectOption>)}</NativeSelect></div>
@@ -927,7 +957,7 @@ function MapArtwork({ data, tool = "select", selectedRoute, selectedStop, select
     {data.backgroundImage && <BackgroundImageObject image={data.backgroundImage} height={format.height} selected={Boolean(imageSelected)} print={print} tool={tool} onSelect={onImageSelect} onMove={onImageMove} onScale={onImageScale} onRotate={onImageRotate} />}
     {data.background.map((shape) => <BackgroundObject key={shape.id} shape={shape} height={format.height} selected={shape.id === selectedBackground} print={print} tool={tool} onSelect={onBackground} onPoint={onBackgroundPoint} onLabel={onBackgroundLabel} />)}
     {!print && draft && draft.points.length > 0 && <g className="background-draft">{draft.type === "area" ? <polygon points={draft.points.map((p) => `${p.x},${p.y}`).join(" ")} fill={draft.fill} fillOpacity=".35" stroke={draft.stroke} /> : <polyline points={draft.points.map((p) => `${p.x},${p.y}`).join(" ")} fill="none" stroke={draft.stroke} />}{draft.points.map((point, index) => <circle key={index} cx={point.x} cy={point.y} r="6" />)}</g>}
-    {data.routes.map((route) => { const typeStyle = data.routeTypeStyles.find((item) => item.id === route.type) ?? { id: route.type, label: route.type, stroke: "#736d64", dash: "", strokeWidth: 3, infrastructure: false }; const style = route.lineStyle ? data.lineStyles.find((item) => item.id === route.lineStyle) : undefined; const geometry = parallelPoints(data, route); const curved = Boolean(route.curved) && geometry.length > 2; const path = curved ? curvedPath(geometry) : pathFromPoints(geometry); const points = curved ? curvedSamples(geometry) : geometry; const infrastructure = typeStyle.infrastructure; const routeColor = route.type === "city" || route.type === "region" ? (route.color === "neutral" ? "#736d64" : routeColors[route.color]) : typeStyle.stroke; const routeSelected = route.id === selectedRoute; return <g key={route.id} className={cn("route-group", routeSelected && "selected", style && "custom-style")} onPointerDown={onRoute ? (event) => { event.stopPropagation(); onRoute(route.id); } : undefined}><path d={path} className="route-hit" /><path d={path} className={cn("route-guide", infrastructure && "infrastructure")} fill="none" stroke={routeColor} strokeWidth={style ? style.strokeWidth : typeStyle.strokeWidth} strokeDasharray={style ? style.dash : typeStyle.dash} strokeLinecap="round" strokeLinejoin="round" />{!infrastructure && Array.from({ length: route.length }, (_, index) => { const position = pointAlong(points, (index + .5) / route.length); const isLocomotive = route.locomotiveSlots?.includes(index); const interactive = !print && routeSelected; return <g key={index} className={cn("wagon-slot", isLocomotive && "locomotive")} transform={`translate(${position.x},${position.y}) rotate(${position.angle})`} filter={print ? undefined : "url(#shadow)"} onPointerDown={interactive ? (event) => { event.stopPropagation(); onRouteSlot?.(route.id, index); } : undefined}><rect className="wagon-slot-outline" x={-13} y={-7} width="26" height="14" rx="4" /><rect x={-12} y={-6} width="24" height="12" rx="3" fill="#fffaf0" stroke={routeColor} strokeWidth="3" />{isLocomotive && <g className="locomotive-icon"><rect x={-8} y={-3.5} width="11" height="7" rx="1.5" /><rect x={2} y={-1.5} width="4.5" height="5" rx="1" /><rect x={-2.5} y={-6.5} width="2.5" height="3.5" /><circle cx={-4.5} cy={4} r="1.6" /><circle cx={1.5} cy={4} r="1.6" /></g>}</g>; })}</g>; })}
+    {data.routes.map((route) => { const typeStyle = data.routeTypeStyles.find((item) => item.id === route.type) ?? { id: route.type, label: route.type, stroke: "#736d64", dash: "", strokeWidth: 3, infrastructure: false }; const style = route.lineStyle ? data.lineStyles.find((item) => item.id === route.lineStyle) : undefined; const geometry = parallelPoints(data, route); const curved = Boolean(route.curved) && geometry.length > 2; const path = curved ? curvedPath(geometry) : pathFromPoints(geometry); const points = curved ? curvedSamples(geometry) : geometry; const infrastructure = typeStyle.infrastructure; const routeColor = infrastructure ? typeStyle.stroke : route.color === "neutral" ? "#736d64" : routeColors[route.color]; const routeSelected = route.id === selectedRoute; return <g key={route.id} className={cn("route-group", routeSelected && "selected", style && "custom-style")} onPointerDown={onRoute ? (event) => { event.stopPropagation(); onRoute(route.id); } : undefined}><path d={path} className="route-hit" /><path d={path} className={cn("route-guide", infrastructure && "infrastructure")} fill="none" stroke={routeColor} strokeWidth={style ? style.strokeWidth : typeStyle.strokeWidth} strokeDasharray={style ? style.dash : typeStyle.dash} strokeLinecap="round" strokeLinejoin="round" />{!infrastructure && Array.from({ length: route.length }, (_, index) => { const position = pointAlong(points, (index + .5) / route.length); const isLocomotive = route.locomotiveSlots?.includes(index); const interactive = !print && routeSelected; return <g key={index} className={cn("wagon-slot", isLocomotive && "locomotive")} transform={`translate(${position.x},${position.y}) rotate(${position.angle})`} filter={print ? undefined : "url(#shadow)"} onPointerDown={interactive ? (event) => { event.stopPropagation(); onRouteSlot?.(route.id, index); } : undefined}><rect className="wagon-slot-outline" x={-13} y={-7} width="26" height="14" rx="4" /><rect x={-12} y={-6} width="24" height="12" rx="3" fill="#fffaf0" stroke={routeColor} strokeWidth="3" />{isLocomotive && <g className="locomotive-icon"><rect x={-8} y={-3.5} width="11" height="7" rx="1.5" /><rect x={2} y={-1.5} width="4.5" height="5" rx="1" /><rect x={-2.5} y={-6.5} width="2.5" height="3.5" /><circle cx={-4.5} cy={4} r="1.6" /><circle cx={1.5} cy={4} r="1.6" /></g>}</g>; })}</g>; })}
     {data.stops.map((stop) => { const meta = stopTypeMeta[stop.type]; const active = stop.id === selectedStop || stop.id === routeStart; const radius = stopSizeMeta[stop.size ?? "medium"].radius; return <g key={stop.id} className={cn("stop", active && "active")} transform={`translate(${stop.x},${stop.y})`} onPointerDown={onStop ? (event) => { event.stopPropagation(); onStop(stop.id); } : undefined}><circle r={active ? radius + 3 : radius} fill={meta.fill} stroke={meta.stroke} strokeWidth={active ? 4 : 3} />{stop.type === "rail" && <rect x={-4} y={-4} width="8" height="8" fill={meta.stroke} />}<StopSymbolGlyph stop={stop} radius={radius} color={meta.stroke} /><text x={stop.x > 900 ? -14 : 14} y={stop.y > format.height - 100 ? -13 : -12} textAnchor={stop.x > 900 ? "end" : "start"}>{stop.name}</text></g>; })}
     {data.notes.map((note) => <NoteBoxObject key={note.id} note={note} height={format.height} selected={note.id === selectedNote} print={print} tool={tool} onSelect={onNoteSelect} onMove={onNoteMove} onResize={onNoteResize} />)}
     {!print && selectedRoute && (() => {

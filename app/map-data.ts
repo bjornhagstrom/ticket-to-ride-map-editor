@@ -96,12 +96,14 @@ export const stopTypeMeta: Record<StopType, { label: string; fill: string; strok
 };
 
 export const defaultRouteTypeStyles: RouteTypeStyle[] = [
+  // Card routes carry each route's own wagon colour, so these are told apart by width and dash.
+  // `stroke` is only drawn when a type is marked as pre-built infrastructure.
   { id: "city", label: "City route", stroke: "#721c24", dash: "", strokeWidth: 3, infrastructure: false },
-  { id: "region", label: "Regional route", stroke: "#b05b2a", dash: "", strokeWidth: 3, infrastructure: false },
-  { id: "brt", label: "Rapid transit", stroke: "#00877c", dash: "", strokeWidth: 3, infrastructure: false },
-  { id: "ferry", label: "Ferry", stroke: "#23749b", dash: "10 7", strokeWidth: 3, infrastructure: false },
-  { id: "rail", label: "Railway", stroke: "#292b2f", dash: "3 6", strokeWidth: 4, infrastructure: true },
-  { id: "trail", label: "Trail", stroke: "#53723b", dash: "11 6", strokeWidth: 5, infrastructure: true },
+  { id: "region", label: "Regional route", stroke: "#b05b2a", dash: "", strokeWidth: 6, infrastructure: false },
+  { id: "brt", label: "Rapid transit", stroke: "#00877c", dash: "2 5", strokeWidth: 4, infrastructure: false },
+  { id: "ferry", label: "Ferry", stroke: "#23749b", dash: "10 6", strokeWidth: 3, infrastructure: false },
+  { id: "rail", label: "Railway", stroke: "#292b2f", dash: "4 4", strokeWidth: 4, infrastructure: true },
+  { id: "trail", label: "Trail", stroke: "#53723b", dash: "14 4 2 4", strokeWidth: 5, infrastructure: true },
 ];
 
 export const routeColors: Record<string, string> = {
@@ -212,5 +214,7 @@ export const initialMap: MapData = {
     { id: "example-route-8", a: "example-old-town", b: "example-harbour", length: 3, type: "region", color: "green", points: [{ x: 790, y: 585 }] },
     { id: "example-route-9", a: "example-harbour", b: "example-eastgate", length: 3, type: "city", color: "yellow", points: [{ x: 950, y: 335 }] },
     { id: "example-route-10", a: "example-old-town", b: "example-quarry", length: 2, type: "region", color: "purple", points: [{ x: 850, y: 645 }] },
+    // A double route: same stops and type as route 1, different wagon colour, drawn alongside it.
+    { id: "example-route-11", a: "example-westport", b: "example-central", length: 4, type: "city", color: "black", points: [{ x: 265, y: 235 }] },
   ],
 };

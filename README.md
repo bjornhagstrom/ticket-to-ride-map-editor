@@ -8,7 +8,8 @@ Live site: <https://hagstrom.nu/ttr/>
 
 - Draw, move and edit stops and routes.
 - Shape a route freely: add as many bend points as you like anywhere along it, and optionally draw it as a smooth curve that the wagon slots follow.
-- Fully customise route types: rename, restyle (colour, thickness, dash) or delete the built-in city/region/rapid transit/ferry/railway/trail types, and add your own, each with its own appearance and infrastructure behaviour.
+- Fully customise route types: rename, restyle (thickness and dash pattern) or delete the built-in city/region/rapid transit/ferry/railway/trail types, and add your own. Types are told apart by line shape, never by colour, so every route keeps its own wagon colour whatever its type.
+- Build double routes: two or more parallel lines between the same pair of stops, each in its own colour, drawn side by side automatically.
 - Choose one of three stop sizes, which can carry meaning in some expansions.
 - Mark a stop with a dot, dash, cross or a short letter code, independent of its type.
 - Mark specific wagon slots on a route as requiring a locomotive card.
@@ -21,7 +22,7 @@ Live site: <https://hagstrom.nu/ttr/>
 - Analyse how balanced the network is: hub degree and neighbour count per stop, a colour-by-length distribution table, and a flag for under-connected stops.
 - Measure the shortest travel distance between any two stops (by route length, not straight-line distance).
 - Get automatic route suggestions between nearby, unconnected, poorly-connected stops, with a starting length and colour guess drawn from the balance analysis, that you can add with one click and then adjust.
-- Undo and redo up to 40 changes during the current session.
+- Undo and redo up to 200 changes during the current session, with Cmd/Ctrl+Z and Cmd/Ctrl+Shift+Z.
 - Save automatically in the current browser.
 - Import and export complete maps as JSON, or just the background or the route network on their own.
 - Print full test sheets or reduced A4 proofs of individual foldable-board panels.

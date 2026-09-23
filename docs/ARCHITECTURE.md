@@ -31,7 +31,7 @@ This ordering means a first-time visitor always makes an explicit choice before 
 
 `MapEditor` owns the active `MapData` plus transient interface state such as the selected tool, selected object and drag target.
 
-Normal edits pass through `change()`. Before applying an edit it stores a deep copy in an in-memory undo history. History is limited to 40 states and is not retained after a reload. Continuous pointer dragging updates the active map directly to avoid creating one undo entry for every pointer movement.
+Normal edits pass through `change()`. Before applying an edit it stores a deep copy in an in-memory undo history. History is limited to 200 states and is not retained after a reload. Continuous pointer dragging updates the active map directly to avoid creating one undo entry for every pointer movement; a single snapshot is taken when a drag begins and committed only if the pointer actually moved. Snapshots share the background image's base64 string rather than copying it, which is what makes a deep history affordable.
 
 ## Coordinate system
 
@@ -59,7 +59,7 @@ Changing this order can alter pointer behaviour as well as appearance. Notes are
 
 ## Customisable route styling
 
-Route appearance is data, not code. `MapData.routeTypeStyles` is a user-editable array (label, line colour, thickness, dash pattern, and an `infrastructure` flag that hides the colour picker and wagon slots for pre-built types like rail/trail). `Route.type` is a plain `string` id into that array rather than a fixed TypeScript union, so a map can rename, restyle or delete the six default types and add its own. `MapData.lineStyles` is a separate, similarly user-editable array for one-off per-route overrides (thickness/dash only, no colour), letting a single route be flagged as a special case on top of its type's normal appearance. Both arrays travel with full-map and network-only exports; `defaultRouteTypeStyles` in `map-data.ts` is the fallback seed for older files and new maps.
+Route appearance is data, not code. `MapData.routeTypeStyles` is a user-editable array (label, thickness, dash pattern, a fallback stroke colour, and an `infrastructure` flag that hides the colour picker and wagon slots for pre-built types like rail/trail). A type's `stroke` is only drawn for infrastructure types: everything claimed with train cards takes its colour from `Route.color`, so a type is identified by line shape alone and any two routes of one type may differ in colour. `Route.type` is a plain `string` id into that array rather than a fixed TypeScript union, so a map can rename, restyle or delete the six default types and add its own. `MapData.lineStyles` is a separate, similarly user-editable array for one-off per-route overrides (thickness/dash only, no colour), letting a single route be flagged as a special case on top of its type's normal appearance. Both arrays travel with full-map and network-only exports; `defaultRouteTypeStyles` in `map-data.ts` is the fallback seed for older files and new maps.
 
 ## Route geometry
 
