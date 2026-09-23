@@ -20,6 +20,7 @@ Live site: <https://hagstrom.nu/ttr/>
 - Place resizable evaluation notes with explanatory text on the map, for reviewers and playtesters.
 - Choose standard, large and custom foldable board formats or A4/A3/US Letter test sheets.
 - Detect crossings between buildable routes.
+- Check that each route is drawn about as long as its wagon count needs, and see which routes are too short or unnecessarily roomy.
 - Analyse how balanced the network is: hub degree and neighbour count per stop, a colour-by-length distribution table, and a flag for under-connected stops.
 - Measure the shortest travel distance between any two stops (by route length, not straight-line distance).
 - Get automatic route suggestions between nearby, unconnected, poorly-connected stops, with a starting length and colour guess drawn from the balance analysis, that you can add with one click and then adjust.
@@ -66,7 +67,14 @@ The deployable website is generated in `out/`. Its contents are intended to be s
 | Path | Purpose |
 | --- | --- |
 | `app/map-data.ts` | Map types, board formats, empty map and first-visit example map |
-| `app/map-editor.tsx` | Editor state, interactions, import/export and SVG rendering |
+| `app/map-editor.tsx` | Editor state, pointer interactions and layout |
+| `app/map-geometry.ts` | Route geometry, curves and intersection primitives |
+| `app/map-analysis.ts` | Balance metrics, shortest path and route suggestions |
+| `app/map-storage.ts` | Local storage, file normalizers and format rescaling |
+| `app/map-artwork.tsx` | SVG rendering of the map |
+| `app/map-properties.tsx` | Properties panel editors |
+| `app/map-dialogs.tsx` | Welcome guide, balance report and suggestions |
+| `app/map-print.tsx` | Print pages |
 | `app/globals.css` | Main editor layout and visual styling |
 | `app/editor-additions.css` | Route handles, mobile behaviour and print layouts |
 | `app/layout.tsx` | Page metadata and global layout |
@@ -83,7 +91,16 @@ npm run typecheck
 npm run build
 ```
 
-There are currently no automated interaction tests for drawing, dragging, persistence or printing. This is a documented gap rather than an implied guarantee.
+There is no automated test suite in the repository. Interaction testing during development has been
+done with ad-hoc Playwright scripts against the dev server, covering the example map, route colours,
+bend points on double routes, curves, locomotive marking, undo, true-scale wagons, the balance and
+suggestion dialogs, the measure tool, format changes, print pages and reload persistence. Turning
+that into a committed suite is still an open gap rather than an implied guarantee.
+
+Note that the Turbopack dev server has repeatedly served a stale stylesheet after edits to
+`app/globals.css`, reporting a successful compile while the browser still had the previous rules.
+If a style change does not take effect locally, restart the dev server after removing `.next`
+before looking for the cause in the code.
 
 ## Source of truth
 

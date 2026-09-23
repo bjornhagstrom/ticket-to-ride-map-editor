@@ -27,6 +27,25 @@ Static hosting
 
 This ordering means a first-time visitor always makes an explicit choice before either map is loaded, and an existing locally saved map is never silently replaced.
 
+## Module layout
+
+The editor is split by responsibility, with dependencies pointing one way and no cycles:
+
+| Module | Responsibility |
+| --- | --- |
+| `app/map-data.ts` | Types, board formats, colours, real-component sizes, the empty and example maps |
+| `app/map-geometry.ts` | Route geometry: bend points, parallel offsets, curves, point-along-line, segment intersection |
+| `app/map-analysis.ts` | Everything derived from the network: hub degree, shortest path, colour×length, route suggestions, room per wagon |
+| `app/map-storage.ts` | Local-storage keys, file normalizers, board-format rescaling, image reading |
+| `app/map-artwork.tsx` | The SVG layer stack, object renderers and editing handles |
+| `app/map-properties.tsx` | The Properties panel editors and the type/style pickers |
+| `app/map-dialogs.tsx` | Welcome guide, balance report, route suggestions |
+| `app/map-print.tsx` | The hidden print tree |
+| `app/map-editor.tsx` | Editor state, pointer interactions and the surrounding layout |
+
+`map-geometry` and `map-analysis` are pure: no React, no DOM, no storage. That is what makes the
+balance numbers testable straight from a `MapData` object.
+
 ## State and history
 
 `MapEditor` owns the active `MapData` plus transient interface state such as the selected tool, selected object and drag target.
@@ -53,6 +72,13 @@ The SVG layers are rendered in this order:
 6. Stops, stop symbols/letters and stop labels
 7. Evaluation notes
 8. Editing handles (bend points, bend insert handles, resize/rotate handles — hidden in print)
+
+Editing handles are drawn beside the line rather than on it: `+` handles on one side, bend grips on
+the other, each `HANDLE_OFFSET` units out with a smaller `HANDLE_HIT` grab radius. The gap between
+them has to stay wider than half a wagon space, or a handle's invisible hit area swallows the click
+that toggles a locomotive on the space beneath it. The offset is measured from the line as drawn,
+which for a double route is `parallelOffset` units to the side of the centre line that `Route.points`
+actually stores.
 9. Fold guides
 
 Changing this order can alter pointer behaviour as well as appearance. Notes are deliberately drawn above the map content so they stay readable; they are not considered part of the map itself and are therefore excluded from Background only and Network only exports.
@@ -97,13 +123,6 @@ A hidden print-only tree renders one page for A4/A3 formats and one reduced A4 p
 
 ## Known structural debt
 
-`app/map-editor.tsx` currently combines state management, editing interactions, forms, printing and SVG rendering, and has grown further with each added object type (background image, notes, per-type and per-route line styles). Properties panels and pickers are already split into function components within the file (`StopProperties`, `RouteProperties`, `RouteTypeEditor`, `LineStylePicker`, `NoteProperties`, `BackgroundImageProperties`, `BackgroundProperties`), but everything still lives in one module. Logical extraction candidates into separate files are:
+`app/map-editor.tsx` still owns all editor state and every pointer interaction in one component, which is the largest remaining lump. The pointer logic in particular (`onCanvasDown`, `onCanvasMove`, `stopDragging` and the seven drag refs they share) is the part most likely to be worth extracting next, probably into a hook.
 
-- persistence and file import/export;
-- board-format conversion;
-- print-page generation;
-- background and background-image renderers;
-- route and route-type-style renderers;
-- properties panels (already componentised, just not yet split out).
-
-Refactoring should preserve the stored JSON shape and local-storage key unless an explicit migration is added.
+Any refactoring must preserve the stored JSON shape and the local-storage key unless an explicit migration is added.
