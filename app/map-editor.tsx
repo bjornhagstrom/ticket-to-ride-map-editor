@@ -157,13 +157,19 @@ function parallelPoints(data: MapData, route: Route): Point[] {
     const length = Math.hypot(dx, dy) || 1;
     return { x: point.x - dy / length * distance, y: point.y + dx / length * distance };
   };
-  if (points.length === 2) {
-    const [a, b] = points;
-    const nearA = { x: a.x + (b.x - a.x) * .16, y: a.y + (b.y - a.y) * .16 };
-    const nearB = { x: a.x + (b.x - a.x) * .84, y: a.y + (b.y - a.y) * .84 };
-    return [a, shifted(nearA, a, b, offset), shifted(nearB, a, b, offset), b];
-  }
-  return points.map((point, i) => i === 0 || i === points.length - 1 ? point : shifted(point, points[i - 1], points[i + 1], offset));
+  // Every point moves sideways, bends included, so the lines of a double route follow each other
+  // instead of meeting in the middle. Two siblings sharing the same bend points then run exactly
+  // parallel; give one its own bends and they part company where you put them.
+  const sideways = points.map((point, i) => shifted(point, points[i === 0 ? 0 : i - 1], points[i === points.length - 1 ? i : i + 1], offset));
+  // Both lines still have to reach the same two stops, so they converge over a short run-in at
+  // each end rather than along the whole first and last segment.
+  const runIn = (from: Point, to: Point) => {
+    const distance = Math.hypot(to.x - from.x, to.y - from.y) || 1;
+    const t = Math.min(.35, Math.abs(offset) * 1.4 / distance);
+    return { x: from.x + (to.x - from.x) * t, y: from.y + (to.y - from.y) * t };
+  };
+  const last = points.length - 1;
+  return [points[0], runIn(sideways[0], sideways[1]), ...sideways.slice(1, last), runIn(sideways[last], sideways[last - 1]), points[last]];
 }
 
 const orient = (a: Point, b: Point, c: Point) => (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
