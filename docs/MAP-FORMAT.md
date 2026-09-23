@@ -20,7 +20,7 @@ Every exported filename ends with the local date and time it was saved, as `-YYY
 }
 ```
 
-`endGapMm` is optional and sets how much room, in millimetres, is left beyond a stop's own circle before the first wagon of every route into it. Leaving it out uses the default of 2 mm. It is a property of the map rather than of the viewer, so printing and exporting agree with what is on screen.
+`endGapMm` is optional and sets how much room, in millimetres, is left beyond a stop's own circle before the first wagon of every route into it. Leaving it out uses the default of 2 mm. A stop can carry its own `endGapMm` that overrides the map's, which is what lets the two ends of one route differ. It is a property of the map rather than of the viewer, so printing and exporting agree with what is on screen.
 
 The `kind` field identifies what a file contains. `"map"` (or a missing `kind`, for compatibility with files exported before this field existed) is a full map and replaces everything on import. The Import action reads this field to decide what to do with a file — there is no separate control for choosing the import type.
 
@@ -69,6 +69,8 @@ All geometry uses SVG editor coordinates, for example `{ "x": 420, "y": 345 }`. 
 ```
 
 Supported stop types are `city`, `region`, `brt`, `rail`, `ferry` and `outing`. `size` is optional (`small`, `medium` or `large`; missing means `medium`) and only affects how large the stop is drawn — some expansions give meaning to stop size, such as marking major cities.
+
+`endGapMm` on a stop overrides the map-level setting of the same name for every route into that stop.
 
 `labelAngle` is optional and places the stop's name around the stop, as a bearing in degrees where 0 is to the right and 90 is below. The name stays attached to the stop wherever it is turned, so it follows the stop when the stop is moved. Leaving it out keeps the original placement (up and to the right, flipping to the left near the right edge), so older files are unaffected. Turn it with the Name position slider in a selected stop's Properties panel, which is how you move a name clear of a route that runs under it. The editor flags names that cover a route and can pick a clear bearing for you; where a stop is hemmed in and no bearing is clear, it says so rather than pretending otherwise.
 

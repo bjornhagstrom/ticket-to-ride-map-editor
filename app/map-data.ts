@@ -5,7 +5,7 @@ export type RouteType = string;
 export type BackgroundType = "area" | "line" | "label";
 export type MapFormat = "board-2x3" | "board-2x3-large" | "board-2x4" | "a4" | "a3" | "us-letter";
 export type Point = { x: number; y: number };
-export type Stop = Point & { id: string; name: string; type: StopType; size?: StopSize; symbol?: StopSymbol; letter?: string; labelAngle?: number };
+export type Stop = Point & { id: string; name: string; type: StopType; size?: StopSize; symbol?: StopSymbol; letter?: string; labelAngle?: number; endGapMm?: number };
 
 // Where a stop's name sits, as a compass bearing around the stop in degrees (0 = right, 90 = below).
 // Undefined keeps the original behaviour: up and to the right, flipping left near the right edge.
@@ -94,7 +94,8 @@ export const REFERENCE_BOARD_MM = 790;
 // first wagon of every route into it. Two is the measured sweet spot on the imported Europe map:
 // it keeps the median wagon spacing at the real board's 25.5 mm while leaving about 3 mm of clear
 // paper around every stop. Past about four the wagons start being squeezed out of real spacing.
-// `MapData.endGapMm` overrides it per map.
+// `MapData.endGapMm` sets it for the whole map and `Stop.endGapMm` for one stop, which is what
+// lets the two ends of the same route differ.
 export const DEFAULT_END_GAP_MM = 2;
 
 // Centre-to-centre distance between the lines of a double route, in millimetres on the reference

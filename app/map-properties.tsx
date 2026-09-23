@@ -26,7 +26,7 @@ const dashOptions = (current: string) => dashPresets.some((preset) => preset.val
   ? dashPresets
   : [...dashPresets, { value: current, label: `Custom (${current})` }];
 
-export function StopProperties({ stop, change, onDelete, labelState }: { stop: Stop; change: (fn: (draft: MapData) => MapData) => void; onDelete: () => void; labelState: { covers: boolean; clear: number[]; best: number } }) {
+export function StopProperties({ stop, change, onDelete, labelState, mapEndGapMm }: { stop: Stop; change: (fn: (draft: MapData) => MapData) => void; onDelete: () => void; mapEndGapMm: number; labelState: { covers: boolean; clear: number[]; best: number } }) {
   const update = (values: Partial<Stop>) => change((draft) => { const item = stopById(draft, stop.id); if (item) Object.assign(item, values); return draft; });
   const symbol = stop.symbol ?? "none";
   return <div className="property-form">
@@ -41,6 +41,12 @@ export function StopProperties({ stop, change, onDelete, labelState }: { stop: S
       {symbol === "letter" && <div><Label>Letter</Label><Input maxLength={2} value={stop.letter ?? ""} onChange={(event) => update({ letter: event.target.value })} /></div>}
     </div>
     <p className="helper">Mark a stop with a symbol or short code for rules of your own, independent of its type.</p>
+    <div className="label-angle">
+      <Label htmlFor="stop-end-gap">Space before the first wagon · {stop.endGapMm ?? mapEndGapMm} mm{stop.endGapMm === undefined ? " (map default)" : ""}</Label>
+      <input id="stop-end-gap" className="range-input" type="range" min="0" max="30" step="1" value={stop.endGapMm ?? mapEndGapMm} onChange={(event) => update({ endGapMm: Number(event.target.value) })} />
+      <p className="helper">Room left beyond this stop&apos;s circle before the first wagon of every route into it. Set it per stop where one end of a line needs more air than the other.</p>
+      {stop.endGapMm !== undefined && <Button size="sm" variant="ghost" onClick={() => update({ endGapMm: undefined })}>Use the map default ({mapEndGapMm} mm)</Button>}
+    </div>
     <div className="label-angle">
       <Label>Name position · {Math.round(labelAngleOf(stop))}°</Label>
       <input className="range-input" type="range" min="0" max="345" step="15" value={Math.round(labelAngleOf(stop))} onChange={(event) => update({ labelAngle: Number(event.target.value) })} />

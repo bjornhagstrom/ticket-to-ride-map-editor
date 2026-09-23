@@ -102,15 +102,17 @@ each stop carries an invisible `stop-hit` circle so it stays comfortable to clic
 
 ## Wagon spacing
 
-Wagon spaces are laid out in millimetres, not in canvas units. The default view converts through a
-fixed `REFERENCE_BOARD_MM` (790) so a map looks the same whichever format it is set to; true-scale
-mode converts through the map's own target board instead. Either way a space is drawn at
+Wagon spaces are laid out in millimetres, not in canvas units. Sizes convert through the board the map is
+for: its own format, or for a test sheet the board it stands in for. A space is drawn at
 `realWagon`'s real size and the spaces are placed at the real board's pitch, centred on the route,
-so a route looks the way it will play. Only when the wagons will not fit does the route fall back to
+so a route always looks the way it will play. There was briefly a True-scale toggle for this; once
+the default view was calibrated the toggle did nothing on a standard board, so it was removed. Only when the wagons will not fit does the route fall back to
 spreading them evenly over whatever room it has.
 
-Before the wagons are placed, room is reserved at each end: the stop's own radius plus
-`MapData.endGapMm` (default `DEFAULT_END_GAP_MM`), capped at 30% of the route. Two millimetres is
+Before the wagons are placed, room is reserved at each end: that stop's own radius plus its gap
+setting, capped at 30% of the route. The gap is `Stop.endGapMm` if the stop sets one, otherwise
+`MapData.endGapMm`, otherwise `DEFAULT_END_GAP_MM`. Because it is resolved per stop, the two ends of
+one route can differ — useful where a line runs from a crowded hub into open space. Two millimetres is
 the measured sweet spot on the imported Europe map — it holds the median spacing at the real board's
 25.5 mm while leaving about 3 mm of clear paper around every stop, and past about four the wagons
 start being squeezed out of real spacing. The Tools panel exposes it as a slider, and it is stored

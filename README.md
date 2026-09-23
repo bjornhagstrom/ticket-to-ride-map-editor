@@ -14,8 +14,8 @@ Live site: <https://hagstrom.nu/ttr/>
 - Mark a stop with a dot, dash, cross or a short letter code, independent of its type.
 - Turn a stop's name around the stop to keep it clear of the routes running past it, with a warning listing names that cover a route and a one-click move to a clear position.
 - Mark specific wagon slots on a route as requiring a locomotive card.
-- Wagon spaces, stop circles and the gap between the lines of a double route are all drawn at the size a real board uses, with an adjustable amount of room left around each stop for maps where many lines meet.
-- Switch on true-scale wagons to measure that against the actual target board rather than a standard one, so you can judge how crowded the finished board will actually be. A board format printed at full size gives exactly real-size wagons; a test sheet is treated as a shrunken proof of whichever board you pick, so the layout matches the board and simply prints smaller. Routes drawn too short for their own wagon count are outlined in red.
+- Wagon spaces, stop circles and the gap between the lines of a double route are all drawn at the size a real board uses, with an adjustable amount of room left around each stop, set for the whole map or per stop so the two ends of one line can differ.
+- Wagons are always measured against the board the map is for, so you can judge how crowded the finished board will actually be. A board format printed at full size gives exactly real-size wagons; a test sheet is treated as a shrunken proof of whichever board you pick, so the layout matches the board and simply prints smaller. Routes drawn too short for their own wagon count are outlined in red.
 - Define reusable custom line styles (thickness and dash pattern) to flag routes that follow a special rule, and set a default style so new routes pick it up automatically.
 - Add areas, boundaries and labels behind the route network.
 - Import a background image (PNG, JPEG or WebP) — from the Import menu or the Draw background tool — and move, scale, rotate, crop, fade or lock it behind the rest of the map, or centre it and fit it to the page with a print-safe margin in one click.
