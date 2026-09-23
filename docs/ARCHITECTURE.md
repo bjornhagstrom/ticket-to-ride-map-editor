@@ -91,21 +91,29 @@ Route appearance is data, not code. `MapData.routeTypeStyles` is a user-editable
 
 A route's shape is `Route.points`: any number of bend points between its two stops, each draggable, insertable at any segment via the `+` handles drawn beside a selected route, and removable by double-clicking. `Route.curved` switches the drawing from straight segments (`pathFromPoints`) to a Catmull-Rom spline converted to cubic Béziers (`curveControls`/`curvedPath`). Because wagon spaces are positioned by walking the polyline, a curved route is also flattened into a denser sample list (`curvedSamples`, 12 points per segment) before slot placement, so the spaces sit on the visible curve and rotate with it rather than following the underlying control polygon.
 
-## True-scale wagons
+## Wagon spacing
 
-By default the wagon spaces are spread evenly along the part of the route that is left after an end
-margin is reserved at each stop, so the first and last wagon do not crowd the circle they run into.
-That margin is half of `realWagon.endMargin`, raised to the stop's own radius plus a little where
-the stop is large, and capped at a fifth of the route so a short route still fits its wagons. On the
-imported Europe map this moved the closest wagon from 2.6 mm to 8.8 mm from a stop edge, with nothing
-left under 8 mm. The even spread is good for sketching but says nothing about whether the route is
-physically long enough. The optional true-scale view instead sizes each space from `realWagon` (20 × 9 mm, 5.5 mm gap) and lays the spaces edge to edge from the centre of the route. The conversion divides by the width of the board the map is *for*, not the paper it is printed on: a board format is measured against itself, so printing it at full size yields exactly 20 mm wagons, while a format marked `testSheet` is a shrunken proof of a target board (chosen in the Tools panel, default the standard 2×3) and therefore shows the board's own layout, printing smaller along with everything else. This matches how the sheets are used — marked up with coloured pens, not played with real components.
+Wagon spaces are laid out in millimetres, not in canvas units. The default view converts through a
+fixed `REFERENCE_BOARD_MM` (790) so a map looks the same whichever format it is set to; true-scale
+mode converts through the map's own target board instead. Either way a space is drawn at
+`realWagon`'s real size and the spaces are placed at the real board's pitch, centred on the route,
+so a route looks the way it will play. Only when the wagons will not fit does the route fall back to
+spreading them evenly over whatever room it has.
+
+Before the wagons are placed, room is reserved at each end: the stop's own radius plus
+`MapData.endGapMm` (default `DEFAULT_END_GAP_MM`), capped at 30% of the route. Two millimetres is
+the measured sweet spot on the imported Europe map — it holds the median spacing at the real board's
+25.5 mm while leaving about 3 mm of clear paper around every stop, and past about four the wagons
+start being squeezed out of real spacing. The Tools panel exposes it as a slider, and it is stored
+in the map so print and export agree with the screen.
 
 `realWagon`'s spacing figures are calibrated rather than guessed. Fitting `distance = pitch × wagons + margin`
 by least squares over all 101 routes of the published Ticket to Ride Europe map gives 25.6 mm per wagon
 space and 14.8 mm of end margin, and scored against that model the real board lands between 97% and 106%
-at every route length. `routeSpacing` uses the same formula, so "100%" means "drawn about as long as a real
-board would draw it". Re-running that fit is the way to revise the constants, not adjusting them by eye. A route whose drawn length is shorter than `length × pitch` gets a `too-tight` class and a red outline, and the count is surfaced in the Tools panel. This is a view mode only: nothing about it is stored in `MapData`.
+at every route length. `routeSpacing` uses that formula for its verdicts, so "100%" means "drawn about as
+long as a real board would draw it". Re-running that fit is the way to revise the constants, not adjusting
+them by eye. Note that the renderer's end reservation is a separate, simpler rule (stop radius plus the
+map's gap) — the fitted `endMargin` is what the analysis judges against, not what the renderer draws.
 
 ## Balance analysis and route suggestions
 

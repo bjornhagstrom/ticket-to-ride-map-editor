@@ -13,11 +13,14 @@ Every exported filename ends with the local date and time it was saved, as `-YYY
   "kind": "map",
   "name": "Example map",
   "format": "board-2x3",
+  "endGapMm": 2,
   "background": [],
   "stops": [],
   "routes": []
 }
 ```
+
+`endGapMm` is optional and sets how much room, in millimetres, is left beyond a stop's own circle before the first wagon of every route into it. Leaving it out uses the default of 2 mm. It is a property of the map rather than of the viewer, so printing and exporting agree with what is on screen.
 
 The `kind` field identifies what a file contains. `"map"` (or a missing `kind`, for compatibility with files exported before this field existed) is a full map and replaces everything on import. The Import action reads this field to decide what to do with a file — there is no separate control for choosing the import type.
 

@@ -48,7 +48,7 @@ export type NoteBox = {
   text: string;
   locked?: boolean;
 };
-export type MapData = { name: string; format: MapFormat; background: BackgroundShape[]; stops: Stop[]; routes: Route[]; backgroundImage?: BackgroundImage; notes: NoteBox[]; lineStyles: LineStyle[]; routeTypeStyles: RouteTypeStyle[] };
+export type MapData = { name: string; format: MapFormat; endGapMm?: number; background: BackgroundShape[]; stops: Stop[]; routes: Route[]; backgroundImage?: BackgroundImage; notes: NoteBox[]; lineStyles: LineStyle[]; routeTypeStyles: RouteTypeStyle[] };
 
 export const W = 1100;
 export const STORAGE_KEY = "orebro-map-editor-public-v2";
@@ -85,6 +85,17 @@ export const mapFormats: Record<MapFormat, MapFormatDefinition> = {
 // real board lands between 97% and 106% at every route length, which is what makes it a usable
 // reference for "is this route drawn about right". Change these if you measure your own set.
 export const realWagon = { length: 20, width: 9, gap: 5.5, endMargin: 15 };
+
+// The board the default view draws to scale against, so a map looks the same whichever format it is
+// set to. True-scale mode measures against the map's own target board instead.
+export const REFERENCE_BOARD_MM = 790;
+
+// Extra room, in millimetres on the reference board, added beyond a stop's own circle before the
+// first wagon of every route into it. Two is the measured sweet spot on the imported Europe map:
+// it keeps the median wagon spacing at the real board's 25.5 mm while leaving about 3 mm of clear
+// paper around every stop. Past about four the wagons start being squeezed out of real spacing.
+// `MapData.endGapMm` overrides it per map.
+export const DEFAULT_END_GAP_MM = 2;
 
 export const stopSizeMeta: Record<StopSize, { label: string; radius: number }> = {
   small: { label: "Small", radius: 6 },
