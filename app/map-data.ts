@@ -61,15 +61,17 @@ export type MapFormatDefinition = {
   columns: number;
   rows: number;
   custom?: boolean;
+  /** A proof sheet, not a finished board: true-scale wagons are sized from a target board instead. */
+  testSheet?: boolean;
 };
 
 export const mapFormats: Record<MapFormat, MapFormatDefinition> = {
   "board-2x3": { label: "Standard board 2×3 · 790 × 525 mm", shortLabel: "Standard board 2×3", note: "Verified standard Ticket to Ride size", width: W, height: Math.round(W * 525 / 790), widthMm: 790, heightMm: 525, columns: 3, rows: 2 },
   "board-2x3-large": { label: "Large board 2×3 · 972 × 648 mm", shortLabel: "Large board 2×3", note: "Large Anniversary-style size", width: W, height: Math.round(W * 648 / 972), widthMm: 972, heightMm: 648, columns: 3, rows: 2 },
   "board-2x4": { label: "Extended board 2×4 · 1,053 × 526 mm", shortLabel: "Extended board 2×4", note: "Custom size using standard-size square panels", width: W, height: Math.round(W * 526 / 1053), widthMm: 1053, heightMm: 526, columns: 4, rows: 2, custom: true },
-  a4: { label: "A4 test sheet · 297 × 210 mm", shortLabel: "A4 test sheet", note: "One landscape test sheet", width: W, height: Math.round(W * 210 / 297), widthMm: 297, heightMm: 210, columns: 1, rows: 1 },
-  a3: { label: "A3 test sheet · 420 × 297 mm", shortLabel: "A3 test sheet", note: "One landscape test sheet", width: W, height: Math.round(W * 297 / 420), widthMm: 420, heightMm: 297, columns: 1, rows: 1 },
-  "us-letter": { label: "US Letter test sheet · 11 × 8.5 in", shortLabel: "US Letter test sheet", note: "One landscape test sheet", width: W, height: Math.round(W * 215.9 / 279.4), widthMm: 279.4, heightMm: 215.9, imperial: "11 × 8.5 in", columns: 1, rows: 1 },
+  a4: { label: "A4 test sheet · 297 × 210 mm", shortLabel: "A4 test sheet", note: "One landscape test sheet", width: W, height: Math.round(W * 210 / 297), widthMm: 297, heightMm: 210, columns: 1, rows: 1 , testSheet: true },
+  a3: { label: "A3 test sheet · 420 × 297 mm", shortLabel: "A3 test sheet", note: "One landscape test sheet", width: W, height: Math.round(W * 297 / 420), widthMm: 420, heightMm: 297, columns: 1, rows: 1 , testSheet: true },
+  "us-letter": { label: "US Letter test sheet · 11 × 8.5 in", shortLabel: "US Letter test sheet", note: "One landscape test sheet", width: W, height: Math.round(W * 215.9 / 279.4), widthMm: 279.4, heightMm: 215.9, imperial: "11 × 8.5 in", columns: 1, rows: 1 , testSheet: true },
 };
 
 // Footprint of a real plastic train, in millimetres, used by the true-scale wagon view. These are
