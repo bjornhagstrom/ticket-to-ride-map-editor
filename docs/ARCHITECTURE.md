@@ -65,6 +65,10 @@ Route appearance is data, not code. `MapData.routeTypeStyles` is a user-editable
 
 A route's shape is `Route.points`: any number of bend points between its two stops, each draggable, insertable at any segment via the `+` handles drawn beside a selected route, and removable by double-clicking. `Route.curved` switches the drawing from straight segments (`pathFromPoints`) to a Catmull-Rom spline converted to cubic Béziers (`curveControls`/`curvedPath`). Because wagon spaces are positioned by walking the polyline, a curved route is also flattened into a denser sample list (`curvedSamples`, 12 points per segment) before slot placement, so the spaces sit on the visible curve and rotate with it rather than following the underlying control polygon.
 
+## True-scale wagons
+
+By default the wagon spaces are spread evenly along a route at `(index + 0.5) / length`, which is good for sketching but says nothing about whether the route is physically long enough. The optional true-scale view instead sizes each space from `realWagon` (20 × 9 mm, 2 mm gap) converted through the chosen format's own `widthMm`, and lays the spaces edge to edge from the centre of the route. Because the conversion goes through the format, the same geometry yields different results for a 790 mm board and an A4 sheet — which is correct, since a real train does not shrink when the board does. A route whose drawn length is shorter than `length × pitch` gets a `too-tight` class and a red outline, and the count is surfaced in the Tools panel. This is a view mode only: nothing about it is stored in `MapData`.
+
 ## Balance analysis and route suggestions
 
 `app/map-editor.tsx` includes a small graph layer computed purely from `data.stops`/`data.routes`, with no separate module and no new persisted data:

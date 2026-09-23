@@ -72,6 +72,10 @@ export const mapFormats: Record<MapFormat, MapFormatDefinition> = {
   "us-letter": { label: "US Letter test sheet · 11 × 8.5 in", shortLabel: "US Letter test sheet", note: "One landscape test sheet", width: W, height: Math.round(W * 215.9 / 279.4), widthMm: 279.4, heightMm: 215.9, imperial: "11 × 8.5 in", columns: 1, rows: 1 },
 };
 
+// Footprint of a real plastic train, in millimetres, used by the true-scale wagon view. These are
+// the numbers to change if you measure your own components and find them different.
+export const realWagon = { length: 20, width: 9, gap: 2 };
+
 export const stopSizeMeta: Record<StopSize, { label: string; radius: number }> = {
   small: { label: "Small", radius: 6 },
   medium: { label: "Medium", radius: 9 },
