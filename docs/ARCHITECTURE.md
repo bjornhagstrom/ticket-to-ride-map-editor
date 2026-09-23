@@ -151,7 +151,7 @@ Shared maps and live collaboration require a server API, central storage and an 
 
 ## Printing
 
-A hidden print-only tree renders one page for A4/A3 formats and one reduced A4 proof per panel for foldable formats. The foldable proof is not a full-scale production file. Its caption states the approximate reduction percentage.
+A hidden print-only tree renders one page for the sheet formats and one reduced A4 proof per panel for foldable formats. Each format asks the printer for the paper it was laid out for through a named `@page` rule, so the sheet formats come out landscape instead of being scaled down onto portrait paper, and everything outside the print tree is hidden so no blank trailing sheet is produced. The foldable proof is not a full-scale production file. Its caption states the approximate reduction percentage.
 
 ## Known structural debt
 

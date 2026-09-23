@@ -99,10 +99,11 @@ bend points on double routes, curves, locomotive marking, undo, true-scale wagon
 suggestion dialogs, the measure tool, format changes, print pages and reload persistence. Turning
 that into a committed suite is still an open gap rather than an implied guarantee.
 
-Note that the Turbopack dev server has repeatedly served a stale stylesheet after edits to
-`app/globals.css`, reporting a successful compile while the browser still had the previous rules.
-If a style change does not take effect locally, restart the dev server after removing `.next`
-before looking for the cause in the code.
+If a change does not take effect locally, check for an orphaned dev server before suspecting the
+build. `npm run dev` falls back to port 3001 when 3000 is already taken, printing only a warning, so
+a previous server left running keeps serving the old code on 3000 while the new one compiles your
+edits somewhere you are not looking. `pgrep -f next-server` shows them; stop them all before
+starting a new one, and do not delete `.next` while a server is running.
 
 ## Source of truth
 

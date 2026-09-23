@@ -18,10 +18,22 @@
 }
 
 @media print{
-  @page{size:auto;margin:0}
+  /* Named pages so each format asks the printer for the paper it was laid out for. Without this the
+     print dialog defaults to portrait and a landscape sheet is scaled down to fit. */
+  @page{margin:0}
+  @page portrait-a4{size:A4 portrait;margin:0}
+  @page landscape-a4{size:A4 landscape;margin:0}
+  @page landscape-a3{size:A3 landscape;margin:0}
+  @page landscape-letter{size:Letter landscape;margin:0}
+  .format-board-2x3 .print-page,.format-board-2x3-large .print-page,.format-board-2x4 .print-page{page:portrait-a4}
+  .format-a4 .print-page{page:landscape-a4}
+  .format-a3 .print-page{page:landscape-a3}
+  .format-us-letter .print-page{page:landscape-letter}
   html,body{background:white!important}
   body{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
   .topbar,.workspace,[role="alertdialog"]{display:none!important}
+  body>*:not(.app-shell){display:none!important}
+  .app-shell>*:not(.print-pages){display:none!important}
   .app-shell{display:block!important;min-height:0!important}
   .print-pages{display:block!important}
   .print-page{page-break-after:always;break-after:page;overflow:hidden;background:white}
@@ -35,6 +47,8 @@
   .format-a4 .print-page svg{display:block;width:277mm;height:181mm;background:#f7f1e5;border:.3mm solid #81786c}
   .format-a3 .print-page{width:420mm;height:297mm;padding:12mm}
   .format-a3 .print-page svg{display:block;width:396mm;height:254mm;background:#f7f1e5;border:.3mm solid #81786c}
+  .format-us-letter .print-page{width:279.4mm;height:215.9mm;padding:10mm}
+  .format-us-letter .print-page svg{display:block;width:259.4mm;height:186.9mm;background:#f7f1e5;border:.3mm solid #81786c}
   .print-page .route-hit{display:none}
   .print-page .stop,.print-page .route-group{filter:none!important}
   .print-page .stop text{font-size:12px}
