@@ -1,7 +1,7 @@
 // The balance layer: everything derived from the stops and routes themselves. All of it is pure,
 // computed on demand from MapData, and none of it is stored in a map file.
 import { defaultLabelAngle, stopSizeMeta, type MapData, type Point, realWagon, type Route, routeColors, type Stop, W } from "./map-data";
-import { curvedSamples, intersects, parallelPoints, pointsFor, polylineLength, stopById } from "./map-geometry";
+import { curvedSamples, isCurved, intersects, parallelPoints, pointsFor, polylineLength, stopById } from "./map-geometry";
 
 export type RouteSpacing = { route: Route; drawnMm: number; neededMm: number; ratio: number; verdict: "short" | "long" | "ok" };
 const SPACING_SHORT = .85, SPACING_LONG = 1.35;
@@ -11,7 +11,7 @@ export function routeSpacing(data: MapData, scaleWidthMm: number): RouteSpacing[
   const infrastructureTypes = new Set(data.routeTypeStyles.filter((style) => style.infrastructure).map((style) => style.id));
   return data.routes.filter((route) => !infrastructureTypes.has(route.type)).map((route) => {
     const geometry = parallelPoints(data, route);
-    const points = route.curved && geometry.length > 2 ? curvedSamples(geometry) : geometry;
+    const points = isCurved(route) && geometry.length > 2 ? curvedSamples(geometry) : geometry;
     const drawnMm = (polylineLength(points) || 1) * unitMm;
     const neededMm = route.length * pitchMm + realWagon.endMargin;
     const ratio = drawnMm / neededMm;
@@ -195,7 +195,7 @@ export function routeSamplePoints(data: MapData): Point[] {
   const points: Point[] = [];
   for (const route of data.routes) {
     const geometry = parallelPoints(data, route);
-    const drawn = route.curved && geometry.length > 2 ? curvedSamples(geometry) : geometry;
+    const drawn = isCurved(route) && geometry.length > 2 ? curvedSamples(geometry) : geometry;
     for (let i = 0; i < drawn.length - 1; i++) {
       const a = drawn[i], b = drawn[i + 1];
       const steps = Math.max(2, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / 6));
@@ -222,6 +222,37 @@ export function labelAngleOptions(data: MapData, stop: Stop, samples: Point[]): 
   const options = [];
   for (let angle = 0; angle < 360; angle += 15) options.push({ angle, overlap: overlapCount(labelBox(stop, angle, radius), samples) });
   return options;
+}
+
+type Box = ReturnType<typeof labelBox>;
+const boxesOverlap = (a: Box, b: Box) => a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+const bearingGap = (a: number, b: number) => { const d = Math.abs(a - b) % 360; return d > 180 ? 360 - d : d; };
+
+// Try to turn every name clear of the routes, and of the names already placed. Stops with the
+// fewest clear bearings go first so the hemmed-in ones get the good spots, and a name that is
+// already fine stays where it is. Whatever cannot be placed is reported rather than shuffled.
+export function autoPlaceLabels(data: MapData): { placed: Map<string, number>; unresolved: string[] } {
+  const samples = routeSamplePoints(data);
+  const radiusOf = (stop: Stop) => stopSizeMeta[stop.size ?? "medium"].radius;
+  const scored = data.stops.map((stop) => ({ stop, options: labelAngleOptions(data, stop, samples) }));
+  scored.sort((a, b) => a.options.filter((o) => !o.overlap).length - b.options.filter((o) => !o.overlap).length);
+  const taken: Box[] = [];
+  const placed = new Map<string, number>();
+  const unresolved: string[] = [];
+  for (const { stop, options } of scored) {
+    const current = labelAngleOf(stop);
+    const free = options.filter((option) => option.overlap === 0)
+      .sort((a, b) => bearingGap(a.angle, current) - bearingGap(b.angle, current));
+    const choice = free.find((option) => !taken.some((box) => boxesOverlap(box, labelBox(stop, option.angle, radiusOf(stop)))));
+    if (choice) {
+      taken.push(labelBox(stop, choice.angle, radiusOf(stop)));
+      if (choice.angle !== current) placed.set(stop.id, choice.angle);
+      continue;
+    }
+    taken.push(labelBox(stop, current, radiusOf(stop)));
+    if (labelCovers(data, stop, samples)) unresolved.push(stop.id);
+  }
+  return { placed, unresolved };
 }
 
 export function coveredLabels(data: MapData): Stop[] {

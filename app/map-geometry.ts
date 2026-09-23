@@ -49,6 +49,9 @@ export const curvedSamples = (points: Point[], perSegment = 12): Point[] => {
   return samples;
 };
 
+// A route curves unless it has been explicitly straightened. The field is left unset for the
+// common case, so `undefined` has to mean curved rather than straight.
+export const isCurved = (route: Route) => route.curved !== false;
 export const samePair = (one: Route, other: Route) => (one.a === other.a && one.b === other.b) || (one.a === other.b && one.b === other.a);
 // How far to the side of the centre line this route is actually drawn. Zero unless it is one of
 // several routes between the same two stops. Editing handles need it so they land beside the line

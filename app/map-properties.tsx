@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
 import { colorLabels, type ImageCrop, type LineStyle, type MapData, type NoteBox, type RouteTypeStyle, type BackgroundImage, type BackgroundShape, type Route, routeColors, type Stop, stopSizeMeta, stopSymbolMeta, type StopSize, type StopSymbol, type StopType, stopTypeMeta, W } from "./map-data";
-import { samePair, stopById } from "./map-geometry";
+import { isCurved, samePair, stopById } from "./map-geometry";
 import { labelAngleOf } from "./map-analysis";
 import { cn } from "@/lib/utils";
 
@@ -134,7 +134,7 @@ export function RouteProperties({ route, stops, routes, lineStyles, routeTypeSty
     <div className="bend-controls">
       <Label>Shape · {route.points?.length ?? 0} bend point{(route.points?.length ?? 0) === 1 ? "" : "s"}</Label>
       <p className="helper">Click a + beside the selected route to add a bend between any two wagon spaces, drag a bend to move it, double-click it to remove it.</p>
-      <label className="checkbox-row"><input type="checkbox" checked={Boolean(route.curved)} onChange={(event) => onSetCurved(route.id, event.target.checked)} />Draw as a smooth curve</label>
+      <label className="checkbox-row"><input type="checkbox" checked={isCurved(route)} onChange={(event) => onSetCurved(route.id, event.target.checked)} />Draw as a smooth curve</label>
       {parallelCount > 1 && <label className="checkbox-row"><input type="checkbox" checked={linkParallel} onChange={(event) => onLinkParallel(event.target.checked)} />Shape the parallel line{parallelCount > 2 ? "s" : ""} together with this one</label>}
       {Boolean(route.points?.length) && <Button size="sm" variant="ghost" onClick={() => onStraighten(route.id)}>Straighten route</Button>}
     </div>

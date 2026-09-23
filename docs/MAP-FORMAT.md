@@ -87,7 +87,7 @@ Supported stop types are `city`, `region`, `brt`, `rail`, `ferry` and `outing`. 
   "type": "city",
   "color": "red",
   "points": [{ "x": 265, "y": 235 }, { "x": 320, "y": 300 }],
-  "curved": true,
+  "curved": false,
   "locomotiveSlots": [1],
   "lineStyle": "style-tunnel"
 }
@@ -97,7 +97,7 @@ Supported stop types are `city`, `region`, `brt`, `rail`, `ferry` and `outing`. 
 
 Two or more routes between the same pair of stops form a double route: they are automatically drawn side by side, each keeping its own `color`, `length` and type. Nothing in the file marks them as a pair — being between the same two stops is enough. The sideways offset is applied to every point of the line, bend points included, so siblings sharing the same `points` run exactly parallel and bend together; they converge only over a short run-in at each stop, which both lines have to reach. Bend points, the smooth-curve setting and Straighten route are applied to every line of a double route at once, so shaping one shapes them all and they stay parallel. Untick **Shape the parallel lines together with this one** in the Properties panel to edit just the selected line, which is how you make them separate.
 
-`curved` is optional. When `true` the route is drawn as a smooth Catmull-Rom curve through its bend points instead of straight segments; the wagon slots are placed along the curve and rotate with it. A route needs at least one bend point for the setting to have a visible effect. Select a route and use the `+` handles beside it to add a bend anywhere along the line, drag a bend to move it, and double-click one to remove it.
+`curved` is optional and **defaults to true**: a route is drawn as a smooth Catmull-Rom curve through its bend points unless it carries `"curved": false`, which draws straight segments instead. The wagon spaces are placed along the curve and rotate with it. A route needs at least one bend point for the setting to have any visible effect, so a file that never mentions `curved` looks the same as before for straight two-point routes. Only the exception is stored, which is why an older file with no `curved` field anywhere now opens with curved routes. Select a route and use the `+` handles beside it to add a bend anywhere along the line, drag a bend to move it, and double-click one to remove it.
 
 `locomotiveSlots` is optional and lists the zero-based wagon-slot indices (out of `length`) that must be covered with a locomotive card, drawn with a small engine icon. Toggle it by clicking a wagon slot on a selected route.
 

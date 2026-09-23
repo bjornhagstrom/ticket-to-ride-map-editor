@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, BarChart3, BusFront, Check, ChevronDown, ChevronUp, GripVertical, CircleDot, CircleHelp, Download, Image as ImageIcon, Layers3, Lightbulb, Link2, MapPinPlus, MousePointer2, Printer, Redo2, RotateCcw, Ruler, StickyNote, Trash2, Undo2, Upload } from "lucide-react";
+import { AlertTriangle, BarChart3, Crosshair, BusFront, Check, ChevronDown, ChevronUp, GripVertical, CircleDot, CircleHelp, Download, Image as ImageIcon, Layers3, Lightbulb, Link2, MapPinPlus, MousePointer2, Printer, Redo2, RotateCcw, Ruler, StickyNote, Trash2, Undo2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
@@ -16,7 +16,7 @@ import { MapArtwork, type Tool } from "./map-artwork";
 import { AnalysisDialog, SuggestionsDialog, WelcomeGuide } from "./map-dialogs";
 import { BackgroundImageProperties, BackgroundProperties, LineStylePicker, NoteProperties, RouteProperties, RouteTypeEditor, StopProperties } from "./map-properties";
 import { PrintPages } from "./map-print";
-import { type RouteSuggestion, labelCovers, labelAngleOptions, routeSamplePoints, colourLengthTable, crossingPairs, buildAdjacency, networkStats, routeSpacing, shortestPath, suggestRoutes } from "./map-analysis";
+import { autoPlaceLabels, type RouteSuggestion, labelCovers, labelAngleOptions, routeSamplePoints, colourLengthTable, crossingPairs, buildAdjacency, networkStats, routeSpacing, shortestPath, suggestRoutes } from "./map-analysis";
 import { canvasPoint, pointsFor, samePair, stopById } from "./map-geometry";
 import { cloneForHistory, cloneMap, formatTimestamp, GUIDE_SEEN_KEY, HISTORY_LIMIT, MAX_IMAGE_WARN_BYTES, normalizeBackgroundFile, normalizeMap, normalizeNetworkFile, readBackgroundImage, rescaleMapToFormat, ROUTE_HINT_KEY, ROUTE_HINT_X_KEY } from "./map-storage";
 import { colorLabels, emptyMap, initialMap, type LineStyle, DEFAULT_END_GAP_MM, mapFormats, type BackgroundImage, type BackgroundShape, type BackgroundType, type MapData, type MapFormat, type Point, realWagon, type Route, type RouteType, type RouteTypeStyle, routeColors, STORAGE_KEY, type Stop, type StopSize, stopSizeMeta, type StopSymbol, stopSymbolMeta, type StopType, stopTypeMeta, W } from "./map-data";
@@ -181,7 +181,7 @@ export function MapEditor() {
     if (tool === "route") {
       if (!routeStart) { setRouteStart(id); return; }
       if (routeStart === id) { setRouteStart(null); return; }
-      change((draft) => { draft.routes.push({ id: `r-${Date.now()}`, a: routeStart, b: id, length: 2, type: routeType, color: routeColor, lineStyle: routeLineStyle, curved: routeCurved || undefined }); return draft; });
+      change((draft) => { draft.routes.push({ id: `r-${Date.now()}`, a: routeStart, b: id, length: 2, type: routeType, color: routeColor, lineStyle: routeLineStyle, curved: routeCurved ? undefined : false }); return draft; });
       setRouteStart(null);
       return;
     }
@@ -334,7 +334,17 @@ export function MapEditor() {
     return draft.routes.filter((item) => samePair(item, route));
   };
   const straightenRoute = (routeId: string) => change((draft) => { for (const route of bendTargets(draft, routeId)) route.points = undefined; return draft; });
-  const applyRouteCurve = (routeId: string, curved: boolean) => change((draft) => { for (const route of bendTargets(draft, routeId)) route.curved = curved || undefined; return draft; });
+  const applyRouteCurve = (routeId: string, curved: boolean) => change((draft) => { for (const route of bendTargets(draft, routeId)) route.curved = curved ? undefined : false; return draft; });
+  const tidyLabels = () => {
+    const { placed, unresolved } = autoPlaceLabels(data);
+    if (!placed.size && !unresolved.length) { toast.success("Every stop name is already clear of the routes."); return; }
+    if (placed.size) change((draft) => { for (const stop of draft.stops) { const angle = placed.get(stop.id); if (angle !== undefined) stop.labelAngle = angle; } return draft; });
+    const moved = `Moved ${placed.size} name${placed.size === 1 ? "" : "s"}, clear of the routes and of each other`;
+    if (unresolved.length) {
+      const names = unresolved.map((id) => stopById(data, id)?.name).filter(Boolean);
+      toast.warning(`${moved}. ${unresolved.length} could not be placed: ${names.slice(0, 4).join(", ")}${names.length > 4 ? ` and ${names.length - 4} more` : ""}. Move the stop, bend the route away, or set those by hand.`);
+    } else toast.success(`${moved}.`);
+  };
   const insertRouteBend = (routeId: string, index: number, point: Point) => change((draft) => { for (const route of bendTargets(draft, routeId)) { const points = [...(route.points ?? [])]; points.splice(index, 0, { ...point }); route.points = points; } return draft; });
   const removeRouteBend = (routeId: string, index: number) => change((draft) => { for (const route of bendTargets(draft, routeId)) { if (!route.points) continue; const points = route.points.filter((_, item) => item !== index); route.points = points.length ? points : undefined; } return draft; });
   const assignRouteLineStyle = (routeId: string, styleId: string | undefined) => change((draft) => { const route = draft.routes.find((item) => item.id === routeId); if (route) route.lineStyle = styleId; return draft; });
@@ -441,6 +451,7 @@ export function MapEditor() {
           <p>Select the stop and use <strong>Name position</strong> to turn the name around it. If the stop is so hemmed in that no position is clear, the panel says so — then move the stop, bend the route away, or accept it.</p>
           <p>Text width is estimated rather than measured, so this errs slightly on the cautious side.</p>
         </TooltipContent></Tooltip>}
+        {coveredNames.length > 0 && <Button variant="outline" size="sm" className="analyze-button" onClick={tidyLabels}><Crosshair />Move names clear</Button>}
         <Tooltip><TooltipTrigger asChild>
           <div className={cn("crossing-card", crossings.length && "has-warning")} tabIndex={0}><div className="crossing-icon">{crossings.length ? <AlertTriangle /> : <Check />}</div><div><strong>{crossings.length ? `${crossings.length} crossing${crossings.length === 1 ? "" : "s"}` : "No crossings"}</strong><p>{crossings.length ? "between buildable routes" : "The route network is geometrically clean"}</p></div></div>
         </TooltipTrigger><TooltipContent side="right" className="balance-tooltip">

@@ -12,7 +12,7 @@ Live site: <https://hagstrom.nu/ttr/>
 - Build double routes: two or more parallel lines between the same pair of stops, each in its own colour, drawn side by side automatically.
 - Choose one of three stop sizes, which can carry meaning in some expansions.
 - Mark a stop with a dot, dash, cross or a short letter code, independent of its type.
-- Turn a stop's name around the stop to keep it clear of the routes running past it, with a warning listing names that cover a route and a one-click move to a clear position.
+- Turn a stop's name around the stop to keep it clear of the routes running past it, with a warning listing names that cover a route, a one-click move to a clear position, and a Move names clear button that turns the whole map's names at once and names the stops it could not solve.
 - Mark specific wagon slots on a route as requiring a locomotive card.
 - Wagon spaces, stop circles and the gap between the lines of a double route are all drawn at the size a real board uses, with an adjustable amount of room left around each stop, set for the whole map or per stop so the two ends of one line can differ.
 - Wagons are always measured against the board the map is for, so you can judge how crowded the finished board will actually be. A board format printed at full size gives exactly real-size wagons; a test sheet is treated as a shrunken proof of whichever board you pick, so the layout matches the board and simply prints smaller. Routes drawn too short for their own wagon count are outlined in red.
