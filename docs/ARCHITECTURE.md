@@ -73,6 +73,12 @@ The SVG layers are rendered in this order:
 7. Evaluation notes
 8. Editing handles (bend points, bend insert handles, resize/rotate handles — hidden in print)
 
+Selecting an object shows `MapHint`, one shared box over the canvas that says what can be done with
+it directly on the map. Routes and stops supply their own title and text; the box itself owns the
+placement (whichever edge of the board the object is furthest from), the collapse state and the
+sideways offset, both remembered in local storage, so the two kinds of object cannot drift apart in
+behaviour. Its storage keys still say `route-hint` so existing browsers keep the setting.
+
 Editing handles are drawn beside the line rather than on it: `+` handles on one side, bend grips on
 the other, each `HANDLE_OFFSET` units out with a smaller `HANDLE_HIT` grab radius. The gap between
 them has to stay wider than half a wagon space, or a handle's invisible hit area swallows the click

@@ -6,12 +6,13 @@ Live site: <https://hagstrom.nu/ttr/>
 
 ## Current capabilities
 
-- Draw, move and edit stops and routes.
+- Draw, move and edit stops and routes, each with a hint box over the map listing what can be done with the selected object directly on the canvas.
 - Shape a route freely: add as many bend points as you like anywhere along it, and optionally draw it as a smooth curve that the wagon slots follow.
 - Fully customise route types: rename, restyle (thickness and dash pattern) or delete the built-in city/region/rapid transit/ferry/railway/trail types, and add your own. Types are told apart by line shape, never by colour, so every route keeps its own wagon colour whatever its type.
 - Build double routes: two or more parallel lines between the same pair of stops, each in its own colour, drawn side by side automatically.
 - Choose one of three stop sizes, which can carry meaning in some expansions.
 - Mark a stop with a dot, dash, cross or a short letter code, independent of its type.
+- Lock a stop's position so it cannot be dragged by accident, and Shift-drag to move it anyway.
 - Turn a stop's name around the stop to keep it clear of the routes running past it, with a warning listing names that cover a route, a one-click move to a clear position, and a Move names clear button that turns the whole map's names at once and names the stops it could not solve.
 - Mark specific wagon slots on a route as requiring a locomotive card.
 - Wagon spaces, stop circles and the gap between the lines of a double route are all drawn at the size a real board uses, with an adjustable amount of room left around each stop, set for the whole map or per stop so the two ends of one line can differ.

@@ -5,8 +5,9 @@ import { defaultRouteTypeStyles, type LineStyle, type RouteTypeStyle, type Backg
 export const GUIDE_SEEN_KEY = `${STORAGE_KEY}-guide-seen`;
 export const MAX_IMAGE_WARN_BYTES = 2 * 1024 * 1024;
 export const HISTORY_LIMIT = 200;
-export const ROUTE_HINT_KEY = `${STORAGE_KEY}-route-hint`;
-export const ROUTE_HINT_X_KEY = `${STORAGE_KEY}-route-hint-x`;
+// The stored strings keep their original names so an existing browser does not lose the setting.
+export const MAP_HINT_KEY = `${STORAGE_KEY}-route-hint`;
+export const MAP_HINT_X_KEY = `${STORAGE_KEY}-route-hint-x`;
 export const cloneMap = (data: MapData): MapData => JSON.parse(JSON.stringify(data));
 // History snapshots deep-clone everything except the background image's base64 payload, which is
 // re-attached by reference. Strings are immutable, so every snapshot shares one copy of the image
