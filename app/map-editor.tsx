@@ -103,6 +103,45 @@ const pointsFor = (data: MapData, route: Route): Point[] => {
   return a && b ? [a, ...(route.points ?? []), b] : [];
 };
 const pathFromPoints = (points: Point[]) => points.map((point, index) => `${index ? "L" : "M"}${point.x},${point.y}`).join(" ");
+// A Catmull-Rom spline through every point, written out as cubic Béziers. The curve passes through
+// each bend point, so dragging one still does exactly what it looks like it does.
+const curveControls = (points: Point[], index: number) => {
+  const p0 = points[index - 1] ?? points[index];
+  const p1 = points[index];
+  const p2 = points[index + 1];
+  const p3 = points[index + 2] ?? p2;
+  return {
+    p1, p2,
+    c1: { x: p1.x + (p2.x - p0.x) / 6, y: p1.y + (p2.y - p0.y) / 6 },
+    c2: { x: p2.x - (p3.x - p1.x) / 6, y: p2.y - (p3.y - p1.y) / 6 },
+  };
+};
+const curvedPath = (points: Point[]) => {
+  if (points.length < 3) return pathFromPoints(points);
+  let path = `M${points[0].x},${points[0].y}`;
+  for (let index = 0; index < points.length - 1; index++) {
+    const { c1, c2, p2 } = curveControls(points, index);
+    path += ` C${c1.x},${c1.y} ${c2.x},${c2.y} ${p2.x},${p2.y}`;
+  }
+  return path;
+};
+// Flatten the same curve into a dense polyline, so wagon slots and their angles follow the drawn
+// line instead of the straight polyline underneath it.
+const curvedSamples = (points: Point[], perSegment = 12): Point[] => {
+  if (points.length < 3) return points;
+  const samples: Point[] = [points[0]];
+  for (let index = 0; index < points.length - 1; index++) {
+    const { p1, c1, c2, p2 } = curveControls(points, index);
+    for (let step = 1; step <= perSegment; step++) {
+      const t = step / perSegment, u = 1 - t;
+      samples.push({
+        x: u * u * u * p1.x + 3 * u * u * t * c1.x + 3 * u * t * t * c2.x + t * t * t * p2.x,
+        y: u * u * u * p1.y + 3 * u * u * t * c1.y + 3 * u * t * t * c2.y + t * t * t * p2.y,
+      });
+    }
+  }
+  return samples;
+};
 
 function parallelPoints(data: MapData, route: Route): Point[] {
   const siblings = data.routes.filter((item) => (item.a === route.a && item.b === route.b) || (item.a === route.b && item.b === route.a));
@@ -546,6 +585,8 @@ export function MapEditor() {
       return draft;
     });
   };
+  const insertRouteBend = (routeId: string, index: number, point: Point) => change((draft) => { const route = draft.routes.find((item) => item.id === routeId); if (!route) return draft; const points = [...(route.points ?? [])]; points.splice(index, 0, point); route.points = points; return draft; });
+  const removeRouteBend = (routeId: string, index: number) => change((draft) => { const route = draft.routes.find((item) => item.id === routeId); if (!route?.points) return draft; const points = route.points.filter((_, item) => item !== index); route.points = points.length ? points : undefined; return draft; });
   const assignRouteLineStyle = (routeId: string, styleId: string | undefined) => change((draft) => { const route = draft.routes.find((item) => item.id === routeId); if (route) route.lineStyle = styleId; return draft; });
   const addSuggestedRoute = (suggestion: RouteSuggestion) => change((draft) => { draft.routes.push({ id: `r-${Date.now()}`, a: suggestion.a, b: suggestion.b, length: suggestion.suggestedLength, type: routeType, color: suggestion.suggestedColor }); return draft; });
   const addLineStyleToRoute = (routeId: string) => { const id = `style-${Date.now()}`; change((draft) => { draft.lineStyles.push({ id, label: "New style", strokeWidth: 6, dash: "10 6" }); const route = draft.routes.find((item) => item.id === routeId); if (route) route.lineStyle = id; return draft; }); };
@@ -624,7 +665,7 @@ export function MapEditor() {
     clearSelection();
   };
 
-  return <main className="app-shell">
+  return <TooltipProvider delayDuration={0}><main className="app-shell">
     <header className="topbar">
       <div className="brand"><span className="brand-mark"><BusFront /></span><div><p>Ticket to Ride</p><h1>Map editor – Print and draw</h1></div></div>
       <div className="map-title"><Label htmlFor="map-name" className="sr-only">Map name</Label><Input id="map-name" value={data.name} onChange={(event) => change((draft) => ({ ...draft, name: event.target.value }))} /><span className="save-state"><Check />{saved ? "Saved locally" : "Saving…"}</span></div>
@@ -633,7 +674,7 @@ export function MapEditor() {
     <div className="workspace">
       <aside className="tools-panel panel">
         <div className="panel-heading"><span>Tools</span><small>Work directly on the map</small></div>
-        <div className="tool-row"><TooltipProvider>{toolDefinitions.map((item) => <ToolButton key={item.id} active={tool === item.id} icon={item.icon} title={item.title} note={item.note} onClick={() => selectTool(item.id)} />)}</TooltipProvider></div>
+        <div className="tool-row">{toolDefinitions.map((item) => <ToolButton key={item.id} active={tool === item.id} icon={item.icon} title={item.title} note={item.note} onClick={() => selectTool(item.id)} />)}</div>
         <div className="tool-panel">
           {tool === "route" && <p className="tool-status">{routeStart ? `Start: ${stopById(data, routeStart)?.name} · now click the destination stop` : "Click two stops to connect them."}</p>}
           {tool === "measure" && <p className="tool-status">{measureStart ? `From ${stopById(data, measureStart)?.name} · now click the destination stop` : measureResult ? ("unreachable" in measureResult ? `${stopById(data, measureResult.from)?.name} → ${stopById(data, measureResult.to)?.name}: no connected path` : `${stopById(data, measureResult.from)?.name} → ${stopById(data, measureResult.to)?.name}: ${measureResult.distance} wagon spaces`) : "Click two stops for the shortest path."}</p>}
@@ -642,20 +683,20 @@ export function MapEditor() {
           {tool === "background" && <div className="tool-options background-tools"><div className="image-import-row"><Label>Background image</Label><div className="image-import-buttons"><Button size="sm" variant="outline" onClick={() => imageFileRef.current?.click()}><ImageIcon />{data.backgroundImage ? "Replace image" : "Import image"}</Button>{data.backgroundImage && <Button size="sm" variant="ghost" onClick={() => { chooseImage(); setDanger("delete"); }}><Trash2 />Remove</Button>}</div></div><Label>Object</Label><NativeSelect value={backgroundType} onChange={(event) => { setBackgroundType(event.target.value as BackgroundType); setDraftPoints([]); }}><NativeSelectOption value="area">Area</NativeSelectOption><NativeSelectOption value="line">Line</NativeSelectOption><NativeSelectOption value="label">Label</NativeSelectOption></NativeSelect>{backgroundType !== "label" && <><div className="colour-row"><label>Fill <input type="color" value={backgroundFill} onChange={(event) => setBackgroundFill(event.target.value)} disabled={backgroundType === "line"} /></label><label>Outline <input type="color" value={backgroundStroke} onChange={(event) => setBackgroundStroke(event.target.value)} /></label></div><p className="helper">Click to add points. Finish when the shape is ready.</p><div className="draft-actions"><Button size="sm" disabled={draftPoints.length < (backgroundType === "area" ? 3 : 2)} onClick={finishBackground}>Finish shape</Button><Button size="sm" variant="ghost" disabled={!draftPoints.length} onClick={() => setDraftPoints([])}>Cancel</Button></div></>}</div>}
         </div>
         <div className="format-control"><Label htmlFor="map-format">Board format</Label><NativeSelect id="map-format" value={data.format} onChange={(event) => changeFormat(event.target.value as MapFormat)}>{Object.entries(mapFormats).map(([key, item]) => <NativeSelectOption key={key} value={key}>{item.label}</NativeSelectOption>)}</NativeSelect><dl className="format-measurements"><div><dt>Finished size</dt><dd>{format.widthMm.toLocaleString("en-GB")} × {format.heightMm.toLocaleString("en-GB")} mm{format.imperial ? ` (${format.imperial})` : ""}</dd></div>{format.columns > 1 && <div><dt>Panel size</dt><dd>about {panelWidthMm} × {panelHeightMm} mm</dd></div>}</dl><p>{format.note}{format.custom ? ". This is not a verified commercial Ticket to Ride size" : ""}. Changing format keeps objects in the same relative positions.</p></div>
-        <TooltipProvider><Tooltip><TooltipTrigger asChild>
+        <Tooltip><TooltipTrigger asChild>
           <div className={cn("crossing-card", crossings.length && "has-warning")} tabIndex={0}><div className="crossing-icon">{crossings.length ? <AlertTriangle /> : <Check />}</div><div><strong>{crossings.length ? `${crossings.length} crossing${crossings.length === 1 ? "" : "s"}` : "No crossings"}</strong><p>{crossings.length ? "between buildable routes" : "The route network is geometrically clean"}</p></div></div>
         </TooltipTrigger><TooltipContent side="right" className="balance-tooltip">
           <p><strong>Crossings</strong> are places where two buildable routes pass over each other without meeting at a stop.</p>
           <p>Aim for zero. On a printed board a crossing is ambiguous: players can&apos;t tell which line a marked wagon space belongs to, and it usually means the geometry needs a stop at the junction or a route routed around.</p>
           <p>Drag a stop, or add a bend point to a selected route, to pull the lines apart. Pre-built infrastructure routes are ignored here, since those are drawn as continuous lines that nobody claims.</p>
-        </TooltipContent></Tooltip></TooltipProvider>
-        {data.stops.length > 0 && <TooltipProvider><Tooltip><TooltipTrigger asChild>
+        </TooltipContent></Tooltip>
+        {data.stops.length > 0 && <Tooltip><TooltipTrigger asChild>
           <div className={cn("crossing-card", lowConnectionStops.length && "has-warning")} tabIndex={0}><div className="crossing-icon">{lowConnectionStops.length ? <AlertTriangle /> : <Check />}</div><div><strong>{lowConnectionStops.length ? `${lowConnectionStops.length} low-connection stop${lowConnectionStops.length === 1 ? "" : "s"}` : "Well connected"}</strong><p>avg hub degree {avgHubDegree.toFixed(1)}{lowConnectionStops.length ? " · some stops are dead ends" : ""}</p></div></div>
         </TooltipTrigger><TooltipContent side="right" className="balance-tooltip">
           <p><strong>Hub degree</strong> is a stop&apos;s direct neighbours plus the routes touching it, so a stop on two routes scores 4. Two parallel routes to the same neighbour count twice.</p>
           <p>Aim to give every stop at least two neighbours — a stop on a single route is a dead end that one player can block off. Across a whole map, an average of roughly 4–6 gives players choices without turning the board into a mesh.</p>
           <p>Drawing and deleting routes moves it; placing stops you never connect drags the average down.</p>
-        </TooltipContent></Tooltip></TooltipProvider>}
+        </TooltipContent></Tooltip>}
         {data.stops.length > 0 && <Button variant="outline" size="sm" className="analyze-button" onClick={() => setShowAnalysis(true)}><BarChart3 />Analyze balance</Button>}
         {data.stops.length > 1 && <Button variant="outline" size="sm" className="analyze-button" onClick={() => setShowSuggestions(true)}><Lightbulb />Suggest routes</Button>}
         <div className="legend"><p className="eyebrow">Stop types</p>{Object.entries(stopTypeMeta).map(([key, meta]) => <div key={key}><i style={{ background: meta.fill, borderColor: meta.stroke }} />{meta.label}</div>)}</div>
@@ -664,7 +705,7 @@ export function MapEditor() {
       <section className="map-wrap">
         <div className="map-status"><Badge variant="secondary">{format.shortLabel}</Badge><Badge variant="secondary">{format.widthMm.toLocaleString("en-GB")} × {format.heightMm.toLocaleString("en-GB")} mm</Badge><Badge variant="secondary">{data.stops.length} stops</Badge><Badge variant="secondary">{data.routes.length} routes</Badge><Badge variant="secondary">{data.background.length} background objects</Badge>{data.notes.length > 0 && <Badge variant="secondary">{data.notes.length} note{data.notes.length === 1 ? "" : "s"}</Badge>}<span>Everything is stored in the exported map file</span></div>
         <svg className={cn("map-canvas", `tool-${tool}`)} style={{ aspectRatio: `${W} / ${format.height}` }} viewBox={`0 0 ${W} ${format.height}`} onPointerDown={onCanvasDown} onPointerMove={onCanvasMove} onPointerUp={stopDragging} onPointerLeave={stopDragging}>
-          <MapArtwork data={data} tool={tool} selectedRoute={selectedRoute} selectedStop={selectedStop} selectedBackground={selectedBackground} imageSelected={imageSelected} selectedNote={selectedNote} routeStart={routeStart} draft={{ type: backgroundType, points: draftPoints, fill: backgroundFill, stroke: backgroundStroke }} onRoute={(id) => { setSelectedRoute(id); setSelectedStop(null); setSelectedBackground(null); setSelectedNote(null); setTool("select"); }} onRouteSlot={toggleLocomotiveSlot} onStop={(id) => { chooseStop(id); if (tool === "select") { beginDrag(); dragStopRef.current = id; } }} onWaypoint={(routeId, index) => { beginDrag(); dragWaypointRef.current = { routeId, index }; }} onBackground={(id) => { setSelectedBackground(id); setSelectedRoute(null); setSelectedStop(null); setSelectedNote(null); setTool("select"); }} onBackgroundPoint={(shapeId, index) => { beginDrag(); dragBackgroundPointRef.current = { shapeId, index }; }} onBackgroundLabel={(shapeId) => { beginDrag(); dragBackgroundLabelRef.current = shapeId; }} onImageSelect={chooseImage} onImageMove={(point) => { chooseImage(); const img = data.backgroundImage; if (img) { beginDrag(); dragImageRef.current = { mode: "move", offsetX: point.x - img.x, offsetY: point.y - img.y }; } }} onImageScale={() => { beginDrag(); dragImageRef.current = { mode: "scale" }; }} onImageRotate={() => { beginDrag(); dragImageRef.current = { mode: "rotate" }; }} onNoteSelect={chooseNote} onNoteMove={(id, point) => { chooseNote(id); const note = data.notes.find((item) => item.id === id); if (note) { beginDrag(); dragNoteRef.current = { id, mode: "move", offsetX: point.x - note.x, offsetY: point.y - note.y }; } }} onNoteResize={(id) => { beginDrag(); dragNoteRef.current = { id, mode: "resize" }; }} />
+          <MapArtwork data={data} tool={tool} selectedRoute={selectedRoute} selectedStop={selectedStop} selectedBackground={selectedBackground} imageSelected={imageSelected} selectedNote={selectedNote} routeStart={routeStart} draft={{ type: backgroundType, points: draftPoints, fill: backgroundFill, stroke: backgroundStroke }} onRoute={(id) => { setSelectedRoute(id); setSelectedStop(null); setSelectedBackground(null); setSelectedNote(null); setTool("select"); }} onRouteSlot={toggleLocomotiveSlot} onRouteBendInsert={insertRouteBend} onRouteBendRemove={removeRouteBend} onStop={(id) => { chooseStop(id); if (tool === "select") { beginDrag(); dragStopRef.current = id; } }} onWaypoint={(routeId, index) => { beginDrag(); dragWaypointRef.current = { routeId, index }; }} onBackground={(id) => { setSelectedBackground(id); setSelectedRoute(null); setSelectedStop(null); setSelectedNote(null); setTool("select"); }} onBackgroundPoint={(shapeId, index) => { beginDrag(); dragBackgroundPointRef.current = { shapeId, index }; }} onBackgroundLabel={(shapeId) => { beginDrag(); dragBackgroundLabelRef.current = shapeId; }} onImageSelect={chooseImage} onImageMove={(point) => { chooseImage(); const img = data.backgroundImage; if (img) { beginDrag(); dragImageRef.current = { mode: "move", offsetX: point.x - img.x, offsetY: point.y - img.y }; } }} onImageScale={() => { beginDrag(); dragImageRef.current = { mode: "scale" }; }} onImageRotate={() => { beginDrag(); dragImageRef.current = { mode: "rotate" }; }} onNoteSelect={chooseNote} onNoteMove={(id, point) => { chooseNote(id); const note = data.notes.find((item) => item.id === id); if (note) { beginDrag(); dragNoteRef.current = { id, mode: "move", offsetX: point.x - note.x, offsetY: point.y - note.y }; } }} onNoteResize={(id) => { beginDrag(); dragNoteRef.current = { id, mode: "resize" }; }} />
         </svg>
       </section>
       <aside className="properties panel">
@@ -682,7 +723,7 @@ export function MapEditor() {
     <AnalysisDialog open={showAnalysis} onOpenChange={setShowAnalysis} data={data} stats={stats} colourTable={colourTable} />
     <SuggestionsDialog open={showSuggestions} onOpenChange={setShowSuggestions} suggestions={suggestions} onAdd={addSuggestedRoute} />
     <PrintPages data={data} />
-  </main>;
+  </main></TooltipProvider>;
 }
 
 function WelcomeGuide({ open, onOpenChange, onChooseBlank, onChooseExample }: { open: boolean; onOpenChange: (open: boolean) => void; onChooseBlank: () => void; onChooseExample: () => void }) {
@@ -843,6 +884,12 @@ function RouteProperties({ route, stops, routes, lineStyles, routeTypeStyles, ch
       <div><Label>Vehicle spaces</Label><div className="length-stepper"><Button variant="outline" size="icon" aria-label="Decrease" disabled={route.length <= 1} onClick={() => update({ length: Math.max(1, route.length - 1), locomotiveSlots: route.locomotiveSlots?.filter((index) => index < route.length - 1) })}><Minus /></Button><strong>{route.length}</strong><Button variant="outline" size="icon" aria-label="Increase" disabled={route.length >= 8} onClick={() => update({ length: Math.min(8, route.length + 1) })}><Plus /></Button></div><p className="helper">The change is shown directly on the route.</p></div>
       <div><Label>Locomotives required · {route.locomotiveSlots?.length ?? 0} of {route.length}</Label><p className="helper">Click a wagon slot directly on the selected route to toggle it.</p>{Boolean(route.locomotiveSlots?.length) && <Button size="sm" variant="ghost" onClick={() => update({ locomotiveSlots: [] })}><TrainFront />Clear locomotives</Button>}</div>
     </>}
+    <div className="bend-controls">
+      <Label>Shape · {route.points?.length ?? 0} bend point{(route.points?.length ?? 0) === 1 ? "" : "s"}</Label>
+      <p className="helper">Click a + beside the selected route to add a bend between any two wagon spaces, drag a bend to move it, double-click it to remove it.</p>
+      <label className="checkbox-row"><input type="checkbox" checked={Boolean(route.curved)} onChange={(event) => update({ curved: event.target.checked || undefined })} />Draw as a smooth curve</label>
+      {Boolean(route.points?.length) && <Button size="sm" variant="ghost" onClick={() => update({ points: undefined })}>Straighten route</Button>}
+    </div>
     <LineStylePicker value={route.lineStyle} lineStyles={lineStyles} onChange={(styleId) => onSetStyle(route.id, styleId)} onCreate={() => onCreateStyle(route.id)} onUpdate={onUpdateStyle} onDelete={onDeleteStyle} helper="Give this one route a thicker or dashed line to flag it individually, on top of its type's appearance." />
     <Button variant="destructive" onClick={onDelete}><Trash2 />Delete route</Button>
   </div>;
@@ -863,7 +910,7 @@ function BackgroundProperties({ shape, change, onDelete }: { shape: BackgroundSh
   return <div className="property-form"><div><Label htmlFor="background-label">Label</Label><Input id="background-label" value={shape.label} onChange={(event) => update({ label: event.target.value })} /></div>{shape.type === "area" && <div><Label>Fill colour</Label><input className="colour-input" type="color" value={shape.fill} onChange={(event) => update({ fill: event.target.value })} /></div>}<div><Label>{shape.type === "label" ? "Text colour" : "Line colour"}</Label><input className="colour-input" type="color" value={shape.stroke} onChange={(event) => update({ stroke: event.target.value })} /></div><div><Label>Opacity · {Math.round(shape.opacity * 100)}%</Label><input className="range-input" type="range" min="0.1" max="1" step="0.05" value={shape.opacity} onChange={(event) => update({ opacity: Number(event.target.value) })} /></div>{shape.type !== "label" && <><div><Label>Line width</Label><Input type="number" min="1" max="16" value={shape.strokeWidth} onChange={(event) => update({ strokeWidth: Math.max(1, Math.min(16, Number(event.target.value))) })} /></div><Button variant="outline" onClick={() => update({ labelPoint: undefined })}>Reset label position</Button><p className="helper label-helper">Drag the green handle to position the label freely.</p></>}<Button variant="outline" onClick={() => update({ locked: !shape.locked })}>{shape.locked ? <Unlock /> : <Lock />}{shape.locked ? "Unlock geometry" : "Lock geometry"}</Button><Button variant="destructive" onClick={onDelete}><Trash2 />Delete background object</Button></div>;
 }
 
-function MapArtwork({ data, tool = "select", selectedRoute, selectedStop, selectedBackground, imageSelected, selectedNote, routeStart, draft, onRoute, onRouteSlot, onStop, onWaypoint, onBackground, onBackgroundPoint, onBackgroundLabel, onImageSelect, onImageMove, onImageScale, onImageRotate, onNoteSelect, onNoteMove, onNoteResize, print = false }: { data: MapData; tool?: Tool; selectedRoute?: string | null; selectedStop?: string | null; selectedBackground?: string | null; imageSelected?: boolean; selectedNote?: string | null; routeStart?: string | null; draft?: { type: BackgroundType; points: Point[]; fill: string; stroke: string }; onRoute?: (id: string) => void; onRouteSlot?: (routeId: string, index: number) => void; onStop?: (id: string) => void; onWaypoint?: (routeId: string, index: number) => void; onBackground?: (id: string) => void; onBackgroundPoint?: (shapeId: string, index: number) => void; onBackgroundLabel?: (shapeId: string) => void; onImageSelect?: () => void; onImageMove?: (point: Point) => void; onImageScale?: () => void; onImageRotate?: () => void; onNoteSelect?: (id: string) => void; onNoteMove?: (id: string, point: Point) => void; onNoteResize?: (id: string) => void; print?: boolean }) {
+function MapArtwork({ data, tool = "select", selectedRoute, selectedStop, selectedBackground, imageSelected, selectedNote, routeStart, draft, onRoute, onRouteSlot, onRouteBendInsert, onRouteBendRemove, onStop, onWaypoint, onBackground, onBackgroundPoint, onBackgroundLabel, onImageSelect, onImageMove, onImageScale, onImageRotate, onNoteSelect, onNoteMove, onNoteResize, print = false }: { data: MapData; tool?: Tool; selectedRoute?: string | null; selectedStop?: string | null; selectedBackground?: string | null; imageSelected?: boolean; selectedNote?: string | null; routeStart?: string | null; draft?: { type: BackgroundType; points: Point[]; fill: string; stroke: string }; onRoute?: (id: string) => void; onRouteSlot?: (routeId: string, index: number) => void; onRouteBendInsert?: (routeId: string, index: number, point: Point) => void; onRouteBendRemove?: (routeId: string, index: number) => void; onStop?: (id: string) => void; onWaypoint?: (routeId: string, index: number) => void; onBackground?: (id: string) => void; onBackgroundPoint?: (shapeId: string, index: number) => void; onBackgroundLabel?: (shapeId: string) => void; onImageSelect?: () => void; onImageMove?: (point: Point) => void; onImageScale?: () => void; onImageRotate?: () => void; onNoteSelect?: (id: string) => void; onNoteMove?: (id: string, point: Point) => void; onNoteResize?: (id: string) => void; print?: boolean }) {
   const format = mapFormats[data.format];
   return <>
     <defs><pattern id="grid" width="24" height="24" patternUnits="userSpaceOnUse"><path d="M24 0L0 0 0 24" fill="none" stroke="#6b675f" strokeOpacity=".11" /></pattern><filter id="shadow" x="-50%" y="-50%" width="200%" height="200%"><feDropShadow dx="0" dy="2" stdDeviation="2" floodOpacity=".18" /></filter></defs>
@@ -871,10 +918,26 @@ function MapArtwork({ data, tool = "select", selectedRoute, selectedStop, select
     {data.backgroundImage && <BackgroundImageObject image={data.backgroundImage} height={format.height} selected={Boolean(imageSelected)} print={print} tool={tool} onSelect={onImageSelect} onMove={onImageMove} onScale={onImageScale} onRotate={onImageRotate} />}
     {data.background.map((shape) => <BackgroundObject key={shape.id} shape={shape} height={format.height} selected={shape.id === selectedBackground} print={print} tool={tool} onSelect={onBackground} onPoint={onBackgroundPoint} onLabel={onBackgroundLabel} />)}
     {!print && draft && draft.points.length > 0 && <g className="background-draft">{draft.type === "area" ? <polygon points={draft.points.map((p) => `${p.x},${p.y}`).join(" ")} fill={draft.fill} fillOpacity=".35" stroke={draft.stroke} /> : <polyline points={draft.points.map((p) => `${p.x},${p.y}`).join(" ")} fill="none" stroke={draft.stroke} />}{draft.points.map((point, index) => <circle key={index} cx={point.x} cy={point.y} r="6" />)}</g>}
-    {data.routes.map((route) => { const typeStyle = data.routeTypeStyles.find((item) => item.id === route.type) ?? { id: route.type, label: route.type, stroke: "#736d64", dash: "", strokeWidth: 3, infrastructure: false }; const style = route.lineStyle ? data.lineStyles.find((item) => item.id === route.lineStyle) : undefined; const points = parallelPoints(data, route); const path = pathFromPoints(points); const infrastructure = typeStyle.infrastructure; const routeColor = route.type === "city" || route.type === "region" ? (route.color === "neutral" ? "#736d64" : routeColors[route.color]) : typeStyle.stroke; const routeSelected = route.id === selectedRoute; return <g key={route.id} className={cn("route-group", routeSelected && "selected", style && "custom-style")} onPointerDown={onRoute ? (event) => { event.stopPropagation(); onRoute(route.id); } : undefined}><path d={path} className="route-hit" /><path d={path} className={cn("route-guide", infrastructure && "infrastructure")} fill="none" stroke={routeColor} strokeWidth={style ? style.strokeWidth : typeStyle.strokeWidth} strokeDasharray={style ? style.dash : typeStyle.dash} strokeLinecap="round" strokeLinejoin="round" />{!infrastructure && Array.from({ length: route.length }, (_, index) => { const position = pointAlong(points, (index + .5) / route.length); const isLocomotive = route.locomotiveSlots?.includes(index); const interactive = !print && routeSelected; return <g key={index} className={cn("wagon-slot", isLocomotive && "locomotive")} transform={`translate(${position.x},${position.y}) rotate(${position.angle})`} filter={print ? undefined : "url(#shadow)"} onPointerDown={interactive ? (event) => { event.stopPropagation(); onRouteSlot?.(route.id, index); } : undefined}><rect className="wagon-slot-outline" x={-13} y={-7} width="26" height="14" rx="4" /><rect x={-12} y={-6} width="24" height="12" rx="3" fill="#fffaf0" stroke={routeColor} strokeWidth="3" />{isLocomotive && <g className="locomotive-icon"><rect x={-8} y={-3.5} width="11" height="7" rx="1.5" /><rect x={2} y={-1.5} width="4.5" height="5" rx="1" /><rect x={-2.5} y={-6.5} width="2.5" height="3.5" /><circle cx={-4.5} cy={4} r="1.6" /><circle cx={1.5} cy={4} r="1.6" /></g>}</g>; })}</g>; })}
+    {data.routes.map((route) => { const typeStyle = data.routeTypeStyles.find((item) => item.id === route.type) ?? { id: route.type, label: route.type, stroke: "#736d64", dash: "", strokeWidth: 3, infrastructure: false }; const style = route.lineStyle ? data.lineStyles.find((item) => item.id === route.lineStyle) : undefined; const geometry = parallelPoints(data, route); const curved = Boolean(route.curved) && geometry.length > 2; const path = curved ? curvedPath(geometry) : pathFromPoints(geometry); const points = curved ? curvedSamples(geometry) : geometry; const infrastructure = typeStyle.infrastructure; const routeColor = route.type === "city" || route.type === "region" ? (route.color === "neutral" ? "#736d64" : routeColors[route.color]) : typeStyle.stroke; const routeSelected = route.id === selectedRoute; return <g key={route.id} className={cn("route-group", routeSelected && "selected", style && "custom-style")} onPointerDown={onRoute ? (event) => { event.stopPropagation(); onRoute(route.id); } : undefined}><path d={path} className="route-hit" /><path d={path} className={cn("route-guide", infrastructure && "infrastructure")} fill="none" stroke={routeColor} strokeWidth={style ? style.strokeWidth : typeStyle.strokeWidth} strokeDasharray={style ? style.dash : typeStyle.dash} strokeLinecap="round" strokeLinejoin="round" />{!infrastructure && Array.from({ length: route.length }, (_, index) => { const position = pointAlong(points, (index + .5) / route.length); const isLocomotive = route.locomotiveSlots?.includes(index); const interactive = !print && routeSelected; return <g key={index} className={cn("wagon-slot", isLocomotive && "locomotive")} transform={`translate(${position.x},${position.y}) rotate(${position.angle})`} filter={print ? undefined : "url(#shadow)"} onPointerDown={interactive ? (event) => { event.stopPropagation(); onRouteSlot?.(route.id, index); } : undefined}><rect className="wagon-slot-outline" x={-13} y={-7} width="26" height="14" rx="4" /><rect x={-12} y={-6} width="24" height="12" rx="3" fill="#fffaf0" stroke={routeColor} strokeWidth="3" />{isLocomotive && <g className="locomotive-icon"><rect x={-8} y={-3.5} width="11" height="7" rx="1.5" /><rect x={2} y={-1.5} width="4.5" height="5" rx="1" /><rect x={-2.5} y={-6.5} width="2.5" height="3.5" /><circle cx={-4.5} cy={4} r="1.6" /><circle cx={1.5} cy={4} r="1.6" /></g>}</g>; })}</g>; })}
     {data.stops.map((stop) => { const meta = stopTypeMeta[stop.type]; const active = stop.id === selectedStop || stop.id === routeStart; const radius = stopSizeMeta[stop.size ?? "medium"].radius; return <g key={stop.id} className={cn("stop", active && "active")} transform={`translate(${stop.x},${stop.y})`} onPointerDown={onStop ? (event) => { event.stopPropagation(); onStop(stop.id); } : undefined}><circle r={active ? radius + 3 : radius} fill={meta.fill} stroke={meta.stroke} strokeWidth={active ? 4 : 3} />{stop.type === "rail" && <rect x={-4} y={-4} width="8" height="8" fill={meta.stroke} />}<StopSymbolGlyph stop={stop} radius={radius} color={meta.stroke} /><text x={stop.x > 900 ? -14 : 14} y={stop.y > format.height - 100 ? -13 : -12} textAnchor={stop.x > 900 ? "end" : "start"}>{stop.name}</text></g>; })}
     {data.notes.map((note) => <NoteBoxObject key={note.id} note={note} height={format.height} selected={note.id === selectedNote} print={print} tool={tool} onSelect={onNoteSelect} onMove={onNoteMove} onResize={onNoteResize} />)}
-    {!print && selectedRoute && data.routes.find((route) => route.id === selectedRoute)?.points?.map((point, index) => <g key={index} className="waypoint-handle" transform={`translate(${point.x},${point.y})`} onPointerDown={(event) => { event.stopPropagation(); onWaypoint?.(selectedRoute, index); }}><circle className="waypoint-hit" r="19" /><rect x="-8" y="-8" width="16" height="16" rx="3" transform="rotate(45)" /><circle r="3" /></g>)}
+    {!print && selectedRoute && (() => {
+      const route = data.routes.find((item) => item.id === selectedRoute);
+      if (!route) return null;
+      const base = pointsFor(data, route);
+      return <>
+        {base.slice(0, -1).map((from, index) => {
+          const to = base[index + 1];
+          const mid = { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 };
+          const dx = to.x - from.x, dy = to.y - from.y;
+          const length = Math.hypot(dx, dy) || 1;
+          // Sit the + beside the line so it doesn't fight with the wagon slot underneath it.
+          const handle = { x: mid.x - dy / length * 17, y: mid.y + dx / length * 17 };
+          return <g key={`insert-${index}`} className="bend-insert-handle" transform={`translate(${handle.x},${handle.y})`} onPointerDown={(event) => { event.stopPropagation(); onRouteBendInsert?.(route.id, index, mid); }}><circle className="point-hit" r="15" /><circle r="8" /><path d="M-4,0 H4 M0,-4 V4" /></g>;
+        })}
+        {route.points?.map((point, index) => <g key={index} className="waypoint-handle" transform={`translate(${point.x},${point.y})`} onPointerDown={(event) => { event.stopPropagation(); onWaypoint?.(selectedRoute, index); }} onDoubleClick={(event) => { event.stopPropagation(); onRouteBendRemove?.(route.id, index); }}><circle className="waypoint-hit" r="19" /><rect x="-8" y="-8" width="16" height="16" rx="3" transform="rotate(45)" /><circle r="3" /></g>)}
+      </>;
+    })()}
     {format.columns > 1 && <g className="fold-guides">{Array.from({ length: format.columns - 1 }, (_, index) => <line key={`v-${index}`} x1={W * (index + 1) / format.columns} y1="0" x2={W * (index + 1) / format.columns} y2={format.height} />)}{Array.from({ length: format.rows - 1 }, (_, index) => <line key={`h-${index}`} x1="0" y1={format.height * (index + 1) / format.rows} x2={W} y2={format.height * (index + 1) / format.rows} />)}</g>}
   </>;
 }

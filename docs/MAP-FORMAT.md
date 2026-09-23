@@ -78,13 +78,16 @@ Supported stop types are `city`, `region`, `brt`, `rail`, `ferry` and `outing`. 
   "length": 4,
   "type": "city",
   "color": "red",
-  "points": [{ "x": 265, "y": 235 }],
+  "points": [{ "x": 265, "y": 235 }, { "x": 320, "y": 300 }],
+  "curved": true,
   "locomotiveSlots": [1],
   "lineStyle": "style-tunnel"
 }
 ```
 
-`a` and `b` reference stop IDs. `points` is optional and contains movable intermediate waypoints. `type` references the `id` of an entry in the map's `routeTypeStyles` list (see below) — `city`, `region`, `brt`, `ferry`, `rail` and `trail` by default, but any map can rename, restyle, delete or add to that list.
+`a` and `b` reference stop IDs. `points` is optional and contains any number of movable bend points between the two stops. `type` references the `id` of an entry in the map's `routeTypeStyles` list (see below) — `city`, `region`, `brt`, `ferry`, `rail` and `trail` by default, but any map can rename, restyle, delete or add to that list.
+
+`curved` is optional. When `true` the route is drawn as a smooth Catmull-Rom curve through its bend points instead of straight segments; the wagon slots are placed along the curve and rotate with it. A route needs at least one bend point for the setting to have a visible effect. Select a route and use the `+` handles beside it to add a bend anywhere along the line, drag a bend to move it, and double-click one to remove it.
 
 `locomotiveSlots` is optional and lists the zero-based wagon-slot indices (out of `length`) that must be covered with a locomotive card, drawn with a small engine icon. Toggle it by clicking a wagon slot on a selected route.
 

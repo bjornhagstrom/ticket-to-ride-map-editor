@@ -52,7 +52,7 @@ The SVG layers are rendered in this order:
 5. Routes, vehicle spaces and locomotive markers
 6. Stops, stop symbols/letters and stop labels
 7. Evaluation notes
-8. Editing handles (waypoints, resize/rotate handles — hidden in print)
+8. Editing handles (bend points, bend insert handles, resize/rotate handles — hidden in print)
 9. Fold guides
 
 Changing this order can alter pointer behaviour as well as appearance. Notes are deliberately drawn above the map content so they stay readable; they are not considered part of the map itself and are therefore excluded from Background only and Network only exports.
@@ -60,6 +60,10 @@ Changing this order can alter pointer behaviour as well as appearance. Notes are
 ## Customisable route styling
 
 Route appearance is data, not code. `MapData.routeTypeStyles` is a user-editable array (label, line colour, thickness, dash pattern, and an `infrastructure` flag that hides the colour picker and wagon slots for pre-built types like rail/trail). `Route.type` is a plain `string` id into that array rather than a fixed TypeScript union, so a map can rename, restyle or delete the six default types and add its own. `MapData.lineStyles` is a separate, similarly user-editable array for one-off per-route overrides (thickness/dash only, no colour), letting a single route be flagged as a special case on top of its type's normal appearance. Both arrays travel with full-map and network-only exports; `defaultRouteTypeStyles` in `map-data.ts` is the fallback seed for older files and new maps.
+
+## Route geometry
+
+A route's shape is `Route.points`: any number of bend points between its two stops, each draggable, insertable at any segment via the `+` handles drawn beside a selected route, and removable by double-clicking. `Route.curved` switches the drawing from straight segments (`pathFromPoints`) to a Catmull-Rom spline converted to cubic Béziers (`curveControls`/`curvedPath`). Because wagon spaces are positioned by walking the polyline, a curved route is also flattened into a denser sample list (`curvedSamples`, 12 points per segment) before slot placement, so the spaces sit on the visible curve and rotate with it rather than following the underlying control polygon.
 
 ## Balance analysis and route suggestions
 
