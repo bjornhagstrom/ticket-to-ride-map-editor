@@ -451,15 +451,20 @@ export function MapEditor() {
           {format.testSheet && <div><Label htmlFor="scale-target">Printed as a proof of</Label><NativeSelect id="scale-target" value={scaleTarget} onChange={(event) => setScaleTarget(event.target.value as MapFormat)}>{Object.entries(mapFormats).filter(([, item]) => !item.testSheet).map(([key, item]) => <NativeSelectOption key={key} value={key}>{item.shortLabel}</NativeSelectOption>)}</NativeSelect></div>}
           <p className="helper">Wagon spaces are drawn at the size a real {realWagon.length} × {realWagon.width} mm train takes up on a {scaleWidthMm.toLocaleString("en-GB")} mm board{format.testSheet ? `, shrunk with the sheet to about ${(realWagon.length / scaleWidthMm * format.widthMm).toFixed(1)} mm each in print` : ", so printing this format at full size gives real-size wagons"}. {tightRoutes.length || looseRoutes.length ? `${[tightRoutes.length && `${tightRoutes.length} too short`, looseRoutes.length && `${looseRoutes.length} roomier than needed`].filter(Boolean).join(", ")} — see Analyze balance.` : "Every route is drawn about the length its wagon count needs."}</p>
         </div>
-        {coveredNames.length > 0 && <div className="crossing-card has-warning name-card">
-          <div className="crossing-icon"><AlertTriangle /></div>
-          <div>
-            <strong>{coveredNames.length} stop name{coveredNames.length === 1 ? "" : "s"} on a route</strong>
-            <p>{coveredNames.slice(0, 3).map((stop) => stop.name).join(", ")}{coveredNames.length > 3 ? ` and ${coveredNames.length - 3} more` : ""}</p>
-            <Button variant="outline" size="sm" onClick={tidyLabels}><Crosshair />Move {coveredNames.length} name{coveredNames.length === 1 ? "" : "s"} clear</Button>
-            <p className="helper">Turns each name around its stop, away from the routes and from the other names. Any that cannot be placed are named so you can move the stop or bend the route yourself.</p>
+        {coveredNames.length > 0 && <Tooltip><TooltipTrigger asChild>
+          <div className="crossing-card has-warning name-card" tabIndex={0}>
+            <div className="crossing-icon"><AlertTriangle /></div>
+            <div>
+              <strong>{coveredNames.length} stop name{coveredNames.length === 1 ? "" : "s"} on a route</strong>
+              <p>{coveredNames.slice(0, 3).map((stop) => stop.name).join(", ")}{coveredNames.length > 3 ? ` and ${coveredNames.length - 3} more` : ""}</p>
+              <Button variant="outline" size="sm" onClick={tidyLabels}><Crosshair />Move {coveredNames.length} name{coveredNames.length === 1 ? "" : "s"} clear</Button>
+            </div>
           </div>
-        </div>}
+        </TooltipTrigger><TooltipContent side="right" className="balance-tooltip">
+          <p>A stop&apos;s name is drawn over a route line, which is hard to read in print.</p>
+          <p>The button turns each name around its own stop, away from the routes and away from the other names. Stops with the fewest clear positions are placed first, and a name that already sits well is left alone.</p>
+          <p>Any that cannot be placed are named afterwards, so you can move the stop, bend the route away, or set those by hand with <strong>Name position</strong>.</p>
+        </TooltipContent></Tooltip>}
         <Tooltip><TooltipTrigger asChild>
           <div className={cn("crossing-card", crossings.length && "has-warning")} tabIndex={0}><div className="crossing-icon">{crossings.length ? <AlertTriangle /> : <Check />}</div><div><strong>{crossings.length ? `${crossings.length} crossing${crossings.length === 1 ? "" : "s"}` : "No crossings"}</strong><p>{crossings.length ? "between buildable routes" : "The route network is geometrically clean"}</p></div></div>
         </TooltipTrigger><TooltipContent side="right" className="balance-tooltip">
