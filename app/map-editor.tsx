@@ -451,14 +451,15 @@ export function MapEditor() {
           {format.testSheet && <div><Label htmlFor="scale-target">Printed as a proof of</Label><NativeSelect id="scale-target" value={scaleTarget} onChange={(event) => setScaleTarget(event.target.value as MapFormat)}>{Object.entries(mapFormats).filter(([, item]) => !item.testSheet).map(([key, item]) => <NativeSelectOption key={key} value={key}>{item.shortLabel}</NativeSelectOption>)}</NativeSelect></div>}
           <p className="helper">Wagon spaces are drawn at the size a real {realWagon.length} × {realWagon.width} mm train takes up on a {scaleWidthMm.toLocaleString("en-GB")} mm board{format.testSheet ? `, shrunk with the sheet to about ${(realWagon.length / scaleWidthMm * format.widthMm).toFixed(1)} mm each in print` : ", so printing this format at full size gives real-size wagons"}. {tightRoutes.length || looseRoutes.length ? `${[tightRoutes.length && `${tightRoutes.length} too short`, looseRoutes.length && `${looseRoutes.length} roomier than needed`].filter(Boolean).join(", ")} — see Analyze balance.` : "Every route is drawn about the length its wagon count needs."}</p>
         </div>
-        {coveredNames.length > 0 && <Tooltip><TooltipTrigger asChild>
-          <div className="crossing-card has-warning" tabIndex={0}><div className="crossing-icon"><AlertTriangle /></div><div><strong>{coveredNames.length} stop name{coveredNames.length === 1 ? "" : "s"} on a route</strong><p>{coveredNames.slice(0, 3).map((stop) => stop.name).join(", ")}{coveredNames.length > 3 ? ` and ${coveredNames.length - 3} more` : ""}</p></div></div>
-        </TooltipTrigger><TooltipContent side="right" className="balance-tooltip">
-          <p>A stop&apos;s name is drawn over a route line, which is hard to read in print.</p>
-          <p>Select the stop and use <strong>Name position</strong> to turn the name around it. If the stop is so hemmed in that no position is clear, the panel says so — then move the stop, bend the route away, or accept it.</p>
-          <p>Text width is estimated rather than measured, so this errs slightly on the cautious side.</p>
-        </TooltipContent></Tooltip>}
-        {coveredNames.length > 0 && <Button variant="outline" size="sm" className="analyze-button" onClick={tidyLabels}><Crosshair />Move names clear</Button>}
+        {coveredNames.length > 0 && <div className="crossing-card has-warning name-card">
+          <div className="crossing-icon"><AlertTriangle /></div>
+          <div>
+            <strong>{coveredNames.length} stop name{coveredNames.length === 1 ? "" : "s"} on a route</strong>
+            <p>{coveredNames.slice(0, 3).map((stop) => stop.name).join(", ")}{coveredNames.length > 3 ? ` and ${coveredNames.length - 3} more` : ""}</p>
+            <Button variant="outline" size="sm" onClick={tidyLabels}><Crosshair />Move {coveredNames.length} name{coveredNames.length === 1 ? "" : "s"} clear</Button>
+            <p className="helper">Turns each name around its stop, away from the routes and from the other names. Any that cannot be placed are named so you can move the stop or bend the route yourself.</p>
+          </div>
+        </div>}
         <Tooltip><TooltipTrigger asChild>
           <div className={cn("crossing-card", crossings.length && "has-warning")} tabIndex={0}><div className="crossing-icon">{crossings.length ? <AlertTriangle /> : <Check />}</div><div><strong>{crossings.length ? `${crossings.length} crossing${crossings.length === 1 ? "" : "s"}` : "No crossings"}</strong><p>{crossings.length ? "between buildable routes" : "The route network is geometrically clean"}</p></div></div>
         </TooltipTrigger><TooltipContent side="right" className="balance-tooltip">

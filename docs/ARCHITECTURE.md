@@ -76,7 +76,9 @@ The SVG layers are rendered in this order:
 Selecting an object shows `MapHint`, one shared box over the canvas that says what can be done with
 it directly on the map. Routes and stops supply their own title and text; the box itself owns the
 placement (whichever edge of the board the object is furthest from), the collapse state and the
-sideways offset, both remembered in local storage, so the two kinds of object cannot drift apart in
+sideways offset, both remembered in local storage. Its sticky positioning carries a `left` offset as
+well as a vertical one, because sticky pins only the axes it is given offsets for and a map wider
+than the window would otherwise carry the box off the side, so the two kinds of object cannot drift apart in
 behaviour. Its storage keys still say `route-hint` so existing browsers keep the setting.
 
 Editing handles are drawn beside the line rather than on it: `+` handles on one side, bend grips on
