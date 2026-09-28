@@ -95,11 +95,23 @@ npm run typecheck
 npm run build
 ```
 
-There is no automated test suite in the repository. Interaction testing during development has been
-done with ad-hoc Playwright scripts against the dev server, covering the example map, route colours,
-bend points on double routes, curves, locomotive marking, undo, true-scale wagons, the balance and
-suggestion dialogs, the measure tool, format changes, print pages and reload persistence. Turning
-that into a committed suite is still an open gap rather than an implied guarantee.
+Plus a browser regression suite, which needs the dev server running in another terminal:
+
+```bash
+npm run dev
+npm run test:regression
+```
+
+It drives the editor with Playwright and checks 25 things: the welcome guide, the example map,
+per-route colours, the tool row and its tooltips, bend points on double routes, curves, locomotive
+marking, undo, real-size wagons and stop circles, the room-per-wagon table, the balance and
+suggestion dialogs, the hint boxes, the measure tool, placing a stop, changing board format, print
+pages and reload persistence.
+
+It is a single script rather than a Playwright test project, and it expects the editor at
+`http://localhost:3000/ttr/`. It has caught real bugs — a handle's hit area swallowing the click
+that marks a locomotive, editing handles measured from the wrong line on double routes — so it
+earns its place, but it is not wired into CI and there are no unit tests.
 
 If a change does not take effect locally, check for an orphaned dev server before suspecting the
 build. `npm run dev` falls back to port 3001 when 3000 is already taken, printing only a warning, so

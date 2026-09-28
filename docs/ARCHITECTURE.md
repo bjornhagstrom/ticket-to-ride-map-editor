@@ -161,6 +161,17 @@ Shared maps and live collaboration require a server API, central storage and an 
 
 A hidden print-only tree renders one page for the sheet formats and one reduced A4 proof per panel for foldable formats. Each format asks the printer for the paper it was laid out for through a named `@page` rule, so the sheet formats come out landscape instead of being scaled down onto portrait paper, and everything outside the print tree is hidden so no blank trailing sheet is produced. The foldable proof is not a full-scale production file. Its caption states the approximate reduction percentage.
 
+## Testing
+
+`tests/regression.cjs` is the only automated test: a Playwright script that drives the running
+editor and asserts on what it finds in the DOM and in local storage. It covers the interactions
+that have broken before rather than aiming for coverage, and it needs `npm run dev` in another
+terminal. There are no unit tests, and nothing runs in CI.
+
+Because it asserts against rendered geometry — wagon spacing in millimetres, stop circle diameter,
+parallel line separation — it is also where the calibrated constants in `map-data.ts` are pinned.
+Changing `realWagon` or `stopSizeMeta` without updating the suite will fail it, which is intended.
+
 ## Known structural debt
 
 `app/map-editor.tsx` still owns all editor state and every pointer interaction in one component, which is the largest remaining lump. The pointer logic in particular (`onCanvasDown`, `onCanvasMove`, `stopDragging` and the seven drag refs they share) is the part most likely to be worth extracting next, probably into a hook.
