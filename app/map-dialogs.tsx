@@ -1,11 +1,14 @@
 "use client";
 
 // The modal surfaces: the first-visit guide, the balance report and the route suggestions.
-import { FileStack, Layers3, MapPinPlus, Pencil, Plus, Printer, Save } from "lucide-react";
+import { Copy, Download, FileStack, Layers3, MapPinPlus, Pencil, Plus, Printer, Save, Trash2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { colorLabels, type MapData, realWagon, type Stop } from "./map-data";
+import { colorLabels, type MapData, realWagon, type Stop, ticketsInSet, type TicketSet } from "./map-data";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { type TicketReview, type ColourLengthTable, type NetworkStats, type RouteSpacing, type RouteSuggestion } from "./map-analysis";
 
 export function WelcomeGuide({ open, onOpenChange, onChooseBlank, onChooseExample }: { open: boolean; onOpenChange: (open: boolean) => void; onChooseBlank: () => void; onChooseExample: () => void }) {
@@ -86,7 +89,7 @@ export function SuggestionsDialog({ open, onOpenChange, suggestions, onAdd }: { 
 }
 
 
-export function TicketsDialog({ open, onOpenChange, data, reviews, coverage, rate, selected, onSelect, onUpdate, onDelete }: {
+export function TicketsDialog({ open, onOpenChange, data, reviews, coverage, rate, selected, activeSet, onSelect, onUpdate, onDelete, onSelectSet, onAddSet, onDuplicateSet, onRenameSet, onDeleteSet, onExport, onImport, onPrint }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   data: MapData;
@@ -94,9 +97,18 @@ export function TicketsDialog({ open, onOpenChange, data, reviews, coverage, rat
   coverage: { stop: Stop; count: number }[];
   rate: number;
   selected: string | null;
+  activeSet: TicketSet;
   onSelect: (ticketId: string | null) => void;
   onUpdate: (ticketId: string, values: { points?: number; long?: boolean }) => void;
   onDelete: (ticketId: string) => void;
+  onSelectSet: (setId: string) => void;
+  onAddSet: () => void;
+  onDuplicateSet: () => void;
+  onRenameSet: (label: string) => void;
+  onDeleteSet: () => void;
+  onExport: (scope: "set" | "all") => void;
+  onImport: () => void;
+  onPrint: () => void;
 }) {
   const name = (id: string) => data.stops.find((stop) => stop.id === id)?.name ?? "—";
   const problems = reviews.filter((review) => review.verdict !== "ok");
@@ -105,7 +117,24 @@ export function TicketsDialog({ open, onOpenChange, data, reviews, coverage, rat
 
   return <Dialog open={open} onOpenChange={onOpenChange}>
     <DialogContent className="analysis-dialog">
-      <DialogHeader><DialogTitle>Destination tickets</DialogTitle><DialogDescription>{reviews.length} ticket{reviews.length === 1 ? "" : "s"}, worth about {rate.toFixed(1)} point{rate.toFixed(1) === "1.0" ? "" : "s"} per wagon space on this map.</DialogDescription></DialogHeader>
+      <DialogHeader><DialogTitle>Destination tickets</DialogTitle><DialogDescription>{reviews.length} ticket{reviews.length === 1 ? "" : "s"} in this deck, worth about {rate.toFixed(1)} point{rate.toFixed(1) === "1.0" ? "" : "s"} per wagon space.</DialogDescription></DialogHeader>
+
+      <div className="ticket-set-bar">
+        <div className="ticket-set-field"><Label htmlFor="ticket-set">Deck</Label><NativeSelect id="ticket-set" value={activeSet.id} onChange={(event) => onSelectSet(event.target.value)}>{data.ticketSets.map((set) => <NativeSelectOption key={set.id} value={set.id}>{set.label} ({ticketsInSet(data, set.id).length})</NativeSelectOption>)}</NativeSelect></div>
+        <div className="ticket-set-field"><Label htmlFor="ticket-set-name">Name</Label><Input id="ticket-set-name" value={activeSet.label} onChange={(event) => onRenameSet(event.target.value)} /></div>
+        <div className="ticket-set-buttons">
+          <Button size="sm" variant="outline" onClick={onAddSet}><Plus />New deck</Button>
+          <Button size="sm" variant="outline" onClick={onDuplicateSet}><Copy />Duplicate</Button>
+          <Button size="sm" variant="ghost" disabled={data.ticketSets.length < 2} onClick={onDeleteSet}><Trash2 />Delete deck</Button>
+        </div>
+        <div className="ticket-set-buttons">
+          <Button size="sm" variant="outline" onClick={onImport}><Upload />Import tickets</Button>
+          <Button size="sm" variant="outline" onClick={() => onExport("set")}><Download />Export this deck</Button>
+          <Button size="sm" variant="ghost" disabled={data.ticketSets.length < 2} onClick={() => onExport("all")}><Download />Export all decks</Button>
+          <Button size="sm" variant="outline" disabled={!reviews.length} onClick={onPrint}><Printer />Print cards</Button>
+        </div>
+        <p className="helper">Several decks can sit in one map, so variants can be judged side by side. Imported decks always arrive as new decks and match stops by name when the ids differ.</p>
+      </div>
 
       {problems.length > 0 && <p className="helper helper-warning">{problems.length} need{problems.length === 1 ? "s" : ""} a look: {problems.map((review) => `${name(review.ticket.a)}–${name(review.ticket.b)}`).slice(0, 4).join(", ")}{problems.length > 4 ? ` and ${problems.length - 4} more` : ""}.</p>}
 

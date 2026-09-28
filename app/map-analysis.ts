@@ -1,6 +1,6 @@
 // The balance layer: everything derived from the stops and routes themselves. All of it is pure,
 // computed on demand from MapData, and none of it is stored in a map file.
-import { defaultLabelAngle, stopSizeMeta, type MapData, type Ticket, type Point, realWagon, type Route, routeColors, type Stop, W } from "./map-data";
+import { defaultLabelAngle, stopSizeMeta, ticketsInSet, type MapData, type Ticket, type Point, realWagon, type Route, routeColors, type Stop, W } from "./map-data";
 import { curvedSamples, isCurved, intersects, parallelPoints, pointsFor, polylineLength, stopById } from "./map-geometry";
 
 export type RouteSpacing = { route: Route; drawnMm: number; neededMm: number; ratio: number; verdict: "short" | "long" | "ok" };
@@ -280,10 +280,10 @@ export function ticketPointsPerSpace(reviews: { distance: number | null; ticket:
   return total / usable.length;
 }
 
-export function reviewTickets(data: MapData): TicketReview[] {
+export function reviewTickets(data: MapData, setId?: string): TicketReview[] {
   const adjacency = buildAdjacency(data);
   const seen = new Map<string, string>();
-  const measured = data.tickets.map((ticket) => {
+  const measured = (setId ? ticketsInSet(data, setId) : data.tickets).map((ticket) => {
     const path = ticket.a === ticket.b ? null : shortestPath(adjacency, ticket.a, ticket.b);
     return { ticket, distance: path ? path.distance : null, routeIds: path ? path.routeIds : [] };
   });
@@ -304,8 +304,8 @@ export function reviewTickets(data: MapData): TicketReview[] {
 
 // How many tickets name each stop. A stop no ticket reaches is dead weight; one named by half the
 // deck makes every game run through it.
-export function ticketCoverage(data: MapData): { stop: Stop; count: number }[] {
+export function ticketCoverage(data: MapData, setId?: string): { stop: Stop; count: number }[] {
   const counts = new Map<string, number>();
-  for (const ticket of data.tickets) for (const id of [ticket.a, ticket.b]) counts.set(id, (counts.get(id) ?? 0) + 1);
+  for (const ticket of (setId ? ticketsInSet(data, setId) : data.tickets)) for (const id of [ticket.a, ticket.b]) counts.set(id, (counts.get(id) ?? 0) + 1);
   return data.stops.map((stop) => ({ stop, count: counts.get(stop.id) ?? 0 })).sort((a, b) => b.count - a.count);
 }

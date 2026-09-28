@@ -6,6 +6,9 @@
 // It writes to the same local storage the editor uses, so it will replace whatever map is open in
 // that browser profile. It runs headless in its own profile, so your own browser is untouched.
 const { chromium } = require("playwright");
+const fs = require("fs");
+const os = require("os");
+const path = require("path");
 
 const ok = [];
 const bad = [];
@@ -162,6 +165,73 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.reload({ waitUntil: "networkidle" });
   await page.waitForTimeout(700);
   check("map survives a reload", (await badges())[2] === "9 stops", (await badges())[2]);
+
+  // 12. destination tickets: decks, ticket-only export and import, card printing
+  await tool("Add ticket").click();
+  await clickStop("Westport"); await clickStop("Quarry");
+  await clickStop("Pine Hill"); await clickStop("Central");
+  const ticketsButton = page.getByRole("button", { name: /^Tickets · / });
+  check("tickets are added to the current deck", (await ticketsButton.textContent()).includes("Tickets · 2"), await ticketsButton.textContent());
+  await ticketsButton.click();
+  await page.waitForTimeout(400);
+
+  const ticketFile = path.join(os.tmpdir(), `ttr-tickets-${Date.now()}.json`);
+  const download = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Export this deck" }).click();
+  await (await download).saveAs(ticketFile);
+  const ticketPayload = JSON.parse(fs.readFileSync(ticketFile, "utf8"));
+  check("ticket-only export writes a ticket file", ticketPayload.kind === "tickets" && ticketPayload.tickets.length === 2, ticketPayload.kind);
+  check("exported tickets carry stop names for re-matching", ticketPayload.tickets.every((t) => t.aName && t.bName), JSON.stringify(ticketPayload.tickets[0]));
+
+  await page.getByRole("button", { name: "Duplicate" }).click();
+  await page.waitForTimeout(400);
+  await page.locator("#ticket-set-name").fill("Variant");
+  await page.waitForTimeout(400);
+  await page.locator("#ticket-set").selectOption({ index: 0 });
+  await page.waitForTimeout(300);
+  check("two decks live side by side", (await page.locator("#ticket-set option").allTextContents()).join(" | ") === "Main deck (2) | Variant (2)", (await page.locator("#ticket-set option").allTextContents()).join(" | "));
+
+  await page.locator('input[type="file"][accept="application/json"]').setInputFiles(ticketFile);
+  await page.waitForTimeout(800);
+  check("importing tickets adds a deck instead of overwriting", (await page.locator("#ticket-set option").count()) === 3, (await page.locator("#ticket-set option").allTextContents()).join(" | "));
+  check("imported tickets land on real stops", (await page.locator(".analysis-table tbody tr td:first-child").allTextContents()).every((r) => !r.includes("—")));
+  fs.rmSync(ticketFile, { force: true });
+
+  // Print media hides the dialog, so the button is clicked from script and the print tree is
+  // measured inside the print() stub, while it is still mounted.
+  await page.evaluate(() => {
+    window.__print = null;
+    window.print = () => {
+      const card = document.querySelector(".print-tickets .ticket-card");
+      const sheet = document.querySelector(".print-tickets .ticket-page");
+      window.__print = { cards: document.querySelectorAll(".print-tickets .ticket-card").length, card: card && card.getBoundingClientRect(), text: card ? card.textContent : "", sheet: sheet && sheet.getBoundingClientRect() };
+    };
+  });
+  await page.emulateMedia({ media: "print" });
+  await page.evaluate(() => Array.from(document.querySelectorAll("button")).find((b) => b.textContent.includes("Print cards")).click());
+  await page.waitForFunction(() => window.__print !== null, null, { timeout: 5000 });
+  const printed = await page.evaluate(() => window.__print);
+  const mm = (value) => value / 25.4 * 96;
+  check("ticket printing lays out one card per ticket", printed.cards === 2, String(printed.cards));
+  check("ticket cards are 45 x 67 mm on A4 portrait", Math.abs(printed.card.width - mm(45)) < 3 && Math.abs(printed.card.height - mm(67)) < 3 && Math.abs(printed.sheet.height - mm(297)) < 3, `${printed.card.width.toFixed(0)}x${printed.card.height.toFixed(0)}px on ${printed.sheet.width.toFixed(0)}x${printed.sheet.height.toFixed(0)}px`);
+  check("a card names both ends and its points", /Westport/.test(printed.text) && /\d/.test(printed.text), printed.text);
+  await page.emulateMedia({ media: "screen" });
+  await page.waitForTimeout(400);
+  check("the map print tree returns after printing tickets", (await page.locator(".print-tickets").count()) === 0);
+
+  // 13. a stop lists the tickets that name it, and each one opens for editing
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(300);
+  await tool("Select & move").click();
+  await clickStop("Westport");
+  await page.waitForTimeout(400);
+  const stopLinks = await page.locator(".stop-ticket-link").allTextContents();
+  check("a stop lists its tickets from every deck", stopLinks.length === 3, stopLinks.join(" | "));
+  await page.locator(".stop-ticket-link").first().click();
+  await page.waitForTimeout(500);
+  check("a ticket link opens that ticket for editing", await page.locator(".ticket-set-bar").isVisible() && (await page.locator(".analysis-row-active").count()) === 1, await page.locator("#ticket-set-name").inputValue());
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(300);
 
   console.log("PASS:"); ok.forEach((l) => console.log("  ✓ " + l));
   if (bad.length) { console.log("FAIL:"); bad.forEach((l) => console.log("  ✗ " + l)); }

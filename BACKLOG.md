@@ -1,13 +1,12 @@
 # Backlog
 
-## Destination tickets — printing
+## Destination tickets
 
-The editing, scoring and coverage parts are built. What remains:
+Editing, scoring, coverage, decks, ticket-only transfer and card printing are built. What remains:
 
-- Print the ticket list as cut-out cards on a separate sheet, so a playtest set can be made with
-  the same print-and-draw workflow as the board.
 - Show the distribution of ticket lengths against a reference distribution, rather than only the
   shortest, median and longest.
+- Compare two decks against each other directly, rather than by switching between them.
 
 ## Map collaboration
 

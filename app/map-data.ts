@@ -62,7 +62,17 @@ export type BackgroundImage = {
 };
 // A destination ticket: reach one stop from the other to score its points. `long` marks the ones
 // drawn from a separate, longer deck.
-export type Ticket = { id: string; a: string; b: string; points: number; long?: boolean };
+export type Ticket = { id: string; a: string; b: string; points: number; long?: boolean; set?: string };
+
+// Tickets live in named sets so several decks can sit in one map and be compared. A ticket without
+// a set belongs to the first one, which is how a map written before sets still opens.
+export type TicketSet = { id: string; label: string };
+export const defaultTicketSet: TicketSet = { id: "main", label: "Main deck" };
+
+export function ticketsInSet(data: MapData, setId: string): Ticket[] {
+  const first = data.ticketSets[0]?.id;
+  return data.tickets.filter((ticket) => (ticket.set ?? first) === setId);
+}
 
 export type NoteBox = {
   id: string;
@@ -74,7 +84,7 @@ export type NoteBox = {
   locked?: boolean;
   collapsed?: boolean;
 };
-export type MapData = { name: string; format: MapFormat; endGapMm?: number; background: BackgroundShape[]; stops: Stop[]; routes: Route[]; backgroundImage?: BackgroundImage; notes: NoteBox[]; lineStyles: LineStyle[]; routeTypeStyles: RouteTypeStyle[]; wagonStyles: WagonStyle[]; stopTypeStyles: StopTypeStyle[]; tickets: Ticket[] };
+export type MapData = { name: string; format: MapFormat; endGapMm?: number; background: BackgroundShape[]; stops: Stop[]; routes: Route[]; backgroundImage?: BackgroundImage; notes: NoteBox[]; lineStyles: LineStyle[]; routeTypeStyles: RouteTypeStyle[]; wagonStyles: WagonStyle[]; stopTypeStyles: StopTypeStyle[]; tickets: Ticket[]; ticketSets: TicketSet[] };
 
 export const W = 1100;
 export const STORAGE_KEY = "orebro-map-editor-public-v2";
@@ -194,6 +204,7 @@ export const emptyMap: MapData = {
   wagonStyles: defaultWagonStyles.map((style) => ({ ...style })),
   stopTypeStyles: defaultStopTypeStyles.map((style) => ({ ...style })),
   tickets: [],
+  ticketSets: [{ ...defaultTicketSet }],
 };
 
 export const initialMap: MapData = {
@@ -216,6 +227,7 @@ export const initialMap: MapData = {
   wagonStyles: defaultWagonStyles.map((style) => ({ ...style })),
   stopTypeStyles: defaultStopTypeStyles.map((style) => ({ ...style })),
   tickets: [],
+  ticketSets: [{ ...defaultTicketSet }],
   background: [
     {
       id: "example-lake",

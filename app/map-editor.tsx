@@ -15,12 +15,12 @@ import { cn } from "@/lib/utils";
 import { MapArtwork, type Tool } from "./map-artwork";
 import { AnalysisDialog, SuggestionsDialog, TicketsDialog, WelcomeGuide } from "./map-dialogs";
 import { BackgroundImageProperties, BackgroundProperties, NoteProperties, RouteProperties, StopProperties, StylePicker } from "./map-properties";
-import { PrintPages } from "./map-print";
+import { PrintPages, TicketPrintPages } from "./map-print";
 import { SettingsDialog, type StyleTarget } from "./map-styles";
 import { autoPlaceLabels, reviewTickets, ticketPointsPerSpace, ticketCoverage, type RouteSuggestion, labelCovers, labelAngleOptions, routeSamplePoints, colourLengthTable, crossingPairs, buildAdjacency, networkStats, routeSpacing, shortestPath, suggestRoutes } from "./map-analysis";
 import { canvasPoint, pointsFor, samePair, stopById } from "./map-geometry";
-import { cloneForHistory, cloneMap, formatTimestamp, GUIDE_SEEN_KEY, HISTORY_LIMIT, MAX_IMAGE_WARN_BYTES, normalizeBackgroundFile, normalizeMap, normalizeNetworkFile, readBackgroundImage, rescaleMapToFormat, MAP_HINT_KEY, MAP_HINT_X_KEY } from "./map-storage";
-import { colorLabels, emptyMap, initialMap, type LineStyle, DEFAULT_END_GAP_MM, mapFormats, type BackgroundImage, type BackgroundShape, type BackgroundType, type MapData, type MapFormat, type Point, realWagon, type Route, type RouteType, type RouteTypeStyle, routeColors, STORAGE_KEY, type Stop, type StopSize, stopSizeMeta, type StopSymbol, stopSymbolMeta, type StopType, W } from "./map-data";
+import { cloneForHistory, cloneMap, formatTimestamp, GUIDE_SEEN_KEY, HISTORY_LIMIT, MAX_IMAGE_WARN_BYTES, normalizeBackgroundFile, normalizeMap, normalizeNetworkFile, normalizeTicketFile, buildTicketFile, readBackgroundImage, rescaleMapToFormat, MAP_HINT_KEY, MAP_HINT_X_KEY } from "./map-storage";
+import { colorLabels, defaultTicketSet, ticketsInSet, type TicketSet, emptyMap, initialMap, type LineStyle, DEFAULT_END_GAP_MM, mapFormats, type BackgroundImage, type BackgroundShape, type BackgroundType, type MapData, type MapFormat, type Point, realWagon, type Route, type RouteType, type RouteTypeStyle, routeColors, STORAGE_KEY, type Stop, type StopSize, stopSizeMeta, type StopSymbol, stopSymbolMeta, type StopType, W } from "./map-data";
 
 type MeasureResult = { from: string; to: string; distance: number; routeIds: string[] } | { from: string; to: string; unreachable: true };
 type Danger = "reset" | "delete" | "load-blank" | "load-example" | "import-background" | "import-network" | "import-image" | null;
@@ -75,6 +75,8 @@ export function MapEditor() {
   const [ticketStart, setTicketStart] = useState<string | null>(null);
   const [selectedTicket, setSelectedTicket] = useState<string | null>(null);
   const [showTickets, setShowTickets] = useState(false);
+  const [ticketSetId, setTicketSetId] = useState(defaultTicketSet.id);
+  const [printScope, setPrintScope] = useState<"map" | "tickets">("map");
   const [measureResult, setMeasureResult] = useState<MeasureResult | null>(null);
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -126,7 +128,11 @@ export function MapEditor() {
   const crossings = useMemo(() => crossingPairs(data), [data]);
   // Routes drawn too short to hold their own wagons at real component size.
   const spacing = useMemo(() => routeSpacing(data, scaleWidthMm), [data, scaleWidthMm]);
-  const ticketReviews = useMemo(() => reviewTickets(data), [data]);
+  // The deck the editor is currently working in. Derived rather than corrected in an effect, so a
+  // freshly imported or loaded map always lands on a deck that exists.
+  const activeTicketSet = data.ticketSets.find((set) => set.id === ticketSetId) ?? data.ticketSets[0];
+  const ticketsHere = ticketsInSet(data, activeTicketSet.id);
+  const ticketReviews = useMemo(() => reviewTickets(data, activeTicketSet.id), [data, activeTicketSet.id]);
   const ticketRate = useMemo(() => ticketPointsPerSpace(ticketReviews), [ticketReviews]);
   const highlightRoutes = useMemo(() => new Set(selectedTicket ? ticketReviews.find((review) => review.ticket.id === selectedTicket)?.routeIds ?? [] : []), [selectedTicket, ticketReviews]);
   const routeSamples = useMemo(() => routeSamplePoints(data), [data]);
@@ -149,6 +155,14 @@ export function MapEditor() {
     const best = [...options].sort((a, b) => a.overlap - b.overlap)[0]?.angle ?? 0;
     return { covers: labelCovers(data, selectedS, routeSamples), clear, best };
   }, [data, routeSamples, selectedS]);
+  // Tickets that name the selected stop, from every deck, so the panel shows what depends on it.
+  const stopTickets = selectedS ? data.tickets.filter((ticket) => ticket.a === selectedS.id || ticket.b === selectedS.id).map((ticket) => ({
+    id: ticket.id,
+    other: stopById(data, ticket.a === selectedS.id ? ticket.b : ticket.a)?.name ?? "—",
+    points: ticket.points,
+    deck: data.ticketSets.length > 1 ? data.ticketSets.find((set) => set.id === (ticket.set ?? data.ticketSets[0].id))?.label : undefined,
+  })) : [];
+  const openTicket = (ticketId: string) => { const ticket = data.tickets.find((item) => item.id === ticketId); if (!ticket) return; setTicketSetId(ticket.set ?? data.ticketSets[0].id); setSelectedTicket(ticketId); setShowTickets(true); };
   const selectedR = data.routes.find((route) => route.id === selectedRoute);
   // Put the shape hint on whichever edge of the board the selected route is furthest from,
   // so it never covers the bend points you are about to drag.
@@ -184,6 +198,14 @@ export function MapEditor() {
   const undo = () => { const previous = past.at(-1); if (!previous) return; setFuture((items) => [cloneForHistory(data), ...items]); setData(previous); setPast((items) => items.slice(0, -1)); clearSelection(); };
   const redo = () => { const next = future[0]; if (!next) return; setPast((items) => [...items, cloneForHistory(data)]); setData(next); setFuture((items) => items.slice(1)); clearSelection(); };
   useEffect(() => { undoRef.current = undo; redoRef.current = redo; });
+  // Ticket cards print on their own paper, so the print tree swaps to them, prints, and swaps back.
+  // Two frames, because the printed layout depends on styles applied after the swap renders.
+  useEffect(() => {
+    if (printScope !== "tickets") return;
+    let inner = 0;
+    const outer = requestAnimationFrame(() => { inner = requestAnimationFrame(() => { window.print(); setPrintScope("map"); }); });
+    return () => { cancelAnimationFrame(outer); cancelAnimationFrame(inner); };
+  }, [printScope]);
 
   const hasContent = data.stops.length > 0 || data.routes.length > 0 || data.background.length > 0 || data.notes.length > 0 || Boolean(data.backgroundImage);
   const formatOpen = !hasContent || formatShown;
@@ -208,7 +230,7 @@ export function MapEditor() {
       const path = shortestPath(adjacency, ticketStart, id);
       const points = path ? Math.max(1, Math.round(path.distance * ticketRate)) : 1;
       const ticketId = `t-${Date.now()}`;
-      change((draft) => { draft.tickets.push({ id: ticketId, a: ticketStart, b: id, points }); return draft; });
+      change((draft) => { draft.tickets.push({ id: ticketId, a: ticketStart, b: id, points, set: activeTicketSet.id }); return draft; });
       setTicketStart(null);
       setSelectedTicket(ticketId);
       if (!path) toast.warning(`${stopById(data, ticketStart)?.name} and ${stopById(data, id)?.name} are not connected. The ticket is added, but nobody can complete it yet.`);
@@ -384,6 +406,8 @@ export function MapEditor() {
   const exportMap = () => downloadJson({ kind: "map", ...data }, data.name);
   const exportBackground = () => downloadJson({ kind: "background", format: data.format, background: data.background, backgroundImage: data.backgroundImage }, `${data.name} background`);
   const exportNetwork = () => downloadJson({ kind: "network", format: data.format, stops: data.stops, routes: data.routes, lineStyles: data.lineStyles, routeTypeStyles: data.routeTypeStyles }, `${data.name} network`);
+  const exportTickets = (scope: "set" | "all") => { const ids = scope === "all" ? data.ticketSets.map((set) => set.id) : [activeTicketSet.id]; downloadJson(buildTicketFile(data, ids), `${data.name} ${scope === "all" ? "tickets" : activeTicketSet.label}`); };
+  const printTickets = () => { setShowTickets(false); setPrintScope("tickets"); };
   const applyBackgroundImport = (background: BackgroundShape[], backgroundImage?: BackgroundImage) => { change((draft) => ({ ...draft, background, backgroundImage })); clearSelection(); setDanger(null); setPendingImport(null); };
   const applyNetworkImport = (stops: Stop[], routes: Route[], lineStyles: LineStyle[], routeTypeStyles: RouteTypeStyle[]) => { change((draft) => ({ ...draft, stops, routes, lineStyles, routeTypeStyles })); clearSelection(); setDanger(null); setPendingImport(null); };
   const applyImageImport = (image: BackgroundImage) => { change((draft) => ({ ...draft, backgroundImage: image })); chooseImage(); setDanger(null); setPendingImport(null); };
@@ -397,6 +421,15 @@ export function MapEditor() {
           const { background, backgroundImage } = normalizeBackgroundFile(raw, format.height);
           if (data.background.length || data.backgroundImage) { setPendingImport({ kind: "background", background, backgroundImage }); setDanger("import-background"); }
           else applyBackgroundImport(background, backgroundImage);
+          return;
+        }
+        if (raw && raw.kind === "tickets") {
+          const { sets, tickets, dropped } = normalizeTicketFile(raw, data);
+          if (!tickets.length) { toast.error(dropped ? `None of the ${dropped} tickets in the file match a stop in this map.` : "That ticket file is empty."); return; }
+          change((draft) => ({ ...draft, ticketSets: [...draft.ticketSets, ...sets], tickets: [...draft.tickets, ...tickets] }));
+          setTicketSetId(sets[0].id);
+          setShowTickets(true);
+          toast.success(`${tickets.length} ticket${tickets.length === 1 ? "" : "s"} imported as ${sets.map((set) => set.label).join(", ")}.${dropped ? ` ${dropped} skipped: no matching stop.` : ""}`);
           return;
         }
         if (raw && raw.kind === "network") {
@@ -439,7 +472,7 @@ export function MapEditor() {
     <header className="topbar">
       <div className="brand"><span className="brand-mark"><BusFront /></span><div><p>Ticket to Ride</p><h1>Map editor – Print and draw</h1></div></div>
       <div className="map-title"><Label htmlFor="map-name" className="sr-only">Map name</Label><Input id="map-name" value={data.name} onChange={(event) => change((draft) => ({ ...draft, name: event.target.value }))} /><span className="save-state"><Check />{saved ? "Saved locally" : "Saving…"}</span></div>
-      <div className="header-actions"><Button variant="outline" size="sm" onClick={() => setShowGuide(true)}><CircleHelp />Help</Button><Button variant="ghost" size="icon" aria-label="Undo" title="Undo (Ctrl/Cmd+Z)" disabled={!past.length} onClick={undo}><Undo2 /></Button><Button variant="ghost" size="icon" aria-label="Redo" title="Redo (Ctrl/Cmd+Shift+Z)" disabled={!future.length} onClick={redo}><Redo2 /></Button><DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" size="sm"><Upload />Import</Button></DropdownMenuTrigger><DropdownMenuContent align="start"><DropdownMenuItem onClick={() => fileRef.current?.click()}><Upload />Map project</DropdownMenuItem><DropdownMenuItem onClick={() => imageFileRef.current?.click()}><ImageIcon />Background image</DropdownMenuItem></DropdownMenuContent></DropdownMenu><input ref={fileRef} hidden type="file" accept="application/json" onChange={(event) => { importMap(event.target.files?.[0]); event.target.value = ""; }} /><input ref={imageFileRef} hidden type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => { importBackgroundImage(event.target.files?.[0]); event.target.value = ""; }} /><Button variant="outline" size="sm" onClick={() => window.print()}><Printer />Print {format.shortLabel}</Button><DropdownMenu><DropdownMenuTrigger asChild><Button size="sm"><Download />Export</Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onClick={exportMap}><Download />Full map</DropdownMenuItem><DropdownMenuItem onClick={exportBackground}><Layers3 />Background only</DropdownMenuItem><DropdownMenuItem onClick={exportNetwork}><Link2 />Network only</DropdownMenuItem></DropdownMenuContent></DropdownMenu></div>
+      <div className="header-actions"><Button variant="outline" size="sm" onClick={() => setShowGuide(true)}><CircleHelp />Help</Button><Button variant="ghost" size="icon" aria-label="Undo" title="Undo (Ctrl/Cmd+Z)" disabled={!past.length} onClick={undo}><Undo2 /></Button><Button variant="ghost" size="icon" aria-label="Redo" title="Redo (Ctrl/Cmd+Shift+Z)" disabled={!future.length} onClick={redo}><Redo2 /></Button><DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" size="sm"><Upload />Import</Button></DropdownMenuTrigger><DropdownMenuContent align="start"><DropdownMenuItem onClick={() => fileRef.current?.click()}><Upload />Map project</DropdownMenuItem><DropdownMenuItem onClick={() => fileRef.current?.click()}><TicketIcon />Tickets only</DropdownMenuItem><DropdownMenuItem onClick={() => imageFileRef.current?.click()}><ImageIcon />Background image</DropdownMenuItem></DropdownMenuContent></DropdownMenu><input ref={fileRef} hidden type="file" accept="application/json" onChange={(event) => { importMap(event.target.files?.[0]); event.target.value = ""; }} /><input ref={imageFileRef} hidden type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => { importBackgroundImage(event.target.files?.[0]); event.target.value = ""; }} /><Button variant="outline" size="sm" onClick={() => window.print()}><Printer />Print {format.shortLabel}</Button><DropdownMenu><DropdownMenuTrigger asChild><Button size="sm"><Download />Export</Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onClick={exportMap}><Download />Full map</DropdownMenuItem><DropdownMenuItem onClick={exportBackground}><Layers3 />Background only</DropdownMenuItem><DropdownMenuItem onClick={exportNetwork}><Link2 />Network only</DropdownMenuItem><DropdownMenuItem onClick={() => exportTickets("all")}><TicketIcon />Tickets only</DropdownMenuItem></DropdownMenuContent></DropdownMenu></div>
     </header>
     <div className="workspace">
       <aside className="tools-panel panel">
@@ -447,7 +480,7 @@ export function MapEditor() {
         <div className="tool-row">{toolDefinitions.map((item) => <ToolButton key={item.id} active={tool === item.id} icon={item.icon} title={item.title} note={item.note} onClick={() => selectTool(item.id)} />)}</div>
         <div className="tool-panel">
           {tool === "route" && <p className="tool-status">{routeStart ? `Start: ${stopById(data, routeStart)?.name} · now click the destination stop` : "Click two stops to connect them."}</p>}
-          {tool === "ticket" && <p className="tool-status">{ticketStart ? `From ${stopById(data, ticketStart)?.name} · now click the other end` : `Click two stops to make a ticket. ${data.tickets.length} so far.`}</p>}
+          {tool === "ticket" && <p className="tool-status">{ticketStart ? `From ${stopById(data, ticketStart)?.name} · now click the other end` : `Click two stops to make a ticket for ${activeTicketSet.label}. ${ticketsHere.length} so far.`}</p>}
           {tool === "measure" && <p className="tool-status">{measureStart ? `From ${stopById(data, measureStart)?.name} · now click the destination stop` : measureResult ? ("unreachable" in measureResult ? `${stopById(data, measureResult.from)?.name} → ${stopById(data, measureResult.to)?.name}: no connected path` : `${stopById(data, measureResult.from)?.name} → ${stopById(data, measureResult.to)?.name}: ${measureResult.distance} wagon spaces`) : "Click two stops for the shortest path."}</p>}
           {tool === "stop" && <div className="tool-options"><div className="grid-two"><div><Label>Stop type</Label><NativeSelect value={stopType} onChange={(event) => setStopType(event.target.value as StopType)}>{data.stopTypeStyles.map((meta) => <NativeSelectOption key={meta.id} value={meta.id}>{meta.label}</NativeSelectOption>)}</NativeSelect></div><div><Label>Stop size</Label><NativeSelect value={stopSize} onChange={(event) => setStopSize(event.target.value as StopSize)}>{Object.entries(stopSizeMeta).map(([key, meta]) => <NativeSelectOption key={key} value={key}>{meta.label}</NativeSelectOption>)}</NativeSelect></div></div><div className="grid-two"><div><Label>Symbol</Label><NativeSelect value={stopSymbol} onChange={(event) => setStopSymbol(event.target.value as StopSymbol)}>{Object.entries(stopSymbolMeta).map(([key, meta]) => <NativeSelectOption key={key} value={key}>{meta.label}</NativeSelectOption>)}</NativeSelect></div>{stopSymbol === "letter" && <div><Label>Letter</Label><Input maxLength={2} value={stopLetter} onChange={(event) => setStopLetter(event.target.value)} /></div>}</div></div>}
           {tool === "route" && <div className="tool-options"><StylePicker label="Route type" value={routeType} styles={data.routeTypeStyles} placeholder="" onChange={(id) => id && setRouteType(id)} onEdit={() => openStyles({ kind: "route", id: routeType })} /><label className="checkbox-row"><input type="checkbox" checked={routeCurved} onChange={(event) => setRouteCurved(event.target.checked)} />Draw as a smooth curve</label><div><Label>Colour</Label><NativeSelect value={routeColor} onChange={(event) => setRouteColor(event.target.value)}>{Object.keys(routeColors).map((key) => <NativeSelectOption key={key} value={key}>{colorLabels[key]}</NativeSelectOption>)}</NativeSelect></div><StylePicker label="Special rule style" value={routeLineStyle} styles={data.lineStyles} placeholder="Default appearance" helper="New routes you draw will use this style." onChange={setRouteLineStyle} onEdit={() => openStyles({ kind: "line", id: routeLineStyle })} /></div>}
@@ -492,7 +525,7 @@ export function MapEditor() {
         </TooltipContent></Tooltip>}
         <Button variant="outline" size="sm" className="analyze-button" onClick={() => openStyles({ kind: "map" })}><Settings2 />Settings</Button>
         {data.stops.length > 0 && <Button variant="outline" size="sm" className="analyze-button" onClick={() => setShowAnalysis(true)}><BarChart3 />Analyze balance</Button>}
-        {data.tickets.length > 0 && <Button variant="outline" size="sm" className="analyze-button" onClick={() => setShowTickets(true)}><TicketIcon />Tickets · {data.tickets.length}</Button>}
+        <Button variant="outline" size="sm" className="analyze-button" onClick={() => setShowTickets(true)}><TicketIcon />Tickets · {ticketsHere.length}{data.ticketSets.length > 1 ? ` in ${activeTicketSet.label}` : ""}</Button>
         {data.stops.length > 1 && <Button variant="outline" size="sm" className="analyze-button" onClick={() => setShowSuggestions(true)}><Lightbulb />Suggest routes</Button>}
         <div className="legend"><p className="eyebrow">Stop types</p>{data.stopTypeStyles.map((meta) => <div key={meta.id}><i style={{ background: meta.fill, borderColor: meta.stroke }} />{meta.label}</div>)}</div>
         <Button variant="ghost" className="reset-button" onClick={() => setDanger("reset")}><RotateCcw />Clear map</Button>
@@ -511,19 +544,25 @@ export function MapEditor() {
         {selectedN && <NoteProperties note={selectedN} change={change} onDelete={() => setDanger("delete")} />}
         {imageSelected && data.backgroundImage && <BackgroundImageProperties image={data.backgroundImage} formatHeight={format.height} change={change} onDelete={() => setDanger("delete")} />}
         {selectedB && <BackgroundProperties shape={selectedB} change={change} onDelete={() => setDanger("delete")} />}
-        {selectedS && <StopProperties stop={selectedS} change={change} onDelete={() => setDanger("delete")} labelState={selectedLabelState} stopTypeStyles={data.stopTypeStyles} onEditStyles={openStyles} mapEndGapMm={data.endGapMm ?? DEFAULT_END_GAP_MM} allLocked={data.stops.length > 0 && data.stops.every((item) => item.locked)} onLockAll={lockAllStops} />}
+        {selectedS && <StopProperties stop={selectedS} change={change} onDelete={() => setDanger("delete")} labelState={selectedLabelState} stopTypeStyles={data.stopTypeStyles} onEditStyles={openStyles} mapEndGapMm={data.endGapMm ?? DEFAULT_END_GAP_MM} allLocked={data.stops.length > 0 && data.stops.every((item) => item.locked)} onLockAll={lockAllStops} tickets={stopTickets} onOpenTicket={openTicket} />}
         {selectedR && <RouteProperties route={selectedR} stops={data.stops} routes={data.routes} lineStyles={data.lineStyles} routeTypeStyles={data.routeTypeStyles} change={change} onDelete={() => setDanger("delete")} onSetStyle={assignRouteLineStyle} onAddParallel={addParallelRoute} wagonStyles={data.wagonStyles} onEditStyles={openStyles} onStraighten={straightenRoute} onSetCurved={applyRouteCurve} linkParallel={linkParallel} onLinkParallel={setLinkParallel} />}
       </aside>
     </div>
     <AlertDialog open={danger !== null} onOpenChange={(open) => { if (!open) { setDanger(null); setPendingImport(null); } }}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{danger === "reset" ? "Clear the entire map?" : danger === "load-blank" ? "Replace the current map with a blank one?" : danger === "load-example" ? "Replace the current map with the example?" : danger === "import-background" ? "Replace the background?" : danger === "import-network" ? "Replace stops and routes?" : danger === "import-image" ? "Replace the background image?" : "Delete the selected object?"}</AlertDialogTitle><AlertDialogDescription>{danger === "reset" ? "All locally stored background objects, stops and routes will be removed. Export the map first if you want to keep it." : danger === "load-blank" ? "Your current background objects, stops and routes will be replaced with a blank map. Export the map first if you want to keep your work." : danger === "load-example" ? "Your current background objects, stops and routes will be replaced with the neutral example map. Export the map first if you want to keep your work." : danger === "import-background" ? "The imported background, including any background image, will replace the current one. Stops and routes are kept as they are." : danger === "import-network" ? "The imported stops and routes will replace the current network. Background objects are kept as they are." : danger === "import-image" ? "The new image will replace the current background image." : selectedStop ? "The stop and all connected routes will be deleted." : "The selected object will be deleted."}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => { if (danger === "reset") { change(() => cloneMap(emptyMap)); clearSelection(); setDanger(null); } else if (danger === "load-blank") applyGuideChoice(emptyMap); else if (danger === "load-example") applyGuideChoice(initialMap); else if (danger === "import-background" && pendingImport?.kind === "background") applyBackgroundImport(pendingImport.background, pendingImport.backgroundImage); else if (danger === "import-network" && pendingImport?.kind === "network") applyNetworkImport(pendingImport.stops, pendingImport.routes, pendingImport.lineStyles, pendingImport.routeTypeStyles); else if (danger === "import-image" && pendingImport?.kind === "image") applyImageImport(pendingImport.image); else deleteSelected(); }}>Continue</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
     <WelcomeGuide open={showGuide} onOpenChange={(open) => !open && dismissGuide()} onChooseBlank={() => chooseFromGuide("blank")} onChooseExample={() => chooseFromGuide("example")} />
     <SettingsDialog open={showStyles} onOpenChange={setShowStyles} target={styleTarget} onTarget={setStyleTarget} data={data} change={change} onChangeFormat={changeFormat} defaults={{ stopType, setStopType, stopSize, setStopSize: (value) => setStopSize(value as StopSize), routeType, setRouteType, routeColor, setRouteColor, routeCurved, setRouteCurved, routeLineStyle, setRouteLineStyle, linkParallel, setLinkParallel, scaleTarget, setScaleTarget: (value) => setScaleTarget(value as MapFormat) }} />
-    <TicketsDialog open={showTickets} onOpenChange={setShowTickets} data={data} reviews={ticketReviews} coverage={ticketCoverage(data)} rate={ticketRate} selected={selectedTicket} onSelect={setSelectedTicket}
+    <TicketsDialog open={showTickets} onOpenChange={setShowTickets} data={data} reviews={ticketReviews} coverage={ticketCoverage(data, activeTicketSet.id)} rate={ticketRate} selected={selectedTicket} activeSet={activeTicketSet} onSelect={setSelectedTicket}
+      onSelectSet={(setId) => { setTicketSetId(setId); setSelectedTicket(null); }}
+      onAddSet={() => { const id = `ts-${Date.now()}`; change((draft) => { draft.ticketSets.push({ id, label: nextDeckLabel(draft.ticketSets) }); return draft; }); setTicketSetId(id); setSelectedTicket(null); }}
+      onDuplicateSet={() => { const id = `ts-${Date.now()}`; const stamp = Date.now(); change((draft) => { draft.ticketSets.push({ id, label: nextDeckLabel(draft.ticketSets, `${activeTicketSet.label} copy`) }); ticketsInSet(draft, activeTicketSet.id).forEach((ticket, index) => draft.tickets.push({ ...ticket, id: `t-${stamp}-${index}`, set: id })); return draft; }); setTicketSetId(id); setSelectedTicket(null); }}
+      onRenameSet={(label) => change((draft) => { const set = draft.ticketSets.find((item) => item.id === activeTicketSet.id); if (set) set.label = label; return draft; })}
+      onDeleteSet={() => { if (data.ticketSets.length < 2) return; const gone = activeTicketSet.id; change((draft) => { const first = draft.ticketSets[0].id; draft.tickets = draft.tickets.filter((ticket) => (ticket.set ?? first) !== gone); draft.ticketSets = draft.ticketSets.filter((set) => set.id !== gone); return draft; }); setTicketSetId(data.ticketSets.find((set) => set.id !== gone)!.id); setSelectedTicket(null); }}
+      onExport={exportTickets} onImport={() => fileRef.current?.click()} onPrint={printTickets}
       onUpdate={(ticketId, values) => change((draft) => { const ticket = draft.tickets.find((item) => item.id === ticketId); if (ticket) Object.assign(ticket, { ...values, long: values.long === false ? undefined : values.long ?? ticket.long }); return draft; })}
       onDelete={(ticketId) => { change((draft) => { draft.tickets = draft.tickets.filter((item) => item.id !== ticketId); return draft; }); setSelectedTicket((current) => current === ticketId ? null : current); }} />
     <AnalysisDialog open={showAnalysis} onOpenChange={setShowAnalysis} data={data} stats={stats} colourTable={colourTable} spacing={spacing} scaleWidthMm={scaleWidthMm} onSelectRoute={(routeId) => { setShowAnalysis(false); setSelectedRoute(routeId); setSelectedStop(null); setSelectedBackground(null); setSelectedNote(null); setImageSelected(false); setTool("select"); }} onSelectStop={(stopId) => { setShowAnalysis(false); setSelectedStop(stopId); setSelectedRoute(null); setSelectedBackground(null); setSelectedNote(null); setImageSelected(false); setTool("select"); }} />
     <SuggestionsDialog open={showSuggestions} onOpenChange={setShowSuggestions} suggestions={suggestions} onAdd={addSuggestedRoute} />
-    <PrintPages data={data} scaleWidthMm={scaleWidthMm} />
+    {printScope === "tickets" ? <TicketPrintPages data={data} setId={activeTicketSet.id} /> : <PrintPages data={data} scaleWidthMm={scaleWidthMm} />}
   </main></TooltipProvider>;
 }
 
@@ -596,4 +635,13 @@ function ToolButton({ active, icon, title, note, onClick }: { active: boolean; i
   return <Tooltip><TooltipTrigger asChild>
     <button type="button" className={cn("tool-button", active && "active")} onClick={onClick} aria-label={title} aria-pressed={active}>{icon}</button>
   </TooltipTrigger><TooltipContent side="bottom" sideOffset={6} className="tool-tooltip"><strong>{title}</strong><span>{note}</span></TooltipContent></Tooltip>;
+}
+
+// A fresh deck name that does not clash with the ones already in the map.
+function nextDeckLabel(sets: TicketSet[], base = "Deck"): string {
+  const used = new Set(sets.map((set) => set.label.trim().toLowerCase()));
+  if (!used.has(base.toLowerCase())) return base;
+  let attempt = 2;
+  while (used.has(`${base} ${attempt}`.toLowerCase())) attempt += 1;
+  return `${base} ${attempt}`;
 }

@@ -2,8 +2,32 @@
 
 // The hidden print tree: one page per board panel, or a single page for a test sheet.
 import { cn } from "@/lib/utils";
-import { mapFormats, type MapData, W } from "./map-data";
+import { mapFormats, ticketsInSet, type MapData, W } from "./map-data";
 import { MapArtwork } from "./map-artwork";
+
+// Tickets print as cut-out cards on plain A4, 16 to a sheet. The same print-and-cut workflow as the
+// board itself: no bleed, a thin cut line, and nothing that needs colour to be readable.
+const CARDS_PER_PAGE = 16;
+
+export function TicketPrintPages({ data, setId }: { data: MapData; setId: string }) {
+  const set = data.ticketSets.find((item) => item.id === setId) ?? data.ticketSets[0];
+  const name = (id: string) => data.stops.find((stop) => stop.id === id)?.name ?? "—";
+  const tickets = ticketsInSet(data, set?.id ?? "");
+  const pageCount = Math.max(1, Math.ceil(tickets.length / CARDS_PER_PAGE));
+  return <div className="print-pages print-tickets" aria-hidden="true">
+    <style>{"@media print{@page{size:210mm 297mm;margin:0}}"}</style>
+    {Array.from({ length: pageCount }, (_, page) => <section className="print-page ticket-page" key={page}>
+      <div className="print-caption"><strong>{data.name}</strong><span>{set?.label} · tickets {page * CARDS_PER_PAGE + 1}–{Math.min(tickets.length, (page + 1) * CARDS_PER_PAGE)} of {tickets.length}</span></div>
+      <div className="ticket-sheet">{tickets.slice(page * CARDS_PER_PAGE, (page + 1) * CARDS_PER_PAGE).map((ticket) => <div className="ticket-card" key={ticket.id}>
+        <p className="ticket-card-from">{name(ticket.a)}</p>
+        <p className="ticket-card-arrow">↕</p>
+        <p className="ticket-card-to">{name(ticket.b)}</p>
+        <p className="ticket-card-points">{ticket.points}</p>
+        {ticket.long && <p className="ticket-card-flag">Long route</p>}
+      </div>)}</div>
+    </section>)}
+  </div>;
+}
 
 export function PrintPages({ data, scaleWidthMm }: { data: MapData; scaleWidthMm: number }) {
   const format = mapFormats[data.format];

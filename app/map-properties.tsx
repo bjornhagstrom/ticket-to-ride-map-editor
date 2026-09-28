@@ -14,7 +14,11 @@ import { type StyleTarget } from "./map-styles";
 import { labelAngleOf } from "./map-analysis";
 import { cn } from "@/lib/utils";
 
-export function StopProperties({ stop, change, onDelete, labelState, mapEndGapMm, allLocked, onLockAll, stopTypeStyles, onEditStyles }: { stop: Stop; stopTypeStyles: StopTypeStyle[]; onEditStyles: (target: StyleTarget) => void; allLocked: boolean; onLockAll: (locked: boolean) => void; change: (fn: (draft: MapData) => MapData) => void; onDelete: () => void; mapEndGapMm: number; labelState: { covers: boolean; clear: number[]; best: number } }) {
+// One ticket as the stop panel lists it: the far end, the points, and the deck when the map has
+// more than one.
+export type StopTicket = { id: string; other: string; points: number; deck?: string };
+
+export function StopProperties({ stop, change, onDelete, labelState, mapEndGapMm, allLocked, onLockAll, stopTypeStyles, onEditStyles, tickets, onOpenTicket }: { stop: Stop; stopTypeStyles: StopTypeStyle[]; onEditStyles: (target: StyleTarget) => void; tickets: StopTicket[]; onOpenTicket: (ticketId: string) => void; allLocked: boolean; onLockAll: (locked: boolean) => void; change: (fn: (draft: MapData) => MapData) => void; onDelete: () => void; mapEndGapMm: number; labelState: { covers: boolean; clear: number[]; best: number } }) {
   const update = (values: Partial<Stop>) => change((draft) => { const item = stopById(draft, stop.id); if (item) Object.assign(item, values); return draft; });
   const symbol = stop.symbol ?? "none";
   return <div className="property-form">
@@ -53,6 +57,11 @@ export function StopProperties({ stop, change, onDelete, labelState, mapEndGapMm
     <Button variant="outline" onClick={() => update({ locked: !stop.locked || undefined })}>{stop.locked ? <Unlock /> : <Lock />}{stop.locked ? "Unlock position" : "Lock position"}</Button>
     <Button variant="outline" size="sm" onClick={() => onLockAll(!allLocked)}>{allLocked ? <Unlock /> : <Lock />}{allLocked ? "Unlock every stop" : "Lock every stop"}</Button>
     <p className="helper">A locked stop can still be selected and edited, it just cannot be dragged by accident. Hold Shift while dragging to move it anyway, without unlocking it first.</p>
+    <div className="stop-tickets">
+      <Label>Tickets naming this stop</Label>
+      {tickets.length ? <ul>{tickets.map((ticket) => <li key={ticket.id}><button type="button" className="stop-ticket-link" onClick={() => onOpenTicket(ticket.id)}>{stop.name} → {ticket.other}<span>{ticket.points} pt{ticket.deck ? ` · ${ticket.deck}` : ""}</span></button></li>)}</ul>
+        : <p className="helper">No ticket sends a player here yet.</p>}
+    </div>
     <Button variant="destructive" onClick={onDelete}><Trash2 />Delete stop</Button>
     <p className="delete-note">Connected routes will also be deleted.</p>
   </div>;

@@ -1,6 +1,6 @@
 // Loading, saving and reshaping map files: local-storage keys, the normalizers that let older
 // files open, board-format rescaling, and image reading.
-import { defaultStopTypeStyles, fallbackStopTypeStyle, type StopTypeStyle, defaultWagonStyles, type WagonStyle, defaultRouteTypeStyles, type LineStyle, type RouteTypeStyle, type BackgroundImage, type BackgroundShape, type ImageCrop, mapFormats, type MapData, type MapFormat, type NoteBox, type Point, type Route, type Stop, STORAGE_KEY } from "./map-data";
+import { defaultTicketSet, type Ticket, type TicketSet, defaultStopTypeStyles, fallbackStopTypeStyle, type StopTypeStyle, defaultWagonStyles, type WagonStyle, defaultRouteTypeStyles, type LineStyle, type RouteTypeStyle, type BackgroundImage, type BackgroundShape, type ImageCrop, mapFormats, type MapData, type MapFormat, type NoteBox, type Point, type Route, type Stop, STORAGE_KEY } from "./map-data";
 
 export const GUIDE_SEEN_KEY = `${STORAGE_KEY}-guide-seen`;
 export const MAX_IMAGE_WARN_BYTES = 2 * 1024 * 1024;
@@ -76,6 +76,7 @@ export const normalizeMap = (value: Partial<MapData>): MapData => ({
   wagonStyles: normalizeWagonStyles(value),
   stopTypeStyles: normalizeStopTypeStyles(value),
   tickets: Array.isArray(value.tickets) ? value.tickets : [],
+  ticketSets: Array.isArray(value.ticketSets) && value.ticketSets.length ? value.ticketSets : [{ ...defaultTicketSet }],
   backgroundImage: normalizeBackgroundImage(value.backgroundImage),
 });
 const scalePointToHeight = (point: Point, fromHeight: number, toHeight: number): Point => ({ x: point.x, y: point.y * toHeight / fromHeight });
@@ -91,6 +92,58 @@ export const normalizeBackgroundFile = (value: { format?: unknown; background?: 
   return { background: scaleBackgroundToHeight(Array.isArray(value.background) ? value.background : [], fromHeight, toHeight), backgroundImage: image ? scaleImageToHeight(image, fromHeight, toHeight) : undefined };
 };
 export const normalizeNetworkFile = (value: { format?: unknown; stops?: unknown; routes?: unknown; lineStyles?: unknown; routeTypeStyles?: unknown }, toHeight: number): { stops: Stop[]; routes: Route[]; lineStyles: LineStyle[]; routeTypeStyles: RouteTypeStyle[] } => { const fromHeight = sourceHeight(value); return { stops: scaleStopsToHeight(Array.isArray(value.stops) ? value.stops : [], fromHeight, toHeight), routes: scaleRoutesToHeight(Array.isArray(value.routes) ? value.routes : [], fromHeight, toHeight), lineStyles: Array.isArray(value.lineStyles) ? value.lineStyles : [], routeTypeStyles: Array.isArray(value.routeTypeStyles) && value.routeTypeStyles.length ? value.routeTypeStyles : defaultRouteTypeStyles.map((style) => ({ ...style })) }; };
+// A ticket-only file. Endpoints travel as stop ids *and* stop names, so a deck can be moved to
+// another copy of the map where the ids differ but the cities are the same.
+export type TicketFile = { kind: "tickets"; map: string; sets: TicketSet[]; tickets: (Ticket & { aName: string; bName: string })[] };
+
+export function buildTicketFile(data: MapData, setIds: string[]): TicketFile {
+  const name = (id: string) => data.stops.find((stop) => stop.id === id)?.name ?? "";
+  const first = data.ticketSets[0]?.id;
+  const sets = data.ticketSets.filter((set) => setIds.includes(set.id));
+  return {
+    kind: "tickets",
+    map: data.name,
+    sets: sets.map((set) => ({ ...set })),
+    tickets: data.tickets.filter((ticket) => setIds.includes(ticket.set ?? first ?? "")).map((ticket) => ({ ...ticket, set: ticket.set ?? first, aName: name(ticket.a), bName: name(ticket.b) })),
+  };
+}
+
+// Imported sets always arrive as new sets with fresh ids, so an import can never quietly overwrite
+// a deck that is being compared against it.
+export function normalizeTicketFile(value: unknown, data: MapData): { sets: TicketSet[]; tickets: Ticket[]; dropped: number } {
+  const raw = (value ?? {}) as Partial<TicketFile>;
+  const incomingSets = Array.isArray(raw.sets) && raw.sets.length ? raw.sets : [{ ...defaultTicketSet }];
+  const incomingTickets = Array.isArray(raw.tickets) ? raw.tickets : [];
+  const byId = new Set(data.stops.map((stop) => stop.id));
+  const byName = new Map(data.stops.map((stop) => [stop.name.trim().toLowerCase(), stop.id]));
+  const resolve = (id: unknown, name: unknown): string | null => {
+    if (typeof id === "string" && byId.has(id)) return id;
+    if (typeof name === "string") return byName.get(name.trim().toLowerCase()) ?? null;
+    return null;
+  };
+  const usedLabels = new Set(data.ticketSets.map((set) => set.label.toLowerCase()));
+  const stamp = Date.now();
+  const setIdMap = new Map<string, string>();
+  const sets = incomingSets.map((set, index) => {
+    let label = String(set.label ?? "Imported deck").trim() || "Imported deck";
+    if (usedLabels.has(label.toLowerCase())) { let attempt = 2; while (usedLabels.has(`${label} ${attempt}`.toLowerCase())) attempt += 1; label = `${label} ${attempt}`; }
+    usedLabels.add(label.toLowerCase());
+    const id = `ts-${stamp}-${index}`;
+    setIdMap.set(String(set.id), id);
+    return { id, label };
+  });
+  const fallbackSet = sets[0].id;
+  let dropped = 0;
+  const tickets: Ticket[] = [];
+  incomingTickets.forEach((ticket, index) => {
+    const a = resolve(ticket?.a, ticket?.aName);
+    const b = resolve(ticket?.b, ticket?.bName);
+    if (!a || !b || a === b) { dropped += 1; return; }
+    tickets.push({ id: `t-${stamp}-${index}`, a, b, points: Math.max(1, Math.round(Number(ticket?.points) || 1)), long: ticket?.long ? true : undefined, set: setIdMap.get(String(ticket?.set)) ?? fallbackSet });
+  });
+  return { sets, tickets, dropped };
+}
+
 export const readBackgroundImage = (file: File): Promise<{ dataUrl: string; naturalWidth: number; naturalHeight: number }> => new Promise((resolve, reject) => {
   const reader = new FileReader();
   reader.onerror = () => reject(new Error("Could not read the file"));
