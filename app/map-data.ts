@@ -10,8 +10,28 @@ export type Stop = Point & { id: string; name: string; type: StopType; size?: St
 // Where a stop's name sits, as a compass bearing around the stop in degrees (0 = right, 90 = below).
 // Undefined keeps the original behaviour: up and to the right, flipping left near the right edge.
 export const defaultLabelAngle = (stop: Point) => (stop.x > 900 ? 215 : 325);
-export type Route = { id: string; a: string; b: string; length: number; type: RouteType; color: string; points?: Point[]; locomotiveSlots?: number[]; lineStyle?: string; curved?: boolean; tunnel?: boolean };
+export type Route = { id: string; a: string; b: string; length: number; type: RouteType; color: string; points?: Point[]; locomotiveSlots?: number[]; lineStyle?: string; curved?: boolean; wagonStyle?: string };
 export type LineStyle = { id: string; label: string; strokeWidth: number; dash: string };
+
+// How a route's wagon spaces are drawn, to signal that it plays by a rule of its own. Shape is
+// deliberately a short list: a space prints at 20 x 9 mm on a board and about 7.5 x 3.4 mm on an A4
+// proof, so anything subtler than these disappears. `glyph` is what survives that shrink, and what
+// still reads in black and white.
+export type WagonShape = "plain" | "serrated" | "notched" | "heavy";
+export type WagonStyle = { id: string; label: string; shape: WagonShape; glyph?: string };
+
+export const wagonShapeMeta: Record<WagonShape, { label: string }> = {
+  plain: { label: "Plain" },
+  serrated: { label: "Serrated (tunnel)" },
+  notched: { label: "Notched corners" },
+  heavy: { label: "Heavy outline" },
+};
+
+// Ships with every map so a tunnel is there from the start, but it is an ordinary style: rename it,
+// restyle it, or delete it like any other.
+export const defaultWagonStyles: WagonStyle[] = [
+  { id: "tunnel", label: "Tunnel", shape: "serrated" },
+];
 export type RouteTypeStyle = { id: string; label: string; stroke: string; dash: string; strokeWidth: number; infrastructure: boolean };
 export type BackgroundShape = {
   id: string;
@@ -48,7 +68,7 @@ export type NoteBox = {
   text: string;
   locked?: boolean;
 };
-export type MapData = { name: string; format: MapFormat; endGapMm?: number; background: BackgroundShape[]; stops: Stop[]; routes: Route[]; backgroundImage?: BackgroundImage; notes: NoteBox[]; lineStyles: LineStyle[]; routeTypeStyles: RouteTypeStyle[] };
+export type MapData = { name: string; format: MapFormat; endGapMm?: number; background: BackgroundShape[]; stops: Stop[]; routes: Route[]; backgroundImage?: BackgroundImage; notes: NoteBox[]; lineStyles: LineStyle[]; routeTypeStyles: RouteTypeStyle[]; wagonStyles: WagonStyle[] };
 
 export const W = 1100;
 export const STORAGE_KEY = "orebro-map-editor-public-v2";
@@ -159,6 +179,7 @@ export const emptyMap: MapData = {
   notes: [],
   lineStyles: [],
   routeTypeStyles: defaultRouteTypeStyles.map((style) => ({ ...style })),
+  wagonStyles: defaultWagonStyles.map((style) => ({ ...style })),
 };
 
 export const initialMap: MapData = {
@@ -178,6 +199,7 @@ export const initialMap: MapData = {
     { id: "example-restricted", label: "Restricted", strokeWidth: 7, dash: "2 5" },
   ],
   routeTypeStyles: defaultRouteTypeStyles.map((style) => ({ ...style })),
+  wagonStyles: defaultWagonStyles.map((style) => ({ ...style })),
   background: [
     {
       id: "example-lake",
@@ -242,7 +264,7 @@ export const initialMap: MapData = {
     { id: "example-route-2", a: "example-westport", b: "example-pine-hill", length: 3, type: "region", color: "orange", points: [{ x: 170, y: 420 }] },
     { id: "example-route-3", a: "example-pine-hill", b: "example-central", length: 3, type: "trail", color: "neutral", points: [{ x: 350, y: 500 }] },
     { id: "example-route-4", a: "example-central", b: "example-lakeside", length: 3, type: "rail", color: "neutral", points: [{ x: 525, y: 225 }] },
-    { id: "example-route-5", a: "example-central", b: "example-old-town", length: 4, type: "city", color: "blue", points: [{ x: 545, y: 485 }], tunnel: true },
+    { id: "example-route-5", a: "example-central", b: "example-old-town", length: 4, type: "city", color: "blue", points: [{ x: 545, y: 485 }], wagonStyle: "tunnel" },
     { id: "example-route-6", a: "example-lakeside", b: "example-eastgate", length: 4, type: "brt", color: "neutral", points: [{ x: 815, y: 165 }] },
     { id: "example-route-7", a: "example-lakeside", b: "example-harbour", length: 3, type: "ferry", color: "neutral", points: [{ x: 800, y: 270 }, { x: 855, y: 370 }], locomotiveSlots: [0] },
     { id: "example-route-8", a: "example-old-town", b: "example-harbour", length: 3, type: "region", color: "green", points: [{ x: 790, y: 585 }] },

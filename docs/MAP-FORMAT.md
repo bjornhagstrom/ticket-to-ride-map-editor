@@ -88,7 +88,7 @@ Supported stop types are `city`, `region`, `brt`, `rail`, `ferry` and `outing`. 
   "color": "red",
   "points": [{ "x": 265, "y": 235 }, { "x": 320, "y": 300 }],
   "curved": false,
-  "tunnel": true,
+  "wagonStyle": "tunnel",
   "locomotiveSlots": [1],
   "lineStyle": "style-tunnel"
 }
@@ -100,7 +100,7 @@ Two or more routes between the same pair of stops form a double route: they are 
 
 `curved` is optional and **defaults to true**: a route is drawn as a smooth Catmull-Rom curve through its bend points unless it carries `"curved": false`, which draws straight segments instead. The wagon spaces are placed along the curve and rotate with it. A route needs at least one bend point for the setting to have any visible effect, so a file that never mentions `curved` looks the same as before for straight two-point routes. Only the exception is stored, which is why an older file with no `curved` field anywhere now opens with curved routes. Select a route and use the `+` handles beside it to add a bend anywhere along the line, drag a bend to move it, and double-click one to remove it.
 
-`tunnel` is optional. When `true` every wagon space on the route is drawn with serrated long edges, the way a printed board marks a tunnel, so the route reads as one that plays by its own rules. It is a property of the route rather than of individual spaces, which matches how tunnels work on a real board. The teeth are cut into the space rather than added around it, so a tunnel takes exactly the same room as any other space and does not change the spacing analysis.
+`wagonStyle` is optional and references the `id` of an entry in the map's `wagonStyles` list (see below). It marks every wagon space on the route, to show that the route plays by a rule of its own. It replaces the earlier `tunnel: true` flag, which is still read on import and converted to `"wagonStyle": "tunnel"`.
 
 `locomotiveSlots` is optional and lists the zero-based wagon-slot indices (out of `length`) that must be covered with a locomotive card, drawn with a small engine icon. Toggle it by clicking a wagon slot on a selected route.
 
@@ -117,6 +117,30 @@ Two or more routes between the same pair of stops form a double route: they are 
 A type is told apart by **thickness and dash pattern, never by colour**. Every route a player claims with train cards is drawn in its own `color` (from the standard nine-colour deck, with `neutral` drawn grey), so two routes of the same type can and normally do have different colours. `stroke` is therefore only drawn for types with `infrastructure: true`, which have no train cards and so no colour of their own; on any other type it is stored but unused. `dash` is an SVG `stroke-dasharray` (`""` for solid) and `strokeWidth` the line thickness in canvas units. `infrastructure: true` marks a pre-built type with no train cards and no wagon slots (drawn as a continuous line, like the default `rail` and `trail`); `false` marks a type that shows wagon slots, a colour choice and can take locomotive requirements (like `city`, `region`, `brt` and `ferry`).
 
 Create, rename, restyle and delete types from the Route type control in the Draw route tool (sets the default for new routes) or in a selected route's Properties panel (changes that route's type and, through it, every other route sharing it). A type cannot be deleted while any route still uses it, or if it is the map's only remaining type. `routeTypeStyles` travels with full-map and network-only exports.
+
+## Wagon styles
+
+`wagonStyles` is a map-level array of named ways to draw a route's wagon spaces:
+
+```json
+{ "id": "tunnel", "label": "Tunnel", "shape": "serrated", "glyph": "T" }
+```
+
+`shape` is one of `plain`, `serrated` (the jagged edges a printed board uses for a tunnel), `notched`
+(cut corners) or `heavy` (a thicker outline). `glyph` is optional and draws one or two characters
+inside every space on the route.
+
+The shape list is deliberately short. A wagon space prints at 20 × 9 mm on a board and about
+7.5 × 3.4 mm on an A4 proof, so a shape difference has to be around 1.5 mm to survive; the serration
+is 1.8 mm for that reason, after a first attempt at 0.9 mm turned out to be invisible. A glyph is
+the more reliable signal: a capital letter comes out about 5.4 mm tall on a board and 2.0 mm on an
+A4 sheet, and it still reads in black and white.
+
+Every map ships with a `tunnel` style so one is there from the start, but it is an ordinary entry:
+rename it, restyle it or delete it like any other. Deleting a style clears `wagonStyle` on the
+routes that used it. A file with no `wagonStyles` list gets the default one on import, plus a plain
+placeholder for any style id its routes already reference. `wagonStyles` travels with full-map and
+network-only exports.
 
 ## Line styles
 

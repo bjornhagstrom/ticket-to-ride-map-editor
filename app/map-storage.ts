@@ -1,6 +1,6 @@
 // Loading, saving and reshaping map files: local-storage keys, the normalizers that let older
 // files open, board-format rescaling, and image reading.
-import { defaultRouteTypeStyles, type LineStyle, type RouteTypeStyle, type BackgroundImage, type BackgroundShape, type ImageCrop, mapFormats, type MapData, type MapFormat, type NoteBox, type Point, type Route, type Stop, STORAGE_KEY } from "./map-data";
+import { defaultWagonStyles, type WagonStyle, defaultRouteTypeStyles, type LineStyle, type RouteTypeStyle, type BackgroundImage, type BackgroundShape, type ImageCrop, mapFormats, type MapData, type MapFormat, type NoteBox, type Point, type Route, type Stop, STORAGE_KEY } from "./map-data";
 
 export const GUIDE_SEEN_KEY = `${STORAGE_KEY}-guide-seen`;
 export const MAX_IMAGE_WARN_BYTES = 2 * 1024 * 1024;
@@ -42,15 +42,31 @@ const normalizeBackgroundImage = (value: unknown): BackgroundImage | undefined =
     locked: Boolean(v.locked),
   };
 };
+// A route used to carry `tunnel: true`; it is a wagon style now. Older files keep working, and the
+// style they point at is added below if the file predates the list entirely.
+const migrateRoute = (route: Route & { tunnel?: boolean }): Route => {
+  if (!route.tunnel) return route;
+  const rest = { ...route };
+  delete rest.tunnel;
+  return { ...rest, wagonStyle: rest.wagonStyle ?? "tunnel" };
+};
+const normalizeWagonStyles = (value: Partial<MapData> & { routes?: unknown }): WagonStyle[] => {
+  if (Array.isArray(value.wagonStyles) && value.wagonStyles.length) return value.wagonStyles;
+  const styles = defaultWagonStyles.map((style) => ({ ...style }));
+  const used = new Set((Array.isArray(value.routes) ? value.routes : []).map((route: Route) => route.wagonStyle).filter(Boolean));
+  for (const id of used) if (id && !styles.some((style) => style.id === id)) styles.push({ id, label: id, shape: "plain" });
+  return styles;
+};
 export const normalizeMap = (value: Partial<MapData>): MapData => ({
   name: typeof value.name === "string" ? value.name : "Imported map",
   format: isMapFormat(value.format) ? value.format : "board-2x3",
   background: Array.isArray(value.background) ? value.background : [],
   stops: Array.isArray(value.stops) ? value.stops : [],
-  routes: Array.isArray(value.routes) ? value.routes : [],
+  routes: Array.isArray(value.routes) ? value.routes.map(migrateRoute) : [],
   notes: Array.isArray(value.notes) ? value.notes : [],
   lineStyles: Array.isArray(value.lineStyles) ? value.lineStyles : [],
   routeTypeStyles: Array.isArray(value.routeTypeStyles) && value.routeTypeStyles.length ? value.routeTypeStyles : defaultRouteTypeStyles.map((style) => ({ ...style })),
+  wagonStyles: normalizeWagonStyles(value),
   backgroundImage: normalizeBackgroundImage(value.backgroundImage),
 });
 const scalePointToHeight = (point: Point, fromHeight: number, toHeight: number): Point => ({ x: point.x, y: point.y * toHeight / fromHeight });

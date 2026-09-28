@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
-import { colorLabels, type ImageCrop, type LineStyle, type MapData, type NoteBox, type RouteTypeStyle, type BackgroundImage, type BackgroundShape, type Route, routeColors, type Stop, stopSizeMeta, stopSymbolMeta, type StopSize, type StopSymbol, type StopType, stopTypeMeta, W } from "./map-data";
+import { type WagonShape, type WagonStyle, wagonShapeMeta, colorLabels, type ImageCrop, type LineStyle, type MapData, type NoteBox, type RouteTypeStyle, type BackgroundImage, type BackgroundShape, type Route, routeColors, type Stop, stopSizeMeta, stopSymbolMeta, type StopSize, type StopSymbol, type StopType, stopTypeMeta, W } from "./map-data";
 import { isCurved, samePair, stopById } from "./map-geometry";
 import { labelAngleOf } from "./map-analysis";
 import { cn } from "@/lib/utils";
@@ -116,7 +116,7 @@ export function LineStylePicker({ value, lineStyles, onChange, onCreate, onUpdat
   </div>;
 }
 
-export function RouteProperties({ route, stops, routes, lineStyles, routeTypeStyles, change, onDelete, onCreateStyle, onUpdateStyle, onDeleteStyle, onSetStyle, onCreateType, onUpdateType, onDeleteType, onAddParallel, onStraighten, onSetCurved, linkParallel, onLinkParallel }: { route: Route; onStraighten: (routeId: string) => void; onSetCurved: (routeId: string, curved: boolean) => void; linkParallel: boolean; onLinkParallel: (value: boolean) => void; stops: Stop[]; routes: Route[]; lineStyles: LineStyle[]; routeTypeStyles: RouteTypeStyle[]; change: (fn: (draft: MapData) => MapData) => void; onDelete: () => void; onAddParallel: (routeId: string) => void; onCreateStyle: (routeId: string) => void; onUpdateStyle: (styleId: string, values: Partial<LineStyle>) => void; onDeleteStyle: (styleId: string) => void; onSetStyle: (routeId: string, styleId: string | undefined) => void; onCreateType: (routeId: string) => void; onUpdateType: (typeId: string, values: Partial<RouteTypeStyle>) => void; onDeleteType: (typeId: string) => void }) {
+export function RouteProperties({ route, stops, routes, lineStyles, routeTypeStyles, change, onDelete, onCreateStyle, onUpdateStyle, onDeleteStyle, onSetStyle, onCreateType, onUpdateType, onDeleteType, onAddParallel, wagonStyles, onCreateWagonStyle, onUpdateWagonStyle, onDeleteWagonStyle, onStraighten, onSetCurved, linkParallel, onLinkParallel }: { route: Route; onStraighten: (routeId: string) => void; onSetCurved: (routeId: string, curved: boolean) => void; linkParallel: boolean; onLinkParallel: (value: boolean) => void; stops: Stop[]; routes: Route[]; lineStyles: LineStyle[]; routeTypeStyles: RouteTypeStyle[]; change: (fn: (draft: MapData) => MapData) => void; onDelete: () => void; onAddParallel: (routeId: string) => void; wagonStyles: WagonStyle[]; onCreateWagonStyle: () => string; onUpdateWagonStyle: (styleId: string, values: Partial<WagonStyle>) => void; onDeleteWagonStyle: (styleId: string) => void; onCreateStyle: (routeId: string) => void; onUpdateStyle: (styleId: string, values: Partial<LineStyle>) => void; onDeleteStyle: (styleId: string) => void; onSetStyle: (routeId: string, styleId: string | undefined) => void; onCreateType: (routeId: string) => void; onUpdateType: (typeId: string, values: Partial<RouteTypeStyle>) => void; onDeleteType: (typeId: string) => void }) {
   const update = (values: Partial<Route>) => change((draft) => { const item = draft.routes.find((entry) => entry.id === route.id); if (item) Object.assign(item, values); return draft; });
   const infrastructure = routeTypeStyles.find((style) => style.id === route.type)?.infrastructure ?? false;
   const parallelCount = routes.filter((item) => samePair(item, route)).length;
@@ -132,7 +132,7 @@ export function RouteProperties({ route, stops, routes, lineStyles, routeTypeSty
     {!infrastructure && <>
       <div><Label>Colour</Label><NativeSelect value={route.color} onChange={(event) => update({ color: event.target.value })}>{Object.keys(routeColors).map((key) => <NativeSelectOption key={key} value={key}>{colorLabels[key]}</NativeSelectOption>)}</NativeSelect></div>
       <div><Label>Vehicle spaces</Label><div className="length-stepper"><Button variant="outline" size="icon" aria-label="Decrease" disabled={route.length <= 1} onClick={() => update({ length: Math.max(1, route.length - 1), locomotiveSlots: route.locomotiveSlots?.filter((index) => index < route.length - 1) })}><Minus /></Button><strong>{route.length}</strong><Button variant="outline" size="icon" aria-label="Increase" disabled={route.length >= 8} onClick={() => update({ length: Math.min(8, route.length + 1) })}><Plus /></Button></div><p className="helper">The change is shown directly on the route.</p></div>
-      <label className="checkbox-row"><input type="checkbox" checked={Boolean(route.tunnel)} onChange={(event) => update({ tunnel: event.target.checked || undefined })} />Tunnel · its own rules apply</label>
+      <WagonStylePicker value={route.wagonStyle} wagonStyles={wagonStyles} onChange={(id) => update({ wagonStyle: id })} onCreate={() => update({ wagonStyle: onCreateWagonStyle() })} onUpdate={onUpdateWagonStyle} onDelete={onDeleteWagonStyle} />
       <div><Label>Locomotives required · {route.locomotiveSlots?.length ?? 0} of {route.length}</Label><p className="helper">Click a wagon slot directly on the selected route to toggle it.</p>{Boolean(route.locomotiveSlots?.length) && <Button size="sm" variant="ghost" onClick={() => update({ locomotiveSlots: [] })}><TrainFront />Clear locomotives</Button>}</div>
     </>}
     <div className="bend-controls">
@@ -191,3 +191,24 @@ export function BackgroundImageProperties({ image, formatHeight, change, onDelet
   </div>;
 }
 
+
+export function WagonStylePicker({ value, wagonStyles, onChange, onCreate, onUpdate, onDelete }: { value: string | undefined; wagonStyles: WagonStyle[]; onChange: (styleId: string | undefined) => void; onCreate: () => void; onUpdate: (styleId: string, values: Partial<WagonStyle>) => void; onDelete: (styleId: string) => void }) {
+  const active = wagonStyles.find((style) => style.id === value);
+  return <div className="line-style-section">
+    <Label>Wagon style</Label>
+    <div className="line-style-row">
+      <NativeSelect value={value ?? ""} onChange={(event) => onChange(event.target.value || undefined)}>
+        <NativeSelectOption value="">Plain wagons</NativeSelectOption>
+        {wagonStyles.map((style) => <NativeSelectOption key={style.id} value={style.id}>{style.label}</NativeSelectOption>)}
+      </NativeSelect>
+      <Button size="sm" variant="outline" onClick={onCreate}>New style</Button>
+    </div>
+    <p className="helper">Marks every wagon space on this route, to show it plays by a rule of its own. Tunnel is here by default; rename or restyle it like any other.</p>
+    {active && <div className="line-style-editor">
+      <div><Label>Style name</Label><Input value={active.label} onChange={(event) => onUpdate(active.id, { label: event.target.value })} /></div>
+      <div><Label>Shape</Label><NativeSelect value={active.shape} onChange={(event) => onUpdate(active.id, { shape: event.target.value as WagonShape })}>{Object.entries(wagonShapeMeta).map(([key, meta]) => <NativeSelectOption key={key} value={key}>{meta.label}</NativeSelectOption>)}</NativeSelect></div>
+      <div><Label>Mark in the space</Label><Input maxLength={2} value={active.glyph ?? ""} onChange={(event) => onUpdate(active.id, { glyph: event.target.value || undefined })} /><p className="helper">One or two characters, drawn inside every space. A shape alone can get lost on a small print; a letter survives it.</p></div>
+      <Button size="sm" variant="ghost" onClick={() => onDelete(active.id)}>Delete this style</Button>
+    </div>}
+  </div>;
+}
