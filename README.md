@@ -35,6 +35,9 @@ Live site: <https://hagstrom.nu/ttr/>
 - Print full test sheets or reduced A4 proofs of individual foldable-board panels.
 - Show a neutral example map to first-time visitors.
 
+Styles are applied from the Properties panel and defined in one shared Styles dialog, reachable in
+one click from wherever a style is applied.
+
 ## Important storage behaviour
 
 The application has no server-side database. A map is automatically stored in the current browser under the key `orebro-map-editor-public-v2`. This preserves existing users' data despite the historical key name.

@@ -38,7 +38,8 @@ The editor is split by responsibility, with dependencies pointing one way and no
 | `app/map-analysis.ts` | Everything derived from the network: hub degree, shortest path, colour×length, route suggestions, room per wagon |
 | `app/map-storage.ts` | Local-storage keys, file normalizers, board-format rescaling, image reading |
 | `app/map-artwork.tsx` | The SVG layer stack, object renderers and editing handles |
-| `app/map-properties.tsx` | The Properties panel editors and the type/style pickers |
+| `app/map-properties.tsx` | The Properties panel editors, which apply styles but never define them |
+| `app/map-styles.tsx` | The style library dialog, where every kind of reusable appearance is created and edited |
 | `app/map-dialogs.tsx` | Welcome guide, balance report, route suggestions |
 | `app/map-print.tsx` | The hidden print tree |
 | `app/map-editor.tsx` | Editor state, pointer interactions and the surrounding layout |
@@ -90,6 +91,15 @@ actually stores.
 9. Fold guides
 
 Changing this order can alter pointer behaviour as well as appearance. Notes are deliberately drawn above the map content so they stay readable; they are not considered part of the map itself and are therefore excluded from Background only and Network only exports.
+
+## Applying a style versus defining one
+
+These are deliberately separate. The Properties panel is about the object you clicked, so it only
+offers a select to apply an existing style, plus an Edit button. Defining styles happens in one
+place, `StyleLibraryDialog`, which holds stop types, route types, wagon styles and line styles
+side by side. The Edit button opens that dialog on the right kind with the right style selected, so
+you can get from an object to the definition behind it in one click without the panel having to
+carry a full editor for every kind of appearance.
 
 ## Customisable route styling
 

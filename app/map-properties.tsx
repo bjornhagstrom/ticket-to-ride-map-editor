@@ -2,45 +2,31 @@
 
 // The right-hand Properties panel: one editor component per kind of selected object, plus the
 // route-type and line-style pickers they share.
-import { ChevronDown, Copy, Crosshair, Lock, Maximize2, Minus, Plus, TrainFront, Trash2, Unlock } from "lucide-react";
+import { ChevronDown, Copy, Crosshair, Lock, Pencil, Maximize2, Minus, Plus, TrainFront, Trash2, Unlock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
-import { type StopTypeStyle, type WagonStyle, wagonShapeMeta, type WagonShape, colorLabels, type ImageCrop, type LineStyle, type MapData, type NoteBox, type RouteTypeStyle, type BackgroundImage, type BackgroundShape, type Route, routeColors, type Stop, stopSizeMeta, stopSymbolMeta, type StopSize, type StopSymbol, type StopType, W } from "./map-data";
+import { type StopTypeStyle, type WagonStyle, colorLabels, type ImageCrop, type LineStyle, type MapData, type NoteBox, type RouteTypeStyle, type BackgroundImage, type BackgroundShape, type Route, routeColors, type Stop, stopSizeMeta, stopSymbolMeta, type StopSize, type StopSymbol, W } from "./map-data";
 import { isCurved, samePair, stopById } from "./map-geometry";
+import { type StyleTarget } from "./map-styles";
 import { labelAngleOf } from "./map-analysis";
 import { cn } from "@/lib/utils";
 
-const dashPresets: Array<{ value: string; label: string }> = [
-  { value: "", label: "Solid" },
-  { value: "4 4", label: "Fine dashes" },
-  { value: "10 6", label: "Dashes" },
-  { value: "2 5", label: "Dotted" },
-  { value: "14 4 2 4", label: "Dash-dot" },
-];
-// An imported map may carry a dash pattern we have no preset for; keep it selectable rather than
-// silently showing "Solid" and overwriting it the moment the user touches the field.
-const dashOptions = (current: string) => dashPresets.some((preset) => preset.value === current)
-  ? dashPresets
-  : [...dashPresets, { value: current, label: `Custom (${current})` }];
-
-export function StopProperties({ stop, change, onDelete, labelState, mapEndGapMm, allLocked, onLockAll, stops, stopTypeStyles, onCreateStopType, onUpdateStopType, onDeleteStopType }: { stop: Stop; stops: Stop[]; stopTypeStyles: StopTypeStyle[]; onCreateStopType: () => string; onUpdateStopType: (typeId: string, values: Partial<StopTypeStyle>) => void; onDeleteStopType: (typeId: string) => void; allLocked: boolean; onLockAll: (locked: boolean) => void; change: (fn: (draft: MapData) => MapData) => void; onDelete: () => void; mapEndGapMm: number; labelState: { covers: boolean; clear: number[]; best: number } }) {
+export function StopProperties({ stop, change, onDelete, labelState, mapEndGapMm, allLocked, onLockAll, stopTypeStyles, onEditStyles }: { stop: Stop; stopTypeStyles: StopTypeStyle[]; onEditStyles: (target: StyleTarget) => void; allLocked: boolean; onLockAll: (locked: boolean) => void; change: (fn: (draft: MapData) => MapData) => void; onDelete: () => void; mapEndGapMm: number; labelState: { covers: boolean; clear: number[]; best: number } }) {
   const update = (values: Partial<Stop>) => change((draft) => { const item = stopById(draft, stop.id); if (item) Object.assign(item, values); return draft; });
   const symbol = stop.symbol ?? "none";
   return <div className="property-form">
     <div><Label htmlFor="stop-name">Name</Label><Input id="stop-name" value={stop.name} onChange={(event) => update({ name: event.target.value })} /></div>
     <div className="grid-two">
-      <div><Label>Stop type</Label><NativeSelect value={stop.type} onChange={(event) => update({ type: event.target.value as StopType })}>{stopTypeStyles.map((meta) => <NativeSelectOption key={meta.id} value={meta.id}>{meta.label}</NativeSelectOption>)}</NativeSelect></div>
       <div><Label>Stop size</Label><NativeSelect value={stop.size ?? "medium"} onChange={(event) => update({ size: event.target.value as StopSize })}>{Object.entries(stopSizeMeta).map(([key, meta]) => <NativeSelectOption key={key} value={key}>{meta.label}</NativeSelectOption>)}</NativeSelect></div>
     </div>
-    <p className="helper">Size can carry meaning in some expansions, such as marking major cities.</p>
     <div className="grid-two">
       <div><Label>Symbol</Label><NativeSelect value={symbol} onChange={(event) => update({ symbol: event.target.value as StopSymbol, letter: event.target.value === "letter" ? (stop.letter || "A") : stop.letter })}>{Object.entries(stopSymbolMeta).map(([key, meta]) => <NativeSelectOption key={key} value={key}>{meta.label}</NativeSelectOption>)}</NativeSelect></div>
       {symbol === "letter" && <div><Label>Letter</Label><Input maxLength={2} value={stop.letter ?? ""} onChange={(event) => update({ letter: event.target.value })} /></div>}
     </div>
-    <StopTypeEditor typeId={stop.type} stopTypeStyles={stopTypeStyles} stops={stops} onCreateType={() => update({ type: onCreateStopType() })} onUpdateType={onUpdateStopType} onDeleteType={onDeleteStopType} />
+    <StylePicker label="Stop type" value={stop.type} styles={stopTypeStyles} placeholder="" onChange={(id) => id && update({ type: id })} onEdit={() => onEditStyles({ kind: "stop", id: stop.type })} />
     <p className="helper">Mark a stop with a symbol or short code for rules of your own, independent of its type.</p>
     <div className="label-angle">
       <Label htmlFor="stop-end-gap">Space before the first wagon · {stop.endGapMm ?? mapEndGapMm} mm{stop.endGapMm === undefined ? " (map default)" : ""}</Label>
@@ -71,53 +57,9 @@ export function StopProperties({ stop, change, onDelete, labelState, mapEndGapMm
   </div>;
 }
 
-export function RouteTypeEditor({ typeId, routeTypeStyles, routes, onSelectType, onCreateType, onUpdateType, onDeleteType }: { typeId: string; routeTypeStyles: RouteTypeStyle[]; routes: Route[]; onSelectType: (typeId: string) => void; onCreateType: () => void; onUpdateType: (typeId: string, values: Partial<RouteTypeStyle>) => void; onDeleteType: (typeId: string) => void }) {
-  const style = routeTypeStyles.find((item) => item.id === typeId);
-  // A type's own colour only shows on pre-built infrastructure. Everything a player claims with
-  // train cards takes its colour from the route, so types are told apart by thickness and dash.
-  const colourApplies = routeTypeStyles.find((item) => item.id === typeId)?.infrastructure ?? false;
-  const usageCount = style ? routes.filter((route) => route.type === style.id).length : 0;
-  return <div className="line-style-section">
-    <Label>Route type</Label>
-    <div className="line-style-row">
-      <NativeSelect value={typeId} onChange={(event) => onSelectType(event.target.value)}>
-        {routeTypeStyles.map((item) => <NativeSelectOption key={item.id} value={item.id}>{item.label}</NativeSelectOption>)}
-      </NativeSelect>
-      <Button size="sm" variant="outline" onClick={onCreateType}>New type</Button>
-    </div>
-    {style && <div className="line-style-editor">
-      <div><Label>Type name</Label><Input value={style.label} onChange={(event) => onUpdateType(style.id, { label: event.target.value })} /></div>
-      {colourApplies ? <div><Label>Line colour</Label><input className="colour-input" type="color" value={style.stroke} onChange={(event) => onUpdateType(style.id, { stroke: event.target.value })} /></div> : <p className="helper">Every route keeps its own wagon colour, so a type is told apart by thickness and dash pattern — not by colour.</p>}
-      <div><Label>Thickness · {style.strokeWidth}px</Label><input className="range-input" type="range" min="2" max="14" value={style.strokeWidth} onChange={(event) => onUpdateType(style.id, { strokeWidth: Number(event.target.value) })} /></div>
-      <div><Label>Dash pattern</Label><NativeSelect value={style.dash} onChange={(event) => onUpdateType(style.id, { dash: event.target.value })}>{dashOptions(style.dash).map((preset) => <NativeSelectOption key={preset.value} value={preset.value}>{preset.label}</NativeSelectOption>)}</NativeSelect></div>
-      <label className="checkbox-row"><input type="checkbox" checked={style.infrastructure} onChange={(event) => onUpdateType(style.id, { infrastructure: event.target.checked })} />Pre-built infrastructure (no train cards or wagon slots)</label>
-      <Button size="sm" variant="ghost" disabled={usageCount > 0 || routeTypeStyles.length <= 1} onClick={() => onDeleteType(style.id)}>{usageCount > 0 ? `In use by ${usageCount} route${usageCount === 1 ? "" : "s"}` : "Delete this type"}</Button>
-    </div>}
-  </div>;
-}
 
-export function LineStylePicker({ value, lineStyles, onChange, onCreate, onUpdate, onDelete, helper }: { value: string | undefined; lineStyles: LineStyle[]; onChange: (styleId: string | undefined) => void; onCreate: () => void; onUpdate: (styleId: string, values: Partial<LineStyle>) => void; onDelete: (styleId: string) => void; helper: string }) {
-  const activeStyle = lineStyles.find((style) => style.id === value);
-  return <div className="line-style-section">
-    <Label>Special rule style</Label>
-    <div className="line-style-row">
-      <NativeSelect value={value ?? ""} onChange={(event) => onChange(event.target.value || undefined)}>
-        <NativeSelectOption value="">Default appearance</NativeSelectOption>
-        {lineStyles.map((style) => <NativeSelectOption key={style.id} value={style.id}>{style.label}</NativeSelectOption>)}
-      </NativeSelect>
-      <Button size="sm" variant="outline" onClick={onCreate}>New style</Button>
-    </div>
-    <p className="helper">{helper}</p>
-    {activeStyle && <div className="line-style-editor">
-      <div><Label>Style name</Label><Input value={activeStyle.label} onChange={(event) => onUpdate(activeStyle.id, { label: event.target.value })} /></div>
-      <div><Label>Thickness · {activeStyle.strokeWidth}px</Label><input className="range-input" type="range" min="2" max="14" value={activeStyle.strokeWidth} onChange={(event) => onUpdate(activeStyle.id, { strokeWidth: Number(event.target.value) })} /></div>
-      <div><Label>Dash pattern</Label><NativeSelect value={activeStyle.dash} onChange={(event) => onUpdate(activeStyle.id, { dash: event.target.value })}>{dashPresets.map((preset) => <NativeSelectOption key={preset.label} value={preset.value}>{preset.label}</NativeSelectOption>)}</NativeSelect></div>
-      <Button size="sm" variant="ghost" onClick={() => onDelete(activeStyle.id)}>Delete this style</Button>
-    </div>}
-  </div>;
-}
 
-export function RouteProperties({ route, stops, routes, lineStyles, routeTypeStyles, change, onDelete, onCreateStyle, onUpdateStyle, onDeleteStyle, onSetStyle, onCreateType, onUpdateType, onDeleteType, onAddParallel, wagonStyles, onCreateWagonStyle, onUpdateWagonStyle, onDeleteWagonStyle, onStraighten, onSetCurved, linkParallel, onLinkParallel }: { route: Route; onStraighten: (routeId: string) => void; onSetCurved: (routeId: string, curved: boolean) => void; linkParallel: boolean; onLinkParallel: (value: boolean) => void; stops: Stop[]; routes: Route[]; lineStyles: LineStyle[]; routeTypeStyles: RouteTypeStyle[]; change: (fn: (draft: MapData) => MapData) => void; onDelete: () => void; onAddParallel: (routeId: string) => void; wagonStyles: WagonStyle[]; onCreateWagonStyle: () => string; onUpdateWagonStyle: (styleId: string, values: Partial<WagonStyle>) => void; onDeleteWagonStyle: (styleId: string) => void; onCreateStyle: (routeId: string) => void; onUpdateStyle: (styleId: string, values: Partial<LineStyle>) => void; onDeleteStyle: (styleId: string) => void; onSetStyle: (routeId: string, styleId: string | undefined) => void; onCreateType: (routeId: string) => void; onUpdateType: (typeId: string, values: Partial<RouteTypeStyle>) => void; onDeleteType: (typeId: string) => void }) {
+export function RouteProperties({ route, stops, routes, lineStyles, routeTypeStyles, change, onDelete, onSetStyle, onAddParallel, wagonStyles, onEditStyles, onStraighten, onSetCurved, linkParallel, onLinkParallel }: { route: Route; onStraighten: (routeId: string) => void; onSetCurved: (routeId: string, curved: boolean) => void; linkParallel: boolean; onLinkParallel: (value: boolean) => void; stops: Stop[]; routes: Route[]; lineStyles: LineStyle[]; routeTypeStyles: RouteTypeStyle[]; change: (fn: (draft: MapData) => MapData) => void; onDelete: () => void; onAddParallel: (routeId: string) => void; wagonStyles: WagonStyle[]; onSetStyle: (routeId: string, styleId: string | undefined) => void; onEditStyles: (target: StyleTarget) => void }) {
   const update = (values: Partial<Route>) => change((draft) => { const item = draft.routes.find((entry) => entry.id === route.id); if (item) Object.assign(item, values); return draft; });
   const infrastructure = routeTypeStyles.find((style) => style.id === route.type)?.infrastructure ?? false;
   const parallelCount = routes.filter((item) => samePair(item, route)).length;
@@ -129,11 +71,11 @@ export function RouteProperties({ route, stops, routes, lineStyles, routeTypeSty
       <Button size="sm" variant="outline" onClick={() => onAddParallel(route.id)}><Copy />Add parallel route</Button>
       <p className="helper">A double route: a second line between the same two stops, in its own colour. Both lines are drawn side by side.</p>
     </div>
-    <RouteTypeEditor typeId={route.type} routeTypeStyles={routeTypeStyles} routes={routes} onSelectType={(typeId) => update({ type: typeId })} onCreateType={() => onCreateType(route.id)} onUpdateType={onUpdateType} onDeleteType={onDeleteType} />
+    <StylePicker label="Route type" value={route.type} styles={routeTypeStyles} placeholder="" onChange={(id) => id && update({ type: id })} onEdit={() => onEditStyles({ kind: "route", id: route.type })} />
     {!infrastructure && <>
       <div><Label>Colour</Label><NativeSelect value={route.color} onChange={(event) => update({ color: event.target.value })}>{Object.keys(routeColors).map((key) => <NativeSelectOption key={key} value={key}>{colorLabels[key]}</NativeSelectOption>)}</NativeSelect></div>
       <div><Label>Vehicle spaces</Label><div className="length-stepper"><Button variant="outline" size="icon" aria-label="Decrease" disabled={route.length <= 1} onClick={() => update({ length: Math.max(1, route.length - 1), locomotiveSlots: route.locomotiveSlots?.filter((index) => index < route.length - 1) })}><Minus /></Button><strong>{route.length}</strong><Button variant="outline" size="icon" aria-label="Increase" disabled={route.length >= 8} onClick={() => update({ length: Math.min(8, route.length + 1) })}><Plus /></Button></div><p className="helper">The change is shown directly on the route.</p></div>
-      <WagonStylePicker value={route.wagonStyle} wagonStyles={wagonStyles} onChange={(id) => update({ wagonStyle: id })} onCreate={() => update({ wagonStyle: onCreateWagonStyle() })} onUpdate={onUpdateWagonStyle} onDelete={onDeleteWagonStyle} />
+      <StylePicker label="Wagon style" value={route.wagonStyle} styles={wagonStyles} placeholder="Plain wagons" helper="Marks every wagon space on this route, to show it plays by a rule of its own." onChange={(id) => update({ wagonStyle: id })} onEdit={() => onEditStyles({ kind: "wagon", id: route.wagonStyle })} />
       <div><Label>Locomotives required · {route.locomotiveSlots?.length ?? 0} of {route.length}</Label><p className="helper">Click a wagon slot directly on the selected route to toggle it.</p>{Boolean(route.locomotiveSlots?.length) && <Button size="sm" variant="ghost" onClick={() => update({ locomotiveSlots: [] })}><TrainFront />Clear locomotives</Button>}</div>
     </>}
     <div className="bend-controls">
@@ -143,7 +85,7 @@ export function RouteProperties({ route, stops, routes, lineStyles, routeTypeSty
       {parallelCount > 1 && <label className="checkbox-row"><input type="checkbox" checked={linkParallel} onChange={(event) => onLinkParallel(event.target.checked)} />Shape the parallel line{parallelCount > 2 ? "s" : ""} together with this one</label>}
       {Boolean(route.points?.length) && <Button size="sm" variant="ghost" onClick={() => onStraighten(route.id)}>Straighten route</Button>}
     </div>
-    <LineStylePicker value={route.lineStyle} lineStyles={lineStyles} onChange={(styleId) => onSetStyle(route.id, styleId)} onCreate={() => onCreateStyle(route.id)} onUpdate={onUpdateStyle} onDelete={onDeleteStyle} helper="Give this one route a thicker or dashed line to flag it individually, on top of its type's appearance." />
+    <StylePicker label="Special rule style" value={route.lineStyle} styles={lineStyles} placeholder="Default appearance" helper="Overrides this one route's line, on top of its type." onChange={(id) => onSetStyle(route.id, id)} onEdit={() => onEditStyles({ kind: "line", id: route.lineStyle })} />
     <Button variant="destructive" onClick={onDelete}><Trash2 />Delete route</Button>
   </div>;
 }
@@ -193,42 +135,20 @@ export function BackgroundImageProperties({ image, formatHeight, change, onDelet
 }
 
 
-export function WagonStylePicker({ value, wagonStyles, onChange, onCreate, onUpdate, onDelete }: { value: string | undefined; wagonStyles: WagonStyle[]; onChange: (styleId: string | undefined) => void; onCreate: () => void; onUpdate: (styleId: string, values: Partial<WagonStyle>) => void; onDelete: (styleId: string) => void }) {
-  const active = wagonStyles.find((style) => style.id === value);
+
+
+// Pick a style here; define it in the style library. The pencil opens that library on this kind,
+// with this style selected, so the two live in one place without leaving the object behind.
+export function StylePicker({ label, value, styles, placeholder, helper, onChange, onEdit }: { label: string; value: string | undefined; styles: { id: string; label: string }[]; placeholder: string; helper?: string; onChange: (id: string | undefined) => void; onEdit: () => void }) {
   return <div className="line-style-section">
-    <Label>Wagon style</Label>
+    <Label>{label}</Label>
     <div className="line-style-row">
       <NativeSelect value={value ?? ""} onChange={(event) => onChange(event.target.value || undefined)}>
-        <NativeSelectOption value="">Plain wagons</NativeSelectOption>
-        {wagonStyles.map((style) => <NativeSelectOption key={style.id} value={style.id}>{style.label}</NativeSelectOption>)}
+        {placeholder && <NativeSelectOption value="">{placeholder}</NativeSelectOption>}
+        {styles.map((style) => <NativeSelectOption key={style.id} value={style.id}>{style.label}</NativeSelectOption>)}
       </NativeSelect>
-      <Button size="sm" variant="outline" onClick={onCreate}>New style</Button>
+      <Button size="sm" variant="outline" onClick={onEdit} aria-label={`Edit ${label.toLowerCase()}`}><Pencil />Edit</Button>
     </div>
-    <p className="helper">Marks every wagon space on this route, to show it plays by a rule of its own. Tunnel is here by default; rename or restyle it like any other.</p>
-    {active && <div className="line-style-editor">
-      <div><Label>Style name</Label><Input value={active.label} onChange={(event) => onUpdate(active.id, { label: event.target.value })} /></div>
-      <div><Label>Shape</Label><NativeSelect value={active.shape} onChange={(event) => onUpdate(active.id, { shape: event.target.value as WagonShape })}>{Object.entries(wagonShapeMeta).map(([key, meta]) => <NativeSelectOption key={key} value={key}>{meta.label}</NativeSelectOption>)}</NativeSelect></div>
-      <div><Label>Mark in the space</Label><Input maxLength={2} value={active.glyph ?? ""} onChange={(event) => onUpdate(active.id, { glyph: event.target.value || undefined })} /><p className="helper">One or two characters, drawn inside every space. A shape alone can get lost on a small print; a letter survives it.</p></div>
-      <Button size="sm" variant="ghost" onClick={() => onDelete(active.id)}>Delete this style</Button>
-    </div>}
-  </div>;
-}
-
-export function StopTypeEditor({ typeId, stopTypeStyles, stops, onCreateType, onUpdateType, onDeleteType }: { typeId: string; stopTypeStyles: StopTypeStyle[]; stops: Stop[]; onCreateType: () => void; onUpdateType: (typeId: string, values: Partial<StopTypeStyle>) => void; onDeleteType: (typeId: string) => void }) {
-  const style = stopTypeStyles.find((item) => item.id === typeId);
-  const usageCount = stops.filter((stop) => stop.type === typeId).length;
-  return <div className="line-style-section">
-    <div className="line-style-row">
-      <Button size="sm" variant="outline" onClick={onCreateType}>New stop type</Button>
-    </div>
-    {style && <div className="line-style-editor">
-      <div><Label>Type name</Label><Input value={style.label} onChange={(event) => onUpdateType(style.id, { label: event.target.value })} /></div>
-      <div className="colour-row">
-        <label>Fill<input className="colour-input" type="color" value={style.fill} onChange={(event) => onUpdateType(style.id, { fill: event.target.value })} /></label>
-        <label>Outline<input className="colour-input" type="color" value={style.stroke} onChange={(event) => onUpdateType(style.id, { stroke: event.target.value })} /></label>
-      </div>
-      <label className="checkbox-row"><input type="checkbox" checked={Boolean(style.square)} onChange={(event) => onUpdateType(style.id, { square: event.target.checked || undefined })} />Draw a square inside the circle</label>
-      <Button size="sm" variant="ghost" disabled={usageCount > 0 || stopTypeStyles.length <= 1} onClick={() => onDeleteType(style.id)}>{usageCount > 0 ? `In use by ${usageCount} stop${usageCount === 1 ? "" : "s"}` : "Delete this type"}</Button>
-    </div>}
+    {helper && <p className="helper">{helper}</p>}
   </div>;
 }
