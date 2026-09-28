@@ -133,6 +133,9 @@ export const REFERENCE_BOARD_MM = 790;
 // `MapData.endGapMm` sets it for the whole map and `Stop.endGapMm` for one stop, which is what
 // lets the two ends of the same route differ.
 export const DEFAULT_END_GAP_MM = 2;
+// How much of a background image must stay over the board, so it can hang over an edge without
+// being dragged out of reach.
+export const IMAGE_KEEP_ON_BOARD = 30;
 
 // How a game on this map is set up. The defaults are the original Ticket to Ride's: 45 wagons each,
 // three destination tickets dealt at the start.

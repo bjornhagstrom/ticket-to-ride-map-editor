@@ -115,9 +115,17 @@ export function pointAlong(points: Point[], fraction: number): Point & { angle: 
   return { ...(points.at(-1) ?? { x: 0, y: 0 }), angle: 0 };
 }
 export const polylineLength = (points: Point[]) => points.slice(1).reduce((sum, point, index) => sum + Math.hypot(point.x - points[index].x, point.y - points[index].y), 0);
+// Where the pointer is in map units, kept a margin inside the board. Placing an object puts it where
+// the pointer is, so this keeps a new stop or note from landing half off the edge.
 export function canvasPoint(svg: SVGSVGElement, clientX: number, clientY: number, height: number): Point {
+  const raw = canvasPointRaw(svg, clientX, clientY, height);
+  return { x: Math.max(18, Math.min(W - 18, raw.x)), y: Math.max(18, Math.min(height - 18, raw.y)) };
+}
+// The same point without that margin. Dragging something by the spot you grabbed it needs it: with
+// the pointer held a margin inside the board, an object can never be pushed flush to an edge.
+export function canvasPointRaw(svg: SVGSVGElement, clientX: number, clientY: number, height: number): Point {
   const rect = svg.getBoundingClientRect();
-  return { x: Math.max(18, Math.min(W - 18, (clientX - rect.left) * W / rect.width)), y: Math.max(18, Math.min(height - 18, (clientY - rect.top) * height / rect.height)) };
+  return { x: (clientX - rect.left) * W / rect.width, y: (clientY - rect.top) * height / rect.height };
 }
 export function automaticLabelPoint(shape: BackgroundShape, height: number): Point {
   if (!shape.points.length) return { x: W / 2, y: height / 2 };

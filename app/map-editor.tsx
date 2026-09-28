@@ -18,9 +18,9 @@ import { TicketCoveragePanel, type CoverageSort, BackgroundImageProperties, Back
 import { PrintPages, TicketPrintPages } from "./map-print";
 import { SettingsDialog, type StyleTarget } from "./map-styles";
 import { autoPlaceLabels, setupBalance, stopCoverage, ticketBand, type TicketBand, reviewTickets, ticketPointsPerSpace, ticketCoverage, type RouteSuggestion, labelCovers, labelAngleOptions, routeSamplePoints, colourLengthTable, crossingPairs, buildAdjacency, networkStats, routeSpacing, shortestPath, suggestRoutes } from "./map-analysis";
-import { canvasPoint, pointsFor, samePair, stopById } from "./map-geometry";
+import { canvasPoint, canvasPointRaw, pointsFor, samePair, stopById } from "./map-geometry";
 import { cloneForHistory, cloneMap, formatTimestamp, GUIDE_SEEN_KEY, HISTORY_LIMIT, MAX_IMAGE_WARN_BYTES, normalizeBackgroundFile, normalizeMap, normalizeNetworkFile, normalizeTicketFile, buildTicketFile, readBackgroundImage, rescaleMapToFormat, MAP_HINT_KEY, MAP_HINT_X_KEY } from "./map-storage";
-import { colorLabels, defaultTicketSet, ticketsInSet, type TicketSet, emptyMap, initialMap, type LineStyle, DEFAULT_END_GAP_MM, mapFormats, type BackgroundImage, type BackgroundShape, type BackgroundType, type MapData, type MapFormat, type Point, realWagon, type Route, type RouteType, type RouteTypeStyle, routeColors, STORAGE_KEY, type Stop, type StopSize, stopSizeMeta, type StopSymbol, stopSymbolMeta, type StopType, W } from "./map-data";
+import { colorLabels, defaultTicketSet, IMAGE_KEEP_ON_BOARD, ticketsInSet, type TicketSet, emptyMap, initialMap, type LineStyle, DEFAULT_END_GAP_MM, mapFormats, type BackgroundImage, type BackgroundShape, type BackgroundType, type MapData, type MapFormat, type Point, realWagon, type Route, type RouteType, type RouteTypeStyle, routeColors, STORAGE_KEY, type Stop, type StopSize, stopSizeMeta, type StopSymbol, stopSymbolMeta, type StopType, W } from "./map-data";
 
 type MeasureResult = { from: string; to: string; distance: number; routeIds: string[] } | { from: string; to: string; unreachable: true };
 type Danger = "reset" | "delete" | "load-blank" | "load-example" | "import-background" | "import-network" | "import-image" | null;
@@ -338,6 +338,8 @@ export function MapEditor() {
   const onCanvasMove = (event: React.PointerEvent<SVGSVGElement>) => {
     const point = canvasPoint(event.currentTarget, event.clientX, event.clientY, format.height);
     if (pendingStop) setPickTo(point);
+    // Hold the pointer once a drag is under way, so it keeps reporting after it leaves the board.
+    if (dragging() && !event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.setPointerCapture(event.pointerId);
     if (dragNoteRef.current || dragImageRef.current || dragBackgroundLabelRef.current || dragBackgroundPointRef.current || dragWaypointRef.current || dragStopRef.current) draggedRef.current = true;
     if (dragNoteRef.current) {
       const drag = dragNoteRef.current;
@@ -353,11 +355,19 @@ export function MapEditor() {
     }
     if (dragImageRef.current) {
       const drag = dragImageRef.current;
+      // A background image is placed against the board's edges, and may hang over them, so it moves
+      // and scales by the raw pointer. Only a corner of it has to stay on the board, so it cannot be
+      // dragged out of reach.
+      const free = canvasPointRaw(event.currentTarget, event.clientX, event.clientY, format.height);
       setData((current) => {
         const img = current.backgroundImage;
         if (!img) return current;
-        if (drag.mode === "move") return { ...current, backgroundImage: { ...img, x: point.x - drag.offsetX, y: point.y - drag.offsetY } };
-        if (drag.mode === "scale") return { ...current, backgroundImage: { ...img, width: Math.max(20, point.x - img.x), height: Math.max(20, point.y - img.y) } };
+        if (drag.mode === "move") return { ...current, backgroundImage: {
+          ...img,
+          x: Math.max(IMAGE_KEEP_ON_BOARD - img.width, Math.min(W - IMAGE_KEEP_ON_BOARD, free.x - drag.offsetX)),
+          y: Math.max(IMAGE_KEEP_ON_BOARD - img.height, Math.min(format.height - IMAGE_KEEP_ON_BOARD, free.y - drag.offsetY)),
+        } };
+        if (drag.mode === "scale") return { ...current, backgroundImage: { ...img, width: Math.max(20, free.x - img.x), height: Math.max(20, free.y - img.y) } };
         const cx = img.x + img.width / 2, cy = img.y + img.height / 2;
         const rotation = Math.atan2(point.y - cy, point.x - cx) * 180 / Math.PI + 90;
         return { ...current, backgroundImage: { ...img, rotation } };
@@ -388,6 +398,7 @@ export function MapEditor() {
     setData((current) => ({ ...current, stops: current.stops.map((stop) => stop.id === dragStopRef.current ? { ...stop, ...point } : stop) }));
     setSaved(false);
   };
+  const dragging = () => Boolean(dragNoteRef.current || dragImageRef.current || dragBackgroundLabelRef.current || dragBackgroundPointRef.current || dragWaypointRef.current || dragStopRef.current);
   const stopDragging = () => {
     // Only a drag that actually moved something becomes an undo step — a plain click to select
     // sets the same refs and should not fill the history with no-ops.
@@ -585,7 +596,7 @@ export function MapEditor() {
         {litTicket && <div className="highlight-chip"><TicketIcon /><span>{stopById(data, litTicket.a)?.name} → {stopById(data, litTicket.b)?.name}</span><Button variant="ghost" size="icon" aria-label="Stop showing this ticket" onClick={() => setSelectedTicket(null)}><X /></Button></div>}
         <div className="map-status"><Badge variant="secondary">{format.shortLabel}</Badge><Badge variant="secondary">{format.widthMm.toLocaleString("en-GB")} × {format.heightMm.toLocaleString("en-GB")} mm</Badge><Badge variant="secondary">{data.stops.length} stops</Badge><Badge variant="secondary">{data.routes.length} routes</Badge><Badge variant="secondary">{data.background.length} background objects</Badge>{data.notes.length > 0 && <Badge variant="secondary">{data.notes.length} note{data.notes.length === 1 ? "" : "s"}</Badge>}<span>Everything is stored in the exported map file</span></div>
         {hint && hint.atTop && <MapHint atTop title={hint.title} open={routeHintOpen} onToggle={toggleRouteHint} offsetX={routeHintX} onOffsetChange={moveRouteHint}>{hint.body}</MapHint>}
-        <svg className={cn("map-canvas", `tool-${tool}`)} style={{ aspectRatio: `${W} / ${format.height}` }} viewBox={`0 0 ${W} ${format.height}`} onPointerDown={onCanvasDown} onPointerMove={onCanvasMove} onPointerUp={stopDragging} onPointerLeave={stopDragging}>
+        <svg className={cn("map-canvas", `tool-${tool}`)} style={{ aspectRatio: `${W} / ${format.height}` }} viewBox={`0 0 ${W} ${format.height}`} onPointerDown={onCanvasDown} onPointerMove={onCanvasMove} onPointerUp={stopDragging} onPointerCancel={stopDragging}>
           <MapArtwork data={data} tool={tool} highlightRoutes={highlightRoutes} scaleWidthMm={scaleWidthMm} selectedRoute={selectedRoute} selectedStop={selectedStop} selectedBackground={selectedBackground} imageSelected={imageSelected} selectedNote={selectedNote} pendingStop={pendingStop} pickTo={pickTo} previewRoutes={preview?.routes} previewLabel={preview?.label ?? null} onStopHover={setHoveredStop} draft={{ type: backgroundType, points: draftPoints, fill: backgroundFill, stroke: backgroundStroke }} onRoute={(id) => { setSelectedRoute(id); setSelectedStop(null); setSelectedBackground(null); setSelectedNote(null); setTool("select"); }} onRouteSlot={toggleLocomotiveSlot} onRouteBendInsert={insertRouteBend} onRouteBendRemove={removeRouteBend} onStop={(id, shiftHeld) => { chooseStop(id); if (tool === "select" && (shiftHeld || !stopById(data, id)?.locked)) { beginDrag(); dragStopRef.current = id; } }} onWaypoint={(routeId, index, grabOffset) => { beginDrag(); dragWaypointRef.current = { routeId, index, grabOffset }; }} onBackground={(id) => { setSelectedBackground(id); setSelectedRoute(null); setSelectedStop(null); setSelectedNote(null); setTool("select"); }} onBackgroundPoint={(shapeId, index) => { beginDrag(); dragBackgroundPointRef.current = { shapeId, index }; }} onBackgroundLabel={(shapeId) => { beginDrag(); dragBackgroundLabelRef.current = shapeId; }} onImageSelect={chooseImage} onImageMove={(point) => { chooseImage(); const img = data.backgroundImage; if (img) { beginDrag(); dragImageRef.current = { mode: "move", offsetX: point.x - img.x, offsetY: point.y - img.y }; } }} onImageScale={() => { beginDrag(); dragImageRef.current = { mode: "scale" }; }} onImageRotate={() => { beginDrag(); dragImageRef.current = { mode: "rotate" }; }} onNoteSelect={chooseNote} onNoteMove={(id, point) => { chooseNote(id); const note = data.notes.find((item) => item.id === id); if (note) { beginDrag(); dragNoteRef.current = { id, mode: "move", offsetX: point.x - note.x, offsetY: point.y - note.y }; } }} onNoteResize={(id) => { beginDrag(); dragNoteRef.current = { id, mode: "resize" }; }} onNoteToggle={(id) => change((draft) => { const note = draft.notes.find((item) => item.id === id); if (note) note.collapsed = !note.collapsed || undefined; return draft; })} />
         </svg>
         {hint && !hint.atTop && <MapHint atTop={false} title={hint.title} open={routeHintOpen} onToggle={toggleRouteHint} offsetX={routeHintX} onOffsetChange={moveRouteHint}>{hint.body}</MapHint>}

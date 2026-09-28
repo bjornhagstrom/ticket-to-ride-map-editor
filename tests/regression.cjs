@@ -381,6 +381,53 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.keyboard.press("Escape");
   await page.waitForTimeout(300);
 
+  // 21. a background image reaches every edge and can cover the board
+  // On a clean board: the image is drawn underneath everything, so on a busy map a click at its
+  // middle lands on a route instead of on the image.
+  await page.getByRole("button", { name: "Clear map" }).click();
+  await page.waitForTimeout(300);
+  await page.getByRole("button", { name: "Continue" }).click();
+  await page.waitForTimeout(500);
+  await useTool("Select & move");   // the image only answers the pointer in the select tool
+  const probe = path.join(os.tmpdir(), `ttr-probe-${Date.now()}.png`);
+  fs.writeFileSync(probe, Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFElEQVR4nGP8z4AATAxQxhBmAwCM4QEBnPvKcQAAAABJRU5ErkJggg==", "base64"));
+  await page.locator('input[type="file"][accept^="image"]').setInputFiles(probe);
+  await page.waitForTimeout(900);
+  await page.evaluate(() => document.querySelector(".map-canvas").scrollIntoView({ block: "center" }));
+  await page.waitForTimeout(300);
+  const canvasBox = await page.evaluate(() => {
+    const svg = document.querySelector(".map-canvas");
+    const [, , w, h] = svg.getAttribute("viewBox").split(" ").map(Number);
+    const r = svg.getBoundingClientRect();
+    return { w, h, left: r.left, top: r.top, width: r.width, height: r.height };
+  });
+  const onScreen = (x, y) => ({ x: canvasBox.left + x / canvasBox.w * canvasBox.width, y: canvasBox.top + y / canvasBox.h * canvasBox.height });
+  const storedImage = () => page.evaluate(() => JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")).backgroundImage);
+  let bg = await storedImage();
+  check("a background image can be imported", Boolean(bg), `canvas ${JSON.stringify(canvasBox)}`);
+  // The probe is two units across, so select it by the element rather than by hitting it, and give
+  // it a real size before dragging it about.
+  await page.locator(".map-canvas .background-image").click({ force: true });
+  await page.waitForTimeout(300);
+  bg = await storedImage();
+  const dragTo = async (from, to) => { await page.mouse.move(from.x, from.y); await page.mouse.down(); await page.mouse.move(to.x, to.y, { steps: 10 }); await page.mouse.up(); await page.waitForTimeout(400); };
+  const scaleTarget = { x: canvasBox.w * .85, y: canvasBox.h * .85 };
+  await dragTo(onScreen(bg.x + bg.width, bg.y + bg.height), onScreen(scaleTarget.x, scaleTarget.y));
+  const grown = await storedImage();
+  check("it can be scaled from its corner handle", Math.abs(grown.x + grown.width - scaleTarget.x) < 6 && Math.abs(grown.y + grown.height - scaleTarget.y) < 6, `corner at ${(grown.x + grown.width).toFixed(0)},${(grown.y + grown.height).toFixed(0)} for ${scaleTarget.x.toFixed(0)},${scaleTarget.y.toFixed(0)}`);
+  bg = grown;
+
+  const farCorner = onScreen(canvasBox.w, canvasBox.h);
+  await dragTo(onScreen(bg.x + bg.width / 2, bg.y + bg.height / 2), { x: farCorner.x + 200, y: farCorner.y + 200 });
+  bg = await storedImage();
+  check("it can be dragged to the far corner, held by its middle", bg.x + bg.width >= canvasBox.w && bg.y + bg.height >= canvasBox.h, `right edge ${(bg.x + bg.width).toFixed(0)} of ${canvasBox.w}, bottom ${(bg.y + bg.height).toFixed(0)} of ${canvasBox.h}`);
+  check("and always keeps a hold on the board", bg.x < canvasBox.w && bg.y < canvasBox.h, `x ${bg.x.toFixed(0)}, y ${bg.y.toFixed(0)}`);
+
+  await dragTo(onScreen(bg.x + 6, bg.y + 6), { x: onScreen(0, 0).x - 200, y: onScreen(0, 0).y - 200 });
+  bg = await storedImage();
+  check("and to the near corner the same way", bg.x <= 0 && bg.y <= 0 && bg.x + bg.width > 0, `x ${bg.x.toFixed(0)}, y ${bg.y.toFixed(0)}`);
+  fs.rmSync(probe, { force: true });
+
   console.log("PASS:"); ok.forEach((l) => console.log("  ✓ " + l));
   if (bad.length) { console.log("FAIL:"); bad.forEach((l) => console.log("  ✗ " + l)); }
   console.log(`\n${ok.length} passed, ${bad.length} failed`);
