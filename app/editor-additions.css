@@ -28,19 +28,18 @@
   .app-shell>*:not(.print-pages){display:none!important}
   .app-shell{display:block!important;min-height:0!important}
   .print-pages{display:block!important}
-  .print-page{page-break-after:always;break-after:page;overflow:hidden;background:white}
+  .print-page{page-break-after:always;break-after:page;overflow:hidden;background:white;display:flex;flex-direction:column}
+  .print-page svg{flex:1;min-height:0;width:100%;background:#f7f1e5;border:.3mm solid #81786c}
   .print-page:last-child{page-break-after:auto;break-after:auto}
-  .print-caption{height:15mm;display:flex;flex-direction:column;justify-content:center;border-bottom:.3mm solid #665f55;margin-bottom:4mm;color:#24211d}
-  .print-caption strong{font:700 15pt Georgia,serif}
-  .print-caption span{font:8pt "Segoe UI",Arial,sans-serif;color:#696157;margin-top:1.5mm}
+  /* One compact row: map name on the left, format on the right. No rule under it — the map's own
+     border already separates them, and the height it saves is what the sheet was overflowing by. */
+  .print-caption{display:flex;align-items:baseline;justify-content:space-between;gap:6mm;margin-bottom:2.5mm;color:#24211d}
+  .print-caption strong{font:700 12pt Georgia,serif}
+  .print-caption span{font:7.5pt "Segoe UI",Arial,sans-serif;color:#696157;white-space:nowrap}
   .format-board-2x3 .print-page,.format-board-2x3-large .print-page,.format-board-2x4 .print-page{width:210mm;height:297mm;padding:10mm}
-  .format-board-2x3 .print-page svg,.format-board-2x3-large .print-page svg,.format-board-2x4 .print-page svg{display:block;width:190mm;height:190mm;background:#f7f1e5;border:.3mm solid #81786c}
-  .format-a4 .print-page{width:297mm;height:210mm;padding:10mm}
-  .format-a4 .print-page svg{display:block;width:277mm;height:181mm;background:#f7f1e5;border:.3mm solid #81786c}
+    .format-a4 .print-page{width:297mm;height:210mm;padding:10mm}
   .format-a3 .print-page{width:420mm;height:297mm;padding:12mm}
-  .format-a3 .print-page svg{display:block;width:396mm;height:254mm;background:#f7f1e5;border:.3mm solid #81786c}
   .format-us-letter .print-page{width:279.4mm;height:215.9mm;padding:10mm}
-  .format-us-letter .print-page svg{display:block;width:259.4mm;height:186.9mm;background:#f7f1e5;border:.3mm solid #81786c}
   .print-page .route-hit{display:none}
   .print-page .stop,.print-page .route-group{filter:none!important}
   .print-page .stop text{font-size:12px}

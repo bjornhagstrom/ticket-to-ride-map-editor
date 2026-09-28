@@ -1,6 +1,6 @@
 // Loading, saving and reshaping map files: local-storage keys, the normalizers that let older
 // files open, board-format rescaling, and image reading.
-import { defaultWagonStyles, type WagonStyle, defaultRouteTypeStyles, type LineStyle, type RouteTypeStyle, type BackgroundImage, type BackgroundShape, type ImageCrop, mapFormats, type MapData, type MapFormat, type NoteBox, type Point, type Route, type Stop, STORAGE_KEY } from "./map-data";
+import { defaultStopTypeStyles, fallbackStopTypeStyle, type StopTypeStyle, defaultWagonStyles, type WagonStyle, defaultRouteTypeStyles, type LineStyle, type RouteTypeStyle, type BackgroundImage, type BackgroundShape, type ImageCrop, mapFormats, type MapData, type MapFormat, type NoteBox, type Point, type Route, type Stop, STORAGE_KEY } from "./map-data";
 
 export const GUIDE_SEEN_KEY = `${STORAGE_KEY}-guide-seen`;
 export const MAX_IMAGE_WARN_BYTES = 2 * 1024 * 1024;
@@ -57,6 +57,13 @@ const normalizeWagonStyles = (value: Partial<MapData> & { routes?: unknown }): W
   for (const id of used) if (id && !styles.some((style) => style.id === id)) styles.push({ id, label: id, shape: "plain" });
   return styles;
 };
+const normalizeStopTypeStyles = (value: Partial<MapData>): StopTypeStyle[] => {
+  if (Array.isArray(value.stopTypeStyles) && value.stopTypeStyles.length) return value.stopTypeStyles;
+  const styles = defaultStopTypeStyles.map((style) => ({ ...style }));
+  const used = new Set((Array.isArray(value.stops) ? value.stops : []).map((stop: Stop) => stop.type));
+  for (const id of used) if (id && !styles.some((style) => style.id === id)) styles.push({ ...fallbackStopTypeStyle, id, label: id });
+  return styles;
+};
 export const normalizeMap = (value: Partial<MapData>): MapData => ({
   name: typeof value.name === "string" ? value.name : "Imported map",
   format: isMapFormat(value.format) ? value.format : "board-2x3",
@@ -67,6 +74,7 @@ export const normalizeMap = (value: Partial<MapData>): MapData => ({
   lineStyles: Array.isArray(value.lineStyles) ? value.lineStyles : [],
   routeTypeStyles: Array.isArray(value.routeTypeStyles) && value.routeTypeStyles.length ? value.routeTypeStyles : defaultRouteTypeStyles.map((style) => ({ ...style })),
   wagonStyles: normalizeWagonStyles(value),
+  stopTypeStyles: normalizeStopTypeStyles(value),
   backgroundImage: normalizeBackgroundImage(value.backgroundImage),
 });
 const scalePointToHeight = (point: Point, fromHeight: number, toHeight: number): Point => ({ x: point.x, y: point.y * toHeight / fromHeight });

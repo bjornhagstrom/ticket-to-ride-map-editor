@@ -68,7 +68,7 @@ All geometry uses SVG editor coordinates, for example `{ "x": 420, "y": 345 }`. 
 }
 ```
 
-Supported stop types are `city`, `region`, `brt`, `rail`, `ferry` and `outing`. `size` is optional (`small`, `medium` or `large`; missing means `medium`) and only affects how large the stop is drawn — some expansions give meaning to stop size, such as marking major cities.
+`type` references the `id` of an entry in the map's `stopTypeStyles` list — `city`, `region`, `brt`, `rail`, `ferry` and `outing` by default, but any map can rename, restyle, delete or add to that list, the same way route types work. `size` is optional (`small`, `medium` or `large`; missing means `medium`) and only affects how large the stop is drawn — some expansions give meaning to stop size, such as marking major cities.
 
 `endGapMm` on a stop overrides the map-level setting of the same name for every route into that stop.
 
@@ -105,6 +105,21 @@ Two or more routes between the same pair of stops form a double route: they are 
 `locomotiveSlots` is optional and lists the zero-based wagon-slot indices (out of `length`) that must be covered with a locomotive card, drawn with a small engine icon. Toggle it by clicking a wagon slot on a selected route.
 
 `lineStyle` is optional and references the `id` of an entry in the map's `lineStyles` list (see below). It overrides one specific route's line thickness and dash pattern on top of its type's own appearance, to flag that this particular route follows some special rule.
+
+## Stop type styles
+
+`stopTypeStyles` is a map-level array defining what each kind of stop looks like:
+
+```json
+{ "id": "rail", "label": "Railway station", "fill": "#e8e9eb", "stroke": "#292b2f", "square": true }
+```
+
+`fill` and `stroke` are the circle's colours. `square` is optional and draws a small filled square
+inside the circle, which is how the built-in railway station has always looked; it is an option now
+rather than a property of one hard-coded type. Edit the list from a selected stop's Properties
+panel. A type cannot be deleted while a stop still uses it, or if it is the map's only one. A file
+with no `stopTypeStyles` list gets the default six on import, plus a plain placeholder for any type
+id its stops already reference, so older files keep their stops.
 
 ## Route type styles
 

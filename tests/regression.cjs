@@ -143,6 +143,10 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   });
   await page.waitForTimeout(350);
   check("placing a stop works", (await badges())[2] === "9 stops", (await badges())[2]);
+  // the format control folds away once the map has content, so open it first
+  const formatToggle = page.locator(".format-toggle");
+  if (await formatToggle.count()) { await formatToggle.click(); await page.waitForTimeout(250); }
+  check("board format folds away once the map has content", await formatToggle.count() === 1);
   await page.locator("#map-format").selectOption("board-2x4");
   await page.waitForTimeout(500);
   check("changing board format works", (await badges())[0] === "Extended board 2×4", (await badges())[0]);

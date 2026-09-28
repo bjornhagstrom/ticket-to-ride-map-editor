@@ -10,6 +10,7 @@ Live site: <https://hagstrom.nu/ttr/>
 - Shape a route freely: add as many bend points as you like anywhere along it, and optionally draw it as a smooth curve that the wagon slots follow.
 - Fully customise route types: rename, restyle (thickness and dash pattern) or delete the built-in city/region/rapid transit/ferry/railway/trail types, and add your own. Types are told apart by line shape, never by colour, so every route keeps its own wagon colour whatever its type.
 - Build double routes: two or more parallel lines between the same pair of stops, each in its own colour, drawn side by side automatically.
+- Fully customise stop types too: rename, recolour or delete the built-in six and add your own.
 - Choose one of three stop sizes, which can carry meaning in some expansions.
 - Mark a stop with a dot, dash, cross or a short letter code, independent of its type.
 - Lock a stop's position so it cannot be dragged by accident, one stop at a time or every stop at once, and Shift-drag to move one anyway.

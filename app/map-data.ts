@@ -1,4 +1,5 @@
-export type StopType = "city" | "region" | "brt" | "rail" | "ferry" | "outing";
+export type StopType = string;
+export type StopTypeStyle = { id: string; label: string; fill: string; stroke: string; square?: boolean };
 export type StopSize = "small" | "medium" | "large";
 export type StopSymbol = "none" | "dot" | "dash" | "cross" | "letter";
 export type RouteType = string;
@@ -68,7 +69,7 @@ export type NoteBox = {
   text: string;
   locked?: boolean;
 };
-export type MapData = { name: string; format: MapFormat; endGapMm?: number; background: BackgroundShape[]; stops: Stop[]; routes: Route[]; backgroundImage?: BackgroundImage; notes: NoteBox[]; lineStyles: LineStyle[]; routeTypeStyles: RouteTypeStyle[]; wagonStyles: WagonStyle[] };
+export type MapData = { name: string; format: MapFormat; endGapMm?: number; background: BackgroundShape[]; stops: Stop[]; routes: Route[]; backgroundImage?: BackgroundImage; notes: NoteBox[]; lineStyles: LineStyle[]; routeTypeStyles: RouteTypeStyle[]; wagonStyles: WagonStyle[]; stopTypeStyles: StopTypeStyle[] };
 
 export const W = 1100;
 export const STORAGE_KEY = "orebro-map-editor-public-v2";
@@ -143,14 +144,17 @@ export const stopSymbolMeta: Record<StopSymbol, { label: string }> = {
   letter: { label: "Letter" },
 };
 
-export const stopTypeMeta: Record<StopType, { label: string; fill: string; stroke: string }> = {
-  city: { label: "City stop", fill: "#fffaf0", stroke: "#721c24" },
-  region: { label: "Regional stop", fill: "#fff4dc", stroke: "#b05b2a" },
-  brt: { label: "Rapid transit", fill: "#d9f2ef", stroke: "#00877c" },
-  rail: { label: "Railway station", fill: "#e8e9eb", stroke: "#292b2f" },
-  ferry: { label: "Ferry port", fill: "#dceff8", stroke: "#23749b" },
-  outing: { label: "Destination", fill: "#e8f0dc", stroke: "#53723b" },
-};
+// Stop appearance is data, like route appearance. `square` draws the small centred square the
+// railway station has always had, so that look survives as an option rather than a hard-coded type.
+export const defaultStopTypeStyles: StopTypeStyle[] = [
+  { id: "city", label: "City stop", fill: "#fffaf0", stroke: "#721c24" },
+  { id: "region", label: "Regional stop", fill: "#fff4dc", stroke: "#b05b2a" },
+  { id: "brt", label: "Rapid transit", fill: "#d9f2ef", stroke: "#00877c" },
+  { id: "rail", label: "Railway station", fill: "#e8e9eb", stroke: "#292b2f", square: true },
+  { id: "ferry", label: "Ferry port", fill: "#dceff8", stroke: "#23749b" },
+  { id: "outing", label: "Destination", fill: "#e8f0dc", stroke: "#53723b" },
+];
+export const fallbackStopTypeStyle: StopTypeStyle = { id: "city", label: "Stop", fill: "#fffaf0", stroke: "#721c24" };
 
 export const defaultRouteTypeStyles: RouteTypeStyle[] = [
   // Card routes carry each route's own wagon colour, so these are told apart by width and dash.
@@ -183,6 +187,7 @@ export const emptyMap: MapData = {
   lineStyles: [],
   routeTypeStyles: defaultRouteTypeStyles.map((style) => ({ ...style })),
   wagonStyles: defaultWagonStyles.map((style) => ({ ...style })),
+  stopTypeStyles: defaultStopTypeStyles.map((style) => ({ ...style })),
 };
 
 export const initialMap: MapData = {
@@ -203,6 +208,7 @@ export const initialMap: MapData = {
   ],
   routeTypeStyles: defaultRouteTypeStyles.map((style) => ({ ...style })),
   wagonStyles: defaultWagonStyles.map((style) => ({ ...style })),
+  stopTypeStyles: defaultStopTypeStyles.map((style) => ({ ...style })),
   background: [
     {
       id: "example-lake",

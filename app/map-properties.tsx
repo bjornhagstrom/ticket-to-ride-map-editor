@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
-import { type WagonShape, type WagonStyle, wagonShapeMeta, colorLabels, type ImageCrop, type LineStyle, type MapData, type NoteBox, type RouteTypeStyle, type BackgroundImage, type BackgroundShape, type Route, routeColors, type Stop, stopSizeMeta, stopSymbolMeta, type StopSize, type StopSymbol, type StopType, stopTypeMeta, W } from "./map-data";
+import { type StopTypeStyle, type WagonStyle, wagonShapeMeta, type WagonShape, colorLabels, type ImageCrop, type LineStyle, type MapData, type NoteBox, type RouteTypeStyle, type BackgroundImage, type BackgroundShape, type Route, routeColors, type Stop, stopSizeMeta, stopSymbolMeta, type StopSize, type StopSymbol, type StopType, W } from "./map-data";
 import { isCurved, samePair, stopById } from "./map-geometry";
 import { labelAngleOf } from "./map-analysis";
 import { cn } from "@/lib/utils";
@@ -26,13 +26,13 @@ const dashOptions = (current: string) => dashPresets.some((preset) => preset.val
   ? dashPresets
   : [...dashPresets, { value: current, label: `Custom (${current})` }];
 
-export function StopProperties({ stop, change, onDelete, labelState, mapEndGapMm, allLocked, onLockAll }: { stop: Stop; allLocked: boolean; onLockAll: (locked: boolean) => void; change: (fn: (draft: MapData) => MapData) => void; onDelete: () => void; mapEndGapMm: number; labelState: { covers: boolean; clear: number[]; best: number } }) {
+export function StopProperties({ stop, change, onDelete, labelState, mapEndGapMm, allLocked, onLockAll, stops, stopTypeStyles, onCreateStopType, onUpdateStopType, onDeleteStopType }: { stop: Stop; stops: Stop[]; stopTypeStyles: StopTypeStyle[]; onCreateStopType: () => string; onUpdateStopType: (typeId: string, values: Partial<StopTypeStyle>) => void; onDeleteStopType: (typeId: string) => void; allLocked: boolean; onLockAll: (locked: boolean) => void; change: (fn: (draft: MapData) => MapData) => void; onDelete: () => void; mapEndGapMm: number; labelState: { covers: boolean; clear: number[]; best: number } }) {
   const update = (values: Partial<Stop>) => change((draft) => { const item = stopById(draft, stop.id); if (item) Object.assign(item, values); return draft; });
   const symbol = stop.symbol ?? "none";
   return <div className="property-form">
     <div><Label htmlFor="stop-name">Name</Label><Input id="stop-name" value={stop.name} onChange={(event) => update({ name: event.target.value })} /></div>
     <div className="grid-two">
-      <div><Label>Stop type</Label><NativeSelect value={stop.type} onChange={(event) => update({ type: event.target.value as StopType })}>{Object.entries(stopTypeMeta).map(([key, meta]) => <NativeSelectOption key={key} value={key}>{meta.label}</NativeSelectOption>)}</NativeSelect></div>
+      <div><Label>Stop type</Label><NativeSelect value={stop.type} onChange={(event) => update({ type: event.target.value as StopType })}>{stopTypeStyles.map((meta) => <NativeSelectOption key={meta.id} value={meta.id}>{meta.label}</NativeSelectOption>)}</NativeSelect></div>
       <div><Label>Stop size</Label><NativeSelect value={stop.size ?? "medium"} onChange={(event) => update({ size: event.target.value as StopSize })}>{Object.entries(stopSizeMeta).map(([key, meta]) => <NativeSelectOption key={key} value={key}>{meta.label}</NativeSelectOption>)}</NativeSelect></div>
     </div>
     <p className="helper">Size can carry meaning in some expansions, such as marking major cities.</p>
@@ -40,6 +40,7 @@ export function StopProperties({ stop, change, onDelete, labelState, mapEndGapMm
       <div><Label>Symbol</Label><NativeSelect value={symbol} onChange={(event) => update({ symbol: event.target.value as StopSymbol, letter: event.target.value === "letter" ? (stop.letter || "A") : stop.letter })}>{Object.entries(stopSymbolMeta).map(([key, meta]) => <NativeSelectOption key={key} value={key}>{meta.label}</NativeSelectOption>)}</NativeSelect></div>
       {symbol === "letter" && <div><Label>Letter</Label><Input maxLength={2} value={stop.letter ?? ""} onChange={(event) => update({ letter: event.target.value })} /></div>}
     </div>
+    <StopTypeEditor typeId={stop.type} stopTypeStyles={stopTypeStyles} stops={stops} onCreateType={() => update({ type: onCreateStopType() })} onUpdateType={onUpdateStopType} onDeleteType={onDeleteStopType} />
     <p className="helper">Mark a stop with a symbol or short code for rules of your own, independent of its type.</p>
     <div className="label-angle">
       <Label htmlFor="stop-end-gap">Space before the first wagon · {stop.endGapMm ?? mapEndGapMm} mm{stop.endGapMm === undefined ? " (map default)" : ""}</Label>
@@ -209,6 +210,25 @@ export function WagonStylePicker({ value, wagonStyles, onChange, onCreate, onUpd
       <div><Label>Shape</Label><NativeSelect value={active.shape} onChange={(event) => onUpdate(active.id, { shape: event.target.value as WagonShape })}>{Object.entries(wagonShapeMeta).map(([key, meta]) => <NativeSelectOption key={key} value={key}>{meta.label}</NativeSelectOption>)}</NativeSelect></div>
       <div><Label>Mark in the space</Label><Input maxLength={2} value={active.glyph ?? ""} onChange={(event) => onUpdate(active.id, { glyph: event.target.value || undefined })} /><p className="helper">One or two characters, drawn inside every space. A shape alone can get lost on a small print; a letter survives it.</p></div>
       <Button size="sm" variant="ghost" onClick={() => onDelete(active.id)}>Delete this style</Button>
+    </div>}
+  </div>;
+}
+
+export function StopTypeEditor({ typeId, stopTypeStyles, stops, onCreateType, onUpdateType, onDeleteType }: { typeId: string; stopTypeStyles: StopTypeStyle[]; stops: Stop[]; onCreateType: () => void; onUpdateType: (typeId: string, values: Partial<StopTypeStyle>) => void; onDeleteType: (typeId: string) => void }) {
+  const style = stopTypeStyles.find((item) => item.id === typeId);
+  const usageCount = stops.filter((stop) => stop.type === typeId).length;
+  return <div className="line-style-section">
+    <div className="line-style-row">
+      <Button size="sm" variant="outline" onClick={onCreateType}>New stop type</Button>
+    </div>
+    {style && <div className="line-style-editor">
+      <div><Label>Type name</Label><Input value={style.label} onChange={(event) => onUpdateType(style.id, { label: event.target.value })} /></div>
+      <div className="colour-row">
+        <label>Fill<input className="colour-input" type="color" value={style.fill} onChange={(event) => onUpdateType(style.id, { fill: event.target.value })} /></label>
+        <label>Outline<input className="colour-input" type="color" value={style.stroke} onChange={(event) => onUpdateType(style.id, { stroke: event.target.value })} /></label>
+      </div>
+      <label className="checkbox-row"><input type="checkbox" checked={Boolean(style.square)} onChange={(event) => onUpdateType(style.id, { square: event.target.checked || undefined })} />Draw a square inside the circle</label>
+      <Button size="sm" variant="ghost" disabled={usageCount > 0 || stopTypeStyles.length <= 1} onClick={() => onDeleteType(style.id)}>{usageCount > 0 ? `In use by ${usageCount} stop${usageCount === 1 ? "" : "s"}` : "Delete this type"}</Button>
     </div>}
   </div>;
 }
