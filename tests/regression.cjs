@@ -195,6 +195,13 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.waitForTimeout(800);
   check("importing tickets adds a deck instead of overwriting", (await page.locator("#ticket-set option").count()) === 3, (await page.locator("#ticket-set option").allTextContents()).join(" | "));
   check("imported tickets land on real stops", (await page.locator(".analysis-table tbody tr td:first-child").allTextContents()).every((r) => !r.includes("—")));
+  // An imported deck is stamped with the moment it arrived, so it can be told from the decks the
+  // map already had.
+  const importedName = await page.locator("#ticket-set-name").inputValue();
+  const pad = (n) => String(n).padStart(2, "0");
+  const now = new Date();
+  const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  check("an imported deck carries the date and time it arrived", new RegExp(`^Main deck · ${today} \\d{2}:\\d{2}$`).test(importedName), importedName);
   fs.rmSync(ticketFile, { force: true });
 
   // Print media hides the dialog, so the button is clicked from script and the print tree is

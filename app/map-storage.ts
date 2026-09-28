@@ -108,8 +108,15 @@ export function buildTicketFile(data: MapData, setIds: string[]): TicketFile {
   };
 }
 
+// A human-readable stamp for a deck name: when the deck arrived, to the minute.
+export function formatStampLabel(date: Date = new Date()): string {
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
 // Imported sets always arrive as new sets with fresh ids, so an import can never quietly overwrite
-// a deck that is being compared against it.
+// a deck that is being compared against it. A map always has at least one deck already, so every
+// imported deck is stamped with the moment it arrived and can be told apart from the rest.
 export function normalizeTicketFile(value: unknown, data: MapData): { sets: TicketSet[]; tickets: Ticket[]; dropped: number } {
   const raw = (value ?? {}) as Partial<TicketFile>;
   const incomingSets = Array.isArray(raw.sets) && raw.sets.length ? raw.sets : [{ ...defaultTicketSet }];
@@ -122,10 +129,12 @@ export function normalizeTicketFile(value: unknown, data: MapData): { sets: Tick
     return null;
   };
   const usedLabels = new Set(data.ticketSets.map((set) => set.label.toLowerCase()));
+  const arrived = formatStampLabel();
   const stamp = Date.now();
   const setIdMap = new Map<string, string>();
   const sets = incomingSets.map((set, index) => {
-    let label = String(set.label ?? "Imported deck").trim() || "Imported deck";
+    let label = `${String(set.label ?? "Imported deck").trim() || "Imported deck"} · ${arrived}`;
+    // Two decks in one file can share a name, and two imports can land in the same minute.
     if (usedLabels.has(label.toLowerCase())) { let attempt = 2; while (usedLabels.has(`${label} ${attempt}`.toLowerCase())) attempt += 1; label = `${label} ${attempt}`; }
     usedLabels.add(label.toLowerCase());
     const id = `ts-${stamp}-${index}`;
