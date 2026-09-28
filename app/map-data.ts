@@ -84,7 +84,7 @@ export type NoteBox = {
   locked?: boolean;
   collapsed?: boolean;
 };
-export type MapData = { name: string; format: MapFormat; endGapMm?: number; background: BackgroundShape[]; stops: Stop[]; routes: Route[]; backgroundImage?: BackgroundImage; notes: NoteBox[]; lineStyles: LineStyle[]; routeTypeStyles: RouteTypeStyle[]; wagonStyles: WagonStyle[]; stopTypeStyles: StopTypeStyle[]; tickets: Ticket[]; ticketSets: TicketSet[]; wagonsPerPlayer?: number; startingTickets?: number };
+export type MapData = { name: string; format: MapFormat; endGapMm?: number; background: BackgroundShape[]; stops: Stop[]; routes: Route[]; backgroundImage?: BackgroundImage; notes: NoteBox[]; lineStyles: LineStyle[]; routeTypeStyles: RouteTypeStyle[]; wagonStyles: WagonStyle[]; stopTypeStyles: StopTypeStyle[]; tickets: Ticket[]; ticketSets: TicketSet[]; wagonsPerPlayer?: number; startingTickets?: number; keptTickets?: number };
 
 export const W = 1100;
 export const STORAGE_KEY = "orebro-map-editor-public-v2";
@@ -138,6 +138,9 @@ export const DEFAULT_END_GAP_MM = 2;
 // three destination tickets dealt at the start.
 export const DEFAULT_WAGONS_PER_PLAYER = 45;
 export const DEFAULT_STARTING_TICKETS = 3;
+export const DEFAULT_KEPT_TICKETS = 2;
+// A full table, used to judge whether a deck is thick enough to deal from.
+export const TABLE_SIZE = 5;
 
 // Centre-to-centre distance between the lines of a double route, in millimetres on the reference
 // board: a wagon's width plus a small gap, so the two rows sit beside each other the way a real
@@ -210,6 +213,9 @@ export const emptyMap: MapData = {
   stopTypeStyles: defaultStopTypeStyles.map((style) => ({ ...style })),
   tickets: [],
   ticketSets: [{ ...defaultTicketSet }],
+  wagonsPerPlayer: DEFAULT_WAGONS_PER_PLAYER,
+  startingTickets: DEFAULT_STARTING_TICKETS,
+  keptTickets: DEFAULT_KEPT_TICKETS,
 };
 
 export const initialMap: MapData = {
@@ -233,6 +239,9 @@ export const initialMap: MapData = {
   stopTypeStyles: defaultStopTypeStyles.map((style) => ({ ...style })),
   tickets: [],
   ticketSets: [{ ...defaultTicketSet }],
+  wagonsPerPlayer: DEFAULT_WAGONS_PER_PLAYER,
+  startingTickets: DEFAULT_STARTING_TICKETS,
+  keptTickets: DEFAULT_KEPT_TICKETS,
   background: [
     {
       id: "example-lake",

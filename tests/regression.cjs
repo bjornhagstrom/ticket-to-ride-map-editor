@@ -363,6 +363,21 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.locator("#settings-wagons").blur();
   await page.waitForTimeout(400);
   check("a player cannot be given zero wagons", await page.evaluate(() => JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")).wagonsPerPlayer) >= 1);
+  await page.locator("#settings-kept-tickets").fill("9");
+  await page.locator("#settings-kept-tickets").blur();
+  await page.waitForTimeout(400);
+  const setupStored = await page.evaluate(() => JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")));
+  check("nobody must keep more tickets than they are dealt", setupStored.keptTickets <= setupStored.startingTickets, `${setupStored.keptTickets} of ${setupStored.startingTickets}`);
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(300);
+
+  // 20. the balance report reads the setup against the map
+  await page.getByRole("button", { name: "Analyze balance" }).click();
+  await page.waitForTimeout(600);
+  const setupText = await page.locator(".setup-balance").textContent();
+  check("the balance report weighs the setup against the map", /wagon spaces/.test(setupText) && /player supplies/.test(setupText), setupText.slice(0, 140));
+  check("and warns when the map is too small for the wagon count", (await page.locator(".setup-balance .space-warning").count()) === 1, setupText.slice(0, 260));
+  check("the deck is measured against what a full table is dealt", /a table of five is dealt/.test(setupText));
   await page.keyboard.press("Escape");
   await page.waitForTimeout(300);
 

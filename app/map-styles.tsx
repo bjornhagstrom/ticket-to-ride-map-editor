@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { cn } from "@/lib/utils";
-import { colorLabels, DEFAULT_END_GAP_MM, DEFAULT_WAGONS_PER_PLAYER, DEFAULT_STARTING_TICKETS, type LineStyle, type MapData, type MapFormat, mapFormats, routeColors, stopSizeMeta, type RouteTypeStyle, type StopTypeStyle, type WagonShape, type WagonStyle, wagonShapeMeta } from "./map-data";
+import { colorLabels, DEFAULT_END_GAP_MM, DEFAULT_WAGONS_PER_PLAYER, DEFAULT_STARTING_TICKETS, DEFAULT_KEPT_TICKETS, type LineStyle, type MapData, type MapFormat, mapFormats, routeColors, stopSizeMeta, type RouteTypeStyle, type StopTypeStyle, type WagonShape, type WagonStyle, wagonShapeMeta } from "./map-data";
 
 export type StyleKind = "map" | "stop" | "route" | "wagon" | "line" | "defaults";
 export type StyleTarget = { kind: StyleKind; id?: string };
@@ -126,9 +126,17 @@ export function SettingsDialog({ open, onOpenChange, target, onTarget, data, cha
                   onChange={(event) => change((draft) => { draft.wagonsPerPlayer = clampCount(event.target.value, DEFAULT_WAGONS_PER_PLAYER); return draft; })} /></div>
               <div><Label htmlFor="settings-starting-tickets">Tickets dealt at the start</Label>
                 <Input id="settings-starting-tickets" type="number" min={1} max={20} value={data.startingTickets ?? DEFAULT_STARTING_TICKETS}
-                  onChange={(event) => change((draft) => { draft.startingTickets = clampCount(event.target.value, DEFAULT_STARTING_TICKETS); return draft; })} /></div>
+                  onChange={(event) => change((draft) => {
+                    draft.startingTickets = clampCount(event.target.value, DEFAULT_STARTING_TICKETS);
+                    // Nobody can be made to keep more tickets than they were dealt.
+                    draft.keptTickets = Math.min(draft.keptTickets ?? DEFAULT_KEPT_TICKETS, draft.startingTickets);
+                    return draft;
+                  })} /></div>
+              <div><Label htmlFor="settings-kept-tickets">Tickets a player must keep</Label>
+                <Input id="settings-kept-tickets" type="number" min={1} max={data.startingTickets ?? DEFAULT_STARTING_TICKETS} value={data.keptTickets ?? DEFAULT_KEPT_TICKETS}
+                  onChange={(event) => change((draft) => { draft.keptTickets = Math.min(clampCount(event.target.value, DEFAULT_KEPT_TICKETS), draft.startingTickets ?? DEFAULT_STARTING_TICKETS); return draft; })} /></div>
             </div>
-            <p className="helper">How a game on this map is set up. The original game gives each player {DEFAULT_WAGONS_PER_PLAYER} wagons and deals {DEFAULT_STARTING_TICKETS} tickets; a smaller map usually wants fewer wagons. {totalSpaces > 0 ? `This map has ${totalSpaces} wagon spaces in all, so one player's supply could claim about ${Math.round((data.wagonsPerPlayer ?? DEFAULT_WAGONS_PER_PLAYER) / totalSpaces * 100)}% of it.` : ""}</p>
+            <p className="helper">How a game on this map is set up. The original game gives each player {DEFAULT_WAGONS_PER_PLAYER} wagons and deals {DEFAULT_STARTING_TICKETS} tickets, of which {DEFAULT_KEPT_TICKETS} must be kept; a smaller map usually wants fewer wagons. {totalSpaces > 0 ? `This map has ${totalSpaces} wagon spaces in all, so one player's supply could claim about ${Math.round((data.wagonsPerPlayer ?? DEFAULT_WAGONS_PER_PLAYER) / totalSpaces * 100)}% of it.` : ""}</p>
             <div><Label htmlFor="settings-gap">Space at stops · {data.endGapMm ?? DEFAULT_END_GAP_MM} mm</Label>
               <input id="settings-gap" className="range-input" type="range" min="0" max="30" step="1" value={data.endGapMm ?? DEFAULT_END_GAP_MM} onChange={(event) => change((draft) => { draft.endGapMm = Number(event.target.value); return draft; })} />
               <p className="helper">The default room beyond a stop&apos;s own circle before the first wagon. A single stop can override it from its own panel. Past about 4 mm the wagons start losing their real spacing.</p></div>

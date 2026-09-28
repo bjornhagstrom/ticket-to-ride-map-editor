@@ -1,6 +1,6 @@
 // Loading, saving and reshaping map files: local-storage keys, the normalizers that let older
 // files open, board-format rescaling, and image reading.
-import { DEFAULT_WAGONS_PER_PLAYER, DEFAULT_STARTING_TICKETS, defaultTicketSet, type Ticket, type TicketSet, defaultStopTypeStyles, fallbackStopTypeStyle, type StopTypeStyle, defaultWagonStyles, type WagonStyle, defaultRouteTypeStyles, type LineStyle, type RouteTypeStyle, type BackgroundImage, type BackgroundShape, type ImageCrop, mapFormats, type MapData, type MapFormat, type NoteBox, type Point, type Route, type Stop, STORAGE_KEY } from "./map-data";
+import { DEFAULT_WAGONS_PER_PLAYER, DEFAULT_STARTING_TICKETS, DEFAULT_KEPT_TICKETS, defaultTicketSet, type Ticket, type TicketSet, defaultStopTypeStyles, fallbackStopTypeStyle, type StopTypeStyle, defaultWagonStyles, type WagonStyle, defaultRouteTypeStyles, type LineStyle, type RouteTypeStyle, type BackgroundImage, type BackgroundShape, type ImageCrop, mapFormats, type MapData, type MapFormat, type NoteBox, type Point, type Route, type Stop, STORAGE_KEY } from "./map-data";
 
 export const GUIDE_SEEN_KEY = `${STORAGE_KEY}-guide-seen`;
 export const MAX_IMAGE_WARN_BYTES = 2 * 1024 * 1024;
@@ -81,6 +81,7 @@ export const normalizeMap = (value: Partial<MapData>): MapData => ({
   // A map written before the setup settings existed opens on the real game's numbers.
   wagonsPerPlayer: countOr(value.wagonsPerPlayer, DEFAULT_WAGONS_PER_PLAYER),
   startingTickets: countOr(value.startingTickets, DEFAULT_STARTING_TICKETS),
+  keptTickets: Math.min(countOr(value.keptTickets, DEFAULT_KEPT_TICKETS), countOr(value.startingTickets, DEFAULT_STARTING_TICKETS)),
 });
 const countOr = (value: unknown, fallback: number): number => {
   const number = Math.round(Number(value));

@@ -1,6 +1,6 @@
 // The balance layer: everything derived from the stops and routes themselves. All of it is pure,
 // computed on demand from MapData, and none of it is stored in a map file.
-import { defaultLabelAngle, stopSizeMeta, ticketsInSet, type MapData, type Ticket, type Point, realWagon, type Route, routeColors, type Stop, W } from "./map-data";
+import { DEFAULT_WAGONS_PER_PLAYER, DEFAULT_STARTING_TICKETS, TABLE_SIZE, defaultLabelAngle, stopSizeMeta, ticketsInSet, type MapData, type Ticket, type Point, realWagon, type Route, routeColors, type Stop, W } from "./map-data";
 import { curvedSamples, isCurved, intersects, parallelPoints, pointsFor, polylineLength, stopById } from "./map-geometry";
 
 export type RouteSpacing = { route: Route; drawnMm: number; neededMm: number; ratio: number; verdict: "short" | "long" | "ok" };
@@ -306,6 +306,39 @@ export function reviewTickets(data: MapData, setId?: string): TicketReview[] {
 // deck makes every game run through it.
 // How long a ticket counts as, in wagon spaces along the shortest path. These bands are a stand-in
 // until the real definition arrives; changing these two numbers is the whole change.
+// The game setup read against the map itself. Wagon spaces are what a player's supply is spent on,
+// so the map has to hold enough of them for a table to empty their hands — and not so many that
+// nobody ever competes for a route.
+export type SetupBalance = {
+  totalSpaces: number;
+  wagonsPerPlayer: number;
+  supplies: number;
+  spaceVerdict: "tight" | "ok" | "roomy";
+  deckSize: number;
+  dealtAtTable: number;
+  deckVerdict: "empty" | "thin" | "ok";
+};
+
+const TIGHT_SUPPLIES = 2, ROOMY_SUPPLIES = 8;
+
+export function setupBalance(data: MapData, setId?: string): SetupBalance {
+  const infrastructureTypes = new Set(data.routeTypeStyles.filter((style) => style.infrastructure).map((style) => style.id));
+  const totalSpaces = data.routes.filter((route) => !infrastructureTypes.has(route.type)).reduce((sum, route) => sum + route.length, 0);
+  const wagonsPerPlayer = data.wagonsPerPlayer ?? DEFAULT_WAGONS_PER_PLAYER;
+  const supplies = wagonsPerPlayer > 0 ? totalSpaces / wagonsPerPlayer : 0;
+  const deckSize = (setId ? ticketsInSet(data, setId) : data.tickets).length;
+  const dealtAtTable = TABLE_SIZE * (data.startingTickets ?? DEFAULT_STARTING_TICKETS);
+  return {
+    totalSpaces,
+    wagonsPerPlayer,
+    supplies,
+    spaceVerdict: supplies < TIGHT_SUPPLIES ? "tight" : supplies > ROOMY_SUPPLIES ? "roomy" : "ok",
+    deckSize,
+    dealtAtTable,
+    deckVerdict: deckSize === 0 ? "empty" : deckSize < dealtAtTable ? "thin" : "ok",
+  };
+}
+
 export const TICKET_LENGTH_BANDS = { short: 7, medium: 13 };
 export type TicketBand = "short" | "medium" | "long";
 export const ticketBands: TicketBand[] = ["short", "medium", "long"];

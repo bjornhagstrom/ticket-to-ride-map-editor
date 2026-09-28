@@ -9,7 +9,7 @@ import { colorLabels, type MapData, realWagon, type Stop, ticketsInSet, type Tic
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { type TicketReview, type ColourLengthTable, type NetworkStats, type RouteSpacing, type RouteSuggestion } from "./map-analysis";
+import { type SetupBalance, type TicketReview, type ColourLengthTable, type NetworkStats, type RouteSpacing, type RouteSuggestion } from "./map-analysis";
 
 export function WelcomeGuide({ open, onOpenChange, onChooseBlank, onChooseExample }: { open: boolean; onOpenChange: (open: boolean) => void; onChooseBlank: () => void; onChooseExample: () => void }) {
   const steps: Array<{ icon: React.ReactNode; title: string; text: string }> = [
@@ -31,12 +31,25 @@ export function WelcomeGuide({ open, onOpenChange, onChooseBlank, onChooseExampl
   </Dialog>;
 }
 
-export function AnalysisDialog({ open, onOpenChange, data, stats, colourTable, spacing, scaleWidthMm, onSelectRoute, onSelectStop }: { open: boolean; onSelectRoute: (routeId: string) => void; onSelectStop: (stopId: string) => void; onOpenChange: (open: boolean) => void; data: MapData; stats: NetworkStats; colourTable: ColourLengthTable; spacing: RouteSpacing[]; scaleWidthMm: number }) {
+export function AnalysisDialog({ open, onOpenChange, data, stats, colourTable, spacing, scaleWidthMm, setup, onSelectRoute, onSelectStop }: { setup: SetupBalance; open: boolean; onSelectRoute: (routeId: string) => void; onSelectStop: (stopId: string) => void; onOpenChange: (open: boolean) => void; data: MapData; stats: NetworkStats; colourTable: ColourLengthTable; spacing: RouteSpacing[]; scaleWidthMm: number }) {
   const stopName = (id: string) => data.stops.find((stop) => stop.id === id)?.name ?? "";
   const sortedStops = [...data.stops].sort((a, b) => (stats.hubDegree.get(b.id) ?? 0) - (stats.hubDegree.get(a.id) ?? 0));
   return <Dialog open={open} onOpenChange={onOpenChange}>
     <DialogContent className="analysis-dialog">
       <DialogHeader><DialogTitle>Map balance</DialogTitle><DialogDescription>A quick read on how evenly connected and coloured the network is.</DialogDescription></DialogHeader>
+      <div className="analysis-section setup-balance">
+        <h3>Game setup against the map</h3>
+        <p className="helper">
+          The map holds <strong>{setup.totalSpaces} wagon spaces</strong>. At {setup.wagonsPerPlayer} wagons each, that is about <strong>{setup.supplies.toFixed(1)} player supplies</strong> — how many players could spend everything they have before the routes run out.
+        </p>
+        {setup.spaceVerdict === "tight" && <p className="helper helper-warning space-warning">Too small for {setup.wagonsPerPlayer} wagons: even two players cannot spend their supply here. Either draw more routes or cut the wagon count to about {Math.max(1, Math.floor(setup.totalSpaces / 2))}.</p>}
+        {setup.spaceVerdict === "roomy" && <p className="helper helper-warning space-warning">Very roomy: a full table would leave most of the map unclaimed, so few routes are ever contested. Either raise the wagon count or draw fewer routes.</p>}
+        <p className="helper">
+          The deck holds <strong>{setup.deckSize} ticket{setup.deckSize === 1 ? "" : "s"}</strong>, against the {setup.dealtAtTable} a table of five is dealt at the start.
+        </p>
+        {setup.deckVerdict === "empty" && <p className="helper helper-warning deck-warning">No tickets yet, so nothing sends anyone anywhere.</p>}
+        {setup.deckVerdict === "thin" && <p className="helper helper-warning deck-warning">Too few tickets to deal a full table, let alone leave any to draw later. Aim for at least {setup.dealtAtTable}, and more if players should keep drawing.</p>}
+      </div>
       <div className="analysis-section">
         <h3>Hub degree per stop</h3>
         <p className="helper">Pick a row to select that stop on the map. Neighbours + weighted links (parallel routes between the same pair count extra). Higher means more central; sorted from most to least connected.</p>
