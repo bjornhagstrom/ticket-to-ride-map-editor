@@ -28,7 +28,7 @@ export function WelcomeGuide({ open, onOpenChange, onChooseBlank, onChooseExampl
   </Dialog>;
 }
 
-export function AnalysisDialog({ open, onOpenChange, data, stats, colourTable, spacing, scaleWidthMm, onSelectRoute }: { open: boolean; onSelectRoute: (routeId: string) => void; onOpenChange: (open: boolean) => void; data: MapData; stats: NetworkStats; colourTable: ColourLengthTable; spacing: RouteSpacing[]; scaleWidthMm: number }) {
+export function AnalysisDialog({ open, onOpenChange, data, stats, colourTable, spacing, scaleWidthMm, onSelectRoute, onSelectStop }: { open: boolean; onSelectRoute: (routeId: string) => void; onSelectStop: (stopId: string) => void; onOpenChange: (open: boolean) => void; data: MapData; stats: NetworkStats; colourTable: ColourLengthTable; spacing: RouteSpacing[]; scaleWidthMm: number }) {
   const stopName = (id: string) => data.stops.find((stop) => stop.id === id)?.name ?? "";
   const sortedStops = [...data.stops].sort((a, b) => (stats.hubDegree.get(b.id) ?? 0) - (stats.hubDegree.get(a.id) ?? 0));
   return <Dialog open={open} onOpenChange={onOpenChange}>
@@ -36,10 +36,10 @@ export function AnalysisDialog({ open, onOpenChange, data, stats, colourTable, s
       <DialogHeader><DialogTitle>Map balance</DialogTitle><DialogDescription>A quick read on how evenly connected and coloured the network is.</DialogDescription></DialogHeader>
       <div className="analysis-section">
         <h3>Hub degree per stop</h3>
-        <p className="helper">Neighbours + weighted links (parallel routes between the same pair count extra). Higher means more central; sorted from most to least connected.</p>
+        <p className="helper">Pick a row to select that stop on the map. Neighbours + weighted links (parallel routes between the same pair count extra). Higher means more central; sorted from most to least connected.</p>
         {sortedStops.length === 0 ? <p className="helper">No stops yet.</p> : <div className="analysis-table-scroll"><table className="analysis-table">
           <thead><tr><th>Stop</th><th>Neighbours</th><th>Links</th><th>Hub degree</th></tr></thead>
-          <tbody>{sortedStops.map((stop) => <tr key={stop.id} className={cn((stats.neighbours.get(stop.id) ?? 0) < 2 && "analysis-warning-row")}><td>{stop.name}</td><td>{stats.neighbours.get(stop.id) ?? 0}</td><td>{stats.links.get(stop.id) ?? 0}</td><td>{stats.hubDegree.get(stop.id) ?? 0}</td></tr>)}</tbody>
+          <tbody>{sortedStops.map((stop) => <tr key={stop.id} className={cn("analysis-row-link", (stats.neighbours.get(stop.id) ?? 0) < 2 && "analysis-warning-row")} tabIndex={0} role="button" onClick={() => onSelectStop(stop.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onSelectStop(stop.id); } }}><td>{stop.name}</td><td>{stats.neighbours.get(stop.id) ?? 0}</td><td>{stats.links.get(stop.id) ?? 0}</td><td>{stats.hubDegree.get(stop.id) ?? 0}</td></tr>)}</tbody>
         </table></div>}
       </div>
       <div className="analysis-section">
