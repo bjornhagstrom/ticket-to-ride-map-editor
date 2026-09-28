@@ -22,7 +22,7 @@ Live site: <https://hagstrom.nu/ttr/>
 - Define reusable custom line styles (thickness and dash pattern) to flag routes that follow a special rule, and set a default style so new routes pick it up automatically.
 - Add areas, boundaries and labels behind the route network.
 - Import a background image (PNG, JPEG or WebP) — from the Import menu or the Draw background tool — and move, scale, rotate, crop, fade or lock it behind the rest of the map, or centre it and fit it to the page with a print-safe margin in one click.
-- Place resizable evaluation notes with explanatory text on the map, for reviewers and playtesters.
+- Place resizable evaluation notes with explanatory text on the map, for reviewers and playtesters, and fold one down to a single line when it is in the way.
 - Choose standard, large and custom foldable board formats or A4/A3/US Letter test sheets.
 - Detect crossings between buildable routes.
 - Check that each route is drawn about as long as its wagon count needs, and see which routes are too short or unnecessarily roomy.

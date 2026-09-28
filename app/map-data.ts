@@ -68,6 +68,7 @@ export type NoteBox = {
   height: number;
   text: string;
   locked?: boolean;
+  collapsed?: boolean;
 };
 export type MapData = { name: string; format: MapFormat; endGapMm?: number; background: BackgroundShape[]; stops: Stop[]; routes: Route[]; backgroundImage?: BackgroundImage; notes: NoteBox[]; lineStyles: LineStyle[]; routeTypeStyles: RouteTypeStyle[]; wagonStyles: WagonStyle[]; stopTypeStyles: StopTypeStyle[] };
 
