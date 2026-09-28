@@ -33,6 +33,7 @@ export function StopProperties({ stop, change, onDelete, labelState, mapEndGapMm
       <input id="stop-end-gap" className="range-input" type="range" min="0" max="30" step="1" value={stop.endGapMm ?? mapEndGapMm} onChange={(event) => update({ endGapMm: Number(event.target.value) })} />
       <p className="helper">Room left beyond this stop&apos;s circle before the first wagon of every route into it. Set it per stop where one end of a line needs more air than the other.</p>
       {stop.endGapMm !== undefined && <Button size="sm" variant="ghost" onClick={() => update({ endGapMm: undefined })}>Use the map default ({mapEndGapMm} mm)</Button>}
+      <Button size="sm" variant="ghost" onClick={() => onEditStyles({ kind: "map" })}><Pencil />Change the map default</Button>
     </div>
     <div className="label-angle">
       <Label>Name position · {Math.round(labelAngleOf(stop))}°</Label>
