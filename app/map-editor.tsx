@@ -28,6 +28,13 @@ type PendingImport = { kind: "background"; background: BackgroundShape[]; backgr
 // Snapshots are geometry-only (see cloneForHistory), so a deep stack stays in the low megabytes
 // even for a large map. Kept in memory for the session only, never written to local storage.
 
+const readHintOpen = () => {
+  try { return window.localStorage.getItem(MAP_HINT_KEY) !== "closed"; } catch { return true; }
+};
+const readHintOffset = () => {
+  try { const x = Number(window.localStorage.getItem(MAP_HINT_X_KEY)); return Number.isFinite(x) ? x : 0; } catch { return 0; }
+};
+
 export function MapEditor() {
   const [data, setData] = useState<MapData>(emptyMap);
   const [ready, setReady] = useState(false);
@@ -50,18 +57,11 @@ export function MapEditor() {
   const [formatShown, setFormatShown] = useState(false);
   const [showStyles, setShowStyles] = useState(false);
   const [styleTarget, setStyleTarget] = useState<StyleTarget>({ kind: "stop" });
-  const [routeHintOpen, setRouteHintOpen] = useState(true);
+  const [routeHintOpen, setRouteHintOpen] = useState(readHintOpen);
   const [linkParallel, setLinkParallel] = useState(true);
   // Collapsing the help is a lasting preference, not a per-selection one: reopening it on the next
   // route you click would defeat the point of hiding it.
-  const [routeHintX, setRouteHintX] = useState(0);
-  useEffect(() => {
-    try {
-      if (window.localStorage.getItem(MAP_HINT_KEY) === "closed") setRouteHintOpen(false);
-      const x = Number(window.localStorage.getItem(MAP_HINT_X_KEY));
-      if (Number.isFinite(x) && x) setRouteHintX(x);
-    } catch { /* private mode */ }
-  }, []);
+  const [routeHintX, setRouteHintX] = useState(readHintOffset);
   const moveRouteHint = (value: number) => {
     setRouteHintX(value);
     try { window.localStorage.setItem(MAP_HINT_X_KEY, String(Math.round(value))); } catch { /* private mode */ }
@@ -183,8 +183,7 @@ export function MapEditor() {
   };
   const undo = () => { const previous = past.at(-1); if (!previous) return; setFuture((items) => [cloneForHistory(data), ...items]); setData(previous); setPast((items) => items.slice(0, -1)); clearSelection(); };
   const redo = () => { const next = future[0]; if (!next) return; setPast((items) => [...items, cloneForHistory(data)]); setData(next); setFuture((items) => items.slice(1)); clearSelection(); };
-  undoRef.current = undo;
-  redoRef.current = redo;
+  useEffect(() => { undoRef.current = undo; redoRef.current = redo; });
 
   const hasContent = data.stops.length > 0 || data.routes.length > 0 || data.background.length > 0 || data.notes.length > 0 || Boolean(data.backgroundImage);
   const formatOpen = !hasContent || formatShown;

@@ -186,4 +186,11 @@ Changing `realWagon` or `stopSizeMeta` without updating the suite will fail it, 
 
 `app/map-editor.tsx` still owns all editor state and every pointer interaction in one component, which is the largest remaining lump. The pointer logic in particular (`onCanvasDown`, `onCanvasMove`, `stopDragging` and the seven drag refs they share) is the part most likely to be worth extracting next, probably into a hook.
 
+Lint is clean as of the ticket work. Three things had been failing since before the module split:
+apostrophes inside JSX text, the undo/redo refs being assigned during render rather than in an
+effect, and the hint preference being read from local storage through a `setState` in an effect. The
+last one is now read straight into the initial state instead, which is safe here because the hint
+only renders once something is selected — it cannot appear during prerender, so there is nothing for
+it to mismatch against.
+
 Any refactoring must preserve the stored JSON shape and the local-storage key unless an explicit migration is added.
