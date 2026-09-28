@@ -304,6 +304,38 @@ export function reviewTickets(data: MapData, setId?: string): TicketReview[] {
 
 // How many tickets name each stop. A stop no ticket reaches is dead weight; one named by half the
 // deck makes every game run through it.
+// How long a ticket counts as, in wagon spaces along the shortest path. These bands are a stand-in
+// until the real definition arrives; changing these two numbers is the whole change.
+export const TICKET_LENGTH_BANDS = { short: 7, medium: 13 };
+export type TicketBand = "short" | "medium" | "long";
+export const ticketBands: TicketBand[] = ["short", "medium", "long"];
+
+export function ticketBand(distance: number | null): TicketBand | null {
+  if (distance === null) return null;
+  if (distance <= TICKET_LENGTH_BANDS.short) return "short";
+  if (distance <= TICKET_LENGTH_BANDS.medium) return "medium";
+  return "long";
+}
+
+export type StopCoverage = { stop: Stop; short: number; medium: number; long: number; total: number };
+
+// One row per stop: how many tickets of each length name it. A ticket nobody can complete has no
+// length, so it counts towards the total without landing in a band.
+export function stopCoverage(data: MapData, setId?: string): StopCoverage[] {
+  const reviews = reviewTickets(data, setId);
+  const rows = new Map<string, StopCoverage>(data.stops.map((stop) => [stop.id, { stop, short: 0, medium: 0, long: 0, total: 0 }]));
+  for (const review of reviews) {
+    const band = ticketBand(review.distance);
+    for (const id of new Set([review.ticket.a, review.ticket.b])) {
+      const row = rows.get(id);
+      if (!row) continue;
+      row.total += 1;
+      if (band) row[band] += 1;
+    }
+  }
+  return [...rows.values()];
+}
+
 export function ticketCoverage(data: MapData, setId?: string): { stop: Stop; count: number }[] {
   const counts = new Map<string, number>();
   for (const ticket of (setId ? ticketsInSet(data, setId) : data.tickets)) for (const id of [ticket.a, ticket.b]) counts.set(id, (counts.get(id) ?? 0) + 1);

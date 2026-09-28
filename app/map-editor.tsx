@@ -13,11 +13,11 @@ import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { MapArtwork, type Tool } from "./map-artwork";
-import { AnalysisDialog, SuggestionsDialog, TicketsDialog, WelcomeGuide } from "./map-dialogs";
-import { BackgroundImageProperties, BackgroundProperties, NoteProperties, RouteProperties, StopProperties, StylePicker } from "./map-properties";
+import { AnalysisDialog, StopTicketsDialog, SuggestionsDialog, TicketsDialog, WelcomeGuide } from "./map-dialogs";
+import { TicketCoveragePanel, type CoverageSort, BackgroundImageProperties, BackgroundProperties, NoteProperties, RouteProperties, StopProperties, StylePicker } from "./map-properties";
 import { PrintPages, TicketPrintPages } from "./map-print";
 import { SettingsDialog, type StyleTarget } from "./map-styles";
-import { autoPlaceLabels, reviewTickets, ticketPointsPerSpace, ticketCoverage, type RouteSuggestion, labelCovers, labelAngleOptions, routeSamplePoints, colourLengthTable, crossingPairs, buildAdjacency, networkStats, routeSpacing, shortestPath, suggestRoutes } from "./map-analysis";
+import { autoPlaceLabels, stopCoverage, ticketBand, type TicketBand, reviewTickets, ticketPointsPerSpace, ticketCoverage, type RouteSuggestion, labelCovers, labelAngleOptions, routeSamplePoints, colourLengthTable, crossingPairs, buildAdjacency, networkStats, routeSpacing, shortestPath, suggestRoutes } from "./map-analysis";
 import { canvasPoint, pointsFor, samePair, stopById } from "./map-geometry";
 import { cloneForHistory, cloneMap, formatTimestamp, GUIDE_SEEN_KEY, HISTORY_LIMIT, MAX_IMAGE_WARN_BYTES, normalizeBackgroundFile, normalizeMap, normalizeNetworkFile, normalizeTicketFile, buildTicketFile, readBackgroundImage, rescaleMapToFormat, MAP_HINT_KEY, MAP_HINT_X_KEY } from "./map-storage";
 import { colorLabels, defaultTicketSet, ticketsInSet, type TicketSet, emptyMap, initialMap, type LineStyle, DEFAULT_END_GAP_MM, mapFormats, type BackgroundImage, type BackgroundShape, type BackgroundType, type MapData, type MapFormat, type Point, realWagon, type Route, type RouteType, type RouteTypeStyle, routeColors, STORAGE_KEY, type Stop, type StopSize, stopSizeMeta, type StopSymbol, stopSymbolMeta, type StopType, W } from "./map-data";
@@ -78,6 +78,9 @@ export function MapEditor() {
   const [printScope, setPrintScope] = useState<"map" | "tickets">("map");
   const [pickTo, setPickTo] = useState<Point | null>(null);
   const [hoveredStop, setHoveredStop] = useState<string | null>(null);
+  const [coverageSort, setCoverageSort] = useState<CoverageSort>({ column: "stop", descending: false });
+  const [onlyUncovered, setOnlyUncovered] = useState(false);
+  const [stopTicketView, setStopTicketView] = useState<{ stopId: string; band?: TicketBand } | null>(null);
   const [measureResult, setMeasureResult] = useState<MeasureResult | null>(null);
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -137,6 +140,21 @@ export function MapEditor() {
   const ticketsHere = ticketsInSet(data, activeTicketSet.id);
   const ticketReviews = useMemo(() => reviewTickets(data, activeTicketSet.id), [data, activeTicketSet.id]);
   const ticketRate = useMemo(() => ticketPointsPerSpace(ticketReviews), [ticketReviews]);
+  const coverageRows = useMemo(() => stopCoverage(data, activeTicketSet.id), [data, activeTicketSet.id]);
+  // The tickets behind one number in the coverage panel.
+  const viewedStopTickets = useMemo(() => {
+    if (!stopTicketView) return [];
+    return ticketReviews
+      .filter((review) => (review.ticket.a === stopTicketView.stopId || review.ticket.b === stopTicketView.stopId)
+        && (!stopTicketView.band || ticketBand(review.distance) === stopTicketView.band))
+      .map((review) => ({
+        id: review.ticket.id,
+        other: stopById(data, review.ticket.a === stopTicketView.stopId ? review.ticket.b : review.ticket.a)?.name ?? "—",
+        distance: review.distance,
+        points: review.ticket.points,
+        deck: activeTicketSet.label,
+      }));
+  }, [stopTicketView, ticketReviews, data, activeTicketSet.label]);
   const highlightRoutes = useMemo(() => new Set(selectedTicket ? ticketReviews.find((review) => review.ticket.id === selectedTicket)?.routeIds ?? [] : []), [selectedTicket, ticketReviews]);
   const routeSamples = useMemo(() => routeSamplePoints(data), [data]);
   const coveredNames = useMemo(() => data.stops.filter((stop) => labelCovers(data, stop, routeSamples)), [data, routeSamples]);
@@ -173,12 +191,15 @@ export function MapEditor() {
     return { covers: labelCovers(data, selectedS, routeSamples), clear, best };
   }, [data, routeSamples, selectedS]);
   // Tickets that name the selected stop, from every deck, so the panel shows what depends on it.
-  const stopTickets = selectedS ? data.tickets.filter((ticket) => ticket.a === selectedS.id || ticket.b === selectedS.id).map((ticket) => ({
-    id: ticket.id,
-    other: stopById(data, ticket.a === selectedS.id ? ticket.b : ticket.a)?.name ?? "—",
-    points: ticket.points,
-    deck: data.ticketSets.length > 1 ? data.ticketSets.find((set) => set.id === (ticket.set ?? data.ticketSets[0].id))?.label : undefined,
-  })) : [];
+  // Kept deck by deck: two decks being compared often name the same stop, and a flat list makes
+  // them look like one deck with duplicates.
+  const stopTickets = selectedS ? data.ticketSets.map((set) => ({
+    id: set.id,
+    label: set.label,
+    tickets: ticketsInSet(data, set.id)
+      .filter((ticket) => ticket.a === selectedS.id || ticket.b === selectedS.id)
+      .map((ticket) => ({ id: ticket.id, other: stopById(data, ticket.a === selectedS.id ? ticket.b : ticket.a)?.name ?? "—", points: ticket.points })),
+  })).filter((deck) => deck.tickets.length || data.ticketSets.length === 1) : [];
   const litTicket = selectedTicket && !showTickets ? data.tickets.find((ticket) => ticket.id === selectedTicket) : undefined;
   const startTicketFrom = (stopId: string) => { setShowTickets(false); setSelectedTicket(null); enterTool("ticket"); setTicketStart(stopId); };
   const openTicket = (ticketId: string) => { const ticket = data.tickets.find((item) => item.id === ticketId); if (!ticket) return; setTicketSetId(ticket.set ?? data.ticketSets[0].id); setSelectedTicket(ticketId); setShowTickets(true); };
@@ -569,8 +590,9 @@ export function MapEditor() {
         {hint && !hint.atTop && <MapHint atTop={false} title={hint.title} open={routeHintOpen} onToggle={toggleRouteHint} offsetX={routeHintX} onOffsetChange={moveRouteHint}>{hint.body}</MapHint>}
       </section>
       <aside className="properties panel">
-        <div className="panel-heading"><span>Properties</span><small>{imageSelected ? "Background image selected" : selectedN ? "Note selected" : selectedB ? "Background object selected" : selectedR ? "Route selected" : selectedS ? "Stop selected" : "Select an object on the map"}</small></div>
-        {!imageSelected && !selectedN && !selectedB && !selectedR && !selectedS && <div className="empty-state"><CircleDot /><p>Edit names, types, colours, geometry and route length here.</p></div>}
+        <div className="panel-heading"><span>{tool === "ticket" ? "Ticket coverage" : "Properties"}</span><small>{tool === "ticket" ? `${activeTicketSet.label} · ${ticketsHere.length} ticket${ticketsHere.length === 1 ? "" : "s"}` : imageSelected ? "Background image selected" : selectedN ? "Note selected" : selectedB ? "Background object selected" : selectedR ? "Route selected" : selectedS ? "Stop selected" : "Select an object on the map"}</small></div>
+        {tool === "ticket" && <TicketCoveragePanel rows={coverageRows} deck={activeTicketSet.label} sort={coverageSort} onSort={setCoverageSort} onlyUncovered={onlyUncovered} onOnlyUncovered={setOnlyUncovered} onOpen={(stopId, band) => setStopTicketView({ stopId, band })} />}
+        {tool !== "ticket" && !imageSelected && !selectedN && !selectedB && !selectedR && !selectedS && <div className="empty-state"><CircleDot /><p>Edit names, types, colours, geometry and route length here.</p></div>}
         {selectedN && <NoteProperties note={selectedN} change={change} onDelete={() => setDanger("delete")} />}
         {imageSelected && data.backgroundImage && <BackgroundImageProperties image={data.backgroundImage} formatHeight={format.height} change={change} onDelete={() => setDanger("delete")} />}
         {selectedB && <BackgroundProperties shape={selectedB} change={change} onDelete={() => setDanger("delete")} />}
@@ -579,6 +601,9 @@ export function MapEditor() {
       </aside>
     </div>
     <AlertDialog open={danger !== null} onOpenChange={(open) => { if (!open) { setDanger(null); setPendingImport(null); } }}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{danger === "reset" ? "Clear the entire map?" : danger === "load-blank" ? "Replace the current map with a blank one?" : danger === "load-example" ? "Replace the current map with the example?" : danger === "import-background" ? "Replace the background?" : danger === "import-network" ? "Replace stops and routes?" : danger === "import-image" ? "Replace the background image?" : "Delete the selected object?"}</AlertDialogTitle><AlertDialogDescription>{danger === "reset" ? "All locally stored background objects, stops and routes will be removed. Export the map first if you want to keep it." : danger === "load-blank" ? "Your current background objects, stops and routes will be replaced with a blank map. Export the map first if you want to keep your work." : danger === "load-example" ? "Your current background objects, stops and routes will be replaced with the neutral example map. Export the map first if you want to keep your work." : danger === "import-background" ? "The imported background, including any background image, will replace the current one. Stops and routes are kept as they are." : danger === "import-network" ? "The imported stops and routes will replace the current network. Background objects are kept as they are." : danger === "import-image" ? "The new image will replace the current background image." : selectedStop ? "The stop and all connected routes will be deleted." : "The selected object will be deleted."}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => { if (danger === "reset") { change(() => cloneMap(emptyMap)); clearSelection(); setDanger(null); } else if (danger === "load-blank") applyGuideChoice(emptyMap); else if (danger === "load-example") applyGuideChoice(initialMap); else if (danger === "import-background" && pendingImport?.kind === "background") applyBackgroundImport(pendingImport.background, pendingImport.backgroundImage); else if (danger === "import-network" && pendingImport?.kind === "network") applyNetworkImport(pendingImport.stops, pendingImport.routes, pendingImport.lineStyles, pendingImport.routeTypeStyles); else if (danger === "import-image" && pendingImport?.kind === "image") applyImageImport(pendingImport.image); else deleteSelected(); }}>Continue</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+    <StopTicketsDialog open={stopTicketView !== null} onOpenChange={(open) => { if (!open) setStopTicketView(null); }}
+      stopName={stopTicketView ? stopById(data, stopTicketView.stopId)?.name ?? "" : ""} band={stopTicketView?.band ?? null} tickets={viewedStopTickets}
+      onOpen={(ticketId) => { setStopTicketView(null); openTicket(ticketId); }} />
     <WelcomeGuide open={showGuide} onOpenChange={(open) => !open && dismissGuide()} onChooseBlank={() => chooseFromGuide("blank")} onChooseExample={() => chooseFromGuide("example")} />
     <SettingsDialog open={showStyles} onOpenChange={setShowStyles} target={styleTarget} onTarget={setStyleTarget} data={data} change={change} onChangeFormat={changeFormat} defaults={{ stopType, setStopType, stopSize, setStopSize: (value) => setStopSize(value as StopSize), routeType, setRouteType, routeColor, setRouteColor, routeCurved, setRouteCurved, routeLineStyle, setRouteLineStyle, linkParallel, setLinkParallel, scaleTarget, setScaleTarget: (value) => setScaleTarget(value as MapFormat) }} />
     <TicketsDialog open={showTickets} onOpenChange={setShowTickets} data={data} reviews={ticketReviews} coverage={ticketCoverage(data, activeTicketSet.id)} rate={ticketRate} selected={selectedTicket} activeSet={activeTicketSet} onSelect={setSelectedTicket}

@@ -171,3 +171,26 @@ export function TicketsDialog({ open, onOpenChange, data, reviews, coverage, rat
     </DialogContent>
   </Dialog>;
 }
+
+// The tickets behind one number in the coverage panel, as a way through to editing them.
+export function StopTicketsDialog({ open, onOpenChange, stopName, band, tickets, onOpen }: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  stopName: string;
+  band: string | null;
+  tickets: { id: string; other: string; distance: number | null; points: number; deck: string }[];
+  onOpen: (ticketId: string) => void;
+}) {
+  return <Dialog open={open} onOpenChange={onOpenChange}>
+    <DialogContent className="stop-tickets-dialog">
+      <DialogHeader>
+        <DialogTitle>{stopName}</DialogTitle>
+        <DialogDescription>{tickets.length} {band ? `${band} ` : ""}ticket{tickets.length === 1 ? "" : "s"} name{tickets.length === 1 ? "s" : ""} this stop. Pick one to edit it.</DialogDescription>
+      </DialogHeader>
+      <div className="stop-ticket-rows">{tickets.map((ticket) => <button type="button" key={ticket.id} className="stop-ticket-row" onClick={() => onOpen(ticket.id)}>
+        <span>{stopName} → {ticket.other}</span>
+        <span className="stop-ticket-meta">{ticket.distance === null ? "not connected" : `${ticket.distance} spaces`} · {ticket.points} pt · {ticket.deck}</span>
+      </button>)}</div>
+    </DialogContent>
+  </Dialog>;
+}

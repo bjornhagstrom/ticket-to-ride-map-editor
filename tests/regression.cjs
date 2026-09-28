@@ -306,6 +306,50 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.keyboard.press("Escape");
   await page.waitForTimeout(300);
 
+  // 17. the ticket tool fills the right panel with coverage per stop
+  await useTool("Add ticket");
+  await page.waitForTimeout(300);
+  const cells = () => page.$$eval(".coverage-table tbody tr", (trs) => trs.map((tr) => Array.from(tr.children).map((td) => td.textContent.trim())));
+  check("the ticket tool fills the right panel", await page.locator(".coverage-table").isVisible());
+  check("with a row per stop and a column per ticket length", (await cells()).length === 9 && (await cells())[0].length === 4, JSON.stringify((await cells())[0]));
+  await pointAt("Westport"); await pointAt("Central");
+  await page.waitForTimeout(300);
+  const westportRow = (await cells()).find((row) => row[0] === "Westport");
+  check("a ticket is counted at both ends, in its length band", westportRow.join(" ") === "Westport 1 1 0", westportRow.join(" "));
+  const names = (await cells()).map((row) => row[0]);
+  check("the panel starts sorted by name", names.join() === [...names].sort().join(), names.join(" "));
+  await page.locator(".coverage-table thead th").nth(1).click();
+  await page.waitForTimeout(250);
+  const shortCol = (await cells()).map((row) => Number(row[1]));
+  check("a length column sorts on that length", shortCol[0] >= shortCol[shortCol.length - 1], shortCol.join());
+  await page.getByLabel(/only stops with no tickets/i).check();
+  await page.waitForTimeout(300);
+  check("stops that already have tickets can be hidden", (await cells()).every((row) => row.slice(1).join("") === "000"), (await cells()).map((r) => r.join(" ")).join(" | "));
+  await page.getByLabel(/only stops with no tickets/i).uncheck();
+  await page.waitForTimeout(300);
+
+  await page.locator(".coverage-table tbody tr").filter({ hasText: "Westport" }).locator(".coverage-count").first().click();
+  await page.waitForTimeout(450);
+  check("a count opens only the tickets behind it", (await page.locator(".stop-tickets-dialog .stop-ticket-row").count()) === 1, String(await page.locator(".stop-tickets-dialog .stop-ticket-row").count()));
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(350);
+  await page.locator(".coverage-table tbody tr").filter({ hasText: "Westport" }).locator(".coverage-stop").click();
+  await page.waitForTimeout(450);
+  check("a stop name opens all of them", (await page.locator(".stop-tickets-dialog .stop-ticket-row").count()) === 2, String(await page.locator(".stop-tickets-dialog .stop-ticket-row").count()));
+  await page.locator(".stop-tickets-dialog .stop-ticket-row").first().click();
+  await page.waitForTimeout(500);
+  check("and leads through to editing that ticket", await page.locator(".ticket-set-bar").isVisible() && (await page.locator(".analysis-row-active").count()) === 1);
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(300);
+
+  // 18. the stop panel keeps each deck's tickets apart
+  await useTool("Select & move");
+  await clickStop("Westport");
+  await page.waitForTimeout(400);
+  const deckNames = await page.locator(".stop-ticket-deck-name").allTextContents();
+  check("a stop's tickets are listed deck by deck", deckNames.length === 3, deckNames.join(" | "));
+  check("and every deck group holds only its own", (await page.locator(".stop-ticket-deck").first().locator(".stop-ticket-link").count()) >= 1);
+
   console.log("PASS:"); ok.forEach((l) => console.log("  ✓ " + l));
   if (bad.length) { console.log("FAIL:"); bad.forEach((l) => console.log("  ✗ " + l)); }
   console.log(`\n${ok.length} passed, ${bad.length} failed`);

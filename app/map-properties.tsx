@@ -11,14 +11,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { type StopTypeStyle, type WagonStyle, colorLabels, type ImageCrop, type LineStyle, type MapData, type NoteBox, type RouteTypeStyle, type BackgroundImage, type BackgroundShape, type Route, routeColors, type Stop, stopSizeMeta, stopSymbolMeta, type StopSize, type StopSymbol, W } from "./map-data";
 import { isCurved, samePair, stopById } from "./map-geometry";
 import { type StyleTarget } from "./map-styles";
-import { labelAngleOf } from "./map-analysis";
+import { labelAngleOf, type StopCoverage, TICKET_LENGTH_BANDS, ticketBands, type TicketBand } from "./map-analysis";
 import { cn } from "@/lib/utils";
 
-// One ticket as the stop panel lists it: the far end, the points, and the deck when the map has
-// more than one.
-export type StopTicket = { id: string; other: string; points: number; deck?: string };
+// One ticket as the stop panel lists it: the far end and the points. Decks are kept apart, so a
+// ticket never has to say which one it belongs to.
+export type StopTicket = { id: string; other: string; points: number };
+export type StopTicketDeck = { id: string; label: string; tickets: StopTicket[] };
 
-export function StopProperties({ stop, change, onDelete, labelState, mapEndGapMm, allLocked, onLockAll, stopTypeStyles, onEditStyles, tickets, onOpenTicket }: { stop: Stop; stopTypeStyles: StopTypeStyle[]; onEditStyles: (target: StyleTarget) => void; tickets: StopTicket[]; onOpenTicket: (ticketId: string) => void; allLocked: boolean; onLockAll: (locked: boolean) => void; change: (fn: (draft: MapData) => MapData) => void; onDelete: () => void; mapEndGapMm: number; labelState: { covers: boolean; clear: number[]; best: number } }) {
+export function StopProperties({ stop, change, onDelete, labelState, mapEndGapMm, allLocked, onLockAll, stopTypeStyles, onEditStyles, tickets, onOpenTicket }: { stop: Stop; stopTypeStyles: StopTypeStyle[]; onEditStyles: (target: StyleTarget) => void; tickets: StopTicketDeck[]; onOpenTicket: (ticketId: string) => void; allLocked: boolean; onLockAll: (locked: boolean) => void; change: (fn: (draft: MapData) => MapData) => void; onDelete: () => void; mapEndGapMm: number; labelState: { covers: boolean; clear: number[]; best: number } }) {
   const update = (values: Partial<Stop>) => change((draft) => { const item = stopById(draft, stop.id); if (item) Object.assign(item, values); return draft; });
   const symbol = stop.symbol ?? "none";
   return <div className="property-form">
@@ -59,8 +60,11 @@ export function StopProperties({ stop, change, onDelete, labelState, mapEndGapMm
     <p className="helper">A locked stop can still be selected and edited, it just cannot be dragged by accident. Hold Shift while dragging to move it anyway, without unlocking it first.</p>
     <div className="stop-tickets">
       <Label>Tickets naming this stop</Label>
-      {tickets.length ? <ul>{tickets.map((ticket) => <li key={ticket.id}><button type="button" className="stop-ticket-link" onClick={() => onOpenTicket(ticket.id)}>{stop.name} → {ticket.other}<span>{ticket.points} pt{ticket.deck ? ` · ${ticket.deck}` : ""}</span></button></li>)}</ul>
-        : <p className="helper">No ticket sends a player here yet.</p>}
+      {tickets.length ? tickets.map((deck) => <div className="stop-ticket-deck" key={deck.id}>
+        <p className="stop-ticket-deck-name">{deck.label}</p>
+        {deck.tickets.length ? <ul>{deck.tickets.map((ticket) => <li key={ticket.id}><button type="button" className="stop-ticket-link" onClick={() => onOpenTicket(ticket.id)}>{stop.name} → {ticket.other}<span>{ticket.points} pt</span></button></li>)}</ul>
+          : <p className="helper">Nothing in this deck.</p>}
+      </div>) : <p className="helper">No ticket sends a player here yet.</p>}
     </div>
     <Button variant="destructive" onClick={onDelete}><Trash2 />Delete stop</Button>
     <p className="delete-note">Connected routes will also be deleted.</p>
@@ -161,5 +165,44 @@ export function StylePicker({ label, value, styles, placeholder, helper, onChang
       <Button size="sm" variant="outline" onClick={onEdit} aria-label={`Edit ${label.toLowerCase()}`}><Pencil />Edit</Button>
     </div>
     {helper && <p className="helper">{helper}</p>}
+  </div>;
+}
+
+// The right-hand panel while the ticket tool is in use: every stop, and how many tickets of each
+// length name it. Sorting and the "not yet named" filter are the two ways of finding the gaps.
+export type CoverageSort = { column: "stop" | TicketBand; descending: boolean };
+
+export function TicketCoveragePanel({ rows, deck, sort, onSort, onlyUncovered, onOnlyUncovered, onOpen }: {
+  rows: StopCoverage[];
+  deck: string;
+  sort: CoverageSort;
+  onSort: (sort: CoverageSort) => void;
+  onlyUncovered: boolean;
+  onOnlyUncovered: (value: boolean) => void;
+  onOpen: (stopId: string, band?: TicketBand) => void;
+}) {
+  const shown = (onlyUncovered ? rows.filter((row) => row.total === 0) : rows).slice().sort((a, b) => {
+    if (sort.column === "stop") return sort.descending ? b.stop.name.localeCompare(a.stop.name) : a.stop.name.localeCompare(b.stop.name);
+    const diff = a[sort.column] - b[sort.column];
+    return (sort.descending ? -diff : diff) || a.stop.name.localeCompare(b.stop.name);
+  });
+  const head = (column: CoverageSort["column"], label: string, hint?: string) => <th key={column} className={cn("coverage-head", sort.column === column && "sorted")} title={hint}
+    onClick={() => onSort({ column, descending: sort.column === column ? !sort.descending : column !== "stop" })}>
+    {label}{sort.column === column ? (sort.descending ? " ↓" : " ↑") : ""}
+  </th>;
+
+  return <div className="coverage-panel">
+    <p className="helper">Tickets in {deck}, counted at both ends. Short is up to {TICKET_LENGTH_BANDS.short} wagon spaces, medium up to {TICKET_LENGTH_BANDS.medium}, long beyond that. A ticket nobody can complete has no length and lands in none of the three.</p>
+    <label className="checkbox-row"><input type="checkbox" checked={onlyUncovered} onChange={(event) => onOnlyUncovered(event.target.checked)} />Only stops with no tickets</label>
+    <div className="coverage-scroll"><table className="coverage-table">
+      <thead><tr>{head("stop", "Stop")}{head("short", "S", `Short tickets — up to ${TICKET_LENGTH_BANDS.short} wagon spaces`)}{head("medium", "M", `Medium tickets — up to ${TICKET_LENGTH_BANDS.medium} wagon spaces`)}{head("long", "L", `Long tickets — beyond ${TICKET_LENGTH_BANDS.medium} wagon spaces`)}</tr></thead>
+      <tbody>{shown.map((row) => <tr key={row.stop.id} className={cn(row.total === 0 && "coverage-empty")}>
+        <td><button type="button" className="coverage-stop" disabled={row.total === 0} onClick={() => onOpen(row.stop.id)}>{row.stop.name}</button></td>
+        {ticketBands.map((band) => <td key={band}>{row[band] > 0
+          ? <button type="button" className="coverage-count" onClick={() => onOpen(row.stop.id, band)}>{row[band]}</button>
+          : <span className="coverage-zero">0</span>}</td>)}
+      </tr>)}</tbody>
+    </table></div>
+    {!shown.length && <p className="helper">Every stop is named by at least one ticket.</p>}
   </div>;
 }

@@ -7,6 +7,8 @@ Editing, scoring, coverage, decks, ticket-only transfer and card printing are bu
 - Show the distribution of ticket lengths against a reference distribution, rather than only the
   shortest, median and longest.
 - Compare two decks against each other directly, rather than by switching between them.
+- Replace the stand-in ticket length bands (short up to 7 wagon spaces, medium up to 13) with the
+  real definition once it is settled. They live in `TICKET_LENGTH_BANDS` in `app/map-analysis.ts`.
 
 ## Map collaboration
 
