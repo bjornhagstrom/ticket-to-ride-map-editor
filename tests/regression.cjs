@@ -149,13 +149,16 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   });
   await page.waitForTimeout(350);
   check("placing a stop works", (await badges())[2] === "9 stops", (await badges())[2]);
-  // the format control folds away once the map has content, so open it first
-  const formatToggle = page.locator(".format-toggle");
-  if (await formatToggle.count()) { await formatToggle.click(); await page.waitForTimeout(250); }
-  check("board format folds away once the map has content", await formatToggle.count() === 1);
-  await page.locator("#map-format").selectOption("board-2x4");
+  // the board format lives in Settings, not in the tools panel
+  check("the tools panel carries no board format control", (await page.locator("#map-format").count()) === 0);
+  await page.getByRole("button", { name: "Settings" }).click();
+  await page.waitForTimeout(400);
+  await page.locator("#settings-format").selectOption("board-2x4");
   await page.waitForTimeout(500);
-  check("changing board format works", (await badges())[0] === "Extended board 2×4", (await badges())[0]);
+  check("changing board format from Settings works", (await badges())[0] === "Extended board 2×4", (await badges())[0]);
+  check("Settings shows what the format measures", /mm/.test(await page.locator(".format-measurements").textContent()));
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(400);
 
   // 10. print tree renders
   const printPages = await page.locator(".print-pages .print-page").count();
@@ -237,6 +240,69 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.locator(".stop-ticket-link").first().click();
   await page.waitForTimeout(500);
   check("a ticket link opens that ticket for editing", await page.locator(".ticket-set-bar").isVisible() && (await page.locator(".analysis-row-active").count()) === 1, await page.locator("#ticket-set-name").inputValue());
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(300);
+
+  // 14. the two-click tools show what they are waiting on
+  const stopAt = async (name) => page.evaluate((n) => {
+    const g = Array.from(document.querySelectorAll(".map-canvas .stop")).find((s) => Array.from(s.querySelectorAll("text")).some((t) => t.textContent === n));
+    const r = g.querySelector(".stop-hit").getBoundingClientRect();
+    return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+  }, name);
+  const pointAt = async (name) => { const p = await stopAt(name); await page.mouse.move(p.x, p.y); await page.mouse.down(); await page.mouse.up(); await page.waitForTimeout(250); };
+  // A click on the current tool lets it go, so enter one only when it is not already chosen.
+  const useTool = async (label) => { if ((await tool(label).getAttribute("aria-pressed")) !== "true") await tool(label).click(); await page.waitForTimeout(200); };
+  const pendingText = async () => page.evaluate(() => {
+    const g = document.querySelector(".map-canvas .stop.pending");
+    return g ? Array.from(g.querySelectorAll("text")).map((t) => t.textContent).join(" ") : null;
+  });
+
+  await useTool("Add ticket");
+  await pointAt("Westport");
+  check("the stop a tool is waiting on is marked on the map", String(await pendingText()).includes("Westport"), String(await pendingText()));
+  check("a pending stop is not dressed as a selected one", (await page.locator(".map-canvas .stop.active").count()) === 0);
+  const central = await stopAt("Central");
+  await page.mouse.move(central.x - 50, central.y - 50);
+  await page.waitForTimeout(250);
+  check("a rubber band follows the pointer from it", (await page.locator(".map-canvas .pick-band").count()) === 1);
+  const dim = await page.evaluate(() => { const el = document.querySelector(".map-canvas .background-object"); return el ? Number(getComputedStyle(el).opacity) : 1; });
+  check("background objects step back while picking stops", dim < 1, String(dim));
+
+  const quarry = await stopAt("Quarry");
+  await page.mouse.move(quarry.x, quarry.y);
+  await page.waitForTimeout(350);
+  const previewText = (await page.locator(".pick-preview").count()) ? await page.locator(".pick-preview").textContent() : "";
+  check("hovering the far end previews the ticket", /Westport/.test(previewText) && /Quarry/.test(previewText) && /point/.test(previewText), previewText);
+  check("and lights the path it would use", (await page.locator(".map-canvas .route-group.on-preview").count()) === 3, String(await page.locator(".route-group.on-preview").count()));
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(300);
+  check("Escape drops the pick", (await pendingText()) === null && (await page.locator(".pick-band").count()) === 0);
+
+  // 15. a lit ticket can be switched off again, and tools let go on a second click
+  await page.getByRole("button", { name: /^Tickets · / }).click();
+  await page.waitForTimeout(400);
+  await page.locator(".analysis-row-link").first().click();
+  await page.waitForTimeout(250);
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(400);
+  check("a ticket lit in the dialog stays lit once it closes", (await page.locator(".map-canvas .route-group.on-ticket").count()) > 0);
+  check("with a chip saying so", (await page.locator(".highlight-chip").count()) === 1, (await page.locator(".highlight-chip").count()) ? await page.locator(".highlight-chip").textContent() : "");
+  await page.locator(".highlight-chip").getByRole("button").click();
+  await page.waitForTimeout(400);
+  check("and the chip switches it off", (await page.locator(".map-canvas .route-group.on-ticket").count()) === 0 && (await page.locator(".highlight-chip").count()) === 0);
+
+  await useTool("Add ticket");
+  await tool("Add ticket").click();
+  await page.waitForTimeout(250);
+  check("clicking the current tool lets it go, back to the pointer", (await tool("Select & move").getAttribute("aria-pressed")) === "true");
+
+  // 16. the ways into Settings: a stop type in the legend opens its own section
+  const legendItem = page.locator(".legend-item").nth(1);
+  const wantedType = (await legendItem.textContent()).trim();
+  await legendItem.click();
+  await page.waitForTimeout(500);
+  check("a stop type in the legend opens Settings on stop types", /stop/i.test(await page.locator(".settings-nav .active").textContent()), await page.locator(".settings-nav .active").textContent());
+  check("with that type ready to edit", (await page.locator(".settings-body").textContent()).includes(wantedType), wantedType);
   await page.keyboard.press("Escape");
   await page.waitForTimeout(300);
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, BarChart3, Crosshair, Settings2, Ticket as TicketIcon, BusFront, Check, ChevronDown, ChevronUp, GripVertical, CircleDot, CircleHelp, Download, Image as ImageIcon, Layers3, Lightbulb, Link2, MapPinPlus, MousePointer2, Printer, Redo2, RotateCcw, Ruler, StickyNote, Trash2, Undo2, Upload } from "lucide-react";
+import { AlertTriangle, BarChart3, Crosshair, Settings2, Ticket as TicketIcon, BusFront, Check, ChevronDown, ChevronUp, GripVertical, CircleDot, CircleHelp, Download, Image as ImageIcon, Layers3, Lightbulb, Link2, MapPinPlus, MousePointer2, Printer, Redo2, RotateCcw, Ruler, StickyNote, Trash2, Undo2, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
@@ -54,7 +54,6 @@ export function MapEditor() {
   const [backgroundStroke, setBackgroundStroke] = useState("#4f8394");
   const [draftPoints, setDraftPoints] = useState<Point[]>([]);
   const [routeStart, setRouteStart] = useState<string | null>(null);
-  const [formatShown, setFormatShown] = useState(false);
   const [showStyles, setShowStyles] = useState(false);
   const [styleTarget, setStyleTarget] = useState<StyleTarget>({ kind: "stop" });
   const [routeHintOpen, setRouteHintOpen] = useState(readHintOpen);
@@ -77,6 +76,8 @@ export function MapEditor() {
   const [showTickets, setShowTickets] = useState(false);
   const [ticketSetId, setTicketSetId] = useState(defaultTicketSet.id);
   const [printScope, setPrintScope] = useState<"map" | "tickets">("map");
+  const [pickTo, setPickTo] = useState<Point | null>(null);
+  const [hoveredStop, setHoveredStop] = useState<string | null>(null);
   const [measureResult, setMeasureResult] = useState<MeasureResult | null>(null);
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -98,6 +99,7 @@ export function MapEditor() {
   const dragSnapshotRef = useRef<MapData | null>(null);
   const draggedRef = useRef(false);
   const undoRef = useRef<() => void>(() => {});
+  const cancelPickRef = useRef<() => void>(() => {});
   const redoRef = useRef<() => void>(() => {});
   const fileRef = useRef<HTMLInputElement>(null);
   const imageFileRef = useRef<HTMLInputElement>(null);
@@ -109,6 +111,7 @@ export function MapEditor() {
   useEffect(() => { if (!ready) return; localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); const timer = window.setTimeout(() => setSaved(true), 0); return () => window.clearTimeout(timer); }, [data, ready]);
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { cancelPickRef.current(); return; }
       if (!(event.metaKey || event.ctrlKey)) return;
       const key = event.key.toLowerCase();
       if (key !== "z" && key !== "y") return;
@@ -141,6 +144,20 @@ export function MapEditor() {
   const tightRoutes = spacing.filter((item) => item.verdict === "short");
   const looseRoutes = spacing.filter((item) => item.verdict === "long");
   const adjacency = useMemo(() => buildAdjacency(data), [data]);
+  // All three two-click tools wait on a first stop the same way, so they share one pending state and
+  // one set of map feedback.
+  const pendingStop = tool === "ticket" ? ticketStart : tool === "measure" ? measureStart : tool === "route" ? routeStart : null;
+  const previewTarget = pendingStop && hoveredStop && hoveredStop !== pendingStop ? hoveredStop : null;
+  const preview = useMemo(() => {
+    if (!previewTarget || !pendingStop || tool === "route") return null;
+    const path = shortestPath(adjacency, pendingStop, previewTarget);
+    const from = stopById(data, pendingStop)?.name ?? "";
+    const to = stopById(data, previewTarget)?.name ?? "";
+    if (!path) return { routes: new Set<string>(), label: `${from} → ${to} · not connected` };
+    const worth = tool === "ticket" ? `${Math.max(1, Math.round(path.distance * ticketRate))} points` : `${path.distance} spaces`;
+    return { routes: new Set(path.routeIds), label: `${from} → ${to} · ${worth}` };
+  }, [previewTarget, pendingStop, tool, adjacency, data, ticketRate]);
+  const cancelPick = () => { setTicketStart(null); setMeasureStart(null); setRouteStart(null); setHoveredStop(null); setPickTo(null); };
   const stats = useMemo(() => networkStats(data), [data]);
   const colourTable = useMemo(() => colourLengthTable(data), [data]);
   const lowConnectionStops = useMemo(() => data.stops.filter((stop) => (stats.neighbours.get(stop.id) ?? 0) < 2), [data.stops, stats]);
@@ -162,6 +179,8 @@ export function MapEditor() {
     points: ticket.points,
     deck: data.ticketSets.length > 1 ? data.ticketSets.find((set) => set.id === (ticket.set ?? data.ticketSets[0].id))?.label : undefined,
   })) : [];
+  const litTicket = selectedTicket && !showTickets ? data.tickets.find((ticket) => ticket.id === selectedTicket) : undefined;
+  const startTicketFrom = (stopId: string) => { setShowTickets(false); setSelectedTicket(null); enterTool("ticket"); setTicketStart(stopId); };
   const openTicket = (ticketId: string) => { const ticket = data.tickets.find((item) => item.id === ticketId); if (!ticket) return; setTicketSetId(ticket.set ?? data.ticketSets[0].id); setSelectedTicket(ticketId); setShowTickets(true); };
   const selectedR = data.routes.find((route) => route.id === selectedRoute);
   // Put the shape hint on whichever edge of the board the selected route is furthest from,
@@ -187,17 +206,23 @@ export function MapEditor() {
   const clearSelection = () => { setSelectedStop(null); setSelectedRoute(null); setSelectedBackground(null); setImageSelected(false); setSelectedNote(null); };
   const chooseImage = () => { setImageSelected(true); setSelectedStop(null); setSelectedRoute(null); setSelectedBackground(null); setSelectedNote(null); setTool("select"); };
   const chooseNote = (id: string) => { setSelectedNote(id); setSelectedStop(null); setSelectedRoute(null); setSelectedBackground(null); setImageSelected(false); setTool("select"); };
-  const selectTool = (next: Tool) => {
+  // Going to a tool, whoever asks. A click on the tool row goes through selectTool instead, which
+  // lets a tool go when it is already the current one.
+  const enterTool = (next: Tool) => {
     setTool(next);
-    setRouteStart(null);
+    cancelPick();
     setDraftPoints([]);
-    setMeasureStart(null);
     if (next === "measure") setMeasureResult(null);
     if (next !== "select") clearSelection();
   };
+  const selectTool = (next: Tool) => enterTool(next === tool ? "select" : next);
   const undo = () => { const previous = past.at(-1); if (!previous) return; setFuture((items) => [cloneForHistory(data), ...items]); setData(previous); setPast((items) => items.slice(0, -1)); clearSelection(); };
   const redo = () => { const next = future[0]; if (!next) return; setPast((items) => [...items, cloneForHistory(data)]); setData(next); setFuture((items) => items.slice(1)); clearSelection(); };
-  useEffect(() => { undoRef.current = undo; redoRef.current = redo; });
+  useEffect(() => { undoRef.current = undo; redoRef.current = redo; cancelPickRef.current = () => {
+    // An open dialog owns Escape: the first press closes it, a later one clears what it lit up.
+    if (document.querySelector('[role="dialog"]')) return;
+    if (pendingStop) cancelPick(); else setSelectedTicket(null);
+  }; });
   // Ticket cards print on their own paper, so the print tree swaps to them, prints, and swaps back.
   // Two frames, because the printed layout depends on styles applied after the swap renders.
   useEffect(() => {
@@ -208,9 +233,18 @@ export function MapEditor() {
   }, [printScope]);
 
   const hasContent = data.stops.length > 0 || data.routes.length > 0 || data.background.length > 0 || data.notes.length > 0 || Boolean(data.backgroundImage);
-  const formatOpen = !hasContent || formatShown;
   const dismissGuide = () => { try { localStorage.setItem(GUIDE_SEEN_KEY, "1"); } catch { /* ignore unavailable storage */ } setShowGuide(false); };
-  const applyGuideChoice = (map: MapData) => { change(() => cloneMap(map)); clearSelection(); setDraftPoints([]); setTool("select"); dismissGuide(); setDanger(null); };
+  const applyGuideChoice = (map: MapData) => {
+    change(() => cloneMap(map));
+    clearSelection();
+    setDraftPoints([]);
+    setTool("select");
+    dismissGuide();
+    setDanger(null);
+    // An empty map has nothing to look at, and the board format decides everything drawn on it, so
+    // that is where a new map starts.
+    if (!map.stops.length && !map.routes.length) openStyles({ kind: "map" });
+  };
   const chooseFromGuide = (kind: "blank" | "example") => {
     if (hasContent) { setDanger(kind === "blank" ? "load-blank" : "load-example"); return; }
     applyGuideChoice(kind === "blank" ? emptyMap : initialMap);
@@ -218,14 +252,14 @@ export function MapEditor() {
 
   const chooseStop = (id: string) => {
     if (tool === "route") {
-      if (!routeStart) { setRouteStart(id); return; }
+      if (!routeStart) { setRouteStart(id); setPickTo(null); return; }
       if (routeStart === id) { setRouteStart(null); return; }
       change((draft) => { draft.routes.push({ id: `r-${Date.now()}`, a: routeStart, b: id, length: 2, type: routeType, color: routeColor, lineStyle: routeLineStyle, curved: routeCurved ? undefined : false }); return draft; });
       setRouteStart(null);
       return;
     }
     if (tool === "ticket") {
-      if (!ticketStart) { setTicketStart(id); return; }
+      if (!ticketStart) { setTicketStart(id); setPickTo(null); return; }
       if (ticketStart === id) { setTicketStart(null); return; }
       const path = shortestPath(adjacency, ticketStart, id);
       const points = path ? Math.max(1, Math.round(path.distance * ticketRate)) : 1;
@@ -237,7 +271,7 @@ export function MapEditor() {
       return;
     }
     if (tool === "measure") {
-      if (!measureStart) { setMeasureStart(id); setMeasureResult(null); return; }
+      if (!measureStart) { setMeasureStart(id); setMeasureResult(null); setPickTo(null); return; }
       if (measureStart === id) { setMeasureStart(null); return; }
       const path = shortestPath(adjacency, measureStart, id);
       setMeasureResult(path ? { from: measureStart, to: id, distance: path.distance, routeIds: path.routeIds } : { from: measureStart, to: id, unreachable: true });
@@ -281,6 +315,7 @@ export function MapEditor() {
   };
   const onCanvasMove = (event: React.PointerEvent<SVGSVGElement>) => {
     const point = canvasPoint(event.currentTarget, event.clientX, event.clientY, format.height);
+    if (pendingStop) setPickTo(point);
     if (dragNoteRef.current || dragImageRef.current || dragBackgroundLabelRef.current || dragBackgroundPointRef.current || dragWaypointRef.current || dragStopRef.current) draggedRef.current = true;
     if (dragNoteRef.current) {
       const drag = dragNoteRef.current;
@@ -486,12 +521,6 @@ export function MapEditor() {
           {tool === "route" && <div className="tool-options"><StylePicker label="Route type" value={routeType} styles={data.routeTypeStyles} placeholder="" onChange={(id) => id && setRouteType(id)} onEdit={() => openStyles({ kind: "route", id: routeType })} /><label className="checkbox-row"><input type="checkbox" checked={routeCurved} onChange={(event) => setRouteCurved(event.target.checked)} />Draw as a smooth curve</label><div><Label>Colour</Label><NativeSelect value={routeColor} onChange={(event) => setRouteColor(event.target.value)}>{Object.keys(routeColors).map((key) => <NativeSelectOption key={key} value={key}>{colorLabels[key]}</NativeSelectOption>)}</NativeSelect></div><StylePicker label="Special rule style" value={routeLineStyle} styles={data.lineStyles} placeholder="Default appearance" helper="New routes you draw will use this style." onChange={setRouteLineStyle} onEdit={() => openStyles({ kind: "line", id: routeLineStyle })} /></div>}
           {tool === "background" && <div className="tool-options background-tools"><div className="image-import-row"><Label>Background image</Label><div className="image-import-buttons"><Button size="sm" variant="outline" onClick={() => imageFileRef.current?.click()}><ImageIcon />{data.backgroundImage ? "Replace image" : "Import image"}</Button>{data.backgroundImage && <Button size="sm" variant="ghost" onClick={() => { chooseImage(); setDanger("delete"); }}><Trash2 />Remove</Button>}</div></div><Label>Object</Label><NativeSelect value={backgroundType} onChange={(event) => { setBackgroundType(event.target.value as BackgroundType); setDraftPoints([]); }}><NativeSelectOption value="area">Area</NativeSelectOption><NativeSelectOption value="line">Line</NativeSelectOption><NativeSelectOption value="label">Label</NativeSelectOption></NativeSelect>{backgroundType !== "label" && <><div className="colour-row"><label>Fill <input type="color" value={backgroundFill} onChange={(event) => setBackgroundFill(event.target.value)} disabled={backgroundType === "line"} /></label><label>Outline <input type="color" value={backgroundStroke} onChange={(event) => setBackgroundStroke(event.target.value)} /></label></div><p className="helper">Click to add points. Finish when the shape is ready.</p><div className="draft-actions"><Button size="sm" disabled={draftPoints.length < (backgroundType === "area" ? 3 : 2)} onClick={finishBackground}>Finish shape</Button><Button size="sm" variant="ghost" disabled={!draftPoints.length} onClick={() => setDraftPoints([])}>Cancel</Button></div></>}</div>}
         </div>
-        <div className={cn("format-control", formatOpen && "open")}>
-          {hasContent && <button type="button" className="format-toggle" onClick={() => setFormatShown((open) => !open)} aria-expanded={formatOpen}>
-            <span>Board format</span><ChevronDown />
-          </button>}
-          {formatOpen && <div className="format-body"><Label htmlFor="map-format">Board format</Label><NativeSelect id="map-format" value={data.format} onChange={(event) => changeFormat(event.target.value as MapFormat)}>{Object.entries(mapFormats).map(([key, item]) => <NativeSelectOption key={key} value={key}>{item.label}</NativeSelectOption>)}</NativeSelect><dl className="format-measurements"><div><dt>Finished size</dt><dd>{format.widthMm.toLocaleString("en-GB")} × {format.heightMm.toLocaleString("en-GB")} mm{format.imperial ? ` (${format.imperial})` : ""}</dd></div>{format.columns > 1 && <div><dt>Panel size</dt><dd>about {panelWidthMm} × {panelHeightMm} mm</dd></div>}</dl><p>{format.note}{format.custom ? ". This is not a verified commercial Ticket to Ride size" : ""}. Changing format keeps objects in the same relative positions.</p></div>}
-        </div>
         <div className="scale-control">
           <p className="helper">Wagon spaces are drawn at the size a real {realWagon.length} × {realWagon.width} mm train takes up on a {scaleWidthMm.toLocaleString("en-GB")} mm board{format.testSheet ? `, shrunk with the sheet to about ${(realWagon.length / scaleWidthMm * format.widthMm).toFixed(1)} mm each in print` : ", so printing this format at full size gives real-size wagons"}. {tightRoutes.length || looseRoutes.length ? `${[tightRoutes.length && `${tightRoutes.length} too short`, looseRoutes.length && `${looseRoutes.length} roomier than needed`].filter(Boolean).join(", ")} — see Analyze balance.` : "Every route is drawn about the length its wagon count needs."}</p>
         </div>
@@ -527,14 +556,15 @@ export function MapEditor() {
         {data.stops.length > 0 && <Button variant="outline" size="sm" className="analyze-button" onClick={() => setShowAnalysis(true)}><BarChart3 />Analyze balance</Button>}
         <Button variant="outline" size="sm" className="analyze-button" onClick={() => setShowTickets(true)}><TicketIcon />Tickets · {ticketsHere.length}{data.ticketSets.length > 1 ? ` in ${activeTicketSet.label}` : ""}</Button>
         {data.stops.length > 1 && <Button variant="outline" size="sm" className="analyze-button" onClick={() => setShowSuggestions(true)}><Lightbulb />Suggest routes</Button>}
-        <div className="legend"><p className="eyebrow">Stop types</p>{data.stopTypeStyles.map((meta) => <div key={meta.id}><i style={{ background: meta.fill, borderColor: meta.stroke }} />{meta.label}</div>)}</div>
+        <div className="legend"><p className="eyebrow">Stop types</p>{data.stopTypeStyles.map((meta) => <button type="button" key={meta.id} className="legend-item" title={`Edit the ${meta.label} stop type`} onClick={() => openStyles({ kind: "stop", id: meta.id })}><i style={{ background: meta.fill, borderColor: meta.stroke }} />{meta.label}</button>)}</div>
         <Button variant="ghost" className="reset-button" onClick={() => setDanger("reset")}><RotateCcw />Clear map</Button>
       </aside>
       <section className="map-wrap">
+        {litTicket && <div className="highlight-chip"><TicketIcon /><span>{stopById(data, litTicket.a)?.name} → {stopById(data, litTicket.b)?.name}</span><Button variant="ghost" size="icon" aria-label="Stop showing this ticket" onClick={() => setSelectedTicket(null)}><X /></Button></div>}
         <div className="map-status"><Badge variant="secondary">{format.shortLabel}</Badge><Badge variant="secondary">{format.widthMm.toLocaleString("en-GB")} × {format.heightMm.toLocaleString("en-GB")} mm</Badge><Badge variant="secondary">{data.stops.length} stops</Badge><Badge variant="secondary">{data.routes.length} routes</Badge><Badge variant="secondary">{data.background.length} background objects</Badge>{data.notes.length > 0 && <Badge variant="secondary">{data.notes.length} note{data.notes.length === 1 ? "" : "s"}</Badge>}<span>Everything is stored in the exported map file</span></div>
         {hint && hint.atTop && <MapHint atTop title={hint.title} open={routeHintOpen} onToggle={toggleRouteHint} offsetX={routeHintX} onOffsetChange={moveRouteHint}>{hint.body}</MapHint>}
         <svg className={cn("map-canvas", `tool-${tool}`)} style={{ aspectRatio: `${W} / ${format.height}` }} viewBox={`0 0 ${W} ${format.height}`} onPointerDown={onCanvasDown} onPointerMove={onCanvasMove} onPointerUp={stopDragging} onPointerLeave={stopDragging}>
-          <MapArtwork data={data} tool={tool} highlightRoutes={highlightRoutes} scaleWidthMm={scaleWidthMm} selectedRoute={selectedRoute} selectedStop={selectedStop} selectedBackground={selectedBackground} imageSelected={imageSelected} selectedNote={selectedNote} routeStart={routeStart} draft={{ type: backgroundType, points: draftPoints, fill: backgroundFill, stroke: backgroundStroke }} onRoute={(id) => { setSelectedRoute(id); setSelectedStop(null); setSelectedBackground(null); setSelectedNote(null); setTool("select"); }} onRouteSlot={toggleLocomotiveSlot} onRouteBendInsert={insertRouteBend} onRouteBendRemove={removeRouteBend} onStop={(id, shiftHeld) => { chooseStop(id); if (tool === "select" && (shiftHeld || !stopById(data, id)?.locked)) { beginDrag(); dragStopRef.current = id; } }} onWaypoint={(routeId, index, grabOffset) => { beginDrag(); dragWaypointRef.current = { routeId, index, grabOffset }; }} onBackground={(id) => { setSelectedBackground(id); setSelectedRoute(null); setSelectedStop(null); setSelectedNote(null); setTool("select"); }} onBackgroundPoint={(shapeId, index) => { beginDrag(); dragBackgroundPointRef.current = { shapeId, index }; }} onBackgroundLabel={(shapeId) => { beginDrag(); dragBackgroundLabelRef.current = shapeId; }} onImageSelect={chooseImage} onImageMove={(point) => { chooseImage(); const img = data.backgroundImage; if (img) { beginDrag(); dragImageRef.current = { mode: "move", offsetX: point.x - img.x, offsetY: point.y - img.y }; } }} onImageScale={() => { beginDrag(); dragImageRef.current = { mode: "scale" }; }} onImageRotate={() => { beginDrag(); dragImageRef.current = { mode: "rotate" }; }} onNoteSelect={chooseNote} onNoteMove={(id, point) => { chooseNote(id); const note = data.notes.find((item) => item.id === id); if (note) { beginDrag(); dragNoteRef.current = { id, mode: "move", offsetX: point.x - note.x, offsetY: point.y - note.y }; } }} onNoteResize={(id) => { beginDrag(); dragNoteRef.current = { id, mode: "resize" }; }} onNoteToggle={(id) => change((draft) => { const note = draft.notes.find((item) => item.id === id); if (note) note.collapsed = !note.collapsed || undefined; return draft; })} />
+          <MapArtwork data={data} tool={tool} highlightRoutes={highlightRoutes} scaleWidthMm={scaleWidthMm} selectedRoute={selectedRoute} selectedStop={selectedStop} selectedBackground={selectedBackground} imageSelected={imageSelected} selectedNote={selectedNote} pendingStop={pendingStop} pickTo={pickTo} previewRoutes={preview?.routes} previewLabel={preview?.label ?? null} onStopHover={setHoveredStop} draft={{ type: backgroundType, points: draftPoints, fill: backgroundFill, stroke: backgroundStroke }} onRoute={(id) => { setSelectedRoute(id); setSelectedStop(null); setSelectedBackground(null); setSelectedNote(null); setTool("select"); }} onRouteSlot={toggleLocomotiveSlot} onRouteBendInsert={insertRouteBend} onRouteBendRemove={removeRouteBend} onStop={(id, shiftHeld) => { chooseStop(id); if (tool === "select" && (shiftHeld || !stopById(data, id)?.locked)) { beginDrag(); dragStopRef.current = id; } }} onWaypoint={(routeId, index, grabOffset) => { beginDrag(); dragWaypointRef.current = { routeId, index, grabOffset }; }} onBackground={(id) => { setSelectedBackground(id); setSelectedRoute(null); setSelectedStop(null); setSelectedNote(null); setTool("select"); }} onBackgroundPoint={(shapeId, index) => { beginDrag(); dragBackgroundPointRef.current = { shapeId, index }; }} onBackgroundLabel={(shapeId) => { beginDrag(); dragBackgroundLabelRef.current = shapeId; }} onImageSelect={chooseImage} onImageMove={(point) => { chooseImage(); const img = data.backgroundImage; if (img) { beginDrag(); dragImageRef.current = { mode: "move", offsetX: point.x - img.x, offsetY: point.y - img.y }; } }} onImageScale={() => { beginDrag(); dragImageRef.current = { mode: "scale" }; }} onImageRotate={() => { beginDrag(); dragImageRef.current = { mode: "rotate" }; }} onNoteSelect={chooseNote} onNoteMove={(id, point) => { chooseNote(id); const note = data.notes.find((item) => item.id === id); if (note) { beginDrag(); dragNoteRef.current = { id, mode: "move", offsetX: point.x - note.x, offsetY: point.y - note.y }; } }} onNoteResize={(id) => { beginDrag(); dragNoteRef.current = { id, mode: "resize" }; }} onNoteToggle={(id) => change((draft) => { const note = draft.notes.find((item) => item.id === id); if (note) note.collapsed = !note.collapsed || undefined; return draft; })} />
         </svg>
         {hint && !hint.atTop && <MapHint atTop={false} title={hint.title} open={routeHintOpen} onToggle={toggleRouteHint} offsetX={routeHintX} onOffsetChange={moveRouteHint}>{hint.body}</MapHint>}
       </section>
@@ -557,7 +587,7 @@ export function MapEditor() {
       onDuplicateSet={() => { const id = `ts-${Date.now()}`; const stamp = Date.now(); change((draft) => { draft.ticketSets.push({ id, label: nextDeckLabel(draft.ticketSets, `${activeTicketSet.label} copy`) }); ticketsInSet(draft, activeTicketSet.id).forEach((ticket, index) => draft.tickets.push({ ...ticket, id: `t-${stamp}-${index}`, set: id })); return draft; }); setTicketSetId(id); setSelectedTicket(null); }}
       onRenameSet={(label) => change((draft) => { const set = draft.ticketSets.find((item) => item.id === activeTicketSet.id); if (set) set.label = label; return draft; })}
       onDeleteSet={() => { if (data.ticketSets.length < 2) return; const gone = activeTicketSet.id; change((draft) => { const first = draft.ticketSets[0].id; draft.tickets = draft.tickets.filter((ticket) => (ticket.set ?? first) !== gone); draft.ticketSets = draft.ticketSets.filter((set) => set.id !== gone); return draft; }); setTicketSetId(data.ticketSets.find((set) => set.id !== gone)!.id); setSelectedTicket(null); }}
-      onExport={exportTickets} onImport={() => fileRef.current?.click()} onPrint={printTickets}
+      onExport={exportTickets} onImport={() => fileRef.current?.click()} onPrint={printTickets} onStartFrom={startTicketFrom}
       onUpdate={(ticketId, values) => change((draft) => { const ticket = draft.tickets.find((item) => item.id === ticketId); if (ticket) Object.assign(ticket, { ...values, long: values.long === false ? undefined : values.long ?? ticket.long }); return draft; })}
       onDelete={(ticketId) => { change((draft) => { draft.tickets = draft.tickets.filter((item) => item.id !== ticketId); return draft; }); setSelectedTicket((current) => current === ticketId ? null : current); }} />
     <AnalysisDialog open={showAnalysis} onOpenChange={setShowAnalysis} data={data} stats={stats} colourTable={colourTable} spacing={spacing} scaleWidthMm={scaleWidthMm} onSelectRoute={(routeId) => { setShowAnalysis(false); setSelectedRoute(routeId); setSelectedStop(null); setSelectedBackground(null); setSelectedNote(null); setImageSelected(false); setTool("select"); }} onSelectStop={(stopId) => { setShowAnalysis(false); setSelectedStop(stopId); setSelectedRoute(null); setSelectedBackground(null); setSelectedNote(null); setImageSelected(false); setTool("select"); }} />

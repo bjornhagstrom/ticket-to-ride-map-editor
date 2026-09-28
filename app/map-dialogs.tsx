@@ -89,7 +89,7 @@ export function SuggestionsDialog({ open, onOpenChange, suggestions, onAdd }: { 
 }
 
 
-export function TicketsDialog({ open, onOpenChange, data, reviews, coverage, rate, selected, activeSet, onSelect, onUpdate, onDelete, onSelectSet, onAddSet, onDuplicateSet, onRenameSet, onDeleteSet, onExport, onImport, onPrint }: {
+export function TicketsDialog({ open, onOpenChange, data, reviews, coverage, rate, selected, activeSet, onSelect, onUpdate, onDelete, onSelectSet, onAddSet, onDuplicateSet, onRenameSet, onDeleteSet, onExport, onImport, onPrint, onStartFrom }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   data: MapData;
@@ -109,6 +109,7 @@ export function TicketsDialog({ open, onOpenChange, data, reviews, coverage, rat
   onExport: (scope: "set" | "all") => void;
   onImport: () => void;
   onPrint: () => void;
+  onStartFrom: (stopId: string) => void;
 }) {
   const name = (id: string) => data.stops.find((stop) => stop.id === id)?.name ?? "—";
   const problems = reviews.filter((review) => review.verdict !== "ok");
@@ -162,7 +163,10 @@ export function TicketsDialog({ open, onOpenChange, data, reviews, coverage, rat
 
       <div className="analysis-section">
         <h3>Stops no ticket names</h3>
-        <p className="helper">{uncovered.length ? `${uncovered.length} of ${coverage.length}: ${uncovered.map((entry) => entry.stop.name).slice(0, 8).join(", ")}${uncovered.length > 8 ? " and more" : ""}. Nothing sends a player there.` : "Every stop is named by at least one ticket."}</p>
+        {uncovered.length ? <>
+          <p className="helper">{uncovered.length} of {coverage.length}. Nothing sends a player there — pick one to start a ticket from it.</p>
+          <div className="uncovered-stops">{uncovered.map((entry) => <button type="button" key={entry.stop.id} className="uncovered-stop" onClick={() => onStartFrom(entry.stop.id)}>{entry.stop.name}</button>)}</div>
+        </> : <p className="helper">Every stop is named by at least one ticket.</p>}
       </div>
     </DialogContent>
   </Dialog>;

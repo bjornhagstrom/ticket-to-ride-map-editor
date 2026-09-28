@@ -110,7 +110,8 @@ export function SettingsDialog({ open, onOpenChange, target, onTarget, data, cha
 
           {kind === "map" && <div className="style-fields">
             <div><Label htmlFor="settings-format">Board format</Label><NativeSelect id="settings-format" value={data.format} onChange={(event) => onChangeFormat(event.target.value as MapFormat)}>{Object.entries(mapFormats).map(([key, item]) => <NativeSelectOption key={key} value={key}>{item.label}</NativeSelectOption>)}</NativeSelect>
-              <p className="helper">{format.note}. Changing format keeps objects in the same relative positions.</p></div>
+              <dl className="format-measurements"><div><dt>Finished size</dt><dd>{format.widthMm.toLocaleString("en-GB")} × {format.heightMm.toLocaleString("en-GB")} mm{format.imperial ? ` (${format.imperial})` : ""}</dd></div>{format.columns > 1 && <div><dt>Panel size</dt><dd>about {Math.round(format.widthMm / format.columns)} × {Math.round(format.heightMm / format.rows)} mm</dd></div>}</dl>
+              <p className="helper">{format.note}{format.custom ? ". This is not a verified commercial Ticket to Ride size" : ""}. Changing format keeps objects in the same relative positions.</p></div>
             {format.testSheet && <div><Label htmlFor="settings-proof">This sheet is a proof of</Label><NativeSelect id="settings-proof" value={defaults.scaleTarget} onChange={(event) => defaults.setScaleTarget(event.target.value)}>{Object.entries(mapFormats).filter(([, item]) => !item.testSheet).map(([key, item]) => <NativeSelectOption key={key} value={key}>{item.shortLabel}</NativeSelectOption>)}</NativeSelect>
               <p className="helper">A test sheet is a shrunken stand-in for a real board, so the editor needs to know which board it represents.</p></div>}
             <div><Label htmlFor="settings-gap">Space at stops · {data.endGapMm ?? DEFAULT_END_GAP_MM} mm</Label>
