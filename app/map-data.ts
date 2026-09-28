@@ -122,6 +122,9 @@ export const DEFAULT_END_GAP_MM = 2;
 // board: a wagon's width plus a small gap, so the two rows sit beside each other the way a real
 // board prints them rather than floating far apart.
 export const PARALLEL_SPACING_MM = realWagon.width + 2.5;
+// Styled spaces reach further across their own height than a plain rounded rectangle does — teeth
+// meet teeth — so a double route carrying one gets a little more room between its lines.
+export const PARALLEL_SPACING_STYLED_MM = realWagon.width + 5.5;
 
 // Radii in canvas units, chosen to print at roughly the size a real board's city dots do on the
 // reference board: about 3.2, 4.5 and 6.5 mm across the radius. Larger circles crowd the wagons and

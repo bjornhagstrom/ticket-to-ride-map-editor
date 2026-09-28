@@ -1,6 +1,6 @@
 // Pure geometry for the map: where a route's line runs, where its wagon spaces sit, and the
 // primitives the analysis layer builds on. Nothing here touches React or the DOM.
-import { PARALLEL_SPACING_MM, REFERENCE_BOARD_MM, type BackgroundShape, type MapData, type Point, type Route, W } from "./map-data";
+import { PARALLEL_SPACING_MM, PARALLEL_SPACING_STYLED_MM, REFERENCE_BOARD_MM, type BackgroundShape, type MapData, type Point, type Route, W } from "./map-data";
 
 export const stopById = (data: MapData, id: string) => data.stops.find((stop) => stop.id === id);
 export const pointsFor = (data: MapData, route: Route): Point[] => {
@@ -59,9 +59,14 @@ export const samePair = (one: Route, other: Route) => (one.a === other.a && one.
 export function parallelOffset(data: MapData, route: Route): number {
   const siblings = data.routes.filter((item) => samePair(item, route));
   if (siblings.length < 2) return 0;
+  const styled = siblings.some((item) => {
+    const style = item.wagonStyle ? data.wagonStyles?.find((entry) => entry.id === item.wagonStyle) : undefined;
+    return style && style.shape !== "plain";
+  });
+  const spacing = styled ? PARALLEL_SPACING_STYLED_MM : PARALLEL_SPACING_MM;
   const index = siblings.findIndex((item) => item.id === route.id);
   const direction = route.a.localeCompare(route.b) <= 0 ? 1 : -1;
-  return (index - (siblings.length - 1) / 2) * (PARALLEL_SPACING_MM / (REFERENCE_BOARD_MM / W)) * direction;
+  return (index - (siblings.length - 1) / 2) * (spacing / (REFERENCE_BOARD_MM / W)) * direction;
 }
 export function parallelPoints(data: MapData, route: Route): Point[] {
   const points = pointsFor(data, route);

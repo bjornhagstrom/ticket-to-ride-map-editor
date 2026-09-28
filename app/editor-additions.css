@@ -18,17 +18,9 @@
 }
 
 @media print{
-  /* Named pages so each format asks the printer for the paper it was laid out for. Without this the
-     print dialog defaults to portrait and a landscape sheet is scaled down to fit. */
-  @page{margin:0}
-  @page portrait-a4{size:A4 portrait;margin:0}
-  @page landscape-a4{size:A4 landscape;margin:0}
-  @page landscape-a3{size:A3 landscape;margin:0}
-  @page landscape-letter{size:Letter landscape;margin:0}
-  .format-board-2x3 .print-page,.format-board-2x3-large .print-page,.format-board-2x4 .print-page{page:portrait-a4}
-  .format-a4 .print-page{page:landscape-a4}
-  .format-a3 .print-page{page:landscape-a3}
-  .format-us-letter .print-page{page:landscape-letter}
+  /* The page box itself is set from React, in PrintPages: only one format is live at a time, so a
+     single global @page rule with explicit millimetres is used. Named pages were tried first and
+     are not honoured by every print dialog. */
   html,body{background:white!important}
   body{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
   .topbar,.workspace,[role="alertdialog"]{display:none!important}

@@ -7,8 +7,13 @@ import { MapArtwork } from "./map-artwork";
 
 export function PrintPages({ data, scaleWidthMm }: { data: MapData; scaleWidthMm: number }) {
   const format = mapFormats[data.format];
+  // Ask the printer for the paper this format was laid out for. A sheet format prints at its own
+  // size, landscape; a foldable board prints its panels as portrait A4 proofs. Explicit millimetres
+  // rather than `A4 landscape`, because that form is the one print dialogs actually honour.
+  const page = format.testSheet ? `${format.widthMm}mm ${format.heightMm}mm` : "210mm 297mm";
   const panels = Array.from({ length: format.columns * format.rows }, (_, index) => ({ column: index % format.columns, row: Math.floor(index / format.columns) }));
-  return <div className={cn("print-pages", `format-${data.format}`)} aria-hidden="true">{panels.map(({ column, row }, index) => {
+  return <div className={cn("print-pages", `format-${data.format}`)} aria-hidden="true">
+    <style>{`@media print{@page{size:${page};margin:0}}`}</style>{panels.map(({ column, row }, index) => {
     const panelWidth = W / format.columns;
     const panelHeight = format.height / format.rows;
     const printedPanelScale = Math.round(190 / (format.widthMm / format.columns) * 100);

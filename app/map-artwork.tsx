@@ -18,15 +18,18 @@ const HANDLE_OFFSET = 22, HANDLE_HIT = 12;
 // roughly 1.8 mm on a board they survive the shrink to an A4 proof, where 0.9 mm did not.
 const TOOTH_MM = 1.8, NOTCH_MM = 2.4;
 
-export function tunnelSlotPath(w: number, h: number, tooth: number, teeth = 7) {
-  const x = -w / 2, y = -h / 2;
-  const edge = (from: number, to: number, baseY: number, dir: number) =>
+export function tunnelSlotPath(w: number, h: number, tooth: number, teeth = 3) {
+  // Points stick out from an inset body rather than being bitten into a full-size one, so the teeth
+  // read as teeth while the outer envelope still matches a plain space exactly — a tunnel takes no
+  // more room than any other wagon, which keeps the spacing analysis honest.
+  const x = -w / 2, edgeY = h / 2, baseY = edgeY - tooth;
+  const edge = (from: number, to: number, sign: number) =>
     Array.from({ length: teeth }, (_, i) => {
       const a = from + (to - from) * (i + .5) / teeth;
       const b = from + (to - from) * (i + 1) / teeth;
-      return `L${a},${baseY + tooth * dir} L${b},${baseY}`;
+      return `L${a},${edgeY * sign} L${b},${baseY * sign}`;
     }).join(" ");
-  return `M${x},${y} ${edge(x, x + w, y, 1)} L${x + w},${y + h} ${edge(x + w, x, y + h, -1)} Z`;
+  return `M${x},${-baseY} ${edge(x, x + w, -1)} L${x + w},${baseY} ${edge(x + w, x, 1)} Z`;
 }
 
 export function notchedSlotPath(w: number, h: number, notch: number) {
