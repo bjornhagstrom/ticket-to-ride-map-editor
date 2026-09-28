@@ -26,7 +26,7 @@ const dashOptions = (current: string) => dashPresets.some((preset) => preset.val
   ? dashPresets
   : [...dashPresets, { value: current, label: `Custom (${current})` }];
 
-export function StopProperties({ stop, change, onDelete, labelState, mapEndGapMm }: { stop: Stop; change: (fn: (draft: MapData) => MapData) => void; onDelete: () => void; mapEndGapMm: number; labelState: { covers: boolean; clear: number[]; best: number } }) {
+export function StopProperties({ stop, change, onDelete, labelState, mapEndGapMm, allLocked, onLockAll }: { stop: Stop; allLocked: boolean; onLockAll: (locked: boolean) => void; change: (fn: (draft: MapData) => MapData) => void; onDelete: () => void; mapEndGapMm: number; labelState: { covers: boolean; clear: number[]; best: number } }) {
   const update = (values: Partial<Stop>) => change((draft) => { const item = stopById(draft, stop.id); if (item) Object.assign(item, values); return draft; });
   const symbol = stop.symbol ?? "none";
   return <div className="property-form">
@@ -63,6 +63,7 @@ export function StopProperties({ stop, change, onDelete, labelState, mapEndGapMm
       </div>
     </div>
     <Button variant="outline" onClick={() => update({ locked: !stop.locked || undefined })}>{stop.locked ? <Unlock /> : <Lock />}{stop.locked ? "Unlock position" : "Lock position"}</Button>
+    <Button variant="outline" size="sm" onClick={() => onLockAll(!allLocked)}>{allLocked ? <Unlock /> : <Lock />}{allLocked ? "Unlock every stop" : "Lock every stop"}</Button>
     <p className="helper">A locked stop can still be selected and edited, it just cannot be dragged by accident. Hold Shift while dragging to move it anyway, without unlocking it first.</p>
     <Button variant="destructive" onClick={onDelete}><Trash2 />Delete stop</Button>
     <p className="delete-note">Connected routes will also be deleted.</p>

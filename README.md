@@ -12,7 +12,7 @@ Live site: <https://hagstrom.nu/ttr/>
 - Build double routes: two or more parallel lines between the same pair of stops, each in its own colour, drawn side by side automatically.
 - Choose one of three stop sizes, which can carry meaning in some expansions.
 - Mark a stop with a dot, dash, cross or a short letter code, independent of its type.
-- Lock a stop's position so it cannot be dragged by accident, and Shift-drag to move it anyway.
+- Lock a stop's position so it cannot be dragged by accident, one stop at a time or every stop at once, and Shift-drag to move one anyway.
 - Turn a stop's name around the stop to keep it clear of the routes running past it, with a warning listing names that cover a route, a one-click move to a clear position, and a Move names clear button that turns the whole map's names at once and names the stops it could not solve.
 - Mark specific wagon slots on a route as requiring a locomotive card.
 - Mark a route as a tunnel, drawn with the serrated wagon spaces a printed board uses for routes with their own rules.

@@ -352,6 +352,7 @@ export function MapEditor() {
       toast.warning(`${moved}. ${unresolved.length} could not be placed: ${names.slice(0, 4).join(", ")}${names.length > 4 ? ` and ${names.length - 4} more` : ""}. Move the stop, bend the route away, or set those by hand.`);
     } else toast.success(`${moved}.`);
   };
+  const lockAllStops = (locked: boolean) => change((draft) => { for (const stop of draft.stops) stop.locked = locked || undefined; return draft; });
   const insertRouteBend = (routeId: string, index: number, point: Point) => change((draft) => { for (const route of bendTargets(draft, routeId)) { const points = [...(route.points ?? [])]; points.splice(index, 0, { ...point }); route.points = points; } return draft; });
   const removeRouteBend = (routeId: string, index: number) => change((draft) => { for (const route of bendTargets(draft, routeId)) { if (!route.points) continue; const points = route.points.filter((_, item) => item !== index); route.points = points.length ? points : undefined; } return draft; });
   const assignRouteLineStyle = (routeId: string, styleId: string | undefined) => change((draft) => { const route = draft.routes.find((item) => item.id === routeId); if (route) route.lineStyle = styleId; return draft; });
@@ -498,7 +499,7 @@ export function MapEditor() {
         {selectedN && <NoteProperties note={selectedN} change={change} onDelete={() => setDanger("delete")} />}
         {imageSelected && data.backgroundImage && <BackgroundImageProperties image={data.backgroundImage} formatHeight={format.height} change={change} onDelete={() => setDanger("delete")} />}
         {selectedB && <BackgroundProperties shape={selectedB} change={change} onDelete={() => setDanger("delete")} />}
-        {selectedS && <StopProperties stop={selectedS} change={change} onDelete={() => setDanger("delete")} labelState={selectedLabelState} mapEndGapMm={data.endGapMm ?? DEFAULT_END_GAP_MM} />}
+        {selectedS && <StopProperties stop={selectedS} change={change} onDelete={() => setDanger("delete")} labelState={selectedLabelState} mapEndGapMm={data.endGapMm ?? DEFAULT_END_GAP_MM} allLocked={data.stops.length > 0 && data.stops.every((item) => item.locked)} onLockAll={lockAllStops} />}
         {selectedR && <RouteProperties route={selectedR} stops={data.stops} routes={data.routes} lineStyles={data.lineStyles} routeTypeStyles={data.routeTypeStyles} change={change} onDelete={() => setDanger("delete")} onCreateStyle={addLineStyleToRoute} onUpdateStyle={updateLineStyle} onDeleteStyle={deleteLineStyle} onSetStyle={assignRouteLineStyle} onCreateType={addRouteTypeToRoute} onUpdateType={updateRouteType} onDeleteType={deleteRouteType} onAddParallel={addParallelRoute} onStraighten={straightenRoute} onSetCurved={applyRouteCurve} linkParallel={linkParallel} onLinkParallel={setLinkParallel} />}
       </aside>
     </div>
