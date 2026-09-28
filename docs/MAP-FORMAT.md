@@ -106,6 +106,19 @@ Two or more routes between the same pair of stops form a double route: they are 
 
 `lineStyle` is optional and references the `id` of an entry in the map's `lineStyles` list (see below). It overrides one specific route's line thickness and dash pattern on top of its type's own appearance, to flag that this particular route follows some special rule.
 
+## Destination tickets
+
+`tickets` is a map-level array:
+
+```json
+{ "id": "t-1", "a": "stop-west", "b": "stop-central", "points": 8, "long": false }
+```
+
+`a` and `b` reference stop IDs and `points` is what completing it scores. `long` is optional and
+marks a ticket drawn from a separate, longer deck. Nothing about the route between them is stored:
+the distance is derived from the network whenever it is needed, so a ticket stays correct when the
+routes around it change. A file with no `tickets` list opens with an empty one.
+
 ## Stop type styles
 
 `stopTypeStyles` is a map-level array defining what each kind of stop looks like:

@@ -43,8 +43,11 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   check("no route forced to a type colour", !strokes.includes("#23749b") && !strokes.includes("#00877c"));
 
   // 3. tools + tooltip
-  check("tool row has 6 buttons", await page.locator(".tool-row .tool-button").count() === 6);
-  await page.locator(".tool-row .tool-button").nth(2).hover();
+  const toolLabels = await page.locator(".tool-row .tool-button").evaluateAll((els) => els.map((el) => el.getAttribute("aria-label")));
+  check("every tool has a button", toolLabels.every(Boolean) && toolLabels.length >= 6, toolLabels.join(", "));
+  // by label rather than position, so adding a tool does not silently retarget these clicks
+  const tool = (label) => page.locator(`.tool-row .tool-button[aria-label="${label}"]`);
+  await tool("Draw route").hover();
   await page.waitForTimeout(250);
   check("tool tooltip matches the hovered button", (await page.locator('[data-slot="tooltip-content"]').textContent()).startsWith("Draw route"));
 
@@ -121,7 +124,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.waitForTimeout(300);
 
   // 8. measure tool
-  await page.locator(".tool-row .tool-button").nth(5).click();
+  await tool("Measure distance").click();
   await page.waitForTimeout(200);
   const clickStop = async (name) => {
     await page.evaluate((n) => {
@@ -134,7 +137,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   check("measure reports a distance", (await page.locator(".tool-status").textContent()).includes("wagon spaces"), (await page.locator(".tool-status").textContent()));
 
   // 9. adding a stop, changing format, export
-  await page.locator(".tool-row .tool-button").nth(1).click();
+  await tool("Add stop").click();
   await page.waitForTimeout(150);
   await page.evaluate(() => {
     const svg = document.querySelector(".map-canvas");

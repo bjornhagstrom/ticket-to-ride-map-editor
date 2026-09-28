@@ -28,6 +28,7 @@ Live site: <https://hagstrom.nu/ttr/>
 - Check that each route is drawn about as long as its wagon count needs, and see which routes are too short or unnecessarily roomy.
 - Analyse how balanced the network is: hub degree and neighbour count per stop, a colour-by-length distribution table, and a flag for under-connected stops.
 - Measure the shortest travel distance between any two stops (by route length, not straight-line distance).
+- Build a destination ticket deck by clicking two stops, with points suggested from the shortest path and from what the map's other tickets are worth. The ticket list flags unreachable pairs, duplicates and points far from what the distance implies, shows the spread of ticket lengths, and names the stops no ticket sends anyone to.
 - Get automatic route suggestions between nearby, unconnected, poorly-connected stops, with a starting length and colour guess drawn from the balance analysis, that you can add with one click and then adjust.
 - Undo and redo up to 200 changes during the current session, with Cmd/Ctrl+Z and Cmd/Ctrl+Shift+Z.
 - Save automatically in the current browser.

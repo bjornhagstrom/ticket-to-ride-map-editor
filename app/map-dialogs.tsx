@@ -5,8 +5,8 @@ import { FileStack, Layers3, MapPinPlus, Pencil, Plus, Printer, Save } from "luc
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { colorLabels, type MapData, realWagon } from "./map-data";
-import { type ColourLengthTable, type NetworkStats, type RouteSpacing, type RouteSuggestion } from "./map-analysis";
+import { colorLabels, type MapData, realWagon, type Stop } from "./map-data";
+import { type TicketReview, type ColourLengthTable, type NetworkStats, type RouteSpacing, type RouteSuggestion } from "./map-analysis";
 
 export function WelcomeGuide({ open, onOpenChange, onChooseBlank, onChooseExample }: { open: boolean; onOpenChange: (open: boolean) => void; onChooseBlank: () => void; onChooseExample: () => void }) {
   const steps: Array<{ icon: React.ReactNode; title: string; text: string }> = [
@@ -85,3 +85,56 @@ export function SuggestionsDialog({ open, onOpenChange, suggestions, onAdd }: { 
   </Dialog>;
 }
 
+
+export function TicketsDialog({ open, onOpenChange, data, reviews, coverage, rate, selected, onSelect, onUpdate, onDelete }: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  data: MapData;
+  reviews: TicketReview[];
+  coverage: { stop: Stop; count: number }[];
+  rate: number;
+  selected: string | null;
+  onSelect: (ticketId: string | null) => void;
+  onUpdate: (ticketId: string, values: { points?: number; long?: boolean }) => void;
+  onDelete: (ticketId: string) => void;
+}) {
+  const name = (id: string) => data.stops.find((stop) => stop.id === id)?.name ?? "—";
+  const problems = reviews.filter((review) => review.verdict !== "ok");
+  const lengths = reviews.map((review) => review.distance).filter((d): d is number => d !== null).sort((a, b) => a - b);
+  const uncovered = coverage.filter((entry) => entry.count === 0);
+
+  return <Dialog open={open} onOpenChange={onOpenChange}>
+    <DialogContent className="analysis-dialog">
+      <DialogHeader><DialogTitle>Destination tickets</DialogTitle><DialogDescription>{reviews.length} ticket{reviews.length === 1 ? "" : "s"}, worth about {rate.toFixed(1)} point{rate.toFixed(1) === "1.0" ? "" : "s"} per wagon space on this map.</DialogDescription></DialogHeader>
+
+      {problems.length > 0 && <p className="helper helper-warning">{problems.length} need{problems.length === 1 ? "s" : ""} a look: {problems.map((review) => `${name(review.ticket.a)}–${name(review.ticket.b)}`).slice(0, 4).join(", ")}{problems.length > 4 ? ` and ${problems.length - 4} more` : ""}.</p>}
+
+      <div className="analysis-section">
+        <p className="helper">Pick a row to show that ticket&apos;s shortest path on the map. Suggested points come from this map&apos;s own tickets, not from a fixed table.</p>
+        <div className="analysis-table-scroll"><table className="analysis-table">
+          <thead><tr><th>Ticket</th><th>Spaces</th><th>Points</th><th>Suggested</th><th>Long</th><th /></tr></thead>
+          <tbody>{reviews.map((review) => <tr key={review.ticket.id} className={cn("analysis-row-link", review.verdict !== "ok" && "analysis-warning-row", review.ticket.id === selected && "analysis-row-active")} tabIndex={0} role="button"
+            onClick={() => onSelect(review.ticket.id === selected ? null : review.ticket.id)}
+            onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onSelect(review.ticket.id === selected ? null : review.ticket.id); } }}>
+            <td>{name(review.ticket.a)} → {name(review.ticket.b)}{review.verdict === "unreachable" ? " · not connected" : review.verdict === "duplicate" ? " · duplicate" : ""}</td>
+            <td>{review.distance ?? "—"}</td>
+            <td onClick={(event) => event.stopPropagation()}><input className="ticket-points" type="number" min={1} max={99} value={review.ticket.points} onChange={(event) => onUpdate(review.ticket.id, { points: Math.max(1, Number(event.target.value) || 1) })} /></td>
+            <td>{review.suggested ?? "—"}{review.verdict === "generous" ? " · high" : review.verdict === "stingy" ? " · low" : ""}</td>
+            <td onClick={(event) => event.stopPropagation()}><input type="checkbox" checked={Boolean(review.ticket.long)} onChange={(event) => onUpdate(review.ticket.id, { long: event.target.checked })} /></td>
+            <td onClick={(event) => event.stopPropagation()}><Button size="sm" variant="ghost" onClick={() => onDelete(review.ticket.id)}>Delete</Button></td>
+          </tr>)}</tbody>
+        </table></div>
+      </div>
+
+      <div className="analysis-section">
+        <h3>Length spread</h3>
+        <p className="helper">{lengths.length ? `Shortest ${lengths[0]}, median ${lengths[Math.floor(lengths.length / 2)]}, longest ${lengths[lengths.length - 1]} wagon spaces.` : "No reachable tickets yet."} A deck with only short tickets plays differently from one with a long tail.</p>
+      </div>
+
+      <div className="analysis-section">
+        <h3>Stops no ticket names</h3>
+        <p className="helper">{uncovered.length ? `${uncovered.length} of ${coverage.length}: ${uncovered.map((entry) => entry.stop.name).slice(0, 8).join(", ")}${uncovered.length > 8 ? " and more" : ""}. Nothing sends a player there.` : "Every stop is named by at least one ticket."}</p>
+      </div>
+    </DialogContent>
+  </Dialog>;
+}

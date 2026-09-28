@@ -60,6 +60,10 @@ export type BackgroundImage = {
   crop: ImageCrop;
   locked?: boolean;
 };
+// A destination ticket: reach one stop from the other to score its points. `long` marks the ones
+// drawn from a separate, longer deck.
+export type Ticket = { id: string; a: string; b: string; points: number; long?: boolean };
+
 export type NoteBox = {
   id: string;
   x: number;
@@ -70,7 +74,7 @@ export type NoteBox = {
   locked?: boolean;
   collapsed?: boolean;
 };
-export type MapData = { name: string; format: MapFormat; endGapMm?: number; background: BackgroundShape[]; stops: Stop[]; routes: Route[]; backgroundImage?: BackgroundImage; notes: NoteBox[]; lineStyles: LineStyle[]; routeTypeStyles: RouteTypeStyle[]; wagonStyles: WagonStyle[]; stopTypeStyles: StopTypeStyle[] };
+export type MapData = { name: string; format: MapFormat; endGapMm?: number; background: BackgroundShape[]; stops: Stop[]; routes: Route[]; backgroundImage?: BackgroundImage; notes: NoteBox[]; lineStyles: LineStyle[]; routeTypeStyles: RouteTypeStyle[]; wagonStyles: WagonStyle[]; stopTypeStyles: StopTypeStyle[]; tickets: Ticket[] };
 
 export const W = 1100;
 export const STORAGE_KEY = "orebro-map-editor-public-v2";
@@ -189,6 +193,7 @@ export const emptyMap: MapData = {
   routeTypeStyles: defaultRouteTypeStyles.map((style) => ({ ...style })),
   wagonStyles: defaultWagonStyles.map((style) => ({ ...style })),
   stopTypeStyles: defaultStopTypeStyles.map((style) => ({ ...style })),
+  tickets: [],
 };
 
 export const initialMap: MapData = {
@@ -210,6 +215,7 @@ export const initialMap: MapData = {
   routeTypeStyles: defaultRouteTypeStyles.map((style) => ({ ...style })),
   wagonStyles: defaultWagonStyles.map((style) => ({ ...style })),
   stopTypeStyles: defaultStopTypeStyles.map((style) => ({ ...style })),
+  tickets: [],
   background: [
     {
       id: "example-lake",

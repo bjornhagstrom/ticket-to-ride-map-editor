@@ -75,6 +75,7 @@ export const normalizeMap = (value: Partial<MapData>): MapData => ({
   routeTypeStyles: Array.isArray(value.routeTypeStyles) && value.routeTypeStyles.length ? value.routeTypeStyles : defaultRouteTypeStyles.map((style) => ({ ...style })),
   wagonStyles: normalizeWagonStyles(value),
   stopTypeStyles: normalizeStopTypeStyles(value),
+  tickets: Array.isArray(value.tickets) ? value.tickets : [],
   backgroundImage: normalizeBackgroundImage(value.backgroundImage),
 });
 const scalePointToHeight = (point: Point, fromHeight: number, toHeight: number): Point => ({ x: point.x, y: point.y * toHeight / fromHeight });
