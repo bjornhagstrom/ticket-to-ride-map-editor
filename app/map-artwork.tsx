@@ -115,7 +115,7 @@ export function NoteBoxObject({ note, height, selected, print, tool, onSelect, o
     <foreignObject x="0" y="0" width={note.width - 20} height={collapsedHeight}><div {...{ xmlns: "http://www.w3.org/1999/xhtml" }} className={cn("note-box-text", note.collapsed && "one-line")}>{note.text}</div></foreignObject>
     {!print && <g className="note-fold" transform={`translate(${note.width - 11},11)`} onPointerDown={(event) => { event.stopPropagation(); onToggle?.(note.id); }}>
       <circle className="point-hit" r="11" />
-      <path d={note.collapsed ? "M-4,-2 L0,2 L4,-2" : "M-4,2 L0,-2 L4,2"} />
+      <path d={note.collapsed ? "M-4,-2 L0,2 L4,-2" : "M-4,2 L0,-2 L4,2"} fill="none" stroke="#7a6420" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
     </g>}
     {!print && selected && !note.locked && !note.collapsed && <g className="note-resize-handle" transform={`translate(${note.width},${note.height})`} onPointerDown={(event) => { event.stopPropagation(); onResize?.(note.id); }}><circle className="point-hit" r="18" /><rect x="-7" y="-7" width="14" height="14" rx="2" /></g>}
   </g>;
