@@ -84,7 +84,7 @@ export type NoteBox = {
   locked?: boolean;
   collapsed?: boolean;
 };
-export type MapData = { name: string; format: MapFormat; endGapMm?: number; background: BackgroundShape[]; stops: Stop[]; routes: Route[]; backgroundImage?: BackgroundImage; notes: NoteBox[]; lineStyles: LineStyle[]; routeTypeStyles: RouteTypeStyle[]; wagonStyles: WagonStyle[]; stopTypeStyles: StopTypeStyle[]; tickets: Ticket[]; ticketSets: TicketSet[] };
+export type MapData = { name: string; format: MapFormat; endGapMm?: number; background: BackgroundShape[]; stops: Stop[]; routes: Route[]; backgroundImage?: BackgroundImage; notes: NoteBox[]; lineStyles: LineStyle[]; routeTypeStyles: RouteTypeStyle[]; wagonStyles: WagonStyle[]; stopTypeStyles: StopTypeStyle[]; tickets: Ticket[]; ticketSets: TicketSet[]; wagonsPerPlayer?: number; startingTickets?: number };
 
 export const W = 1100;
 export const STORAGE_KEY = "orebro-map-editor-public-v2";
@@ -133,6 +133,11 @@ export const REFERENCE_BOARD_MM = 790;
 // `MapData.endGapMm` sets it for the whole map and `Stop.endGapMm` for one stop, which is what
 // lets the two ends of the same route differ.
 export const DEFAULT_END_GAP_MM = 2;
+
+// How a game on this map is set up. The defaults are the original Ticket to Ride's: 45 wagons each,
+// three destination tickets dealt at the start.
+export const DEFAULT_WAGONS_PER_PLAYER = 45;
+export const DEFAULT_STARTING_TICKETS = 3;
 
 // Centre-to-centre distance between the lines of a double route, in millimetres on the reference
 // board: a wagon's width plus a small gap, so the two rows sit beside each other the way a real

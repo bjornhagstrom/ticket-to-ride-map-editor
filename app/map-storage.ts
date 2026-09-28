@@ -1,6 +1,6 @@
 // Loading, saving and reshaping map files: local-storage keys, the normalizers that let older
 // files open, board-format rescaling, and image reading.
-import { defaultTicketSet, type Ticket, type TicketSet, defaultStopTypeStyles, fallbackStopTypeStyle, type StopTypeStyle, defaultWagonStyles, type WagonStyle, defaultRouteTypeStyles, type LineStyle, type RouteTypeStyle, type BackgroundImage, type BackgroundShape, type ImageCrop, mapFormats, type MapData, type MapFormat, type NoteBox, type Point, type Route, type Stop, STORAGE_KEY } from "./map-data";
+import { DEFAULT_WAGONS_PER_PLAYER, DEFAULT_STARTING_TICKETS, defaultTicketSet, type Ticket, type TicketSet, defaultStopTypeStyles, fallbackStopTypeStyle, type StopTypeStyle, defaultWagonStyles, type WagonStyle, defaultRouteTypeStyles, type LineStyle, type RouteTypeStyle, type BackgroundImage, type BackgroundShape, type ImageCrop, mapFormats, type MapData, type MapFormat, type NoteBox, type Point, type Route, type Stop, STORAGE_KEY } from "./map-data";
 
 export const GUIDE_SEEN_KEY = `${STORAGE_KEY}-guide-seen`;
 export const MAX_IMAGE_WARN_BYTES = 2 * 1024 * 1024;
@@ -78,7 +78,14 @@ export const normalizeMap = (value: Partial<MapData>): MapData => ({
   tickets: Array.isArray(value.tickets) ? value.tickets : [],
   ticketSets: Array.isArray(value.ticketSets) && value.ticketSets.length ? value.ticketSets : [{ ...defaultTicketSet }],
   backgroundImage: normalizeBackgroundImage(value.backgroundImage),
+  // A map written before the setup settings existed opens on the real game's numbers.
+  wagonsPerPlayer: countOr(value.wagonsPerPlayer, DEFAULT_WAGONS_PER_PLAYER),
+  startingTickets: countOr(value.startingTickets, DEFAULT_STARTING_TICKETS),
 });
+const countOr = (value: unknown, fallback: number): number => {
+  const number = Math.round(Number(value));
+  return Number.isFinite(number) && number >= 1 ? number : fallback;
+};
 const scalePointToHeight = (point: Point, fromHeight: number, toHeight: number): Point => ({ x: point.x, y: point.y * toHeight / fromHeight });
 const scaleBackgroundToHeight = (shapes: BackgroundShape[], fromHeight: number, toHeight: number): BackgroundShape[] => shapes.map((shape) => ({ ...shape, points: shape.points.map((point) => scalePointToHeight(point, fromHeight, toHeight)), labelPoint: shape.labelPoint ? scalePointToHeight(shape.labelPoint, fromHeight, toHeight) : undefined }));
 const scaleStopsToHeight = (stops: Stop[], fromHeight: number, toHeight: number): Stop[] => stops.map((stop) => ({ ...stop, ...scalePointToHeight(stop, fromHeight, toHeight) }));

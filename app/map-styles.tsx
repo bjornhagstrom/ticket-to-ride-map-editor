@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { cn } from "@/lib/utils";
-import { colorLabels, DEFAULT_END_GAP_MM, type LineStyle, type MapData, type MapFormat, mapFormats, routeColors, stopSizeMeta, type RouteTypeStyle, type StopTypeStyle, type WagonShape, type WagonStyle, wagonShapeMeta } from "./map-data";
+import { colorLabels, DEFAULT_END_GAP_MM, DEFAULT_WAGONS_PER_PLAYER, DEFAULT_STARTING_TICKETS, type LineStyle, type MapData, type MapFormat, mapFormats, routeColors, stopSizeMeta, type RouteTypeStyle, type StopTypeStyle, type WagonShape, type WagonStyle, wagonShapeMeta } from "./map-data";
 
 export type StyleKind = "map" | "stop" | "route" | "wagon" | "line" | "defaults";
 export type StyleTarget = { kind: StyleKind; id?: string };
@@ -47,6 +47,11 @@ export type EditorDefaults = {
   scaleTarget: string; setScaleTarget: (value: string) => void;
 };
 
+const clampCount = (raw: string, fallback: number): number => {
+  const number = Math.round(Number(raw));
+  return Number.isFinite(number) && number >= 1 ? number : fallback;
+};
+
 export function SettingsDialog({ open, onOpenChange, target, onTarget, data, change, defaults, onChangeFormat }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -64,6 +69,7 @@ export function SettingsDialog({ open, onOpenChange, target, onTarget, data, cha
   const list = lists[kind] ?? [];
   const selected = list.find((style) => style.id === target.id) ?? list[0];
   const format = mapFormats[data.format];
+  const totalSpaces = data.routes.reduce((sum, route) => sum + route.length, 0);
 
   const usage = (styleId: string) => kind === "stop" ? data.stops.filter((stop) => stop.type === styleId).length
     : kind === "route" ? data.routes.filter((route) => route.type === styleId).length
@@ -114,6 +120,15 @@ export function SettingsDialog({ open, onOpenChange, target, onTarget, data, cha
               <p className="helper">{format.note}{format.custom ? ". This is not a verified commercial Ticket to Ride size" : ""}. Changing format keeps objects in the same relative positions.</p></div>
             {format.testSheet && <div><Label htmlFor="settings-proof">This sheet is a proof of</Label><NativeSelect id="settings-proof" value={defaults.scaleTarget} onChange={(event) => defaults.setScaleTarget(event.target.value)}>{Object.entries(mapFormats).filter(([, item]) => !item.testSheet).map(([key, item]) => <NativeSelectOption key={key} value={key}>{item.shortLabel}</NativeSelectOption>)}</NativeSelect>
               <p className="helper">A test sheet is a shrunken stand-in for a real board, so the editor needs to know which board it represents.</p></div>}
+            <div className="settings-pair">
+              <div><Label htmlFor="settings-wagons">Wagons per player</Label>
+                <Input id="settings-wagons" type="number" min={1} max={99} value={data.wagonsPerPlayer ?? DEFAULT_WAGONS_PER_PLAYER}
+                  onChange={(event) => change((draft) => { draft.wagonsPerPlayer = clampCount(event.target.value, DEFAULT_WAGONS_PER_PLAYER); return draft; })} /></div>
+              <div><Label htmlFor="settings-starting-tickets">Tickets dealt at the start</Label>
+                <Input id="settings-starting-tickets" type="number" min={1} max={20} value={data.startingTickets ?? DEFAULT_STARTING_TICKETS}
+                  onChange={(event) => change((draft) => { draft.startingTickets = clampCount(event.target.value, DEFAULT_STARTING_TICKETS); return draft; })} /></div>
+            </div>
+            <p className="helper">How a game on this map is set up. The original game gives each player {DEFAULT_WAGONS_PER_PLAYER} wagons and deals {DEFAULT_STARTING_TICKETS} tickets; a smaller map usually wants fewer wagons. {totalSpaces > 0 ? `This map has ${totalSpaces} wagon spaces in all, so one player's supply could claim about ${Math.round((data.wagonsPerPlayer ?? DEFAULT_WAGONS_PER_PLAYER) / totalSpaces * 100)}% of it.` : ""}</p>
             <div><Label htmlFor="settings-gap">Space at stops · {data.endGapMm ?? DEFAULT_END_GAP_MM} mm</Label>
               <input id="settings-gap" className="range-input" type="range" min="0" max="30" step="1" value={data.endGapMm ?? DEFAULT_END_GAP_MM} onChange={(event) => change((draft) => { draft.endGapMm = Number(event.target.value); return draft; })} />
               <p className="helper">The default room beyond a stop&apos;s own circle before the first wagon. A single stop can override it from its own panel. Past about 4 mm the wagons start losing their real spacing.</p></div>

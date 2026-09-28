@@ -350,6 +350,22 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   check("a stop's tickets are listed deck by deck", deckNames.length === 3, deckNames.join(" | "));
   check("and every deck group holds only its own", (await page.locator(".stop-ticket-deck").first().locator(".stop-ticket-link").count()) >= 1);
 
+  // 19. the game setup settings: wagons per player and tickets dealt at the start
+  await page.getByRole("button", { name: "Settings" }).click();
+  await page.waitForTimeout(500);
+  check("Settings carries the game setup", await page.locator("#settings-wagons").isVisible() && await page.locator("#settings-starting-tickets").isVisible());
+  check("starting at the original game's numbers", (await page.locator("#settings-wagons").inputValue()) === "45" && (await page.locator("#settings-starting-tickets").inputValue()) === "3", `${await page.locator("#settings-wagons").inputValue()}/${await page.locator("#settings-starting-tickets").inputValue()}`);
+  await page.locator("#settings-wagons").fill("40");
+  await page.locator("#settings-wagons").blur();
+  await page.waitForTimeout(400);
+  check("the setup is stored with the map", await page.evaluate(() => JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")).wagonsPerPlayer) === 40);
+  await page.locator("#settings-wagons").fill("0");
+  await page.locator("#settings-wagons").blur();
+  await page.waitForTimeout(400);
+  check("a player cannot be given zero wagons", await page.evaluate(() => JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")).wagonsPerPlayer) >= 1);
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(300);
+
   console.log("PASS:"); ok.forEach((l) => console.log("  ✓ " + l));
   if (bad.length) { console.log("FAIL:"); bad.forEach((l) => console.log("  ✗ " + l)); }
   console.log(`\n${ok.length} passed, ${bad.length} failed`);
