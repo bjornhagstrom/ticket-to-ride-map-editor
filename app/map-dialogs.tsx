@@ -28,7 +28,7 @@ export function WelcomeGuide({ open, onOpenChange, onChooseBlank, onChooseExampl
   </Dialog>;
 }
 
-export function AnalysisDialog({ open, onOpenChange, data, stats, colourTable, spacing, scaleWidthMm }: { open: boolean; onOpenChange: (open: boolean) => void; data: MapData; stats: NetworkStats; colourTable: ColourLengthTable; spacing: RouteSpacing[]; scaleWidthMm: number }) {
+export function AnalysisDialog({ open, onOpenChange, data, stats, colourTable, spacing, scaleWidthMm, onSelectRoute }: { open: boolean; onSelectRoute: (routeId: string) => void; onOpenChange: (open: boolean) => void; data: MapData; stats: NetworkStats; colourTable: ColourLengthTable; spacing: RouteSpacing[]; scaleWidthMm: number }) {
   const stopName = (id: string) => data.stops.find((stop) => stop.id === id)?.name ?? "";
   const sortedStops = [...data.stops].sort((a, b) => (stats.hubDegree.get(b.id) ?? 0) - (stats.hubDegree.get(a.id) ?? 0));
   return <Dialog open={open} onOpenChange={onOpenChange}>
@@ -44,10 +44,10 @@ export function AnalysisDialog({ open, onOpenChange, data, stats, colourTable, s
       </div>
       <div className="analysis-section">
         <h3>Room per wagon</h3>
-        <p className="helper">How long each route is drawn against what a real board would use for the same wagon count: {realWagon.length + realWagon.gap} mm per space plus {realWagon.endMargin} mm of end margin, on a {scaleWidthMm.toLocaleString("en-GB")} mm board. Those figures are fitted from the published Ticket to Ride Europe map, which scores 97–106% against them throughout. Well under means the wagons are cramped; well over means the line looks roomier on screen than the finished board plays.</p>
+        <p className="helper">Pick a row to select that route on the map. How long each route is drawn against what a real board would use for the same wagon count: {realWagon.length + realWagon.gap} mm per space plus {realWagon.endMargin} mm of end margin, on a {scaleWidthMm.toLocaleString("en-GB")} mm board. Those figures are fitted from the published Ticket to Ride Europe map, which scores 97–106% against them throughout. Well under means the wagons are cramped; well over means the line looks roomier on screen than the finished board plays.</p>
         {spacing.length === 0 ? <p className="helper">No card routes yet.</p> : <div className="analysis-table-scroll"><table className="analysis-table">
           <thead><tr><th>Route</th><th>Wagons</th><th>Drawn</th><th>Needs</th><th>Room</th></tr></thead>
-          <tbody>{[...spacing].sort((a, b) => a.ratio - b.ratio).map((item) => <tr key={item.route.id} className={cn(item.verdict !== "ok" && "analysis-warning-row")}>
+          <tbody>{[...spacing].sort((a, b) => a.ratio - b.ratio).map((item) => <tr key={item.route.id} className={cn("analysis-row-link", item.verdict !== "ok" && "analysis-warning-row")} tabIndex={0} role="button" onClick={() => onSelectRoute(item.route.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onSelectRoute(item.route.id); } }}>
             <td>{stopName(item.route.a)} → {stopName(item.route.b)}</td>
             <td>{item.route.length}</td>
             <td>{Math.round(item.drawnMm)} mm</td>
