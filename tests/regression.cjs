@@ -180,13 +180,17 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
 
   const ticketFile = path.join(os.tmpdir(), `ttr-tickets-${Date.now()}.json`);
   const download = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Export this deck" }).click();
+  await page.getByRole("button", { name: /^Decks/ }).click();
+  await page.waitForTimeout(250);
+  await page.getByRole("menuitem", { name: "Export this deck" }).click();
   await (await download).saveAs(ticketFile);
   const ticketPayload = JSON.parse(fs.readFileSync(ticketFile, "utf8"));
   check("ticket-only export writes a ticket file", ticketPayload.kind === "tickets" && ticketPayload.tickets.length === 2, ticketPayload.kind);
   check("exported tickets carry stop names for re-matching", ticketPayload.tickets.every((t) => t.aName && t.bName), JSON.stringify(ticketPayload.tickets[0]));
 
-  await page.getByRole("button", { name: "Duplicate" }).click();
+  await page.getByRole("button", { name: /Add a deck/ }).click();
+  await page.waitForTimeout(250);
+  await page.getByRole("menuitem", { name: /Duplicate this one/ }).click();
   await page.waitForTimeout(400);
   await page.locator("#ticket-set-name").fill("Variant");
   await page.waitForTimeout(400);
@@ -217,8 +221,13 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
       window.__print = { cards: document.querySelectorAll(".print-tickets .ticket-card").length, card: card && card.getBoundingClientRect(), text: card ? card.textContent : "", sheet: sheet && sheet.getBoundingClientRect() };
     };
   });
+  // Printing is a menu item now. The menu is opened while the page is still on screen, then print
+  // media is switched on: the menu is portalled onto the body, so it survives the dialog being
+  // hidden, and the item can be clicked from script.
+  await page.getByRole("button", { name: /^Decks/ }).click();
+  await page.waitForTimeout(400);
   await page.emulateMedia({ media: "print" });
-  await page.evaluate(() => Array.from(document.querySelectorAll("button")).find((b) => b.textContent.includes("Print cards")).click());
+  await page.evaluate(() => Array.from(document.querySelectorAll('[role="menuitem"]')).find((el) => el.textContent.includes("Print deck")).click());
   await page.waitForFunction(() => window.__print !== null, null, { timeout: 5000 });
   const printed = await page.evaluate(() => window.__print);
   const mm = (value) => value / 25.4 * 96;
@@ -407,7 +416,9 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.waitForTimeout(400);
   const decksBefore = await page.locator("#ticket-set option").count();
   const suggestStarted = Date.now();
-  await page.getByRole("button", { name: /Suggest a deck/ }).click();
+  await page.getByRole("button", { name: /Add a deck/ }).click();
+  await page.waitForTimeout(250);
+  await page.getByRole("menuitem", { name: /Suggest a deck/ }).click();
   await page.waitForSelector(".suggest-table tbody tr", { timeout: 20000 });
   check("the suggest dialog opens at once", Date.now() - suggestStarted < 1500, `${Date.now() - suggestStarted} ms`);
   // The deck is worked out off the main thread, so the column fills a moment later.
@@ -569,7 +580,9 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   const longName = "A deck with a really very long name that nobody would sensibly type";
   await page.getByRole("button", { name: /^Tickets · / }).click();
   await page.waitForTimeout(400);
-  await page.getByRole("button", { name: "New deck" }).click();
+  await page.getByRole("button", { name: /Add a deck/ }).click();
+  await page.waitForTimeout(250);
+  await page.getByRole("menuitem", { name: /New, empty deck/ }).click();
   await page.waitForTimeout(400);
   await page.locator("#ticket-set-name").fill(longName);
   await page.waitForTimeout(400);
@@ -589,7 +602,9 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   // 28. the deck styles are laid out so they can be compared, and nothing is too pale to read
   await page.getByRole("button", { name: /^Tickets · / }).click();
   await page.waitForTimeout(400);
-  await page.getByRole("button", { name: /Suggest a deck/ }).click();
+  await page.getByRole("button", { name: /Add a deck/ }).click();
+  await page.waitForTimeout(250);
+  await page.getByRole("menuitem", { name: /Suggest a deck/ }).click();
   await page.waitForSelector(".suggest-dialog", { timeout: 20000 });
   await page.waitForTimeout(400);
   const styleCards = page.locator(".style-card");
@@ -620,7 +635,8 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
       const fg = parse(style.color); if (!fg) continue;
       const bg = backgroundOf(el);
       const size = parseFloat(style.fontSize);
-      const need = size >= 24 || (Number(style.fontWeight) >= 700 && size >= 18.66) ? 3 : 4.5;
+      // AAA, not AA: at 4.5 the greys still read as washed out against the beige.
+      const need = size >= 24 || (Number(style.fontWeight) >= 700 && size >= 18.66) ? 4.5 : 7;
       const got = ratio(over(fg, bg), bg);
       if (got < need) bad.push(`${el.className || el.tagName} ${style.color} ${got.toFixed(2)}<${need}`);
     }

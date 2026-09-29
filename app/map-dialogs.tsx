@@ -2,9 +2,10 @@
 
 // The modal surfaces: the first-visit guide, the balance report and the route suggestions.
 import { useState } from "react";
-import { Copy, Download, FileStack, Sparkles, Layers3, MapPinPlus, Pencil, Plus, Printer, Save, Trash2, Upload } from "lucide-react";
+import { ChevronDown, Copy, Download, FileStack, Sparkles, Layers3, MapPinPlus, Pencil, Plus, Printer, Save, Trash2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DEFAULT_TICKET_MIX, colorLabels, type MapData, realWagon, type Stop, type Ticket, ticketsInSet, type TicketSet } from "./map-data";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
@@ -162,16 +163,24 @@ export function TicketsDialog({ open, onOpenChange, data, reviews, coverage, rat
         <div className="ticket-set-field"><Label htmlFor="ticket-set">Deck</Label><NativeSelect id="ticket-set" value={activeSet.id} onChange={(event) => onSelectSet(event.target.value)}>{data.ticketSets.map((set) => <NativeSelectOption key={set.id} value={set.id}>{set.label} ({ticketsInSet(data, set.id).length})</NativeSelectOption>)}</NativeSelect></div>
         <div className="ticket-set-field"><Label htmlFor="ticket-set-name">Name</Label><Input id="ticket-set-name" value={activeSet.label} onChange={(event) => onRenameSet(event.target.value)} /></div>
         <div className="ticket-set-buttons">
-          <Button size="sm" variant="outline" onClick={onAddSet}><Plus />New deck</Button>
-          <Button size="sm" variant="outline" onClick={onDuplicateSet}><Copy />Duplicate</Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild><Button size="sm" variant="outline"><Plus />Add a deck<ChevronDown /></Button></DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem onClick={onAddSet}><Plus />New, empty deck</DropdownMenuItem>
+              <DropdownMenuItem onClick={onDuplicateSet}><Copy />Duplicate this one</DropdownMenuItem>
+              <DropdownMenuItem onClick={onSuggest}><Sparkles />Suggest a deck…</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild><Button size="sm" variant="outline"><Download />Decks<ChevronDown /></Button></DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem onClick={onImport}><Upload />Import decks</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onExport("set")}><Download />Export this deck</DropdownMenuItem>
+              <DropdownMenuItem disabled={data.ticketSets.length < 2} onClick={() => onExport("all")}><Download />Export every deck</DropdownMenuItem>
+              <DropdownMenuItem disabled={!reviews.length} onClick={onPrint}><Printer />Print deck</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button size="sm" variant="ghost" disabled={data.ticketSets.length < 2} onClick={onDeleteSet}><Trash2 />Delete deck</Button>
-        </div>
-        <div className="ticket-set-buttons">
-          <Button size="sm" variant="outline" onClick={onImport}><Upload />Import tickets</Button>
-          <Button size="sm" variant="outline" onClick={() => onExport("set")}><Download />Export this deck</Button>
-          <Button size="sm" variant="ghost" disabled={data.ticketSets.length < 2} onClick={() => onExport("all")}><Download />Export all decks</Button>
-          <Button size="sm" variant="outline" disabled={!reviews.length} onClick={onPrint}><Printer />Print cards</Button>
-          <Button size="sm" variant="outline" onClick={onSuggest}><Sparkles />Suggest a deck…</Button>
         </div>
         <p className="helper">Several decks can sit in one map, so variants can be judged side by side. Imported decks always arrive as new decks and match stops by name when the ids differ.</p>
       </div>
