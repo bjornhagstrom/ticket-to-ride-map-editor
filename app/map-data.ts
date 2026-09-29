@@ -1,5 +1,7 @@
 export type StopType = string;
-export type StopTypeStyle = { id: string; label: string; fill: string; stroke: string; square?: boolean };
+// `junction` marks a type whose stops are only there to join routes: paths run through them, but no
+// ticket ever ends at one and they do not count as stops when a deck is judged.
+export type StopTypeStyle = { id: string; label: string; fill: string; stroke: string; square?: boolean; junction?: boolean };
 export type StopSize = "small" | "medium" | "large";
 export type StopSymbol = "none" | "dot" | "dash" | "cross" | "letter";
 export type RouteType = string;
@@ -190,6 +192,7 @@ export const stopSymbolMeta: Record<StopSymbol, { label: string }> = {
 // railway station has always had, so that look survives as an option rather than a hard-coded type.
 export const defaultStopTypeStyles: StopTypeStyle[] = [
   { id: "city", label: "City stop", fill: "#fffaf0", stroke: "#721c24" },
+  { id: "junction", label: "Junction", fill: "#e7e1d6", stroke: "#8a8277", junction: true },
   { id: "region", label: "Regional stop", fill: "#fff4dc", stroke: "#b05b2a" },
   { id: "brt", label: "Rapid transit", fill: "#d9f2ef", stroke: "#00877c" },
   { id: "rail", label: "Railway station", fill: "#e8e9eb", stroke: "#292b2f", square: true },

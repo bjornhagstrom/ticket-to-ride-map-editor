@@ -250,6 +250,8 @@ function StopTypeFields({ style, update }: { style: StopTypeStyle; update: Updat
       <label>Outline<input className="colour-input" type="color" value={style.stroke} onChange={(event) => update({ stroke: event.target.value })} /></label>
     </div>
     <label className="checkbox-row"><input type="checkbox" checked={Boolean(style.square)} onChange={(event) => update({ square: event.target.checked || undefined })} />Draw a square inside the circle</label>
+    <label className="checkbox-row"><input type="checkbox" checked={Boolean(style.junction)} onChange={(event) => update({ junction: event.target.checked || undefined })} />No tickets end here</label>
+    <p className="helper">A junction only joins routes. Journeys run through it, but no ticket is ever drawn to it, and it does not count as a stop when a ticket deck is judged.</p>
   </>;
 }
 
