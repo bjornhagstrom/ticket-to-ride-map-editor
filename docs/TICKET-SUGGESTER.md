@@ -2,8 +2,10 @@
 
 This feature adds a **Suggest tickets…** button to the ticket editor. It proposes a complete destination-ticket deck for the current map, and the person then edits that deck. Every rule and target number below comes from the official Ticket to Ride decks. None of them come from our own maps.
 
-- **Reference data:** `data/ttr-reference-maps.json`. It holds the full USA and Europe maps (routes and tickets), deck profiles, and volume data for about 25 other official maps.
+- **Reference data:** `data/ttr-reference-maps.json`. It holds 15 official maps with routes, and 14 of them have tickets. Eight maps have `useForCalibration: true`: USA, Europe, Nordic, India, Switzerland, Old West, Polska and Northern Lights. On these maps points equal the shortest path, with at most a few exceptions. The file also has deck profiles and volume data for about 25 more maps. `data/README.md` describes the format.
+- **Valuation:** `docs/TICKET-VALUATION.md`. How official maps value tickets, and when they do not follow the shortest path.
 - **Reference implementation:** `scripts/ticket-suggester-reference.py`. It is Python and needs networkx. It suggests decks and evaluates existing decks with the same score. The numbers in this document come from running it.
+- **The default style is `generic`** (§2b). Its targets are the mean of seven official decks. `classic` (USA) and `europe` remain as presets.
 
 ## 1. What the official decks show
 
@@ -51,16 +53,59 @@ The score (§4.5) must rank the official decks as good and random decks as bad. 
 
 If a change to the weights or targets lets the official decks score worse than about 5, or random decks better than about 10, the calibration is broken.
 
+## 2b. Multi-map calibration: why `generic` is the default
+
+The first targets (§1, `classic`) were fitted to the USA deck alone. Scored with them, several official decks scored *worse* than random decks:
+
+| Map | Official deck | Random decks (median) |
+| --- | --- | --- |
+| Nordic | 66 | 79 |
+| Switzerland | 124 | 95 |
+| Northern Lights | 93 | 76 |
+
+The USA targets were USA habits, not design rules.
+
+Across the seven classic calibration decks, only three things separate an official deck from a random deck of the same size (drawn from pairs within reach):
+
+1. **Fewer very short tickets.** Less than 0.30 × reach is below random on 6 of 7 maps; more tickets fall in 0.30–0.45.
+2. **Nearly every city is used.**
+3. **Fewer routes are left unused.**
+
+Periphery and near-duplicate rates are not consistent between maps. Tickets per stop range from 0.83 (USA) to 1.49 (India), with a mean of 1.1. Most tickets naming one stop range from 4 to 9.
+
+The `generic` style therefore uses:
+
+- **Length bins:** the mean of the seven decks, `.18 .33 .22 .16 .11`.
+- **Tickets per stop:** 1.1.
+- **Periphery:** relative only. Long-ish endpoints should be at or above the map's mean periphery, and short endpoints at or below it. Only the wrong side is penalised.
+- **Most tickets per stop:** 7.
+- **Near-duplicates:** 3 %.
+
+Result with `generic` (Python reference, seeds 1–2; official decks limited to city–city tickets within reach):
+
+| Map | Official | Suggested | Random (median) |
+| --- | --- | --- | --- |
+| USA | 8.9 | 0.8 | 25.0 |
+| Nordic | 20.9 | 1.3–1.5 | 35.5 |
+| India | 16.2 | 0.9–1.4 | 24.7 |
+| Old West | 13.4 | 0.6 | 26.4 |
+| Polska | 6.4 | 0.8–0.9 | 16.9 |
+| Northern Lights | 23.6 | 1.5–1.6 | 35.8 |
+| Switzerland | 27.5 | 1.0–1.3 | 18.7 |
+| Europe (`europe` style) | 1.9 | 0.6–1.4 | 137 |
+
+Switzerland is the known exception, because a large part of its deck is country tickets, which the suggester does not model yet. The score is a guide, not a verdict. An official deck is expected to score clearly below random, and a suggestion is expected to score below the official deck.
+
 ## 3. API
 
 Add this to `app/map-analysis.ts`, next to `reviewTickets`:
 
 ```ts
-export type TicketStyle = "classic" | "europe";
+export type TicketStyle = "generic" | "classic" | "europe";
 export type TicketSuggestOptions = {
-  style: TicketStyle;          // default "classic"
+  style: TicketStyle;          // default "generic"
   trainsPerPlayer: number;     // default 45
-  ticketsPerStop?: number;     // override the style's value (classic 0.85, europe 0.85 + 0.13 long)
+  ticketsPerStop?: number;     // override the style's value (generic 1.1, classic 0.85, europe 0.85 + 0.13 long)
   seed: number;                // default 1; "Shuffle" increments it
   keep: string[];              // ticket ids that must stay
   steps?: number;              // annealing steps, default 6000
@@ -93,6 +138,8 @@ export function evaluateTicketDeck(data: MapData, options?: Partial<TicketSugges
   - `locos` is the number of `locomotiveSlots` on the shortest route.
   - `tunnel` is true when that route is drawn as a tunnel (`wagonStyle`/route type; match whatever the map uses).
 - Ignore stops that have no routes. If the graph is not connected, use the largest component and say so in the report.
+- Border countries: when the map's `countryTransit` is false (the default), a path may never pass through a country or border-flag stop. The suggester proposes only city–city tickets, so it can drop those stops from the graph (§4.8).
+- Waypoints (kind `waypoint`) stay in the graph as junctions, but are never endpoints and never count as stops for coverage, periphery or tickets per stop.
 - Run Dijkstra from every stop to get all-pairs distances `D`.
 
 ```
@@ -103,14 +150,17 @@ periphery(stop) = mean D from the stop to all others, rescaled so that the most 
 
 ### 4.2 Style presets
 
-| | classic | europe |
-| --- | --- | --- |
-| Regular tickets | round(0.85 × stops) | round(0.85 × stops) |
-| Long tickets | 0 | round(0.13 × stops) |
-| Regular pool | 0.15·reach ≤ L ≤ reach | 0.15·reach ≤ L < 0.9·reach |
-| Long pool | – | 0.9·reach ≤ L ≤ reach |
-| Target bin shares (regular) | .10 .30 .27 .13 .20 | .25 .53 .20 .02 .00 |
-| Point bonus | +1 when L ≥ 0.9·reach | none |
+| | generic (default) | classic (USA) | europe |
+| --- | --- | --- | --- |
+| Regular tickets | round(1.1 × stops) | round(0.85 × stops) | round(0.85 × stops) |
+| Long tickets | 0 | 0 | round(0.13 × stops) |
+| Regular pool | 0.15·reach ≤ L ≤ reach | 0.15·reach ≤ L ≤ reach | 0.15·reach ≤ L < 0.9·reach |
+| Long pool | – | – | 0.9·reach ≤ L ≤ reach |
+| Target bin shares (regular) | .18 .33 .22 .16 .11 | .10 .30 .27 .13 .20 | .25 .53 .20 .02 .00 |
+| Periphery term | relative (§4.5) | point targets | point targets |
+| Most tickets per stop | 7 | 5 | 5 |
+| Near-duplicate allowance | 3 % | 2 % | 2 % |
+| Point bonus | none | +1 when L ≥ 0.9·reach | none |
 
 The lower bound is `max(3, round(0.15 × reach))`.
 
@@ -137,11 +187,13 @@ Tickets with `frac ≥ .60`, whether in the regular or the long deck, count as "
 
 ```
 f_bins   = Σ_bins (count − share × nRegular)² / nRegular               regular deck only
-f_ends   = (meanPeriphery(long-ish endpoints) − 0.62)²
-         + (meanPeriphery(short endpoints) − (mapMeanPeriphery − 0.05))²
-f_cov    = Σ_stops max(0, count − 5)²
+f_ends   (classic, europe) = (meanPeriphery(long-ish endpoints) − 0.62)²
+                            + (meanPeriphery(short endpoints) − (mapMeanPeriphery − 0.05))²
+f_ends   (generic)         = max(0, mapMeanPeriphery − meanPeriphery(long-ish endpoints))²
+                            + max(0, meanPeriphery(short endpoints) − mapMeanPeriphery)²
+f_cov    = Σ_stops max(0, count − maxPerStop)²          maxPerStop: generic 7, others 5
 zero     = stops named by no ticket
-f_dup    = max(0, duplicatePairs − 0.02 × allPairs)
+f_dup    = max(0, duplicatePairs − dupRate × allPairs)  dupRate: generic 0.03, others 0.02
 f_unused = max(0, unusedRoutes − 0.20 × routes)
 f_load   = variance over edges of load / lanes
 f_hard   = Σ_tickets max(0, locos − 2)
@@ -182,6 +234,10 @@ Read `docs/TICKET-VALUATION.md` before implementing points. The default stays `p
 
 Maps with rules the editor cannot model (zones, festivals, shared tracks) get a warning instead of a guessed value.
 
+Also flag, without changing the value, any ticket where a path exists that costs exactly +1 space and uses fewer routes. Label it *value ambiguous (+1 alternative)*. That pattern explains 6 of the 10 remaining deviations on the calibration maps; see `docs/TICKET-VALUATION.md`.
+
+Maps that do not follow the shortest path must never be used to tune targets or weights: Italia, Iberia, South Korea, Japan, Rails & Sails Great Lakes (often below the path) and Rails & Sails World (always above it). Their rules, such as harbours, tours, country cards and festival cards, are recorded as `specialRules` in the data. Tours (R&S World) have their own key, `tours`, and are out of scope for the suggester.
+
 ### 4.8 Border countries and waypoints
 
 - Whether a path may pass through a border country, entering at one flag and leaving at another, differs between maps. Model it as a map setting `countryTransit` with the default `false`. When it is `false`, border-flag stops are dead ends: a shortest path may start or end there but never pass through. The rulebooks of Italia, Switzerland and Märklin all say `false`; Polska has one entrance per country, so transit cannot happen there.
@@ -201,6 +257,31 @@ Maps with rules the editor cannot model (zones, festivals, shared tracks) get a 
 
 ## 6. Acceptance checks
 
+**Multi-map check (the main one).**
+
+1. Build every map with `useForCalibration: true` from `data/ttr-reference-maps.json` as `MapData`. Use `trainsPerPlayer` from the data, or 45 when it is missing. Treat country and border-flag stops as dead ends, and waypoints as junctions.
+2. With `generic` (Europe with `europe`), check each map:
+   - The official deck, limited to city–city tickets within reach, scores below the median of 10 random decks of the same size. Switzerland is the known exception.
+   - `suggestTickets` with seeds 1 and 2 scores < 5 and below the official deck.
+   - No suggested ticket has a waypoint or a country as an endpoint.
+3. Compare the §2b table metric by metric, not ticket by ticket.
+
+**Valuation check.** With the default `valueTicket`, the printed points of the official tickets match exactly:
+
+| Map | Exact matches |
+| --- | --- |
+| Nordic | 46 / 46 |
+| India | 58 / 58 |
+| Polska | 35 / 35 |
+| Switzerland city tickets | 34 / 34 |
+| Old West | 41 / 42 |
+| Northern Lights | 54 / 55 |
+| Europe | 43 / 46 |
+
+This is the test that the graph is built correctly: dead ends, waypoints and parallel lanes.
+
+**Classic and europe presets.** These checks still hold for the older presets:
+
 Build the USA and Europe maps from `data/ttr-reference-maps.json` as `MapData`: stops from `stops`, routes from `routes`, locomotives from `ferryLocomotives`, tunnels from `tunnel`. Then check:
 
 - `evaluateTicketDeck` on the official decks gives:
@@ -218,7 +299,9 @@ The exact tickets will differ from the Python reference because the PRNGs differ
 ## 7. Known data gaps
 
 - Europe's source does not mark double routes, and colours are only grey or not grey. That affects only `f_load`. The data file says what was corrected.
-- Only USA and Europe have full route and ticket data. Adding more official maps to `data/ttr-reference-maps.json` would let the style presets be checked against them, especially Germany and Märklin with their short/long split, and Nordic and Switzerland, which have 40 trains.
+- Märklin has routes but no tickets yet. Germany is missing, so the short/long split (as in Europe) is only checked on Europe.
+- Country tickets (Switzerland, Italia, Polska) need endpoints that are a group of stops. The editor's `Ticket` model does not support that yet, so the suggester only proposes city–city tickets.
+- The route graphs for maps other than USA, Europe and India were extracted from board photos and confirmed by Björn; `notes` in the data file lists what was checked.
 
 ## Sources
 

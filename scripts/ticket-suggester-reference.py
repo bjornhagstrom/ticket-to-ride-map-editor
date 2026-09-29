@@ -5,7 +5,7 @@ the editor: it exists so the TypeScript port can be checked against known number
 
     python3 scripts/ticket-suggester-reference.py data/ttr-reference-maps.json#usa     # official map by id
     python3 scripts/ticket-suggester-reference.py my-map.json                          # editor export
-    options: --style classic|europe  --trains 45  --seed 1  --steps 6000  --evaluate
+    options: --style generic|classic|europe  --trains 45  --seed 1  --steps 6000  --evaluate
 
 --evaluate scores the tickets already in the file instead of suggesting new ones.
 Requires networkx (pip install networkx).
@@ -17,6 +17,12 @@ import networkx as nx
 # Length bins are fractions of `reach` = min(diameter, 0.47 × trainsPerPlayer).
 BIN_EDGES = [0.0, 0.30, 0.45, 0.60, 0.75, 1.01]
 STYLES = {
+    # Generic (default): targets are the mean of 7 official classic decks (USA, Nordic, India, Switzerland,
+    # Old West, Polska, Northern Lights). Scored against these, 6 of 7 official decks score about half of
+    # random decks (Switzerland is the exception: its deck leans on country tickets).
+    "generic": dict(ticketsPerStop=1.1, longPerStop=0.0,
+                    bins=[0.18, 0.33, 0.22, 0.16, 0.11], longRange=None, bonusFrom=None,
+                    periphery="relative", maxPerStop=7, dupRate=0.03),
     # USA: one deck, ~0.85 tickets per stop, lengths spread over the whole reach
     "classic": dict(ticketsPerStop=0.85, longPerStop=0.0,
                     bins=[0.10, 0.30, 0.27, 0.13, 0.20], longRange=None, bonusFrom=0.9),
@@ -50,6 +56,13 @@ def load(spec):
             if w < e["w"]: e.update(w=w, locos=locos, tunnel=tunnel)
         else:
             G.add_edge(a, b, w=w, lanes=1, locos=locos, tunnel=tunnel)
+    # Border flags / country nodes are dead ends when the map forbids transit (the default). The suggester
+    # only proposes city tickets, so a dead end can simply be removed. Waypoints stay as junctions but are
+    # never endpoints.
+    kinds = {s["id"]: s.get("kind", "city") for s in data["stops"]}
+    if not data.get("countryTransit"):
+        G.remove_nodes_from([s["id"] for s in data["stops"] if s.get("deadEnd") or kinds[s["id"]] == "country"])
+    G.graph["waypoints"] = {n for n, k in kinds.items() if k == "waypoint"}
     G.remove_nodes_from([n for n in list(G) if G.degree(n) == 0])
     return G, names, data.get("tickets", [])
 
@@ -57,7 +70,7 @@ def load(spec):
 class Model:
     def __init__(self, G, trains=45, style="classic"):
         self.G, self.s = G, STYLES[style]
-        self.nodes = sorted(G)
+        self.nodes = sorted(n for n in G if n not in G.graph.get("waypoints", ()))
         self.D = dict(nx.all_pairs_dijkstra_path_length(G, weight="w"))
         self.diam = max(max(v.values()) for v in self.D.values())
         self.reach = min(self.diam, int(0.47 * trains))
@@ -98,14 +111,18 @@ class Model:
         longish = [c for c in allT if c["frac"] >= 0.6]; short = [c for c in allT if c["frac"] < 0.6]
         pm = lambda T: st.mean(self.per[c[k]] for c in T for k in "ab") if T else None
         pl, ps = pm(longish), pm(short)
-        f_ends = ((pl - PERIPHERY_LONG) ** 2 if pl is not None else 0) + \
-                 ((ps - (self.perMean + PERIPHERY_SHORT_DELTA)) ** 2 if ps is not None else 0)
+        if s.get("periphery") == "relative":   # long ends at/above average, short ends at/below
+            f_ends = (max(0, self.perMean - pl) ** 2 if pl is not None else 0) + \
+                     (max(0, ps - self.perMean) ** 2 if ps is not None else 0)
+        else:                                  # USA/Europe point targets
+            f_ends = ((pl - PERIPHERY_LONG) ** 2 if pl is not None else 0) + \
+                     ((ps - (self.perMean + PERIPHERY_SHORT_DELTA)) ** 2 if ps is not None else 0)
         cov = collections.Counter(c[k] for c in allT for k in "ab")
-        f_cov = sum(max(0, cov[n] - MAX_PER_STOP) ** 2 for n in self.nodes)
+        f_cov = sum(max(0, cov[n] - s.get("maxPerStop", MAX_PER_STOP)) ** 2 for n in self.nodes)
         zero = sum(cov[n] == 0 for n in self.nodes)
         pairs = len(allT) * (len(allT) - 1) / 2
         dups = sum(self.dup(x, y) for x, y in itertools.combinations(allT, 2))
-        f_dup = max(0, dups - DUP_RATE * pairs)
+        f_dup = max(0, dups - s.get("dupRate", DUP_RATE) * pairs)
         load = collections.Counter()
         for c in allT: load.update(c["load"])
         unused = sum(load[e] == 0 for e in self.lanes)
@@ -125,7 +142,7 @@ class Model:
         return c["L"] + (1 if b and c["frac"] >= b else 0)
 
 # ------------------------------------------------------------------------- search
-def suggest(G, style="classic", trains=45, seed=1, steps=6000, keep=()):
+def suggest(G, style="generic", trains=45, seed=1, steps=6000, keep=()):
     m = Model(G, trains, style); s = m.s; rng = random.Random(seed)
     nReg = round(s["ticketsPerStop"] * len(m.nodes)); nLong = round(s["longPerStop"] * len(m.nodes))
     pairs = [(a, b) for a, b in itertools.combinations(m.nodes, 2)]
@@ -160,8 +177,11 @@ def suggest(G, style="classic", trains=45, seed=1, steps=6000, keep=()):
                 tunnels=c["tunnels"], long=(g == 1)) for g in (0, 1) for c in groups[g]]
     return out, dict(diameter=m.diam, reach=m.reach, regular=len(groups[0]), long=len(groups[1]), **metrics)
 
-def evaluate(G, tickets, style="classic", trains=45):
+def evaluate(G, tickets, style="generic", trains=45):
     m = Model(G, trains, style)
+    # Only city–city tickets within reach can be scored (country tickets and over-long tickets are skipped).
+    ok = set(m.nodes)
+    tickets = [t for t in tickets if t.get("a") in ok and t.get("b") in ok and 0 < m.D[t["a"]][t["b"]] <= m.reach]
     reg = [m.cand(t["a"], t["b"]) for t in tickets if not t.get("long")]
     lng = [m.cand(t["a"], t["b"]) for t in tickets if t.get("long")]
     _, metrics = m.score(reg, lng, len(reg))
@@ -172,7 +192,7 @@ def evaluate(G, tickets, style="classic", trains=45):
 # ------------------------------------------------------------------------- cli
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(); ap.add_argument("map")
-    ap.add_argument("--style", default="classic", choices=STYLES); ap.add_argument("--trains", type=int, default=45)
+    ap.add_argument("--style", default="generic", choices=STYLES); ap.add_argument("--trains", type=int, default=45)
     ap.add_argument("--seed", type=int, default=1); ap.add_argument("--steps", type=int, default=6000)
     ap.add_argument("--evaluate", action="store_true")
     a = ap.parse_args()
