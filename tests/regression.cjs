@@ -670,6 +670,21 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.keyboard.press("Escape");
   await page.waitForTimeout(300);
 
+  // 30. About sits under Help and is a page of its own
+  await page.getByRole("button", { name: /Help/ }).click();
+  await page.waitForTimeout(300);
+  const helpItems = await page.locator('[role="menuitem"]').allTextContents();
+  check("Help offers the guide and About, and nothing clutters the header", helpItems.length === 2 && helpItems.some((t) => /About/.test(t)), helpItems.join(" | "));
+  await page.getByRole("menuitem", { name: /About/ }).click();
+  await page.waitForTimeout(1200);
+  check("About is a page of its own", page.url().includes("/about"), page.url());
+  const aboutText = (await page.locator("body").textContent()).toLowerCase();
+  check("it says where the numbers come from", /shortest path/.test(aboutText) && /official/.test(aboutText));
+  check("and names the version", /\d+\.\d+\.\d+/.test(aboutText), (aboutText.match(/\d+\.\d+\.\d+/) || ["none"])[0]);
+  await page.getByRole("link", { name: /back to the editor/i }).first().click();
+  await page.waitForTimeout(1200);
+  check("and leads back to the editor", (await page.locator(".map-canvas").count()) === 1, page.url());
+
   console.log("PASS:"); ok.forEach((l) => console.log("  ✓ " + l));
   if (bad.length) { console.log("FAIL:"); bad.forEach((l) => console.log("  ✗ " + l)); }
   console.log(`\n${ok.length} passed, ${bad.length} failed`);

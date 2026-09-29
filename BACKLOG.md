@@ -60,9 +60,3 @@ Worth deciding before building: whether a version bump is manual or comes from t
 whether the changelog is one entry per release or one per user-visible change. The file format has
 its own version, separate from the app's, and the changelog should say when the two move together.
 
-## About page
-
-Planned, not built. A page at `/ttr/about` linked from the header, in three parts: what the tool is
-for, how it works behind the scenes — the calibration against the official decks, what the numbers
-mean, where they come from — and the choices behind it, in readable form. `docs/DECISIONS.md` is the
-record; the page is the story told to someone who has just opened the editor.
