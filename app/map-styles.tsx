@@ -225,7 +225,7 @@ export function SettingsDialog({ open, onOpenChange, target, onTarget, data, cha
           {styleKinds.includes(kind) && <div className="style-columns">
             <div className="style-list">
               {list.map((style) => <button key={style.id} type="button" className={cn("style-entry", style.id === selected?.id && "active")} onClick={() => onTarget({ kind, id: style.id })}>
-                <span>{style.label}</span><small>{usage(style.id) || ""}</small>
+                <span>{style.label}</span>{kind === "route" && <RoutePreview style={style as RouteTypeStyle} />}<small>{usage(style.id) || ""}</small>
               </button>)}
               <Button size="sm" variant="outline" onClick={create}><Plus />New</Button>
             </div>
@@ -271,15 +271,23 @@ function StopTypeFields({ style, update }: { style: StopTypeStyle; update: Updat
 
 // The shape drawn by the same functions the map uses, so what is shown here cannot drift from what
 // is printed.
-function ShapePreview({ shape, glyph, stroke }: { shape: WagonShape; glyph?: string; stroke: string }) {
-  const w = 34, h = 15;
-  const path = shape === "notched" ? notchedSlotPath(w, h, 3.5)
-    : shape === "serrated" ? tunnelSlotPath(w, h, 2.6)
+function RoutePreview({ style, className }: { style: RouteTypeStyle; className?: string }) {
+  const shape = style.shape ?? "plain";
+  const w = 26, h = 12;
+  const slot = shape === "notched" ? notchedSlotPath(w, h, 3)
+    : shape === "serrated" ? tunnelSlotPath(w, h, 2.2)
     : shape === "oval" ? ovalSlotPath(w, h)
     : `M${-w / 2},${-h / 2} h${w} v${h} h${-w} Z`;
-  return <svg className="shape-preview" viewBox="-22 -12 44 24" role="img" aria-label={`${wagonShapeMeta[shape].label} wagon space`}>
-    <path d={path} fill="#fffaf0" stroke={stroke} strokeWidth={shape === "heavy" ? 3 : 2} strokeLinejoin="round" />
-    {glyph?.trim() && <text x="0" y="0" dominantBaseline="central" textAnchor="middle" fontSize="9" fill={stroke} fontWeight="700">{glyph.trim()}</text>}
+  // A card route takes its colour from each route, so the sample uses a neutral one; an already
+  // built route is drawn in the type's own colour, because that is where its colour comes from.
+  const ink = style.infrastructure ? style.stroke : "#8a1c24";
+  return <svg className={cn("route-preview", className)} viewBox="-46 -13 92 26" role="img"
+    aria-label={`${style.label}: ${style.strokeWidth}px ${style.dash ? "dashed" : "solid"} line${style.infrastructure ? ", already built" : `, ${wagonShapeMeta[shape].label.toLowerCase()} spaces`}`}>
+    <line x1="-44" y1="0" x2="44" y2="0" stroke={ink} strokeWidth={style.strokeWidth} strokeDasharray={style.dash || undefined} strokeLinecap="round" />
+    {!style.infrastructure && [-15, 15].map((x) => <g key={x} transform={`translate(${x},0)`}>
+      <path d={slot} fill="#fffaf0" stroke={ink} strokeWidth={shape === "heavy" ? 3 : 2} strokeLinejoin="round" />
+      {style.glyph?.trim() && <text x="0" y="0" dominantBaseline="central" textAnchor="middle" fontSize="8" fill={ink} fontWeight="700">{style.glyph.trim()}</text>}
+    </g>)}
   </svg>;
 }
 
@@ -290,10 +298,11 @@ function RouteTypeFields({ style, update }: { style: RouteTypeStyle; update: Upd
       : <p className="helper">Every route keeps its own wagon colour, so a type is told apart by thickness and dash pattern — not by colour.</p>}
     <div><Label>Thickness · {style.strokeWidth}px</Label><input className="range-input" type="range" min="2" max="14" value={style.strokeWidth} onChange={(event) => update({ strokeWidth: Number(event.target.value) })} /></div>
     <div><Label>Dash pattern</Label><NativeSelect value={style.dash} onChange={(event) => update({ dash: event.target.value })}>{dashOptions(style.dash).map((preset) => <NativeSelectOption key={preset.value} value={preset.value}>{preset.label}</NativeSelectOption>)}</NativeSelect></div>
+    <RoutePreview style={style} className="route-preview-large" />
     {!style.infrastructure && <div><Label>Wagon spaces</Label>
       <div className="shape-row">
         <NativeSelect value={style.shape ?? "plain"} onChange={(event) => update({ shape: event.target.value as WagonShape })}>{Object.entries(wagonShapeMeta).map(([key, meta]) => <NativeSelectOption key={key} value={key}>{meta.label}</NativeSelectOption>)}</NativeSelect>
-        <ShapePreview shape={style.shape ?? "plain"} glyph={style.glyph} stroke={style.infrastructure ? style.stroke : "#721c24"} />
+        
       </div>
       <p className="helper">The shape of every space along a route of this type, drawn here exactly as it will appear on the map. A shape says at a glance that a route plays by its own rule.</p></div>}
     <div><Label>Mark in the space</Label><Input maxLength={2} value={style.glyph ?? ""} onChange={(event) => update({ glyph: event.target.value || undefined })} />

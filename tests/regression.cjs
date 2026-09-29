@@ -730,6 +730,24 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.locator(".settings-foot button").click();
   await page.waitForTimeout(400);
 
+  // 33. route types are drawn, not just named
+  await page.getByRole("button", { name: "Settings" }).click();
+  await page.waitForTimeout(400);
+  await page.locator(".settings-nav-item", { hasText: /Route types/ }).click();
+  await page.waitForTimeout(500);
+  const listPreviews = await page.locator(".style-entry .route-preview").count();
+  check("every route type is drawn beside its name", listPreviews >= 3, `${listPreviews} drawn`);
+  check("and the chosen one is drawn large", await page.locator(".route-preview-large").isVisible());
+  const drawn = await page.locator(".route-preview-large").evaluate((el) => ({
+    line: Boolean(el.querySelector("line")),
+    width: el.querySelector("line").getAttribute("stroke-width"),
+    slots: el.querySelectorAll("path").length,
+  }));
+  check("the drawing carries the line's own thickness", drawn.line && Number(drawn.width) >= 1, `${drawn.width}px`);
+  check("and the wagon spaces along it", drawn.slots >= 2, `${drawn.slots} spaces`);
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(300);
+
   console.log("PASS:"); ok.forEach((l) => console.log("  ✓ " + l));
   if (bad.length) { console.log("FAIL:"); bad.forEach((l) => console.log("  ✗ " + l)); }
   console.log(`\n${ok.length} passed, ${bad.length} failed`);
