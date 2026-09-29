@@ -299,7 +299,7 @@ function RouteTypeFields({ style, update }: { style: RouteTypeStyle; update: Upd
     <div><Label>Mark in the space</Label><Input maxLength={2} value={style.glyph ?? ""} onChange={(event) => update({ glyph: event.target.value || undefined })} />
       <p className="helper">One or two characters, drawn inside every space. A shape alone can get lost on a small print; a letter survives it. It is also the quickest way to mark a rule you are trying out — put a letter in the spaces and write down what it means beside the board.</p></div>
     <label className="checkbox-row"><input type="checkbox" checked={style.infrastructure} onChange={(event) => update({ infrastructure: event.target.checked })} />Already built — nobody claims it</label>
-    <p className="helper">For something that is on the board from the start and free to travel along: a canal, a road, an existing railway. It is drawn as a plain line in this type&apos;s colour, with no wagon spaces, and it is left out of everything that counts what players compete over — the colour and length table, the crossing check, and how crowded a route is. Journeys still run along it. This has nothing to do with how a route looks; it is about whether it is part of the game&apos;s economy.</p>
+    <p className="helper">For something that is on the board from the start and free to travel along: a canal, a road, an existing railway. This is a rule, not a look — but the look follows from it. Nobody lays wagons on such a route, so it has no wagon spaces to draw, and it appears as a plain line in this type&apos;s colour. It is also left out of everything that counts what players compete over: the colour and length table, the crossing check, and how crowded a route is. Journeys still run along it.</p>
   </>;
 }
 
