@@ -274,16 +274,30 @@ export function SuggestTicketsDialog({ open, onOpenChange, data, current, sugges
       </DialogHeader>
 
       <div className="suggest-controls">
-        <div><Label htmlFor="suggest-style">Style</Label>
-          <NativeSelect id="suggest-style" value={style} onChange={(event) => onStyle(event.target.value as TicketStyle)}>
-            {(Object.keys(TICKET_SUGGESTER.styles) as TicketStyle[]).map((key) => <NativeSelectOption key={key} value={key}>{TICKET_SUGGESTER.styles[key].label}</NativeSelectOption>)}
-          </NativeSelect></div>
         <div><Label htmlFor="suggest-wagons">Wagons per player</Label>
           <Input id="suggest-wagons" type="number" min={1} max={99} value={wagons} onChange={(event) => onWagons(Math.max(1, Math.round(Number(event.target.value) || 1)))} /></div>
         <div><Label htmlFor="suggest-size">Tickets</Label>
           <Input id="suggest-size" type="number" min={1} max={200} value={deckSize} onChange={(event) => onDeckSize(Math.max(1, Math.round(Number(event.target.value) || 1)))} /></div>
       </div>
-      <p className="helper">{busy ? "Working out a deck… " : ""}{TICKET_SUGGESTER.styles[style].blurb} The wagon count is this map&apos;s own setting and changing it here changes it there. A player&apos;s reach is {report?.reach ?? current.reach} wagon spaces, from {TICKET_SUGGESTER.styles[style].lengthCap} × {wagons} wagons.</p>
+      <div className="style-choices">
+        <Label htmlFor="suggest-style">Style</Label>
+        <select id="suggest-style" className="visually-hidden" value={style} onChange={(event) => onStyle(event.target.value as TicketStyle)}>
+          {(Object.keys(TICKET_SUGGESTER.styles) as TicketStyle[]).map((key) => <option key={key} value={key}>{TICKET_SUGGESTER.styles[key].label}</option>)}
+        </select>
+        <div className="style-cards">{(Object.keys(TICKET_SUGGESTER.styles) as TicketStyle[]).map((key) => {
+          const preset = TICKET_SUGGESTER.styles[key];
+          return <button type="button" key={key} className={cn("style-card", key === style && "chosen")} aria-pressed={key === style} onClick={() => onStyle(key)}>
+            <strong>{preset.label}</strong>
+            <span>{preset.blurb}</span>
+            <dl>
+              <div><dt>Deck</dt><dd>{preset.deck}</dd></div>
+              <div><dt>Lengths</dt><dd>{preset.lengths}</dd></div>
+              <div><dt>And</dt><dd>{preset.after}</dd></div>
+            </dl>
+          </button>;
+        })}</div>
+      </div>
+      <p className="helper">{busy ? "Working out a deck… " : ""} The wagon count is this map&apos;s own setting and changing it here changes it there. A player&apos;s reach is {report?.reach ?? current.reach} wagon spaces, from {TICKET_SUGGESTER.styles[style].lengthCap} × {wagons} wagons.</p>
       {dealtFloor > 0 && <p className="helper">On a map this size, {TICKET_SUGGESTER.styles[style].ticketsPerStop} tickets per stop would leave too few to deal {data.startingTickets ?? 3} each to a table of five, so the count is held at {dealtFloor}. That is denser than the official decks; lower it if you would rather match them.</p>}
       <label className="checkbox-row"><input type="checkbox" checked={keepExisting} onChange={(event) => onKeepExisting(event.target.checked)} />Keep the tickets this deck already has</label>
 
@@ -293,7 +307,7 @@ export function SuggestTicketsDialog({ open, onOpenChange, data, current, sugges
         <thead><tr><th>Measure</th><th>Now</th><th>Suggested</th><th>Reference</th></tr></thead>
         <tbody>
           {row("Tickets", `${current.regular + current.long}`, report ? `${report.regular + report.long}` : "—", `${TICKET_SUGGESTER.styles[style].ticketsPerStop} per stop`)}
-          {row("Long tickets", `${current.long}`, report ? `${report.long}` : "—", style === "europe" ? "Europe has 6 of 46" : "Classic has none")}
+          {row("Long tickets", `${current.long}`, report ? `${report.long}` : "—", style === "europe" ? "Europe draws 6 of its 46 separately" : "this style has no separate long deck")}
           {row("Tickets per stop", current.perStop.toFixed(2), report ? report.perStop.toFixed(2) : "—", range(official.perStop))}
           {row("Reach", `${current.reach}`, report ? `${report.reach}` : "—", "the longest ticket a player can build")}
           {row("Stops with no ticket", `${current.zeroStops}`, report ? `${report.zeroStops}` : "—", "USA 6, Europe 0")}

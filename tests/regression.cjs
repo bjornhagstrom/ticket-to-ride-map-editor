@@ -535,6 +535,50 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   const headingBox = await page.locator(".properties .panel-heading").evaluate((el) => ({ scroll: el.scrollWidth, client: el.clientWidth, line: el.querySelector("small").getBoundingClientRect().height }));
   check("the right panel cuts it off rather than wrapping it", headingBox.scroll <= headingBox.client + 1 && headingBox.line < 24, `${headingBox.scroll} in ${headingBox.client}, ${headingBox.line.toFixed(0)} px tall`);
 
+  // 26. the deck styles are laid out so they can be compared, and nothing is too pale to read
+  await page.getByRole("button", { name: /^Tickets · / }).click();
+  await page.waitForTimeout(400);
+  await page.getByRole("button", { name: /Suggest a deck/ }).click();
+  await page.waitForSelector(".suggest-dialog", { timeout: 20000 });
+  await page.waitForTimeout(400);
+  const styleCards = page.locator(".style-card");
+  check("every style is described side by side", (await styleCards.count()) === 3, (await page.locator(".style-card strong").allTextContents()).join(", "));
+  const firstCard = (await styleCards.first().textContent()).toLowerCase();
+  check("each says what its deck and its lengths are", /deck/.test(firstCard) && /lengths/.test(firstCard), firstCard.slice(0, 70));
+  check("the chosen one is marked", (await page.locator(".style-card.chosen").count()) === 1, await page.locator(".style-card.chosen strong").textContent());
+  await styleCards.nth(1).click();
+  await page.waitForTimeout(500);
+  check("another style can be picked", (await page.locator(".style-card.chosen strong").textContent()) === "Classic", await page.locator(".style-card.chosen strong").textContent());
+
+  // Text has to stand out from what it sits on: 4.5:1 for ordinary text, 3:1 for large or bold.
+  const faint = await page.evaluate(() => {
+    const parse = (value) => { const m = value.match(/rgba?\(([^)]+)\)/); if (!m) return null; const p = m[1].split(/[ ,\/]+/).filter(Boolean).map(Number); return { r: p[0], g: p[1], b: p[2], a: p[3] === undefined ? 1 : p[3] }; };
+    const lum = ({ r, g, b }) => { const f = (c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
+    const over = (fg, bg) => ({ r: fg.r * fg.a + bg.r * (1 - fg.a), g: fg.g * fg.a + bg.g * (1 - fg.a), b: fg.b * fg.a + bg.b * (1 - fg.a), a: 1 });
+    const ratio = (a, b) => { const hi = Math.max(lum(a), lum(b)), lo = Math.min(lum(a), lum(b)); return (hi + 0.05) / (lo + 0.05); };
+    const backgroundOf = (el) => { let node = el; while (node) { const bg = parse(getComputedStyle(node).backgroundColor); if (bg && bg.a >= 1) return bg; node = node.parentElement; } return { r: 255, g: 255, b: 255, a: 1 }; };
+    const bad = [];
+    for (const el of document.querySelectorAll("body *")) {
+      if (el.closest(".print-pages")) continue;
+      const text = Array.from(el.childNodes).filter((n) => n.nodeType === 3).map((n) => n.textContent.trim()).join(" ").trim();
+      if (!text) continue;
+      const style = getComputedStyle(el);
+      if (style.visibility === "hidden" || style.display === "none" || Number(style.opacity) === 0) continue;
+      const box = el.getBoundingClientRect();
+      if (!box.width || !box.height) continue;
+      const fg = parse(style.color); if (!fg) continue;
+      const bg = backgroundOf(el);
+      const size = parseFloat(style.fontSize);
+      const need = size >= 24 || (Number(style.fontWeight) >= 700 && size >= 18.66) ? 3 : 4.5;
+      const got = ratio(over(fg, bg), bg);
+      if (got < need) bad.push(`${el.className || el.tagName} ${style.color} ${got.toFixed(2)}<${need}`);
+    }
+    return [...new Set(bad)];
+  });
+  check("no text is too pale against what it sits on", faint.length === 0, faint.slice(0, 4).join(" | "));
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(300);
+
   console.log("PASS:"); ok.forEach((l) => console.log("  ✓ " + l));
   if (bad.length) { console.log("FAIL:"); bad.forEach((l) => console.log("  ✗ " + l)); }
   console.log(`\n${ok.length} passed, ${bad.length} failed`);

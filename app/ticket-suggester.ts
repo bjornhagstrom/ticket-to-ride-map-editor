@@ -20,7 +20,10 @@ export const TICKET_SUGGESTER = {
     // against the USA-only targets, several official decks came out worse than random decks.
     generic: {
       label: "Generic",
-      blurb: "The average of seven official maps. A good starting point for a map of your own.",
+      blurb: "The average of seven official maps, and the safest start for a map of your own.",
+      lengths: "A spread with few very short tickets: most sit between a third and half of what a player can build.",
+      deck: "About 1.1 tickets per stop, all in one deck.",
+      after: "Long tickets reach the edges of the map and short ones stay nearer the middle, but only the wrong side counts against a deck.",
       ticketsPerStop: 1.1,
       longPerStop: 0,
       bins: [.18, .33, .22, .16, .11],
@@ -33,7 +36,10 @@ export const TICKET_SUGGESTER = {
     },
     classic: {
       label: "Classic",
-      blurb: "One deck, lengths spread across the whole map, as in the original USA game.",
+      blurb: "The original USA game: one deck, lengths across the whole map.",
+      lengths: "Evenly spread all the way out, with a fifth of the deck at the very limit of what a player can build.",
+      deck: "About 0.85 tickets per stop, all in one deck.",
+      after: "The longest tickets are paid a bonus: +1 near the limit, +2 for the single longest.",
       ticketsPerStop: .85,
       longPerStop: 0,
       bins: [.10, .30, .27, .13, .20],
@@ -46,7 +52,10 @@ export const TICKET_SUGGESTER = {
     },
     europe: {
       label: "Europe",
-      blurb: "A short and medium regular deck plus a few long tickets at the very edge of the map.",
+      blurb: "Two decks: short and medium tickets, plus a few long ones drawn separately.",
+      lengths: "The regular deck stays short — four fifths of it below half of what a player can build.",
+      deck: "About 0.85 tickets per stop, plus a long deck of about 0.13 per stop at the very edge of the map.",
+      after: "No bonus: a long ticket is worth its distance, and the risk is the point.",
       ticketsPerStop: .85,
       longPerStop: .13,
       bins: [.25, .53, .20, .02, .00],
