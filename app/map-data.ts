@@ -64,7 +64,9 @@ export type BackgroundImage = {
 };
 // A destination ticket: reach one stop from the other to score its points. `long` marks the ones
 // drawn from a separate, longer deck.
-export type Ticket = { id: string; a: string; b: string; points: number; long?: boolean; set?: string };
+// `adjust` is the designer's own correction to the computed value, kept separate so that suggesting
+// a new deck never silently overwrites it.
+export type Ticket = { id: string; a: string; b: string; points: number; long?: boolean; set?: string; adjust?: number };
 
 // Tickets live in named sets so several decks can sit in one map and be compared. A ticket without
 // a set belongs to the first one, which is how a map written before sets still opens.
@@ -86,7 +88,7 @@ export type NoteBox = {
   locked?: boolean;
   collapsed?: boolean;
 };
-export type MapData = { name: string; format: MapFormat; endGapMm?: number; background: BackgroundShape[]; stops: Stop[]; routes: Route[]; backgroundImage?: BackgroundImage; notes: NoteBox[]; lineStyles: LineStyle[]; routeTypeStyles: RouteTypeStyle[]; wagonStyles: WagonStyle[]; stopTypeStyles: StopTypeStyle[]; tickets: Ticket[]; ticketSets: TicketSet[]; wagonsPerPlayer?: number; startingTickets?: number; keptTickets?: number; ticketBands?: TicketBands; ticketMix?: TicketMix };
+export type MapData = { name: string; format: MapFormat; endGapMm?: number; background: BackgroundShape[]; stops: Stop[]; routes: Route[]; backgroundImage?: BackgroundImage; notes: NoteBox[]; lineStyles: LineStyle[]; routeTypeStyles: RouteTypeStyle[]; wagonStyles: WagonStyle[]; stopTypeStyles: StopTypeStyle[]; tickets: Ticket[]; ticketSets: TicketSet[]; wagonsPerPlayer?: number; startingTickets?: number; keptTickets?: number; ticketBands?: TicketBands; ticketMix?: TicketMix; ticketValuation?: { longBonus?: boolean; ferryPremium?: number } };
 
 export const W = 1100;
 export const STORAGE_KEY = "orebro-map-editor-public-v2";
