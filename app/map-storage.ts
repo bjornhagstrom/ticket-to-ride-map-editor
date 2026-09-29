@@ -1,6 +1,6 @@
 // Loading, saving and reshaping map files: local-storage keys, the normalizers that let older
 // files open, board-format rescaling, and image reading.
-import { DEFAULT_WAGONS_PER_PLAYER, DEFAULT_STARTING_TICKETS, DEFAULT_KEPT_TICKETS, defaultTicketSet, type Ticket, type TicketSet, defaultStopTypeStyles, fallbackStopTypeStyle, type StopTypeStyle, defaultWagonStyles, type WagonStyle, defaultRouteTypeStyles, type LineStyle, type RouteTypeStyle, type BackgroundImage, type BackgroundShape, type ImageCrop, mapFormats, type MapData, type MapFormat, type NoteBox, type Point, type Route, type Stop, STORAGE_KEY } from "./map-data";
+import { W, type PlayerRange, DEFAULT_WAGONS_PER_PLAYER, DEFAULT_STARTING_TICKETS, DEFAULT_KEPT_TICKETS, defaultTicketSet, type Ticket, type TicketSet, defaultStopTypeStyles, fallbackStopTypeStyle, type StopTypeStyle, defaultWagonStyles, type WagonStyle, defaultRouteTypeStyles, type LineStyle, type RouteTypeStyle, type BackgroundImage, type BackgroundShape, type ImageCrop, mapFormats, type MapData, type MapFormat, type NoteBox, type Point, type Route, type Stop, STORAGE_KEY } from "./map-data";
 
 export const GUIDE_SEEN_KEY = `${STORAGE_KEY}-guide-seen`;
 export const MAX_IMAGE_WARN_BYTES = 2 * 1024 * 1024;
@@ -64,6 +64,108 @@ const normalizeStopTypeStyles = (value: Partial<MapData>): StopTypeStyle[] => {
   for (const id of used) if (id && !styles.some((style) => style.id === id)) styles.push({ ...fallbackStopTypeStyle, id, label: id });
   return styles;
 };
+// ---------------------------------------------------------------------------- the file envelope
+//
+// Every file the editor writes carries the same wrapper, so a reader can tell what it is holding
+// before it tries to understand it. docs/FILE-FORMAT.md is the contract; the rules that matter:
+//
+//  - the payload sits under its own key, so file metadata and map data never share a namespace,
+//  - a file written before the envelope existed is read as version 1 and still opens,
+//  - a file from a newer build is refused with a message, never quietly stripped,
+//  - anything a reader does not understand is carried along and written back out untouched.
+export const FILE_FORMAT = "ticket-to-ride-map";
+export const FILE_VERSION = 2;
+export const APP_NAME = "Map prototypes";
+export const APP_VERSION = "0.1.0";
+
+export type FileKind = "map" | "background" | "network" | "tickets";
+
+export type MapFileEnvelope<T = unknown> = {
+  format: typeof FILE_FORMAT;
+  version: number;
+  kind: FileKind;
+  written: string;
+  app: { name: string; version: string };
+  board: { width: number; height: number };
+  payload: T;
+};
+
+export function writeMapFile<T>(kind: FileKind, payload: T, data: Pick<MapData, "format">): MapFileEnvelope<T> {
+  const board = mapFormats[data.format] ?? mapFormats["board-2x3"];
+  return {
+    format: FILE_FORMAT,
+    version: FILE_VERSION,
+    kind,
+    written: new Date().toISOString(),
+    app: { name: APP_NAME, version: APP_VERSION },
+    board: { width: W, height: board.height },
+    payload,
+  };
+}
+
+// Reads either an enveloped file or one of the flat files written before the envelope existed.
+export function readMapFile(raw: unknown): { kind: FileKind; version: number; payload: Record<string, unknown>; board?: { width: number; height: number } } {
+  const value = (raw ?? {}) as Record<string, unknown>;
+  if (value.format === FILE_FORMAT) {
+    const version = Number(value.version);
+    if (!Number.isFinite(version) || version < 1) throw new Error("This file says it is a map file but does not say which version. It may be damaged.");
+    if (version > FILE_VERSION) {
+      throw new Error(`This file was written by a newer version of the editor (file version ${version}). This one reads up to version ${FILE_VERSION}. Update the editor, or export the file again from the version that wrote it.`);
+    }
+    return {
+      kind: isFileKind(value.kind) ? value.kind : "map",
+      version,
+      payload: (value.payload ?? {}) as Record<string, unknown>,
+      board: value.board as { width: number; height: number } | undefined,
+    };
+  }
+  // Version 1: the payload was the file, with `kind` mixed in beside the data.
+  const { kind, ...payload } = value;
+  return { kind: isFileKind(kind) ? kind : "map", version: 1, payload: payload as Record<string, unknown> };
+}
+
+const isFileKind = (value: unknown): value is FileKind => value === "map" || value === "background" || value === "network" || value === "tickets";
+
+// Everything a map file holds. Anything outside this list is a field some other version knows about
+// and this one does not, so it is kept aside rather than thrown away.
+const MAP_KEYS = new Set([
+  "name", "format", "background", "backgroundImage", "stops", "routes", "notes",
+  "lineStyles", "routeTypeStyles", "wagonStyles", "stopTypeStyles", "tickets", "ticketSets",
+  "wagonsPerPlayer", "startingTickets", "keptTickets", "players", "ticketBands", "ticketMix",
+  "ticketValuation", "lanesUsableByPlayers", "endGapMm", "unknown",
+]);
+
+const unknownKeys = (value: Record<string, unknown>): Record<string, unknown> | undefined => {
+  const kept: Record<string, unknown> = {};
+  for (const [key, entry] of Object.entries(value)) if (!MAP_KEYS.has(key)) kept[key] = entry;
+  return Object.keys(kept).length ? kept : undefined;
+};
+
+// A map as it goes into a file: its own fields, with anything a newer build left behind put back
+// where it was found.
+export function mapPayload(data: MapData): Record<string, unknown> {
+  const { unknown, ...rest } = data;
+  return { ...rest, ...(unknown ?? {}) };
+}
+
+// A network file carries the styles its own objects point at, so it can be read into any map.
+export function networkPayload(data: MapData): Record<string, unknown> {
+  const stopTypes = new Set(data.stops.map((stop) => stop.type));
+  const wagonStyles = new Set(data.routes.map((route) => route.wagonStyle).filter(Boolean) as string[]);
+  const lineStyles = new Set(data.routes.map((route) => route.lineStyle).filter(Boolean) as string[]);
+  const routeTypes = new Set(data.routes.map((route) => route.type));
+  return {
+    format: data.format,
+    stops: data.stops,
+    routes: data.routes,
+    tickets: data.tickets,
+    stopTypeStyles: data.stopTypeStyles.filter((style) => stopTypes.has(style.id)),
+    routeTypeStyles: data.routeTypeStyles.filter((style) => routeTypes.has(style.id)),
+    wagonStyles: (data.wagonStyles ?? []).filter((style) => wagonStyles.has(style.id)),
+    lineStyles: data.lineStyles.filter((style) => lineStyles.has(style.id)),
+  };
+}
+
 export const normalizeMap = (value: Partial<MapData>): MapData => ({
   name: typeof value.name === "string" ? value.name : "Imported map",
   format: isMapFormat(value.format) ? value.format : "board-2x3",
@@ -82,7 +184,18 @@ export const normalizeMap = (value: Partial<MapData>): MapData => ({
   wagonsPerPlayer: countOr(value.wagonsPerPlayer, DEFAULT_WAGONS_PER_PLAYER),
   startingTickets: countOr(value.startingTickets, DEFAULT_STARTING_TICKETS),
   keptTickets: Math.min(countOr(value.keptTickets, DEFAULT_KEPT_TICKETS), countOr(value.startingTickets, DEFAULT_STARTING_TICKETS)),
+  players: normalizePlayers(value.players),
+  ticketBands: value.ticketBands,
+  ticketMix: value.ticketMix,
+  ticketValuation: value.ticketValuation,
+  unknown: unknownKeys(value as Record<string, unknown>),
 });
+
+const normalizePlayers = (value: unknown): PlayerRange | undefined => {
+  const range = value as Partial<PlayerRange> | undefined;
+  if (!range || typeof range.min !== "number" || typeof range.max !== "number") return undefined;
+  return { min: Math.max(1, Math.round(Math.min(range.min, range.max))), max: Math.max(1, Math.round(Math.max(range.min, range.max))) };
+};
 const countOr = (value: unknown, fallback: number): number => {
   const number = Math.round(Number(value));
   return Number.isFinite(number) && number >= 1 ? number : fallback;
@@ -100,7 +213,7 @@ export const normalizeBackgroundFile = (value: { format?: unknown; background?: 
   return { background: scaleBackgroundToHeight(Array.isArray(value.background) ? value.background : [], fromHeight, toHeight), backgroundImage: image ? scaleImageToHeight(image, fromHeight, toHeight) : undefined };
 };
 // A network file may carry the tickets that belong to its stops, as the official reference maps do.
-export const normalizeNetworkFile = (value: { format?: unknown; stops?: unknown; routes?: unknown; lineStyles?: unknown; routeTypeStyles?: unknown; tickets?: unknown }, toHeight: number): { stops: Stop[]; routes: Route[]; lineStyles: LineStyle[]; routeTypeStyles: RouteTypeStyle[]; tickets: Ticket[] } => { const fromHeight = sourceHeight(value); return { tickets: Array.isArray(value.tickets) ? (value.tickets as Ticket[]).map((ticket, index) => ({ ...ticket, id: ticket.id || `t-import-${index}`, set: undefined })) : [], stops: scaleStopsToHeight(Array.isArray(value.stops) ? value.stops : [], fromHeight, toHeight), routes: scaleRoutesToHeight(Array.isArray(value.routes) ? value.routes : [], fromHeight, toHeight), lineStyles: Array.isArray(value.lineStyles) ? value.lineStyles : [], routeTypeStyles: Array.isArray(value.routeTypeStyles) && value.routeTypeStyles.length ? value.routeTypeStyles : defaultRouteTypeStyles.map((style) => ({ ...style })) }; };
+export const normalizeNetworkFile = (value: { format?: unknown; stops?: unknown; routes?: unknown; lineStyles?: unknown; routeTypeStyles?: unknown; stopTypeStyles?: unknown; wagonStyles?: unknown; tickets?: unknown }, toHeight: number): { stops: Stop[]; routes: Route[]; lineStyles: LineStyle[]; routeTypeStyles: RouteTypeStyle[]; stopTypeStyles: StopTypeStyle[]; wagonStyles: WagonStyle[]; tickets: Ticket[] } => { const fromHeight = sourceHeight(value); return { stopTypeStyles: Array.isArray(value.stopTypeStyles) ? value.stopTypeStyles : [], wagonStyles: Array.isArray(value.wagonStyles) ? value.wagonStyles : [], tickets: Array.isArray(value.tickets) ? (value.tickets as Ticket[]).map((ticket, index) => ({ ...ticket, id: ticket.id || `t-import-${index}`, set: undefined })) : [], stops: scaleStopsToHeight(Array.isArray(value.stops) ? value.stops : [], fromHeight, toHeight), routes: scaleRoutesToHeight(Array.isArray(value.routes) ? value.routes : [], fromHeight, toHeight), lineStyles: Array.isArray(value.lineStyles) ? value.lineStyles : [], routeTypeStyles: Array.isArray(value.routeTypeStyles) && value.routeTypeStyles.length ? value.routeTypeStyles : defaultRouteTypeStyles.map((style) => ({ ...style })) }; };
 // A ticket-only file. Endpoints travel as stop ids *and* stop names, so a deck can be moved to
 // another copy of the map where the ids differ but the cities are the same.
 export type TicketFile = { kind: "tickets"; map: string; sets: TicketSet[]; tickets: (Ticket & { aName: string; bName: string })[] };

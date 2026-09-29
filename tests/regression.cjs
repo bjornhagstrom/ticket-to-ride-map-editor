@@ -184,8 +184,11 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.waitForTimeout(250);
   await page.getByRole("menuitem", { name: "Export this deck" }).click();
   await (await download).saveAs(ticketFile);
-  const ticketPayload = JSON.parse(fs.readFileSync(ticketFile, "utf8"));
-  check("ticket-only export writes a ticket file", ticketPayload.kind === "tickets" && ticketPayload.tickets.length === 2, ticketPayload.kind);
+  const ticketFileJson = JSON.parse(fs.readFileSync(ticketFile, "utf8"));
+  check("an exported file says what it is and which schema it follows", ticketFileJson.format === "ticket-to-ride-map" && ticketFileJson.version >= 2 && ticketFileJson.kind === "tickets",
+    `${ticketFileJson.format} v${ticketFileJson.version} ${ticketFileJson.kind}`);
+  const ticketPayload = ticketFileJson.payload;
+  check("ticket-only export writes a ticket file", ticketPayload.tickets.length === 2, String(ticketPayload.tickets.length));
   check("exported tickets carry stop names for re-matching", ticketPayload.tickets.every((t) => t.aName && t.bName), JSON.stringify(ticketPayload.tickets[0]));
 
   await page.getByRole("button", { name: /Add a deck/ }).click();

@@ -20,12 +20,12 @@ import { useTicketSuggestion } from "./use-ticket-suggestion";
 import { SettingsDialog, type StyleTarget } from "./map-styles";
 import { bandsOf, bandCuts, mapDiameter, defaultStyle, evaluateTicketDeck, suggestedDeckSize, type TicketStyle, autoPlaceLabels, setupBalance, stopCoverage, ticketBand, type TicketBand, reviewTickets, ticketPointsPerSpace, ticketCoverage, type RouteSuggestion, labelCovers, labelAngleOptions, routeSamplePoints, colourLengthTable, crossingPairs, buildAdjacency, networkStats, routeSpacing, shortestPath, suggestRoutes } from "./map-analysis";
 import { canvasPoint, canvasPointRaw, pointsFor, samePair, stopById } from "./map-geometry";
-import { cloneForHistory, cloneMap, formatTimestamp, GUIDE_SEEN_KEY, HISTORY_LIMIT, MAX_IMAGE_WARN_BYTES, normalizeBackgroundFile, normalizeMap, normalizeNetworkFile, normalizeTicketFile, buildTicketFile, formatStampLabel, readBackgroundImage, rescaleMapToFormat, MAP_HINT_KEY, MAP_HINT_X_KEY } from "./map-storage";
-import { colorLabels, defaultTicketSet, DEFAULT_WAGONS_PER_PLAYER, IMAGE_KEEP_ON_BOARD, type Ticket, ticketsInSet, type TicketSet, emptyMap, initialMap, type LineStyle, DEFAULT_END_GAP_MM, mapFormats, type BackgroundImage, type BackgroundShape, type BackgroundType, type MapData, type MapFormat, type Point, realWagon, type Route, type RouteType, type RouteTypeStyle, routeColors, STORAGE_KEY, type Stop, type StopSize, stopSizeMeta, type StopSymbol, stopSymbolMeta, type StopType, W } from "./map-data";
+import { cloneForHistory, cloneMap, formatTimestamp, GUIDE_SEEN_KEY, HISTORY_LIMIT, MAX_IMAGE_WARN_BYTES, normalizeBackgroundFile, normalizeMap, normalizeNetworkFile, normalizeTicketFile, buildTicketFile, formatStampLabel, readMapFile, writeMapFile, mapPayload, networkPayload, readBackgroundImage, rescaleMapToFormat, MAP_HINT_KEY, MAP_HINT_X_KEY } from "./map-storage";
+import { colorLabels, defaultTicketSet, DEFAULT_WAGONS_PER_PLAYER, IMAGE_KEEP_ON_BOARD, type Ticket, type StopTypeStyle, type WagonStyle, ticketsInSet, type TicketSet, emptyMap, initialMap, type LineStyle, DEFAULT_END_GAP_MM, mapFormats, type BackgroundImage, type BackgroundShape, type BackgroundType, type MapData, type MapFormat, type Point, realWagon, type Route, type RouteType, type RouteTypeStyle, routeColors, STORAGE_KEY, type Stop, type StopSize, stopSizeMeta, type StopSymbol, stopSymbolMeta, type StopType, W } from "./map-data";
 
 type MeasureResult = { from: string; to: string; distance: number; routeIds: string[] } | { from: string; to: string; unreachable: true };
 type Danger = "reset" | "delete" | "load-blank" | "load-example" | "import-background" | "import-network" | "import-image" | null;
-type PendingImport = { kind: "background"; background: BackgroundShape[]; backgroundImage?: BackgroundImage } | { kind: "network"; stops: Stop[]; routes: Route[]; lineStyles: LineStyle[]; routeTypeStyles: RouteTypeStyle[]; tickets: Ticket[] } | { kind: "image"; image: BackgroundImage };
+type PendingImport = { kind: "background"; background: BackgroundShape[]; backgroundImage?: BackgroundImage } | { kind: "network"; stops: Stop[]; routes: Route[]; lineStyles: LineStyle[]; routeTypeStyles: RouteTypeStyle[]; stopTypeStyles: StopTypeStyle[]; wagonStyles: WagonStyle[]; tickets: Ticket[] } | { kind: "image"; image: BackgroundImage };
 // Snapshots are geometry-only (see cloneForHistory), so a deep stack stays in the low megabytes
 // even for a large map. Kept in memory for the session only, never written to local storage.
 
@@ -509,15 +509,20 @@ export function MapEditor() {
   const addSuggestedRoute = (suggestion: RouteSuggestion) => change((draft) => { draft.routes.push({ id: `r-${Date.now()}`, a: suggestion.a, b: suggestion.b, length: suggestion.suggestedLength, type: routeType, color: suggestion.suggestedColor }); return draft; });
   const openStyles = (target: StyleTarget) => { setStyleTarget(target); setShowStyles(true); };
   const downloadJson = (payload: unknown, filenameBase: string) => { const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }); const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = `${filenameBase.replace(/[^a-z0-9]+/gi, "-").toLowerCase() || "map"}-${formatTimestamp()}.json`; link.click(); URL.revokeObjectURL(url); };
-  const exportMap = () => downloadJson({ kind: "map", ...data }, data.name);
-  const exportBackground = () => downloadJson({ kind: "background", format: data.format, background: data.background, backgroundImage: data.backgroundImage }, `${data.name} background`);
-  const exportNetwork = () => downloadJson({ kind: "network", format: data.format, stops: data.stops, routes: data.routes, lineStyles: data.lineStyles, routeTypeStyles: data.routeTypeStyles }, `${data.name} network`);
-  const exportTickets = (scope: "set" | "all") => { const ids = scope === "all" ? data.ticketSets.map((set) => set.id) : [activeTicketSet.id]; downloadJson(buildTicketFile(data, ids), `${data.name} ${scope === "all" ? "tickets" : activeTicketSet.label}`); };
+  const exportMap = () => downloadJson(writeMapFile("map", mapPayload(data), data), data.name);
+  const exportBackground = () => downloadJson(writeMapFile("background", { format: data.format, background: data.background, backgroundImage: data.backgroundImage }, data), `${data.name} background`);
+  const exportNetwork = () => downloadJson(writeMapFile("network", networkPayload(data), data), `${data.name} network`);
+  const exportTickets = (scope: "set" | "all") => { const ids = scope === "all" ? data.ticketSets.map((set) => set.id) : [activeTicketSet.id]; downloadJson(writeMapFile("tickets", buildTicketFile(data, ids), data), `${data.name} ${scope === "all" ? "tickets" : activeTicketSet.label}`); };
   const printTickets = () => { setShowTickets(false); setPrintScope("tickets"); };
   const applyBackgroundImport = (background: BackgroundShape[], backgroundImage?: BackgroundImage) => { change((draft) => ({ ...draft, background, backgroundImage })); clearSelection(); setDanger(null); setPendingImport(null); };
-  const applyNetworkImport = (stops: Stop[], routes: Route[], lineStyles: LineStyle[], routeTypeStyles: RouteTypeStyle[], tickets: Ticket[]) => {
+  const applyNetworkImport = (stops: Stop[], routes: Route[], lineStyles: LineStyle[], routeTypeStyles: RouteTypeStyle[], stopTypeStyles: StopTypeStyle[], wagonStyles: WagonStyle[], tickets: Ticket[]) => {
     change((draft) => {
-      const next = { ...draft, stops, routes, lineStyles, routeTypeStyles };
+      // Styles the file brought are added where this map has none by that id, so an imported
+      // network keeps its junctions and tunnels without overwriting styles already set up here.
+      const mergeStyles = <T extends { id: string }>(mine: T[], theirs: T[]) => [...mine, ...theirs.filter((style) => !mine.some((item) => item.id === style.id))];
+      const next = { ...draft, stops, routes, lineStyles, routeTypeStyles,
+        stopTypeStyles: mergeStyles(draft.stopTypeStyles, stopTypeStyles),
+        wagonStyles: mergeStyles(draft.wagonStyles ?? [], wagonStyles) };
       // Tickets that came with the network go into the deck being worked on.
       if (tickets.length) next.tickets = [...draft.tickets.filter((ticket) => (ticket.set ?? draft.ticketSets[0].id) !== activeTicketSet.id), ...tickets.map((ticket) => ({ ...ticket, set: activeTicketSet.id }))];
       return next;
@@ -531,14 +536,15 @@ export function MapEditor() {
     const reader = new FileReader();
     reader.onload = () => {
       try {
-        const raw = JSON.parse(String(reader.result));
-        if (raw && raw.kind === "background") {
+        const parsed = readMapFile(JSON.parse(String(reader.result)));
+        const raw = parsed.payload as Record<string, never>;
+        if (parsed.kind === "background") {
           const { background, backgroundImage } = normalizeBackgroundFile(raw, format.height);
           if (data.background.length || data.backgroundImage) { setPendingImport({ kind: "background", background, backgroundImage }); setDanger("import-background"); }
           else applyBackgroundImport(background, backgroundImage);
           return;
         }
-        if (raw && raw.kind === "tickets") {
+        if (parsed.kind === "tickets") {
           const { sets, tickets, dropped } = normalizeTicketFile(raw, data);
           if (!tickets.length) { toast.error(dropped ? `None of the ${dropped} tickets in the file match a stop in this map.` : "That ticket file is empty."); return; }
           change((draft) => ({ ...draft, ticketSets: [...draft.ticketSets, ...sets], tickets: [...draft.tickets, ...tickets] }));
@@ -547,16 +553,19 @@ export function MapEditor() {
           toast.success(`${tickets.length} ticket${tickets.length === 1 ? "" : "s"} imported as ${sets.map((set) => set.label).join(", ")}.${dropped ? ` ${dropped} skipped: no matching stop.` : ""}`);
           return;
         }
-        if (raw && raw.kind === "network") {
-          const { stops, routes, lineStyles, routeTypeStyles, tickets } = normalizeNetworkFile(raw, format.height);
-          if (data.stops.length || data.routes.length) { setPendingImport({ kind: "network", stops, routes, lineStyles, routeTypeStyles, tickets }); setDanger("import-network"); }
-          else applyNetworkImport(stops, routes, lineStyles, routeTypeStyles, tickets);
+        if (parsed.kind === "network") {
+          const { stops, routes, lineStyles, routeTypeStyles, stopTypeStyles, wagonStyles, tickets } = normalizeNetworkFile(raw, format.height);
+          if (data.stops.length || data.routes.length) { setPendingImport({ kind: "network", stops, routes, lineStyles, routeTypeStyles, stopTypeStyles, wagonStyles, tickets }); setDanger("import-network"); }
+          else applyNetworkImport(stops, routes, lineStyles, routeTypeStyles, stopTypeStyles, wagonStyles, tickets);
           return;
         }
         const incoming = normalizeMap(raw);
         change(() => incoming);
         clearSelection();
-      } catch { window.alert("The file could not be read as a map project."); }
+      } catch (error) {
+        // A file from a newer build says so in its own words; anything else is simply not ours.
+        toast.error(error instanceof Error && error.message.includes("newer version") ? error.message : "The file could not be read as a map project.");
+      }
     };
     reader.readAsText(file);
   };
@@ -659,7 +668,7 @@ export function MapEditor() {
         {selectedR && <RouteProperties route={selectedR} stops={data.stops} routes={data.routes} lineStyles={data.lineStyles} routeTypeStyles={data.routeTypeStyles} change={change} onDelete={() => setDanger("delete")} onSetStyle={assignRouteLineStyle} onAddParallel={addParallelRoute} wagonStyles={data.wagonStyles} onEditStyles={openStyles} onStraighten={straightenRoute} onSetCurved={applyRouteCurve} linkParallel={linkParallel} onLinkParallel={setLinkParallel} />}
       </aside>
     </div>
-    <AlertDialog open={danger !== null} onOpenChange={(open) => { if (!open) { setDanger(null); setPendingImport(null); } }}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{danger === "reset" ? "Clear the entire map?" : danger === "load-blank" ? "Replace the current map with a blank one?" : danger === "load-example" ? "Replace the current map with the example?" : danger === "import-background" ? "Replace the background?" : danger === "import-network" ? "Replace stops and routes?" : danger === "import-image" ? "Replace the background image?" : "Delete the selected object?"}</AlertDialogTitle><AlertDialogDescription>{danger === "reset" ? "All locally stored background objects, stops and routes will be removed. Export the map first if you want to keep it." : danger === "load-blank" ? "Your current background objects, stops and routes will be replaced with a blank map. Export the map first if you want to keep your work." : danger === "load-example" ? "Your current background objects, stops and routes will be replaced with the neutral example map. Export the map first if you want to keep your work." : danger === "import-background" ? "The imported background, including any background image, will replace the current one. Stops and routes are kept as they are." : danger === "import-network" ? "The imported stops and routes will replace the current network, and any tickets in the file replace the deck you are working in. Background objects are kept as they are." : danger === "import-image" ? "The new image will replace the current background image." : selectedStop ? "The stop and all connected routes will be deleted." : "The selected object will be deleted."}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => { if (danger === "reset") { change(() => cloneMap(emptyMap)); clearSelection(); setDanger(null); } else if (danger === "load-blank") applyGuideChoice(emptyMap); else if (danger === "load-example") applyGuideChoice(initialMap); else if (danger === "import-background" && pendingImport?.kind === "background") applyBackgroundImport(pendingImport.background, pendingImport.backgroundImage); else if (danger === "import-network" && pendingImport?.kind === "network") applyNetworkImport(pendingImport.stops, pendingImport.routes, pendingImport.lineStyles, pendingImport.routeTypeStyles, pendingImport.tickets); else if (danger === "import-image" && pendingImport?.kind === "image") applyImageImport(pendingImport.image); else deleteSelected(); }}>Continue</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+    <AlertDialog open={danger !== null} onOpenChange={(open) => { if (!open) { setDanger(null); setPendingImport(null); } }}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{danger === "reset" ? "Clear the entire map?" : danger === "load-blank" ? "Replace the current map with a blank one?" : danger === "load-example" ? "Replace the current map with the example?" : danger === "import-background" ? "Replace the background?" : danger === "import-network" ? "Replace stops and routes?" : danger === "import-image" ? "Replace the background image?" : "Delete the selected object?"}</AlertDialogTitle><AlertDialogDescription>{danger === "reset" ? "All locally stored background objects, stops and routes will be removed. Export the map first if you want to keep it." : danger === "load-blank" ? "Your current background objects, stops and routes will be replaced with a blank map. Export the map first if you want to keep your work." : danger === "load-example" ? "Your current background objects, stops and routes will be replaced with the neutral example map. Export the map first if you want to keep your work." : danger === "import-background" ? "The imported background, including any background image, will replace the current one. Stops and routes are kept as they are." : danger === "import-network" ? "The imported stops and routes will replace the current network, and any tickets in the file replace the deck you are working in. Background objects are kept as they are." : danger === "import-image" ? "The new image will replace the current background image." : selectedStop ? "The stop and all connected routes will be deleted." : "The selected object will be deleted."}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => { if (danger === "reset") { change(() => cloneMap(emptyMap)); clearSelection(); setDanger(null); } else if (danger === "load-blank") applyGuideChoice(emptyMap); else if (danger === "load-example") applyGuideChoice(initialMap); else if (danger === "import-background" && pendingImport?.kind === "background") applyBackgroundImport(pendingImport.background, pendingImport.backgroundImage); else if (danger === "import-network" && pendingImport?.kind === "network") applyNetworkImport(pendingImport.stops, pendingImport.routes, pendingImport.lineStyles, pendingImport.routeTypeStyles, pendingImport.stopTypeStyles, pendingImport.wagonStyles, pendingImport.tickets); else if (danger === "import-image" && pendingImport?.kind === "image") applyImageImport(pendingImport.image); else deleteSelected(); }}>Continue</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
     <StopTicketsDialog open={stopTicketView !== null} onOpenChange={(open) => { if (!open) setStopTicketView(null); }}
       stopName={stopTicketView ? stopById(data, stopTicketView.stopId)?.name ?? "" : ""} band={stopTicketView?.band ?? null} tickets={viewedStopTickets}
       onOpen={(ticketId) => { setStopTicketView(null); openTicket(ticketId); }} />
