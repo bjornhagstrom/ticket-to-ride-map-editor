@@ -1,6 +1,6 @@
 // The balance layer: everything derived from the stops and routes themselves. All of it is pure,
 // computed on demand from MapData, and none of it is stored in a map file.
-import { DEFAULT_WAGONS_PER_PLAYER, DEFAULT_STARTING_TICKETS, TABLE_SIZE, defaultLabelAngle, stopSizeMeta, ticketsInSet, type MapData, type Ticket, type Point, realWagon, type Route, routeColors, type Stop, W } from "./map-data";
+import { DEFAULT_WAGONS_PER_PLAYER, DEFAULT_STARTING_TICKETS, DEFAULT_TICKET_BANDS, DEFAULT_TICKET_MIX, type TicketBands, type TicketMix, TABLE_SIZE, defaultLabelAngle, stopSizeMeta, ticketsInSet, type MapData, type Ticket, type Point, realWagon, type Route, routeColors, type Stop, W } from "./map-data";
 import { curvedSamples, isCurved, intersects, parallelPoints, pointsFor, polylineLength, stopById } from "./map-geometry";
 
 export type RouteSpacing = { route: Route; drawnMm: number; neededMm: number; ratio: number; verdict: "short" | "long" | "ok" };
@@ -339,15 +339,40 @@ export function setupBalance(data: MapData, setId?: string): SetupBalance {
   };
 }
 
-export const TICKET_LENGTH_BANDS = { short: 7, medium: 13 };
+// How long a ticket counts as, measured against the map's own diameter so a boundary means the same
+// thing on a small map as on a large one. Each map carries its own, defaulting to the boundaries the
+// official decks were read with.
 export type TicketBand = "short" | "medium" | "long";
 export const ticketBands: TicketBand[] = ["short", "medium", "long"];
 
-export function ticketBand(distance: number | null): TicketBand | null {
-  if (distance === null) return null;
-  if (distance <= TICKET_LENGTH_BANDS.short) return "short";
-  if (distance <= TICKET_LENGTH_BANDS.medium) return "medium";
+export function bandsOf(data: MapData): TicketBands { return data.ticketBands ?? DEFAULT_TICKET_BANDS; }
+export function mixOf(data: MapData): TicketMix { return data.ticketMix ?? DEFAULT_TICKET_MIX; }
+
+// The longest shortest path on the map: what every ticket length is measured against.
+export function mapDiameter(data: MapData): number {
+  const adjacency = buildAdjacency(data);
+  const ids = [...adjacency.keys()];
+  let diameter = 0;
+  for (let i = 0; i < ids.length; i++) {
+    for (let j = i + 1; j < ids.length; j++) {
+      const path = shortestPath(adjacency, ids[i], ids[j]);
+      if (path && path.distance > diameter) diameter = path.distance;
+    }
+  }
+  return diameter;
+}
+
+export function ticketBand(distance: number | null, diameter: number, bands: TicketBands): TicketBand | null {
+  if (distance === null || diameter <= 0) return null;
+  const share = distance / diameter;
+  if (share <= bands.medium) return "short";
+  if (share < bands.long) return "medium";
   return "long";
+}
+
+// The boundaries as whole wagon spaces, for saying out loud what they mean on this map.
+export function bandCuts(diameter: number, bands: TicketBands): { medium: number; long: number } {
+  return { medium: Math.round(bands.medium * diameter), long: Math.round(bands.long * diameter) };
 }
 
 export type StopCoverage = { stop: Stop; short: number; medium: number; long: number; total: number };
@@ -356,9 +381,11 @@ export type StopCoverage = { stop: Stop; short: number; medium: number; long: nu
 // length, so it counts towards the total without landing in a band.
 export function stopCoverage(data: MapData, setId?: string): StopCoverage[] {
   const reviews = reviewTickets(data, setId);
+  const diameter = mapDiameter(data);
+  const bands = bandsOf(data);
   const rows = new Map<string, StopCoverage>(data.stops.map((stop) => [stop.id, { stop, short: 0, medium: 0, long: 0, total: 0 }]));
   for (const review of reviews) {
-    const band = ticketBand(review.distance);
+    const band = ticketBand(review.distance, diameter, bands);
     for (const id of new Set([review.ticket.a, review.ticket.b])) {
       const row = rows.get(id);
       if (!row) continue;

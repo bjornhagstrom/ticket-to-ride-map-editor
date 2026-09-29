@@ -315,7 +315,10 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await pointAt("Westport"); await pointAt("Central");
   await page.waitForTimeout(300);
   const westportRow = (await cells()).find((row) => row[0] === "Westport");
-  check("a ticket is counted at both ends, in its length band", westportRow.join(" ") === "Westport 1 1 0", westportRow.join(" "));
+  // Bands are fractions of the map's own longest journey, so on the small example map a four-space
+  // ticket already counts as medium.
+  const westportTotal = westportRow.slice(1).reduce((sum, value) => sum + Number(value), 0);
+  check("a ticket is counted at both ends, in its length band", westportTotal === 2 && Number(westportRow[1]) === 0, westportRow.join(" "));
   const names = (await cells()).map((row) => row[0]);
   check("the panel starts sorted by name", names.join() === [...names].sort().join(), names.join(" "));
   await page.locator(".coverage-table thead th").nth(1).click();
@@ -454,6 +457,31 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   bg = await storedImage();
   check("and to the near corner the same way", bg.x <= 0 && bg.y <= 0 && bg.x + bg.width > 0, `x ${bg.x.toFixed(0)}, y ${bg.y.toFixed(0)}`);
   fs.rmSync(probe, { force: true });
+
+  // 23. the map's own short/medium/long mix, and following an official map
+  await page.getByRole("button", { name: "Settings" }).click();
+  await page.waitForTimeout(500);
+  await page.locator(".settings-nav-item", { hasText: /ticket/i }).click();
+  await page.waitForTimeout(400);
+  const mixShares = async () => [await page.locator("#mix-short").inputValue(), await page.locator("#mix-medium").inputValue(), await page.locator("#mix-long").inputValue()].join("/");
+  check("a map carries its own ticket length mix", await page.locator("#mix-medium-edge").isVisible() && await page.locator("#mix-short").isVisible());
+  check("starting on the official USA mix", (await mixShares()) === "30/47/23", await mixShares());
+  check("the boundaries are spelled out in wagon spaces for this map", /wagon space/.test(await page.locator(".ticket-mix .helper").first().textContent()));
+  const mixPresets = page.locator(".mix-preset");
+  check("official maps can be followed with one click", (await mixPresets.count()) >= 3, String(await mixPresets.count()));
+  await mixPresets.filter({ hasText: "Ticket to Ride: Europe" }).first().click();
+  await page.waitForTimeout(400);
+  check("clicking one takes that map's mix", (await mixShares()) === "76/11/13", await mixShares());
+  check("and stores it with the map", await page.evaluate(() => JSON.stringify(JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")).ticketMix)) === '{"short":76,"medium":11,"long":13}');
+  await page.locator("#mix-short").fill("50");
+  await page.locator("#mix-short").blur();
+  await page.waitForTimeout(400);
+  check("a mix that does not add up is flagged", (await page.locator(".ticket-mix .helper-warning").count()) === 1);
+  await mixPresets.first().click();
+  await page.waitForTimeout(400);
+  check("and a preset puts it right again", (await page.locator(".ticket-mix .helper-warning").count()) === 0, await mixShares());
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(300);
 
   console.log("PASS:"); ok.forEach((l) => console.log("  ✓ " + l));
   if (bad.length) { console.log("FAIL:"); bad.forEach((l) => console.log("  ✗ " + l)); }

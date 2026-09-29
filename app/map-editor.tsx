@@ -18,7 +18,7 @@ import { TicketCoveragePanel, type CoverageSort, BackgroundImageProperties, Back
 import { PrintPages, TicketPrintPages } from "./map-print";
 import { useTicketSuggestion } from "./use-ticket-suggestion";
 import { SettingsDialog, type StyleTarget } from "./map-styles";
-import { defaultStyle, evaluateTicketDeck, suggestedDeckSize, type TicketStyle, autoPlaceLabels, setupBalance, stopCoverage, ticketBand, type TicketBand, reviewTickets, ticketPointsPerSpace, ticketCoverage, type RouteSuggestion, labelCovers, labelAngleOptions, routeSamplePoints, colourLengthTable, crossingPairs, buildAdjacency, networkStats, routeSpacing, shortestPath, suggestRoutes } from "./map-analysis";
+import { bandsOf, bandCuts, mapDiameter, defaultStyle, evaluateTicketDeck, suggestedDeckSize, type TicketStyle, autoPlaceLabels, setupBalance, stopCoverage, ticketBand, type TicketBand, reviewTickets, ticketPointsPerSpace, ticketCoverage, type RouteSuggestion, labelCovers, labelAngleOptions, routeSamplePoints, colourLengthTable, crossingPairs, buildAdjacency, networkStats, routeSpacing, shortestPath, suggestRoutes } from "./map-analysis";
 import { canvasPoint, canvasPointRaw, pointsFor, samePair, stopById } from "./map-geometry";
 import { cloneForHistory, cloneMap, formatTimestamp, GUIDE_SEEN_KEY, HISTORY_LIMIT, MAX_IMAGE_WARN_BYTES, normalizeBackgroundFile, normalizeMap, normalizeNetworkFile, normalizeTicketFile, buildTicketFile, formatStampLabel, readBackgroundImage, rescaleMapToFormat, MAP_HINT_KEY, MAP_HINT_X_KEY } from "./map-storage";
 import { colorLabels, defaultTicketSet, DEFAULT_WAGONS_PER_PLAYER, IMAGE_KEEP_ON_BOARD, type Ticket, ticketsInSet, type TicketSet, emptyMap, initialMap, type LineStyle, DEFAULT_END_GAP_MM, mapFormats, type BackgroundImage, type BackgroundShape, type BackgroundType, type MapData, type MapFormat, type Point, realWagon, type Route, type RouteType, type RouteTypeStyle, routeColors, STORAGE_KEY, type Stop, type StopSize, stopSizeMeta, type StopSymbol, stopSymbolMeta, type StopType, W } from "./map-data";
@@ -144,6 +144,7 @@ export function MapEditor() {
   const ticketsHere = ticketsInSet(data, activeTicketSet.id);
   const ticketReviews = useMemo(() => reviewTickets(data, activeTicketSet.id), [data, activeTicketSet.id]);
   const ticketRate = useMemo(() => ticketPointsPerSpace(ticketReviews), [ticketReviews]);
+  const ticketDiameter = useMemo(() => mapDiameter(data), [data]);
   const coverageRows = useMemo(() => stopCoverage(data, activeTicketSet.id), [data, activeTicketSet.id]);
   const setup = useMemo(() => setupBalance(data, activeTicketSet.id), [data, activeTicketSet.id]);
   // The suggester runs on the whole map, so it only needs to be asked again when the map, the deck
@@ -182,7 +183,7 @@ export function MapEditor() {
     if (!stopTicketView) return [];
     return ticketReviews
       .filter((review) => (review.ticket.a === stopTicketView.stopId || review.ticket.b === stopTicketView.stopId)
-        && (!stopTicketView.band || ticketBand(review.distance) === stopTicketView.band))
+        && (!stopTicketView.band || ticketBand(review.distance, ticketDiameter, bandsOf(data)) === stopTicketView.band))
       .map((review) => ({
         id: review.ticket.id,
         other: stopById(data, review.ticket.a === stopTicketView.stopId ? review.ticket.b : review.ticket.a)?.name ?? "—",
@@ -190,7 +191,7 @@ export function MapEditor() {
         points: review.ticket.points,
         deck: activeTicketSet.label,
       }));
-  }, [stopTicketView, ticketReviews, data, activeTicketSet.label]);
+  }, [stopTicketView, ticketReviews, data, ticketDiameter, activeTicketSet.label]);
   const highlightRoutes = useMemo(() => new Set(selectedTicket ? ticketReviews.find((review) => review.ticket.id === selectedTicket)?.routeIds ?? [] : []), [selectedTicket, ticketReviews]);
   const routeSamples = useMemo(() => routeSamplePoints(data), [data]);
   const coveredNames = useMemo(() => data.stops.filter((stop) => labelCovers(data, stop, routeSamples)), [data, routeSamples]);
@@ -647,7 +648,7 @@ export function MapEditor() {
       </section>
       <aside className="properties panel">
         <div className="panel-heading"><span>{tool === "ticket" ? "Ticket coverage" : "Properties"}</span><small>{tool === "ticket" ? `${activeTicketSet.label} · ${ticketsHere.length} ticket${ticketsHere.length === 1 ? "" : "s"}` : imageSelected ? "Background image selected" : selectedN ? "Note selected" : selectedB ? "Background object selected" : selectedR ? "Route selected" : selectedS ? "Stop selected" : "Select an object on the map"}</small></div>
-        {tool === "ticket" && <TicketCoveragePanel rows={coverageRows} deck={activeTicketSet.label} sort={coverageSort} onSort={setCoverageSort} onlyUncovered={onlyUncovered} onOnlyUncovered={setOnlyUncovered} onOpen={(stopId, band) => setStopTicketView({ stopId, band })} />}
+        {tool === "ticket" && <TicketCoveragePanel rows={coverageRows} deck={activeTicketSet.label} cuts={bandCuts(ticketDiameter, bandsOf(data))} onEditMix={() => openStyles({ kind: "ticket" })} sort={coverageSort} onSort={setCoverageSort} onlyUncovered={onlyUncovered} onOnlyUncovered={setOnlyUncovered} onOpen={(stopId, band) => setStopTicketView({ stopId, band })} />}
         {tool !== "ticket" && !imageSelected && !selectedN && !selectedB && !selectedR && !selectedS && <div className="empty-state"><CircleDot /><p>Edit names, types, colours, geometry and route length here.</p></div>}
         {selectedN && <NoteProperties note={selectedN} change={change} onDelete={() => setDanger("delete")} />}
         {imageSelected && data.backgroundImage && <BackgroundImageProperties image={data.backgroundImage} formatHeight={format.height} change={change} onDelete={() => setDanger("delete")} />}

@@ -5,7 +5,7 @@ import { Copy, Download, FileStack, Sparkles, Layers3, MapPinPlus, Pencil, Plus,
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { colorLabels, type MapData, realWagon, type Stop, type Ticket, ticketsInSet, type TicketSet } from "./map-data";
+import { DEFAULT_TICKET_MIX, colorLabels, type MapData, realWagon, type Stop, type Ticket, ticketsInSet, type TicketSet } from "./map-data";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -236,6 +236,11 @@ export function SuggestTicketsDialog({ open, onOpenChange, data, current, sugges
     <td>{label}</td><td>{now}</td><td>{next}</td><td className="suggest-range">{hint}</td>
   </tr>;
   const pct = (value: number) => `${value.toFixed(1)} %`;
+  const mix = data.ticketMix ?? DEFAULT_TICKET_MIX;
+  const mixShare = (r: TicketDeckReport) => {
+    const total = r.mix.reduce((sum, count) => sum + count, 0);
+    return total ? r.mix.map((count) => Math.round(100 * count / total)).join(" / ") : "—";
+  };
   // On a small map, dealing a full table needs more tickets than one per stop would give.
   const perStopSize = Math.round((TICKET_SUGGESTER.styles[style].ticketsPerStop + TICKET_SUGGESTER.styles[style].longPerStop) * data.stops.length);
   const dealtFloor = deckSize > perStopSize ? deckSize : 0;
@@ -274,6 +279,7 @@ export function SuggestTicketsDialog({ open, onOpenChange, data, current, sugges
           {row("Most tickets on one stop", `${current.maxPerStop}`, report ? `${report.maxPerStop}` : "—", range(official.maxPerStop))}
           {row("Near-duplicates", pct(current.dupPct), report ? pct(report.dupPct) : "—", range(official.dupPct, " %"))}
           {row("Routes no ticket uses", pct(current.unusedPct), report ? pct(report.unusedPct) : "—", range(official.unusedPct, " %"))}
+          {row("Short / medium / long", mixShare(current), report ? mixShare(report) : "—", `aiming at ${mix.short} / ${mix.medium} / ${mix.long} %`)}
           {row("Score", current.score.toFixed(1), report ? report.score.toFixed(1) : "—", "under 5 is official-like, over 10 is random")}
         </tbody>
       </table></div>

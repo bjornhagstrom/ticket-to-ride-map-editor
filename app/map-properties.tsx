@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { type StopTypeStyle, type WagonStyle, colorLabels, type ImageCrop, type LineStyle, type MapData, type NoteBox, type RouteTypeStyle, type BackgroundImage, type BackgroundShape, type Route, routeColors, type Stop, stopSizeMeta, stopSymbolMeta, type StopSize, type StopSymbol, W } from "./map-data";
 import { isCurved, samePair, stopById } from "./map-geometry";
 import { type StyleTarget } from "./map-styles";
-import { labelAngleOf, type StopCoverage, TICKET_LENGTH_BANDS, ticketBands, type TicketBand } from "./map-analysis";
+import { labelAngleOf, type StopCoverage, ticketBands, type TicketBand } from "./map-analysis";
 import { cn } from "@/lib/utils";
 
 // One ticket as the stop panel lists it: the far end and the points. Decks are kept apart, so a
@@ -172,9 +172,11 @@ export function StylePicker({ label, value, styles, placeholder, helper, onChang
 // length name it. Sorting and the "not yet named" filter are the two ways of finding the gaps.
 export type CoverageSort = { column: "stop" | TicketBand; descending: boolean };
 
-export function TicketCoveragePanel({ rows, deck, sort, onSort, onlyUncovered, onOnlyUncovered, onOpen }: {
+export function TicketCoveragePanel({ rows, deck, cuts, sort, onSort, onlyUncovered, onOnlyUncovered, onOpen, onEditMix }: {
   rows: StopCoverage[];
   deck: string;
+  cuts: { medium: number; long: number };
+  onEditMix: () => void;
   sort: CoverageSort;
   onSort: (sort: CoverageSort) => void;
   onlyUncovered: boolean;
@@ -192,10 +194,10 @@ export function TicketCoveragePanel({ rows, deck, sort, onSort, onlyUncovered, o
   </th>;
 
   return <div className="coverage-panel">
-    <p className="helper">Tickets in {deck}, counted at both ends. Short is up to {TICKET_LENGTH_BANDS.short} wagon spaces, medium up to {TICKET_LENGTH_BANDS.medium}, long beyond that. A ticket nobody can complete has no length and lands in none of the three.</p>
+    <p className="helper">Tickets in {deck}, counted at both ends. On this map short is up to {cuts.medium} wagon spaces, medium up to {cuts.long}, long beyond that. A ticket nobody can complete has no length and lands in none of the three. <button type="button" className="mix-link" onClick={onEditMix}>Change the lengths</button></p>
     <label className="checkbox-row"><input type="checkbox" checked={onlyUncovered} onChange={(event) => onOnlyUncovered(event.target.checked)} />Only stops with no tickets</label>
     <div className="coverage-scroll"><table className="coverage-table">
-      <thead><tr>{head("stop", "Stop")}{head("short", "S", `Short tickets — up to ${TICKET_LENGTH_BANDS.short} wagon spaces`)}{head("medium", "M", `Medium tickets — up to ${TICKET_LENGTH_BANDS.medium} wagon spaces`)}{head("long", "L", `Long tickets — beyond ${TICKET_LENGTH_BANDS.medium} wagon spaces`)}</tr></thead>
+      <thead><tr>{head("stop", "Stop")}{head("short", "S", `Short tickets — up to ${cuts.medium} wagon spaces`)}{head("medium", "M", `Medium tickets — up to ${cuts.long} wagon spaces`)}{head("long", "L", `Long tickets — beyond ${cuts.long} wagon spaces`)}</tr></thead>
       <tbody>{shown.map((row) => <tr key={row.stop.id} className={cn(row.total === 0 && "coverage-empty")}>
         <td><button type="button" className="coverage-stop" disabled={row.total === 0} onClick={() => onOpen(row.stop.id)}>{row.stop.name}</button></td>
         {ticketBands.map((band) => <td key={band}>{row[band] > 0

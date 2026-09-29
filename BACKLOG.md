@@ -11,8 +11,6 @@ Editing, scoring, coverage, decks, ticket-only transfer and card printing are bu
   denser than the official 0.83–0.98 tickets per stop. The dialog says so and the count can be
   overridden, but a better rule would be to warn rather than to force.
 - Tickets to countries or groups of stops, as Switzerland has, are not modelled.
-- Replace the stand-in ticket length bands (short up to 7 wagon spaces, medium up to 13) with the
-  real definition once it is settled. They live in `TICKET_LENGTH_BANDS` in `app/map-analysis.ts`.
 
 ## Map collaboration
 

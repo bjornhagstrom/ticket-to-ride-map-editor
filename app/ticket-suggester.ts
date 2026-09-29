@@ -5,7 +5,7 @@
 // from our own maps. docs/TICKET-SUGGESTER.md explains where each one comes from, and
 // scripts/ticket-suggester-reference.py is the Python original this was ported from. The two use
 // different random number generators, so they agree on the metrics, not on the ticket lists.
-import { DEFAULT_STARTING_TICKETS, DEFAULT_WAGONS_PER_PLAYER, TABLE_SIZE, type MapData, type Ticket, ticketsInSet } from "./map-data";
+import { DEFAULT_STARTING_TICKETS, DEFAULT_TICKET_BANDS, DEFAULT_WAGONS_PER_PLAYER, TABLE_SIZE, type MapData, type Ticket, type TicketBands, type TicketMix, ticketsInSet } from "./map-data";
 
 export type TicketStyle = "classic" | "europe";
 
@@ -68,6 +68,8 @@ export type TicketSuggestOptions = {
 };
 
 export type TicketDeckReport = {
+  // How many tickets sit in the map's own short, medium and long bands.
+  mix: number[];
   diameter: number;
   reach: number;
   regular: number;
@@ -101,7 +103,7 @@ export function mulberry32(seed: number): () => number {
 
 type Edge = { a: string; b: string; weight: number; lanes: number; locos: number; tunnel: boolean; routeId: string };
 type Candidate = {
-  a: string; b: string; length: number; frac: number; bin: number;
+  a: string; b: string; length: number; frac: number; bin: number; mixBand: number;
   load: Map<number, number>; corridor: string[]; locos: number; tunnels: number;
 };
 
@@ -140,7 +142,10 @@ class SuggesterModel {
   private cache = new Map<string, Candidate>();
   private dupCache = new Map<string, boolean>();
 
+  bands: TicketBands;
+
   constructor(data: MapData, wagonsPerPlayer: number, lengthCap: number) {
+    this.bands = data.ticketBands ?? DEFAULT_TICKET_BANDS;
     const edges = buildEdges(data);
     const touched = new Set<string>();
     for (const edge of edges) { touched.add(edge.a); touched.add(edge.b); }
@@ -249,8 +254,12 @@ class SuggesterModel {
     for (let i = 0; i < 5; i++) if (frac >= edges[i] && frac < edges[i + 1]) { bin = i; break; }
     if (frac >= edges[5]) bin = 4;
 
+    // Which of the map's own short/medium/long bands this falls in, measured against the diameter.
+    const share = this.diameter > 0 ? length / this.diameter : 0;
+    const mixBand = share <= this.bands.medium ? 0 : share < this.bands.long ? 1 : 2;
+
     const value: Candidate = {
-      a: aId, b: bId, length, frac, bin, load,
+      a: aId, b: bId, length, frac, bin, mixBand, load,
       corridor: [...corridor].map((i) => this.nodes[i]),
       locos: cost(easiest),
       tunnels: easiest.edges.reduce((sum, edge) => sum + (this.edges[edge].tunnel ? 1 : 0), 0),
@@ -308,6 +317,7 @@ function connectedComponents(nodes: string[], edges: Edge[]): string[][] {
 // own contribution, which is what makes thousands of swaps affordable.
 class DeckState {
   binCounts = [0, 0, 0, 0, 0];
+  mixCounts = [0, 0, 0];
   stopCounts: number[];
   edgeLoad: Float64Array;
   peripheryLongSum = 0; peripheryLongCount = 0;
@@ -326,6 +336,7 @@ class DeckState {
     for (const other of this.members) if (this.model.duplicate(candidate, other)) this.duplicates += 1;
     this.members.push(candidate);
     if (regular) { this.regularCount += 1; this.binCounts[candidate.bin] += 1; }
+    this.mixCounts[candidate.mixBand] += 1;
     this.apply(candidate, 1);
   }
 
@@ -334,6 +345,7 @@ class DeckState {
     if (at >= 0) this.members.splice(at, 1);
     for (const other of this.members) if (this.model.duplicate(candidate, other)) this.duplicates -= 1;
     if (regular) { this.regularCount -= 1; this.binCounts[candidate.bin] -= 1; }
+    this.mixCounts[candidate.mixBand] -= 1;
     this.apply(candidate, -1);
   }
 
@@ -347,16 +359,29 @@ class DeckState {
     this.hardSum += sign * Math.max(0, candidate.locos - TICKET_SUGGESTER.maxLocos);
   }
 
-  score(style: typeof TICKET_SUGGESTER.styles.classic, wantRegular: number): number {
+  score(style: typeof TICKET_SUGGESTER.styles.classic, wantRegular: number, mix: TicketMix | null): number {
     const w = TICKET_SUGGESTER.weights;
     const model = this.model;
-    const n = Math.max(this.regularCount, 1);
+    // A map that states its own short/medium/long mix is aimed at that, over the whole deck. One
+    // that does not follows the style's own spread across the regular deck.
     let bins = 0;
-    for (let i = 0; i < 5; i++) {
-      const diff = this.binCounts[i] - style.bins[i] * wantRegular;
-      bins += diff * diff;
+    if (mix) {
+      const total = mix.short + mix.medium + mix.long;
+      const shares = total > 0 ? [mix.short / total, mix.medium / total, mix.long / total] : [1 / 3, 1 / 3, 1 / 3];
+      const want = Math.max(this.members.length, 1);
+      for (let i = 0; i < 3; i++) {
+        const diff = this.mixCounts[i] - shares[i] * want;
+        bins += diff * diff;
+      }
+      bins /= want;
+    } else {
+      const n = Math.max(this.regularCount, 1);
+      for (let i = 0; i < 5; i++) {
+        const diff = this.binCounts[i] - style.bins[i] * wantRegular;
+        bins += diff * diff;
+      }
+      bins /= n;
     }
-    bins /= n;
 
     const longMean = this.peripheryLongCount ? this.peripheryLongSum / this.peripheryLongCount : null;
     const shortMean = this.peripheryShortCount ? this.peripheryShortSum / this.peripheryShortCount : null;
@@ -425,14 +450,14 @@ export function suggestedDeckSize(data: MapData, style: TicketStyle, stops: numb
 
 function emptyReport(note: string): TicketDeckReport {
   return {
-    diameter: 0, reach: 0, regular: 0, long: 0, bins: [0, 0, 0, 0, 0],
+    mix: [0, 0, 0], diameter: 0, reach: 0, regular: 0, long: 0, bins: [0, 0, 0, 0, 0],
     longPeriphery: null, shortPeriphery: null, mapPeriphery: 0,
     zeroStops: 0, maxPerStop: 0, duplicatePairs: [], dupPct: 0,
     unusedRoutes: [], unusedPct: 0, hard: [], perStop: 0, score: 0, note,
   };
 }
 
-function buildReport(model: SuggesterModel, deck: DeckState, style: typeof TICKET_SUGGESTER.styles.classic, wantRegular: number, longCount: number, ids: Map<Candidate, string>): TicketDeckReport {
+function buildReport(model: SuggesterModel, deck: DeckState, style: typeof TICKET_SUGGESTER.styles.classic, wantRegular: number, longCount: number, ids: Map<Candidate, string>, mix: TicketMix | null): TicketDeckReport {
   const duplicatePairs: [string, string][] = [];
   for (let i = 0; i < deck.members.length; i++) {
     for (let j = i + 1; j < deck.members.length; j++) {
@@ -445,6 +470,7 @@ function buildReport(model: SuggesterModel, deck: DeckState, style: typeof TICKE
     .filter((candidate) => candidate.locos > 0 || candidate.tunnels > 0)
     .map((candidate) => ({ ticketId: ids.get(candidate) ?? "", a: candidate.a, b: candidate.b, locomotives: candidate.locos, tunnels: candidate.tunnels }));
   return {
+    mix: [...deck.mixCounts],
     diameter: model.diameter,
     reach: model.reach,
     regular: deck.regularCount,
@@ -461,7 +487,7 @@ function buildReport(model: SuggesterModel, deck: DeckState, style: typeof TICKE
     unusedPct: model.edges.length ? 100 * unusedRoutes.length / model.edges.length : 0,
     hard,
     perStop: model.nodes.length ? deck.members.length / model.nodes.length : 0,
-    score: deck.score(style, wantRegular),
+    score: deck.score(style, wantRegular, mix),
     note: model.note,
   };
 }
@@ -472,6 +498,7 @@ export function suggestTickets(data: MapData, options: Partial<TicketSuggestOpti
   if (data.stops.length < 4 || data.routes.length < 3) {
     return { tickets: [], report: emptyReport("A map needs at least four stops and a few routes before a deck can be suggested.") };
   }
+  const mix = data.ticketMix ?? null;
   const model = new SuggesterModel(data, resolved.wagonsPerPlayer, style.lengthCap);
   if (model.nodes.length < 4) {
     return { tickets: [], report: emptyReport("Fewer than four stops are connected to anything, so there is nothing to build tickets from.") };
@@ -533,7 +560,7 @@ export function suggestTickets(data: MapData, options: Partial<TicketSuggestOpti
         tried.add(index);
         const candidate = pools[group][index];
         deck.add(candidate, group === 0);
-        const value = deck.score(style, targets[0]);
+        const value = deck.score(style, targets[0], mix);
         deck.remove(candidate, group === 0);
         if (value < bestScore) { bestScore = value; bestIndex = index; }
       }
@@ -546,7 +573,7 @@ export function suggestTickets(data: MapData, options: Partial<TicketSuggestOpti
 
   // Simulated annealing: swap a ticket for one left in the same pool, always accepting an
   // improvement and sometimes accepting a step backwards, less and less often as it cools.
-  let current = deck.score(style, targets[0]);
+  let current = deck.score(style, targets[0], mix);
   for (let step = 0; step < resolved.steps; step++) {
     const group = targets[1] && random() < .15 ? 1 : 0;
     if (groups[group].length <= locked[group] || !pools[group].length) continue;
@@ -556,7 +583,7 @@ export function suggestTickets(data: MapData, options: Partial<TicketSuggestOpti
     const regular = group === 0;
     deck.remove(outgoing, regular);
     deck.add(incoming, regular);
-    const next = deck.score(style, targets[0]);
+    const next = deck.score(style, targets[0], mix);
     const temperature = 5 * (1 - step / resolved.steps) + .01;
     if (next < current || random() < Math.exp((current - next) / temperature)) {
       groups[group][outIndex] = incoming;
@@ -580,7 +607,7 @@ export function suggestTickets(data: MapData, options: Partial<TicketSuggestOpti
     });
   });
 
-  return { tickets, report: buildReport(model, deck, style, targets[0], groups[1].length, ids) };
+  return { tickets, report: buildReport(model, deck, style, targets[0], groups[1].length, ids, mix) };
 }
 
 // Score the deck the map already has, on the same scale.
@@ -589,6 +616,7 @@ export function evaluateTicketDeck(data: MapData, options: Partial<TicketSuggest
   const style = TICKET_SUGGESTER.styles[resolved.style];
   const deckTickets = resolved.setId ? ticketsInSet(data, resolved.setId) : data.tickets;
   if (data.stops.length < 4 || data.routes.length < 3) return emptyReport("A map needs at least four stops and a few routes before a deck can be judged.");
+  const mix = data.ticketMix ?? null;
   const model = new SuggesterModel(data, resolved.wagonsPerPlayer, style.lengthCap);
   if (model.nodes.length < 4) return emptyReport("Fewer than four stops are connected to anything.");
   if (!deckTickets.length) {
@@ -607,7 +635,7 @@ export function evaluateTicketDeck(data: MapData, options: Partial<TicketSuggest
     if (isLong) long += 1;
     deck.add(candidate, !isLong);
   }
-  const report = buildReport(model, deck, style, Math.max(deck.regularCount, 1), long, ids);
+  const report = buildReport(model, deck, style, Math.max(deck.regularCount, 1), long, ids, mix);
   if (skipped) report.note = `${report.note ? `${report.note} ` : ""}${skipped} ticket${skipped === 1 ? "" : "s"} could not be measured and ${skipped === 1 ? "was" : "were"} left out.`;
   return report;
 }

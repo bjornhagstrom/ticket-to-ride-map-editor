@@ -3,20 +3,23 @@
 // The style library: one place to create and edit every kind of reusable appearance the map has.
 // Applying a style stays in the Properties panel, where the object is; defining one lives here, so
 // the panel is about the thing you clicked rather than about the map's vocabulary.
+import { useMemo } from "react";
 import { Plus, Trash2 } from "lucide-react";
+import { bandCuts, mapDiameter } from "./map-analysis";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { cn } from "@/lib/utils";
-import { colorLabels, DEFAULT_END_GAP_MM, DEFAULT_WAGONS_PER_PLAYER, DEFAULT_STARTING_TICKETS, DEFAULT_KEPT_TICKETS, type LineStyle, type MapData, type MapFormat, mapFormats, routeColors, stopSizeMeta, type RouteTypeStyle, type StopTypeStyle, type WagonShape, type WagonStyle, wagonShapeMeta } from "./map-data";
+import { DEFAULT_TICKET_BANDS, DEFAULT_TICKET_MIX, TICKET_MIX_PRESETS, colorLabels, DEFAULT_END_GAP_MM, DEFAULT_WAGONS_PER_PLAYER, DEFAULT_STARTING_TICKETS, DEFAULT_KEPT_TICKETS, type LineStyle, type MapData, type MapFormat, mapFormats, routeColors, stopSizeMeta, type RouteTypeStyle, type StopTypeStyle, type WagonShape, type WagonStyle, wagonShapeMeta } from "./map-data";
 
-export type StyleKind = "map" | "stop" | "route" | "wagon" | "line" | "defaults";
+export type StyleKind = "map" | "ticket" | "stop" | "route" | "wagon" | "line" | "defaults";
 export type StyleTarget = { kind: StyleKind; id?: string };
 
 const kindMeta: Record<StyleKind, { label: string; blurb: string }> = {
   map: { label: "Map", blurb: "Settings for the whole map: the board it is designed for and how much room every stop leaves its wagons." },
+  ticket: { label: "Ticket lengths", blurb: "Where a ticket stops being short and starts being long on this map, and how much of the deck should sit in each band." },
   stop: { label: "Stop types", blurb: "What each kind of stop looks like on the map." },
   route: { label: "Route types", blurb: "Line thickness and dash pattern per type. Colour comes from each route, so types are told apart by shape." },
   wagon: { label: "Wagon styles", blurb: "How the wagon spaces are drawn, to mark a route that plays by its own rule." },
@@ -70,6 +73,7 @@ export function SettingsDialog({ open, onOpenChange, target, onTarget, data, cha
   const selected = list.find((style) => style.id === target.id) ?? list[0];
   const format = mapFormats[data.format];
   const totalSpaces = data.routes.reduce((sum, route) => sum + route.length, 0);
+  const diameter = useMemo(() => mapDiameter(data), [data]);
 
   const usage = (styleId: string) => kind === "stop" ? data.stops.filter((stop) => stop.type === styleId).length
     : kind === "route" ? data.routes.filter((route) => route.type === styleId).length
@@ -113,6 +117,56 @@ export function SettingsDialog({ open, onOpenChange, target, onTarget, data, cha
         </nav>
         <div className="settings-body">
           <p className="helper">{kindMeta[kind].blurb}</p>
+
+          {kind === "ticket" && (() => {
+            const bands = data.ticketBands ?? DEFAULT_TICKET_BANDS;
+            const mix = data.ticketMix ?? DEFAULT_TICKET_MIX;
+            const cuts = bandCuts(diameter, bands);
+            const total = mix.short + mix.medium + mix.long;
+            const setBands = (next: Partial<typeof bands>) => change((draft) => {
+              const merged = { ...bands, ...next };
+              // The two boundaries cannot cross each other.
+              draft.ticketBands = { medium: Math.min(merged.medium, merged.long), long: Math.max(merged.medium, merged.long) };
+              return draft;
+            });
+            const setMix = (next: Partial<typeof mix>) => change((draft) => { draft.ticketMix = { ...mix, ...next }; return draft; });
+            const edge = (id: string, label: string, value: number, key: "medium" | "long") => <div key={id}>
+              <Label htmlFor={id}>{label}</Label>
+              <Input id={id} type="number" min={0.05} max={0.95} step={0.05} value={value}
+                onChange={(event) => setBands({ [key]: Math.min(.95, Math.max(.05, Number(event.target.value) || .05)) })} />
+            </div>;
+            const share = (id: string, label: string, value: number, key: "short" | "medium" | "long") => <div key={id}>
+              <Label htmlFor={id}>{label}</Label>
+              <Input id={id} type="number" min={0} max={100} value={value}
+                onChange={(event) => setMix({ [key]: Math.min(100, Math.max(0, Math.round(Number(event.target.value) || 0))) })} />
+            </div>;
+            return <div className="ticket-mix">
+              <div className="mix-fields">
+                {edge("mix-medium-edge", "Short up to", bands.medium, "medium")}
+                {edge("mix-long-edge", "Long from", bands.long, "long")}
+              </div>
+              <p className="helper">Both are fractions of the map&apos;s own longest journey, which is {diameter} wagon spaces{diameter ? `, so short is up to ${cuts.medium} wagon spaces, medium up to ${cuts.long}, and long beyond that` : ""}. Measuring against the map rather than in fixed wagons is how the official decks were read, so a mix carries between maps of different sizes.</p>
+
+              <div className="mix-fields">
+                {share("mix-short", "Short %", mix.short, "short")}
+                {share("mix-medium", "Medium %", mix.medium, "medium")}
+                {share("mix-long", "Long %", mix.long, "long")}
+              </div>
+              {total !== 100
+                ? <p className="helper helper-warning">These add up to {total} %, not 100. The suggester will read them as proportions all the same, but the numbers are easier to judge when they add up.</p>
+                : <p className="helper">The share of the deck that should sit in each band. The suggester aims at this; the balance report and the ticket panel measure against it.</p>}
+
+              <div className="mix-presets">
+                <p className="eyebrow">Follow an official map</p>
+                {TICKET_MIX_PRESETS.map((preset) => <button type="button" key={preset.id} className={cn("mix-preset", mix.short === preset.mix.short && mix.medium === preset.mix.medium && mix.long === preset.mix.long && "chosen")}
+                  onClick={() => change((draft) => { draft.ticketMix = { ...preset.mix }; draft.ticketBands = { ...DEFAULT_TICKET_BANDS }; return draft; })}>
+                  <strong>{preset.label}</strong>
+                  <span>{preset.mix.short} / {preset.mix.medium} / {preset.mix.long} %</span>
+                  <em>{preset.note}</em>
+                </button>)}
+              </div>
+            </div>;
+          })()}
 
           {kind === "map" && <div className="style-fields">
             <div><Label htmlFor="settings-format">Board format</Label><NativeSelect id="settings-format" value={data.format} onChange={(event) => onChangeFormat(event.target.value as MapFormat)}>{Object.entries(mapFormats).map(([key, item]) => <NativeSelectOption key={key} value={key}>{item.label}</NativeSelectOption>)}</NativeSelect>

@@ -110,6 +110,33 @@ const kept = suggestTickets(usa, { style: "classic", seed: 3, keep: keepThese.ma
 const has = (ticket) => kept.tickets.some((made) => (made.a === ticket.a && made.b === ticket.b) || (made.a === ticket.b && made.b === ticket.a));
 check("kept tickets are always in the suggestion", keepThese.every(has), keepThese.filter((t) => !has(t)).map((t) => `${t.a}–${t.b}`).join(", ") || "all four kept");
 
+// ---------------------------------------------------------------- following a chosen mix
+// A map can set its own short/medium/long split, and the suggester aims at that instead of the
+// style's own spread.
+const withMix = (map, mix) => ({ ...map, ticketMix: mix });
+const mixOf = (report) => report.mix;
+const europeOfficialMix = evaluateTicketDeck(europe, { style: "europe" });
+check("the official Europe deck reads as its published 76/11/13 mix", mixOf(europeOfficialMix).map((n) => Math.round(100 * n / 46)).join("/") === "76/11/13", mixOf(europeOfficialMix).join("/"));
+
+const usaOfficialMix = evaluateTicketDeck(usa, { style: "classic" });
+check("the official USA deck reads as its published 30/47/23 mix", mixOf(usaOfficialMix).map((n) => Math.round(100 * n / 30)).join("/") === "30/47/23", mixOf(usaOfficialMix).join("/"));
+
+const shortHeavy = suggestTickets(withMix(usa, { short: 70, medium: 25, long: 5 }), { style: "classic", seed: 1 });
+const shortShares = mixOf(shortHeavy.report).map((count) => 100 * count / shortHeavy.tickets.length);
+check("asking for mostly short tickets gives mostly short tickets", Math.abs(shortShares[0] - 70) <= 10, shortShares.map((v) => v.toFixed(0)).join("/"));
+
+const longHeavy = suggestTickets(withMix(usa, { short: 20, medium: 30, long: 50 }), { style: "classic", seed: 1 });
+const longShares = mixOf(longHeavy.report).map((count) => 100 * count / longHeavy.tickets.length);
+check("asking for mostly long tickets gives mostly long tickets", Math.abs(longShares[2] - 50) <= 10, longShares.map((v) => v.toFixed(0)).join("/"));
+check("the two mixes really differ", Math.abs(shortShares[0] - longShares[0]) > 25, `${shortShares[0].toFixed(0)} % short against ${longShares[0].toFixed(0)} %`);
+
+const followUsa = suggestTickets(withMix(europe, { short: 30, medium: 47, long: 23 }), { style: "classic", seed: 1 });
+const followShares = mixOf(followUsa.report).map((count) => 100 * count / followUsa.tickets.length);
+check("a map can follow another map's published mix", followShares.every((share, i) => Math.abs(share - [30, 47, 23][i]) <= 10), followShares.map((v) => v.toFixed(0)).join("/"));
+
+const noMix = suggestTickets(usa, { style: "classic", seed: 1 });
+check("a map without a mix of its own still follows the style", noMix.report.score < 5 && noMix.report.bins.join("/") === usaSuggestion.report.bins.join("/"), noMix.report.bins.join("/"));
+
 // ---------------------------------------------------------------- maps too small to work with
 const tiny = { ...usa, stops: usa.stops.slice(0, 3), routes: usa.routes.slice(0, 2), tickets: [] };
 const tinyResult = suggestTickets(tiny, {});

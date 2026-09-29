@@ -84,7 +84,7 @@ export type NoteBox = {
   locked?: boolean;
   collapsed?: boolean;
 };
-export type MapData = { name: string; format: MapFormat; endGapMm?: number; background: BackgroundShape[]; stops: Stop[]; routes: Route[]; backgroundImage?: BackgroundImage; notes: NoteBox[]; lineStyles: LineStyle[]; routeTypeStyles: RouteTypeStyle[]; wagonStyles: WagonStyle[]; stopTypeStyles: StopTypeStyle[]; tickets: Ticket[]; ticketSets: TicketSet[]; wagonsPerPlayer?: number; startingTickets?: number; keptTickets?: number };
+export type MapData = { name: string; format: MapFormat; endGapMm?: number; background: BackgroundShape[]; stops: Stop[]; routes: Route[]; backgroundImage?: BackgroundImage; notes: NoteBox[]; lineStyles: LineStyle[]; routeTypeStyles: RouteTypeStyle[]; wagonStyles: WagonStyle[]; stopTypeStyles: StopTypeStyle[]; tickets: Ticket[]; ticketSets: TicketSet[]; wagonsPerPlayer?: number; startingTickets?: number; keptTickets?: number; ticketBands?: TicketBands; ticketMix?: TicketMix };
 
 export const W = 1100;
 export const STORAGE_KEY = "orebro-map-editor-public-v2";
@@ -142,6 +142,22 @@ export const IMAGE_KEEP_ON_BOARD = 30;
 export const DEFAULT_WAGONS_PER_PLAYER = 45;
 export const DEFAULT_STARTING_TICKETS = 3;
 export const DEFAULT_KEPT_TICKETS = 2;
+
+// Where a ticket stops being short and where it becomes long, as fractions of the map's own
+// diameter — the same measure the official decks were read with, so a mix carries between maps of
+// different sizes. The shares are what fraction of the deck should sit in each band.
+export type TicketBands = { medium: number; long: number };
+export type TicketMix = { short: number; medium: number; long: number };
+export const DEFAULT_TICKET_BANDS: TicketBands = { medium: .35, long: .60 };
+export const DEFAULT_TICKET_MIX: TicketMix = { short: 30, medium: 47, long: 23 };
+
+// What the official decks actually do, to follow with one click. Measured from the full route and
+// ticket data in data/ttr-reference-maps.json.
+export const TICKET_MIX_PRESETS: { id: string; label: string; note: string; mix: TicketMix }[] = [
+  { id: "usa", label: "Ticket to Ride (USA)", note: "30 tickets in one deck, spread across the whole map", mix: { short: 30, medium: 47, long: 23 } },
+  { id: "europe", label: "Ticket to Ride: Europe", note: "all 46 tickets: a short regular deck plus 6 long ones", mix: { short: 76, medium: 11, long: 13 } },
+  { id: "europe-regular", label: "Europe, regular deck only", note: "the 40 regular tickets, without the long deck", mix: { short: 88, medium: 12, long: 0 } },
+];
 // A full table, used to judge whether a deck is thick enough to deal from.
 export const TABLE_SIZE = 5;
 
