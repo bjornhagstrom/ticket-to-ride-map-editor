@@ -41,3 +41,28 @@ Allow several people to work on the same map without passing project files manua
 - Record version history and important actions.
 - Include background images and all map objects in shared storage.
 - Retain full and selective import/export as offline backup and transfer options.
+
+## Version number and a "what's new" page
+
+Planned, not built. Two pieces that belong together:
+
+- **The version, shown discreetly.** One place holds it — `package.json` — and everything else reads
+  from there: the file envelope's `app.version`, a line in the page footer, and the About page. It
+  should never be typed twice. `app/map-storage.ts` currently repeats it as `APP_VERSION`; that
+  constant should come from the build instead, so a release cannot ship a file stamped with the
+  wrong version.
+- **A page that says what changed.** `CHANGELOG.md` as the source, written for the person using the
+  editor rather than for whoever wrote the code: what is new, what changed shape, and what a file
+  written by an older version will do. The page renders it and links from the version line in the
+  footer, so "0.2.0" is clickable and lands on what 0.2.0 brought.
+
+Worth deciding before building: whether a version bump is manual or comes from the release, and
+whether the changelog is one entry per release or one per user-visible change. The file format has
+its own version, separate from the app's, and the changelog should say when the two move together.
+
+## About page
+
+Planned, not built. A page at `/ttr/about` linked from the header, in three parts: what the tool is
+for, how it works behind the scenes — the calibration against the official decks, what the numbers
+mean, where they come from — and the choices behind it, in readable form. `docs/DECISIONS.md` is the
+record; the page is the story told to someone who has just opened the editor.
