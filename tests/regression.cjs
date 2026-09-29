@@ -182,7 +182,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
 
   const ticketFile = path.join(os.tmpdir(), `ttr-tickets-${Date.now()}.json`);
   const download = page.waitForEvent("download");
-  await page.getByRole("button", { name: /^Decks/ }).click();
+  await page.getByRole("button", { name: /Import\/Export decks/ }).click();
   await page.waitForTimeout(250);
   await page.getByRole("menuitem", { name: "Export this deck" }).click();
   await (await download).saveAs(ticketFile);
@@ -229,10 +229,8 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   // Printing is a menu item now. The menu is opened while the page is still on screen, then print
   // media is switched on: the menu is portalled onto the body, so it survives the dialog being
   // hidden, and the item can be clicked from script.
-  await page.getByRole("button", { name: /^Decks/ }).click();
-  await page.waitForTimeout(400);
   await page.emulateMedia({ media: "print" });
-  await page.evaluate(() => Array.from(document.querySelectorAll('[role="menuitem"]')).find((el) => el.textContent.includes("Print deck")).click());
+  await page.evaluate(() => Array.from(document.querySelectorAll("button")).find((b) => b.textContent.includes("Print deck")).click());
   await page.waitForFunction(() => window.__print !== null, null, { timeout: 5000 });
   const printed = await page.evaluate(() => window.__print);
   const mm = (value) => value / 25.4 * 96;

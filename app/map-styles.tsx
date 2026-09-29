@@ -49,6 +49,22 @@ export type EditorDefaults = {
   scaleTarget: string; setScaleTarget: (value: string) => void;
 };
 
+// What actually comes out of the printer, and at what size against a real board.
+function printingNote(id: MapFormat, proofOf: string): string {
+  const format = mapFormats[id];
+  const sheets = format.columns * format.rows;
+  if (format.sheets) {
+    return `Prints at full size on ${sheets} sheet${sheets === 1 ? "" : "s"} of ${format.sheets === "a4" ? "A4" : "US Letter"}, landscape, taped edge to edge. Nothing to trim.`;
+  }
+  if (format.testSheet) {
+    const target = mapFormats[proofOf as MapFormat] ?? mapFormats["board-2x3"];
+    return `One sheet, printed at its own size. That makes it ${Math.round(format.widthMm / target.widthMm * 100)} % of a ${target.shortLabel} — everything is there, just smaller.`;
+  }
+  // A real board proofed onto portrait A4: each panel is shrunk to the printable width.
+  const scale = Math.round(190 / (format.widthMm / format.columns) * 100);
+  return `Prints as ${sheets} A4 proof sheets at about ${scale} % of full size. For a board at its true ${format.widthMm} × ${format.heightMm} mm you would need 9 landscape A4 sheets, cut and taped — or pick one of the sheet sizes in this list, which is the same idea without the trimming.`;
+}
+
 const clampCount = (raw: string, fallback: number): number => {
   const number = Math.round(Number(raw));
   return Number.isFinite(number) && number >= 1 ? number : fallback;
@@ -177,6 +193,7 @@ export function SettingsDialog({ open, onOpenChange, target, onTarget, data, cha
             {fresh && <p className="helper settings-start">A board format is all you need to begin. The rest — ticket lengths, stop and route types, what a new object looks like — is listed on the left and can wait until you want it.</p>}
             <div><Label htmlFor="settings-format">Board format</Label><NativeSelect id="settings-format" value={data.format} onChange={(event) => onChangeFormat(event.target.value as MapFormat)}>{Object.entries(mapFormats).map(([key, item]) => <NativeSelectOption key={key} value={key}>{item.label}</NativeSelectOption>)}</NativeSelect>
               <dl className="format-measurements"><div><dt>Finished size</dt><dd>{format.widthMm.toLocaleString("en-GB")} × {format.heightMm.toLocaleString("en-GB")} mm{format.imperial ? ` (${format.imperial})` : ""}</dd></div>{format.columns > 1 && <div><dt>Panel size</dt><dd>about {Math.round(format.widthMm / format.columns)} × {Math.round(format.heightMm / format.rows)} mm</dd></div>}</dl>
+              <p className="helper">{printingNote(data.format, defaults.scaleTarget)}</p>
               <p className="helper">{format.note}{format.custom ? ". This is not a verified commercial Ticket to Ride size" : ""}. <strong>You can change this whenever you like</strong> — objects keep their relative positions, so switching between a test sheet and a full board while you work costs you nothing.</p></div>
             {format.testSheet && <div><Label htmlFor="settings-proof">This sheet stands in for</Label><NativeSelect id="settings-proof" value={defaults.scaleTarget} onChange={(event) => defaults.setScaleTarget(event.target.value)}>{Object.entries(mapFormats).filter(([, item]) => !item.testSheet).map(([key, item]) => <NativeSelectOption key={key} value={key}>{item.shortLabel}</NativeSelectOption>)}</NativeSelect>
               <p className="helper">A test sheet is a whole board shrunk onto one sheet of paper. Telling the editor which board it stands in for lets it shrink the wagon spaces by the same amount, so what you print is a true miniature: everything sits where it would on the real thing, just smaller. Without it, wagon spaces would be drawn at full size on a sheet far too small for them.</p></div>}
@@ -227,6 +244,7 @@ export function SettingsDialog({ open, onOpenChange, target, onTarget, data, cha
               {list.map((style) => <button key={style.id} type="button" className={cn("style-entry", style.id === selected?.id && "active")} onClick={() => onTarget({ kind, id: style.id })}>
                 <span>{style.label}</span>{kind === "route" && <RoutePreview style={style as RouteTypeStyle} />}<small>{usage(style.id) || ""}</small>
               </button>)}
+              {kind === "route" && <p className="helper list-note">Only the shape is set here. A route&apos;s colour is chosen when you draw it on the map, so the same type can carry a blue route and a red one.</p>}
               <Button size="sm" variant="outline" onClick={create}><Plus />New</Button>
             </div>
             {selected ? <div className="style-fields">

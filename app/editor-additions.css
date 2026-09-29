@@ -39,6 +39,8 @@
   .format-board-2x3 .print-page,.format-board-2x3-large .print-page,.format-board-2x4 .print-page{width:210mm;height:297mm;padding:10mm}
     .format-a4 .print-page{width:297mm;height:210mm;padding:10mm}
   .format-a3 .print-page{width:420mm;height:297mm;padding:12mm}
+  .format-a4-3x2 .print-page,.format-a4-4x2 .print-page{width:297mm;height:210mm;padding:5mm}
+  .format-letter-3x2 .print-page,.format-letter-4x2 .print-page{width:279.4mm;height:215.9mm;padding:5mm}
   .format-us-letter .print-page{width:279.4mm;height:215.9mm;padding:10mm}
   .print-page .route-hit{display:none}
   .print-page .stop,.print-page .route-group{filter:none!important}

@@ -192,14 +192,14 @@ export function TicketsDialog({ open, onOpenChange, data, reviews, coverage, rat
             </DropdownMenuContent>
           </DropdownMenu>
           <DropdownMenu>
-            <DropdownMenuTrigger asChild><Button size="sm" variant="outline"><Download />Decks<ChevronDown /></Button></DropdownMenuTrigger>
+            <DropdownMenuTrigger asChild><Button size="sm" variant="outline"><Download />Import/Export decks<ChevronDown /></Button></DropdownMenuTrigger>
             <DropdownMenuContent align="start">
               <DropdownMenuItem onClick={onImport}><Upload />Import decks</DropdownMenuItem>
               <DropdownMenuItem onClick={() => onExport("set")}><Download />Export this deck</DropdownMenuItem>
               <DropdownMenuItem disabled={data.ticketSets.length < 2} onClick={() => onExport("all")}><Download />Export every deck</DropdownMenuItem>
-              <DropdownMenuItem disabled={!reviews.length} onClick={onPrint}><Printer />Print deck</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          <Button size="sm" variant="outline" disabled={!reviews.length} onClick={onPrint}><Printer />Print deck</Button>
           <Button size="sm" variant="ghost" disabled={data.ticketSets.length < 2} onClick={onDeleteSet}><Trash2 />Delete deck</Button>
         </div>
         <p className="helper">Several decks can sit in one map, so variants can be judged side by side. Imported decks always arrive as new decks and match stops by name when the ids differ.</p>
