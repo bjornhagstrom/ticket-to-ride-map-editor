@@ -413,7 +413,36 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.keyboard.press("Escape");
   await page.waitForTimeout(300);
 
-  // 22. a background image reaches every edge and can cover the board
+  // 22. the ticket list sorts by any of its headings
+  await page.getByRole("button", { name: /^Tickets · / }).click();
+  await page.waitForTimeout(500);
+  // Pick a deck that has tickets in it.
+  const withTickets = (await page.locator("#ticket-set option").allTextContents()).findIndex((label) => !/\(0\)$/.test(label));
+  await page.locator("#ticket-set").selectOption({ index: Math.max(0, withTickets) });
+  await page.waitForTimeout(400);
+  const ticketCells = () => page.$$eval(".analysis-dialog .analysis-table tbody tr", (trs) => trs.map((tr) => Array.from(tr.children).map((td) => {
+    const input = td.querySelector("input[type=number]");
+    return input ? input.value : td.textContent.trim();
+  })));
+  const ticketHead = (label) => page.locator(".analysis-dialog .analysis-table thead th").filter({ hasText: label }).first();
+  const inOrder = (values, descending) => values.every((v, i) => i === 0 || (descending ? v <= values[i - 1] : v >= values[i - 1]));
+  await ticketHead("Spaces").click();
+  await page.waitForTimeout(300);
+  const bySpaces = (await ticketCells()).map((cells) => Number(cells[1]));
+  check("the ticket list sorts by a heading", bySpaces.length > 1 && inOrder(bySpaces, false), `${bySpaces.length} rows: ${bySpaces.slice(0, 6).join(",")}`);
+  check("and says which heading it went by", (await ticketHead("Spaces").getAttribute("class")).includes("sorted"));
+  await ticketHead("Spaces").click();
+  await page.waitForTimeout(300);
+  check("clicking it again turns the order around", inOrder((await ticketCells()).map((cells) => Number(cells[1])), true), (await ticketCells()).map((cells) => cells[1]).slice(0, 6).join(","));
+  const editable = page.locator(".analysis-dialog .analysis-table tbody tr").first().locator(".ticket-points");
+  await editable.fill("9");
+  await editable.blur();
+  await page.waitForTimeout(400);
+  check("a ticket can still be edited while the list is sorted", (await ticketCells()).some((cells) => cells[2] === "9"));
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(300);
+
+  // 23. a background image reaches every edge and can cover the board
   // On a clean board: the image is drawn underneath everything, so on a busy map a click at its
   // middle lands on a route instead of on the image.
   await page.getByRole("button", { name: "Clear map" }).click();
@@ -460,7 +489,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   check("and to the near corner the same way", bg.x <= 0 && bg.y <= 0 && bg.x + bg.width > 0, `x ${bg.x.toFixed(0)}, y ${bg.y.toFixed(0)}`);
   fs.rmSync(probe, { force: true });
 
-  // 23. the map's own short/medium/long mix, and following an official map
+  // 24. the map's own short/medium/long mix, and following an official map
   await page.getByRole("button", { name: "Settings" }).click();
   await page.waitForTimeout(500);
   await page.locator(".settings-nav-item", { hasText: /ticket/i }).click();
@@ -485,7 +514,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.keyboard.press("Escape");
   await page.waitForTimeout(300);
 
-  // 24. a deck name long enough to break the button it is shown in
+  // 25. a deck name long enough to break the button it is shown in
   const longName = "A deck with a really very long name that nobody would sensibly type";
   await page.getByRole("button", { name: /^Tickets · / }).click();
   await page.waitForTimeout(400);

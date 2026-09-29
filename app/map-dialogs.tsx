@@ -1,6 +1,7 @@
 "use client";
 
 // The modal surfaces: the first-visit guide, the balance report and the route suggestions.
+import { useState } from "react";
 import { Copy, Download, FileStack, Sparkles, Layers3, MapPinPlus, Pencil, Plus, Printer, Save, Trash2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -102,6 +103,8 @@ export function SuggestionsDialog({ open, onOpenChange, suggestions, onAdd }: { 
 }
 
 
+type TicketSortColumn = "ticket" | "spaces" | "points" | "suggested" | "long";
+
 export function TicketsDialog({ open, onOpenChange, data, reviews, coverage, rate, selected, activeSet, onSelect, onUpdate, onDelete, onSelectSet, onAddSet, onDuplicateSet, onRenameSet, onDeleteSet, onExport, onImport, onPrint, onStartFrom, onSuggest }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -127,6 +130,24 @@ export function TicketsDialog({ open, onOpenChange, data, reviews, coverage, rat
 }) {
   const name = (id: string) => data.stops.find((stop) => stop.id === id)?.name ?? "—";
   const problems = reviews.filter((review) => review.verdict !== "ok");
+  // The list starts in the order the deck was built, and sorts on any heading from there.
+  const [sort, setSort] = useState<{ column: TicketSortColumn | null; descending: boolean }>({ column: null, descending: false });
+  const sortValue = (review: TicketReview, column: TicketSortColumn): string | number => {
+    if (column === "ticket") return `${name(review.ticket.a)} → ${name(review.ticket.b)}`;
+    if (column === "spaces") return review.distance ?? -1;
+    if (column === "points") return review.ticket.points;
+    if (column === "suggested") return review.suggested ?? -1;
+    return review.ticket.long ? 1 : 0;
+  };
+  const sorted = sort.column === null ? reviews : [...reviews].sort((a, b) => {
+    const left = sortValue(a, sort.column!), right = sortValue(b, sort.column!);
+    const order = typeof left === "string" ? left.localeCompare(right as string) : (left as number) - (right as number);
+    return sort.descending ? -order : order;
+  });
+  const heading = (column: TicketSortColumn, label: string) => <th key={column} className={cn("ticket-head", sort.column === column && "sorted")}
+    onClick={() => setSort({ column, descending: sort.column === column ? !sort.descending : false })}>
+    {label}{sort.column === column ? (sort.descending ? " ↓" : " ↑") : ""}
+  </th>;
   const lengths = reviews.map((review) => review.distance).filter((d): d is number => d !== null).sort((a, b) => a - b);
   const uncovered = coverage.filter((entry) => entry.count === 0);
 
@@ -157,8 +178,8 @@ export function TicketsDialog({ open, onOpenChange, data, reviews, coverage, rat
       <div className="analysis-section">
         <p className="helper">Pick a row to show that ticket&apos;s shortest path on the map. Suggested points come from this map&apos;s own tickets, not from a fixed table.</p>
         <div className="analysis-table-scroll"><table className="analysis-table">
-          <thead><tr><th>Ticket</th><th>Spaces</th><th>Points</th><th>Suggested</th><th>Long</th><th /></tr></thead>
-          <tbody>{reviews.map((review) => <tr key={review.ticket.id} className={cn("analysis-row-link", review.verdict !== "ok" && "analysis-warning-row", review.ticket.id === selected && "analysis-row-active")} tabIndex={0} role="button"
+          <thead><tr>{heading("ticket", "Ticket")}{heading("spaces", "Spaces")}{heading("points", "Points")}{heading("suggested", "Suggested")}{heading("long", "Long")}<th /></tr></thead>
+          <tbody>{sorted.map((review) => <tr key={review.ticket.id} className={cn("analysis-row-link", review.verdict !== "ok" && "analysis-warning-row", review.ticket.id === selected && "analysis-row-active")} tabIndex={0} role="button"
             onClick={() => onSelect(review.ticket.id === selected ? null : review.ticket.id)}
             onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onSelect(review.ticket.id === selected ? null : review.ticket.id); } }}>
             <td>{name(review.ticket.a)} → {name(review.ticket.b)}{review.verdict === "unreachable" ? " · not connected" : review.verdict === "duplicate" ? " · duplicate" : ""}</td>
