@@ -400,6 +400,8 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   const suggestRows = await page.$$eval(".suggest-table tbody tr", (trs) => trs.map((tr) => Array.from(tr.children).map((td) => td.textContent.trim())));
   const suggestedScore = Number(suggestRows.find((row) => row[0] === "Score")[2]);
   check("it scores the suggestion against the official range", suggestedScore < 5, suggestRows.find((row) => row[0] === "Score").join(" | "));
+  check("the dialog offers no Cancel: closing it discards the suggestion", (await page.locator(".suggest-dialog").getByRole("button", { name: "Cancel" }).count()) === 0);
+  check("only Shuffle and Apply are offered", await page.locator(".suggest-dialog").getByRole("button", { name: "Shuffle" }).isVisible() && await page.locator(".suggest-dialog").getByRole("button", { name: /Apply/ }).isVisible());
   check("and shows the official range beside each measure", suggestRows.some((row) => /official/.test(row[3])), suggestRows[2].join(" | "));
   await page.getByRole("button", { name: /Apply as a new deck/ }).click();
   await page.waitForTimeout(1000);

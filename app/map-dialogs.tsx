@@ -285,10 +285,10 @@ export function SuggestTicketsDialog({ open, onOpenChange, data, current, sugges
       </table></div>
 
       {report && report.bins.some((count) => count > 0) && <p className="helper">Lengths, shortest to longest: {report.bins.join(" · ")} against a target of {TICKET_SUGGESTER.styles[style].bins.map((share) => (share * report.regular).toFixed(1)).join(" · ")}.</p>}
+      {report && report.ambiguous.length > 0 && <p className="helper">{report.ambiguous.length} ticket{report.ambiguous.length === 1 ? " has" : "s have"} a way round that costs one space more but is built from one route fewer, so it takes a turn less. Several official cards are priced at that higher figure. These are left at the shortest path — raise them by hand if you want to follow suit.</p>}
       {report && report.hard.length > 0 && <p className="helper">{report.hard.length} ticket{report.hard.length === 1 ? "" : "s"} cross a tunnel or need ferry locomotives. They are worth their wagon count all the same — the difficulty is yours to judge.</p>}
 
       <DialogFooter>
-        <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
         <Button variant="outline" disabled={busy} onClick={onShuffle}>Shuffle</Button>
         <Button disabled={busy || !suggestion?.tickets.length} onClick={onApply}>Apply as a new deck</Button>
       </DialogFooter>
