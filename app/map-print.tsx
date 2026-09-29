@@ -20,13 +20,17 @@ export function TicketPrintPages({ data, setId }: { data: MapData; setId: string
     <style>{"@media print{@page{size:210mm 297mm;margin:10mm}}"}</style>
     <div className="ticket-run">
       <div className="print-caption"><strong>{data.name}</strong><span>{set?.label} · {tickets.length} ticket{tickets.length === 1 ? "" : "s"}</span></div>
-      <div className="ticket-sheet">{tickets.map((ticket) => <div className="ticket-card" key={ticket.id}>
-        <p className="ticket-card-from">{name(ticket.a)}</p>
-        <p className="ticket-card-arrow">↕</p>
-        <p className="ticket-card-to">{name(ticket.b)}</p>
-        <p className="ticket-card-points">{ticket.points}</p>
-        {ticket.long && <p className="ticket-card-flag">Long route</p>}
-      </div>)}</div>
+      {/* Explicit rows of four, each a block that may not be split. Safari ignores break-inside on
+          grid cells, which cut cards in half across the page break. */}
+      {Array.from({ length: Math.ceil(tickets.length / 4) }, (_, row) => tickets.slice(row * 4, row * 4 + 4)).map((row, index) => <div className="ticket-row" key={index}>
+        {row.map((ticket) => <div className="ticket-card" key={ticket.id}>
+          <p className="ticket-card-from">{name(ticket.a)}</p>
+          <p className="ticket-card-arrow">↕</p>
+          <p className="ticket-card-to">{name(ticket.b)}</p>
+          <p className="ticket-card-points">{ticket.points}</p>
+          {ticket.long && <p className="ticket-card-flag">Long route</p>}
+        </div>)}
+      </div>)}
     </div>
   </div>;
 }

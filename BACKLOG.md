@@ -94,3 +94,35 @@ What would be worth building on top:
 - **What a milestone should hold.** Probably the board, the deck, and a page of the balance numbers
   as they stood — so that a year later the file says not just what the map looked like but what the
   editor thought of it.
+
+## Board format and printing, as two separate questions
+
+Agreed with Björn but not built. Today one list mixes the shape of the map with how it is printed,
+which is why it reads as confusing.
+
+**Settings keeps only the shape of the board:** `2×3` and `2×4`. That is what decides where objects
+sit and how big a wagon space is. Everything else leaves the map settings.
+
+**A dialog behind the Print button makes the printing decisions**, per run, without touching the map:
+
+- *How it is split:* one sheet, one sheet per panel, or full size.
+- *Paper:* A4, A3, US Letter or Tabloid (11 × 17 in, the Letter world's A3).
+
+Paper cannot be dropped, though it would be simpler. "Full size" means different things per paper —
+a 790 × 525 mm board is 9 sheets of A4 but 12 of Letter, because Letter is shorter — and the page
+size has to be declared in millimetres for the print dialog to pick the right orientation. But it is
+a printing decision, not a property of the map, so it belongs here rather than in Settings.
+
+The Anniversary size then stops being a board format and becomes a choice under "full size": which
+real board the sheets should add up to.
+
+## Rules text printed with the map
+
+Wanted, not built. A place to write the rules of the map being designed, printed with it.
+
+Markdown in a plain text area, rather than a rich-text editor: it reads as text, survives in the map
+file, and ties us to no editor's data format. Stops and routes referred to as `[[Westport]]` and
+`[[Westport–Central]]`, rendered with the same colour and shape they have on the map.
+
+Two things to decide first: whether the rules print as their own pages after the board, and whether
+a reference to a stop that has since been deleted should warn or just show the name.
