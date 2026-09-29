@@ -232,8 +232,9 @@ export const stopSymbolMeta: Record<StopSymbol, { label: string }> = {
 // More are made in Settings when a map needs them, and a map that already has its own keeps them.
 export const defaultStopTypeStyles: StopTypeStyle[] = [
   { id: "city", label: "Regular", fill: "#fffaf0", stroke: "#721c24" },
-  { id: "junction", label: "Junction", fill: "#e7e1d6", stroke: "#8a8277", junction: true },
   { id: "ferry", label: "Ferry port", fill: "#dceff8", stroke: "#23749b" },
+  // Last: a junction is the one you reach for least often.
+  { id: "junction", label: "Junction", fill: "#e7e1d6", stroke: "#8a8277", junction: true },
 ];
 export const fallbackStopTypeStyle: StopTypeStyle = { id: "city", label: "Stop", fill: "#fffaf0", stroke: "#721c24" };
 
