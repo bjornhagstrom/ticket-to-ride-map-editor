@@ -5,15 +5,32 @@
 // from our own maps. docs/TICKET-SUGGESTER.md explains where each one comes from, and
 // scripts/ticket-suggester-reference.py is the Python original this was ported from. The two use
 // different random number generators, so they agree on the metrics, not on the ticket lists.
+import { valueTicket, type TicketPath } from "./ticket-valuation";
 import { DEFAULT_STARTING_TICKETS, DEFAULT_TICKET_BANDS, DEFAULT_WAGONS_PER_PLAYER, TABLE_SIZE, type MapData, type Ticket, type TicketBands, type TicketMix, ticketsInSet } from "./map-data";
 
-export type TicketStyle = "classic" | "europe";
+export type TicketStyle = "generic" | "classic" | "europe";
 
 // Presets, weights and limits in one place, so they can be tuned and their provenance stays visible.
 export const TICKET_SUGGESTER = {
   // Length bins as fractions of reach, the longest ticket a player can realistically build.
   binEdges: [0, .30, .45, .60, .75, 1.01],
   styles: {
+    // The default. Its targets are the mean of seven official classic decks — USA, Nordic, India,
+    // Switzerland, Old West, Polska and Northern Lights — rather than any one game's habits. Scored
+    // against the USA-only targets, several official decks came out worse than random decks.
+    generic: {
+      label: "Generic",
+      blurb: "The average of seven official maps. A good starting point for a map of your own.",
+      ticketsPerStop: 1.1,
+      longPerStop: 0,
+      bins: [.18, .33, .22, .16, .11],
+      longRange: null as [number, number] | null,
+      bonusFrom: null as number | null,
+      lengthCap: .47,
+      maxPerStop: 7,
+      dupRate: .03,
+      periphery: "relative" as "relative" | "point",
+    },
     classic: {
       label: "Classic",
       blurb: "One deck, lengths spread across the whole map, as in the original USA game.",
@@ -24,6 +41,8 @@ export const TICKET_SUGGESTER = {
       bonusFrom: .9 as number | null,
       lengthCap: .47,
       maxPerStop: 5,
+      dupRate: .02,
+      periphery: "point" as "relative" | "point",
     },
     europe: {
       label: "Europe",
@@ -35,6 +54,8 @@ export const TICKET_SUGGESTER = {
       bonusFrom: null as number | null,
       lengthCap: .47,
       maxPerStop: 5,
+      dupRate: .02,
+      periphery: "point" as "relative" | "point",
     },
   },
   // What the official decks actually measure, for the dialog to show beside each number.
@@ -48,7 +69,6 @@ export const TICKET_SUGGESTER = {
   weights: { bins: 10, ends: 400, cov: 1, zero: .5, dup: 4, unused: 1, load: .5, hard: 2 },
   peripheryLong: .62,
   peripheryShortDelta: -.05,
-  dupRate: .02,
   unusedRate: .20,
   maxLocos: 2,
   minLengthFraction: .15,
@@ -85,6 +105,8 @@ export type TicketDeckReport = {
   unusedRoutes: string[];
   unusedPct: number;
   hard: { ticketId: string; a: string; b: string; locomotives: number; tunnels: number }[];
+  // Tickets where a path exists that costs one more space but is built from fewer routes.
+  ambiguous: { ticketId: string; a: string; b: string }[];
   perStop: number;
   score: number;
   note: string | null;
@@ -103,7 +125,7 @@ export function mulberry32(seed: number): () => number {
 
 type Edge = { a: string; b: string; weight: number; lanes: number; locos: number; tunnel: boolean; routeId: string };
 type Candidate = {
-  a: string; b: string; length: number; frac: number; bin: number; mixBand: number;
+  a: string; b: string; length: number; frac: number; bin: number; mixBand: number; routes: number; ferrySpaces: number;
   load: Map<number, number>; corridor: string[]; locos: number; tunnels: number;
 };
 
@@ -143,9 +165,13 @@ class SuggesterModel {
   private dupCache = new Map<string, boolean>();
 
   bands: TicketBands;
+  // Every stop the graph runs through, junctions included. `nodes` is the subset a ticket may end at.
+  graphNodes: string[] = [];
 
   constructor(data: MapData, wagonsPerPlayer: number, lengthCap: number) {
     this.bands = data.ticketBands ?? DEFAULT_TICKET_BANDS;
+    const junctionTypes = new Set((data.stopTypeStyles ?? []).filter((style) => style.junction).map((style) => style.id));
+    const isJunction = new Map(data.stops.map((stop) => [stop.id, junctionTypes.has(stop.type)]));
     const edges = buildEdges(data);
     const touched = new Set<string>();
     for (const edge of edges) { touched.add(edge.a); touched.add(edge.b); }
@@ -160,7 +186,10 @@ class SuggesterModel {
       nodes = largest;
     }
     const inside = new Set(nodes);
-    this.nodes = nodes;
+    this.graphNodes = nodes;
+    // Junctions join routes and nothing else: journeys pass through them, but no ticket ends at one
+    // and they are not counted when coverage or periphery is worked out.
+    this.nodes = nodes.filter((id) => !isJunction.get(id));
     nodes.forEach((id, i) => this.index.set(id, i));
     this.edges = edges.filter((edge) => inside.has(edge.a) && inside.has(edge.b));
 
@@ -186,9 +215,10 @@ class SuggesterModel {
       const usable = row.filter((d) => Number.isFinite(d));
       return usable.length ? usable.reduce((sum, d) => sum + d, 0) / usable.length : 0;
     });
-    const lo = Math.min(...means), hi = Math.max(...means);
+    const ticketMeans = this.nodes.map((id) => means[this.index.get(id)!]);
+    const lo = Math.min(...ticketMeans), hi = Math.max(...ticketMeans);
     this.periphery = means.map((m) => (m - lo) / ((hi - lo) || 1));
-    this.mapPeriphery = this.periphery.length ? this.periphery.reduce((sum, p) => sum + p, 0) / this.periphery.length : 0;
+    this.mapPeriphery = ticketMeans.length ? ticketMeans.reduce((sum, m) => sum + (m - lo) / ((hi - lo) || 1), 0) / ticketMeans.length : 0;
   }
 
   private dijkstra(source: number) {
@@ -258,14 +288,44 @@ class SuggesterModel {
     const share = this.diameter > 0 ? length / this.diameter : 0;
     const mixBand = share <= this.bands.medium ? 0 : share < this.bands.long ? 1 : 2;
 
+    // What the ticket costs to build, for the valuation: how many separate routes the easiest path
+    // is made of, and how many of its spaces need a locomotive.
+    const routes = easiest.edges.length;
+    const ferrySpaces = easiest.edges.reduce((sum, edge) => sum + (this.edges[edge].locos > 0 ? this.edges[edge].weight : 0), 0);
+
     const value: Candidate = {
-      a: aId, b: bId, length, frac, bin, mixBand, load,
+      a: aId, b: bId, length, frac, bin, mixBand, routes, ferrySpaces, load,
       corridor: [...corridor].map((i) => this.nodes[i]),
       locos: cost(easiest),
       tunnels: easiest.edges.reduce((sum, edge) => sum + (this.edges[edge].tunnel ? 1 : 0), 0),
     };
     this.cache.set(key, value);
     return value;
+  }
+
+  // Is there a way to build this ticket for exactly one more space but one fewer route? Such a path
+  // takes a turn less, and several official +1 cards follow one. Slack never falls along a path, so
+  // two states per stop — on the shortest path, or one space over — are enough to find it.
+  ambiguous(aId: string, bId: string): boolean {
+    const a = this.index.get(aId), b = this.index.get(bId);
+    if (a === undefined || b === undefined) return false;
+    const n = this.graphNodes.length;
+    const best = [new Array<number>(n).fill(Infinity), new Array<number>(n).fill(Infinity)];
+    const done = [new Array<boolean>(n).fill(false), new Array<boolean>(n).fill(false)];
+    best[0][a] = 0;
+    for (;;) {
+      let node = -1, slack = 0, fewest = Infinity;
+      for (let s = 0; s < 2; s++) for (let i = 0; i < n; i++) if (!done[s][i] && best[s][i] < fewest) { fewest = best[s][i]; node = i; slack = s; }
+      if (node < 0) break;
+      done[slack][node] = true;
+      for (const step of this.adjacency[node]) {
+        const extra = this.dist[a][node] + step.weight - this.dist[a][step.to];
+        const next = slack + extra;
+        if (next > 1) continue;
+        if (fewest + 1 < best[next][step.to]) best[next][step.to] = fewest + 1;
+      }
+    }
+    return best[1][b] < best[0][b];
   }
 
   // Two tickets are near-duplicates when they are of similar length and one of them costs at most
@@ -328,7 +388,7 @@ class DeckState {
   regularCount = 0;
 
   constructor(private model: SuggesterModel) {
-    this.stopCounts = new Array(model.nodes.length).fill(0);
+    this.stopCounts = new Array(model.graphNodes.length).fill(0);
     this.edgeLoad = new Float64Array(model.edges.length);
   }
 
@@ -385,19 +445,28 @@ class DeckState {
 
     const longMean = this.peripheryLongCount ? this.peripheryLongSum / this.peripheryLongCount : null;
     const shortMean = this.peripheryShortCount ? this.peripheryShortSum / this.peripheryShortCount : null;
+    // The official decks agree on direction but not on a number: long tickets reach further out than
+    // the average stop and short ones sit further in. `generic` therefore only penalises the wrong
+    // side; the two single-game styles keep their fitted point targets.
     let ends = 0;
-    if (longMean !== null) ends += (longMean - TICKET_SUGGESTER.peripheryLong) ** 2;
-    if (shortMean !== null) ends += (shortMean - (model.mapPeriphery + TICKET_SUGGESTER.peripheryShortDelta)) ** 2;
+    if (style.periphery === "relative") {
+      if (longMean !== null) ends += Math.max(0, model.mapPeriphery - longMean) ** 2;
+      if (shortMean !== null) ends += Math.max(0, shortMean - model.mapPeriphery) ** 2;
+    } else {
+      if (longMean !== null) ends += (longMean - TICKET_SUGGESTER.peripheryLong) ** 2;
+      if (shortMean !== null) ends += (shortMean - (model.mapPeriphery + TICKET_SUGGESTER.peripheryShortDelta)) ** 2;
+    }
 
     let cov = 0, zero = 0;
-    for (const count of this.stopCounts) {
+    for (const id of model.nodes) {
+      const count = this.stopCounts[model.index.get(id)!];
       if (count === 0) zero += 1;
       const over = count - style.maxPerStop;
       if (over > 0) cov += over * over;
     }
 
     const pairs = this.members.length * (this.members.length - 1) / 2;
-    const dup = Math.max(0, this.duplicates - TICKET_SUGGESTER.dupRate * pairs);
+    const dup = Math.max(0, this.duplicates - style.dupRate * pairs);
 
     let unused = 0, loadSum = 0;
     const perLane = new Float64Array(model.edges.length);
@@ -434,8 +503,10 @@ function resolveOptions(data: MapData, options: Partial<TicketSuggestOptions>): 
 // deck that already has long tickets, is taken to want the Europe shape.
 export function defaultStyle(data: MapData, setId?: string): TicketStyle {
   const deck = setId ? ticketsInSet(data, setId) : data.tickets;
+  // A deck that already has long tickets, or a map that deals four or more, is shaped like Europe.
+  // Everything else starts from the average of the official maps.
   if (deck.some((ticket) => ticket.long)) return "europe";
-  return (data.startingTickets ?? DEFAULT_STARTING_TICKETS) >= 4 ? "europe" : "classic";
+  return (data.startingTickets ?? DEFAULT_STARTING_TICKETS) >= 4 ? "europe" : "generic";
 }
 
 // How big a deck to aim for: the style's tickets per stop, but never so few that a full table
@@ -453,9 +524,14 @@ function emptyReport(note: string): TicketDeckReport {
     mix: [0, 0, 0], diameter: 0, reach: 0, regular: 0, long: 0, bins: [0, 0, 0, 0, 0],
     longPeriphery: null, shortPeriphery: null, mapPeriphery: 0,
     zeroStops: 0, maxPerStop: 0, duplicatePairs: [], dupPct: 0,
-    unusedRoutes: [], unusedPct: 0, hard: [], perStop: 0, score: 0, note,
+    unusedRoutes: [], unusedPct: 0, hard: [], ambiguous: [], perStop: 0, score: 0, note,
   };
 }
+
+const pathOf = (candidate: Candidate, longest: number): TicketPath => ({
+  spaces: candidate.length, routes: candidate.routes, ferrySpaces: candidate.ferrySpaces,
+  frac: candidate.frac, longest: candidate.length === longest,
+});
 
 function buildReport(model: SuggesterModel, deck: DeckState, style: typeof TICKET_SUGGESTER.styles.classic, wantRegular: number, longCount: number, ids: Map<Candidate, string>, mix: TicketMix | null): TicketDeckReport {
   const duplicatePairs: [string, string][] = [];
@@ -479,13 +555,16 @@ function buildReport(model: SuggesterModel, deck: DeckState, style: typeof TICKE
     longPeriphery: deck.peripheryLongCount ? deck.peripheryLongSum / deck.peripheryLongCount : null,
     shortPeriphery: deck.peripheryShortCount ? deck.peripheryShortSum / deck.peripheryShortCount : null,
     mapPeriphery: model.mapPeriphery,
-    zeroStops: deck.stopCounts.filter((count) => count === 0).length,
-    maxPerStop: deck.stopCounts.length ? Math.max(...deck.stopCounts) : 0,
+    zeroStops: model.nodes.filter((id) => deck.stopCounts[model.index.get(id)!] === 0).length,
+    maxPerStop: model.nodes.length ? Math.max(...model.nodes.map((id) => deck.stopCounts[model.index.get(id)!])) : 0,
     duplicatePairs,
     dupPct: pairs ? 100 * duplicatePairs.length / pairs : 0,
     unusedRoutes,
     unusedPct: model.edges.length ? 100 * unusedRoutes.length / model.edges.length : 0,
     hard,
+    ambiguous: deck.members
+      .filter((candidate) => model.ambiguous(candidate.a, candidate.b))
+      .map((candidate) => ({ ticketId: ids.get(candidate) ?? "", a: candidate.a, b: candidate.b })),
     perStop: model.nodes.length ? deck.members.length / model.nodes.length : 0,
     score: deck.score(style, wantRegular, mix),
     note: model.note,
@@ -514,7 +593,7 @@ export function suggestTickets(data: MapData, options: Partial<TicketSuggestOpti
   const longPool: Candidate[] = [];
   for (let i = 0; i < model.nodes.length; i++) {
     for (let j = i + 1; j < model.nodes.length; j++) {
-      const length = model.distance(i, j);
+      const length = model.distance(model.index.get(model.nodes[i])!, model.index.get(model.nodes[j])!);
       if (!Number.isFinite(length)) continue;
       const frac = length / model.reach;
       const inRegular = length >= low && length <= model.reach && (!longRange || frac < longRange[0]);
@@ -598,12 +677,14 @@ export function suggestTickets(data: MapData, options: Partial<TicketSuggestOpti
   const stamp = Date.now();
   const ids = new Map<Candidate, string>();
   const tickets: Ticket[] = [];
+  const longest = Math.max(0, ...groups[0].concat(groups[1]).map((candidate) => candidate.length));
   [groups[0], groups[1]].forEach((group, groupIndex) => {
     group.forEach((candidate, i) => {
       const id = `t-${stamp}-${groupIndex}-${i}`;
       ids.set(candidate, id);
-      const bonus = style.bonusFrom !== null && candidate.frac >= style.bonusFrom ? 1 : 0;
-      tickets.push({ id, a: candidate.a, b: candidate.b, points: candidate.length + bonus, long: groupIndex === 1 ? true : undefined });
+      // The style asks for the long-ticket bonus; the valuation decides what it is worth.
+      const value = valueTicket(pathOf(candidate, longest), data, style.bonusFrom !== null ? { longBonus: true } : {});
+      tickets.push({ id, a: candidate.a, b: candidate.b, points: value.points, long: groupIndex === 1 ? true : undefined });
     });
   });
 

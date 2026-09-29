@@ -85,7 +85,8 @@ check("random decks score far worse than the official one", medianRandom > 10, `
 // ---------------------------------------------------------------- suggesting a deck
 const usaSuggestion = suggestTickets(usa, { style: "classic", seed: 1 });
 check("USA: suggests about 31 tickets", Math.abs(usaSuggestion.tickets.length - 31) <= 1, String(usaSuggestion.tickets.length));
-check("USA: no ticket reaches beyond what a player can build", usaSuggestion.tickets.every((ticket) => ticket.points <= usaSuggestion.report.reach + 1), `longest ${Math.max(...usaSuggestion.tickets.map((t) => t.points))}`);
+// The classic style pays +1 at 0.9 of reach and +2 for the single longest, as the USA deck does.
+check("USA: no ticket reaches beyond what a player can build", usaSuggestion.tickets.every((ticket) => ticket.points <= usaSuggestion.report.reach + 2), `longest ${Math.max(...usaSuggestion.tickets.map((t) => t.points))}`);
 check("USA: the suggestion scores under 5", usaSuggestion.report.score < 5, usaSuggestion.report.score.toFixed(1));
 const usaBinTargets = TICKET_SUGGESTER.styles.classic.bins.map((share) => share * usaSuggestion.report.regular);
 const usaBinsOff = usaSuggestion.report.bins.map((count, i) => Math.abs(count - usaBinTargets[i]));
