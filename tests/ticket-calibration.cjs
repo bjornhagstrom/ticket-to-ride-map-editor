@@ -214,7 +214,8 @@ check("evaluating an empty deck does not throw", evaluateTicketDeck({ ...usa, ti
 
 // ---------------------------------------------------------------- the table in §2b
 console.log("\nMetrics against docs/TICKET-SUGGESTER.md §2b (Python reference in brackets):");
-const published = { usa: [8.9, 0.8], nordic: [20.9, 1.4], india: [16.2, 1.15], oldwest: [13.4, 0.6], poland: [6.4, 0.85], northernlights: [23.6, 1.55], switzerland: [27.5, 1.15], europe: [1.9, 1.0] };
+// The §2b table as it stands now: load weighted 2, and the reference data's own train counts.
+const published = { usa: [10.2, 1.8], nordic: [26.1, 3.0], india: [25.5, 4.0], oldwest: [14.9, 1.85], poland: [9.4, 1.95], northernlights: [34.5, 3.55], switzerland: [30.1, 3.05], europe: [4.1, 1.95] };
 console.log(`  ${"map".padEnd(16)}${"official".padStart(9)}${"published".padStart(11)}${"suggested".padStart(11)}${"published".padStart(11)}`);
 for (const source of calibrationMaps) {
   const style = styleFor(source.id);

@@ -90,7 +90,7 @@ Result with `generic` (Python reference, seeds 1–2; official decks limited to 
 | India | 25.5 | 3.9–4.2 | 43.6 |
 | Old West | 14.9 | 1.8–1.9 | 24.4 |
 | Polska | 9.4 | 1.8–2.1 | 20.7 |
-| Northern Lights | 27.8 | 4.3 | 36.7 |
+| Northern Lights | 34.5 | 3.4–3.7 | 43.0 |
 | Switzerland | 30.1 | 2.6–3.5 | 29.0 |
 | Europe (`europe` style) | 4.1 | 1.9–2.0 | 116.8 |
 
@@ -100,6 +100,10 @@ more evenly than the official decks do. Every score above moved with it, officia
 so the relations are what matter, not the absolute figures: an official deck below random, and a
 suggestion below the official deck. At weight 3 suggestions on India and Northern Lights break the
 "under 5" check in §6, so 2 is the ceiling.
+
+Northern Lights was remeasured after the reference data gained its real train count: 40 per player,
+not the 45 that stood in for a missing value, which brings its reach from 20 down to 18. Polska's
+count also arrived, 35, but its reach is 14 either way, so its row is unchanged.
 
 Switzerland is the known exception, because a large part of its deck is country tickets, which the suggester does not model yet. The score is a guide, not a verdict. An official deck is expected to score clearly below random, and a suggestion is expected to score below the official deck.
 
