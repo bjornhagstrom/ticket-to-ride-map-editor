@@ -442,7 +442,40 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.keyboard.press("Escape");
   await page.waitForTimeout(300);
 
-  // 23. a background image reaches every edge and can cover the board
+  // 23. the + that adds a bend leaves its grab handle on the side the click was on
+  await useTool("Select & move");
+  await page.evaluate(() => {
+    const group = Array.from(document.querySelectorAll(".map-canvas .route-group"))
+      .find((g) => !g.querySelector(".route-guide").getAttribute("d").includes("C"));
+    (group || document.querySelector(".map-canvas .route-group")).dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+  });
+  await page.waitForTimeout(400);
+  const middleOf = (selector) => page.evaluate((s) => {
+    const el = document.querySelector(s);
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+  }, selector);
+  const plusHandle = await middleOf(".map-canvas .bend-insert-handle");
+  if (plusHandle) {
+    await page.mouse.click(plusHandle.x, plusHandle.y);
+    await page.waitForTimeout(500);
+    const grabHandle = await middleOf(".map-canvas .waypoint-handle .waypoint-hit");
+    const travel = grabHandle ? Math.hypot(grabHandle.x - plusHandle.x, grabHandle.y - plusHandle.y) : Infinity;
+    // It used to appear across the line, about twice the handle offset away.
+    check("a new bend's handle appears where the + was, not across the route", travel < 30, `${travel.toFixed(0)} px away`);
+    await page.keyboard.press("Meta+z");
+    await page.waitForTimeout(400);
+  }
+
+  // 24. a low-connection warning says which stop it means
+  const lowCard = page.locator(".crossing-card.has-warning").filter({ hasText: "low-connection" });
+  if (await lowCard.count()) {
+    const lowText = (await lowCard.textContent()).replace(/\s+/g, " ");
+    check("the low-connection card names the stops it means", /· [A-Za-zÅÄÖåäö]/.test(lowText), lowText);
+  }
+
+  // 25. a background image reaches every edge and can cover the board
   // On a clean board: the image is drawn underneath everything, so on a busy map a click at its
   // middle lands on a route instead of on the image.
   await page.getByRole("button", { name: "Clear map" }).click();
@@ -489,7 +522,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   check("and to the near corner the same way", bg.x <= 0 && bg.y <= 0 && bg.x + bg.width > 0, `x ${bg.x.toFixed(0)}, y ${bg.y.toFixed(0)}`);
   fs.rmSync(probe, { force: true });
 
-  // 24. the map's own short/medium/long mix, and following an official map
+  // 26. the map's own short/medium/long mix, and following an official map
   await page.getByRole("button", { name: "Settings" }).click();
   await page.waitForTimeout(500);
   await page.locator(".settings-nav-item", { hasText: /ticket/i }).click();
@@ -514,7 +547,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.keyboard.press("Escape");
   await page.waitForTimeout(300);
 
-  // 25. a deck name long enough to break the button it is shown in
+  // 27. a deck name long enough to break the button it is shown in
   const longName = "A deck with a really very long name that nobody would sensibly type";
   await page.getByRole("button", { name: /^Tickets · / }).click();
   await page.waitForTimeout(400);
@@ -535,7 +568,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   const headingBox = await page.locator(".properties .panel-heading").evaluate((el) => ({ scroll: el.scrollWidth, client: el.clientWidth, line: el.querySelector("small").getBoundingClientRect().height }));
   check("the right panel cuts it off rather than wrapping it", headingBox.scroll <= headingBox.client + 1 && headingBox.line < 24, `${headingBox.scroll} in ${headingBox.client}, ${headingBox.line.toFixed(0)} px tall`);
 
-  // 26. the deck styles are laid out so they can be compared, and nothing is too pale to read
+  // 28. the deck styles are laid out so they can be compared, and nothing is too pale to read
   await page.getByRole("button", { name: /^Tickets · / }).click();
   await page.waitForTimeout(400);
   await page.getByRole("button", { name: /Suggest a deck/ }).click();

@@ -90,12 +90,13 @@ export function MapArtwork({ data, tool = "select", highlightRoutes, scaleWidthM
           return <g key={`insert-${index}`} className="bend-insert-handle" transform={`translate(${handle.x},${handle.y})`} onPointerDown={(event) => { event.stopPropagation(); onRouteBendInsert?.(route.id, index, mid); }}><circle className="point-hit" r={HANDLE_HIT} /><circle r="8" /><path d="M-4,0 H4 M0,-4 V4" /></g>;
         })}
         {route.points?.map((point, index) => {
-          // Offset the grab handle to the other side of the line from the + handles, so neither of
-          // them sits on top of a wagon space and swallows the click that toggles a locomotive.
+          // The grab handle sits on the same side as the + that made it, so the mouse does not have to
+          // cross the route to reach what it just created. Both stay clear of the line itself, so
+          // neither covers a wagon space and swallows the click that toggles a locomotive.
           const before = base[index] ?? point, after = base[index + 2] ?? point;
           const dx = after.x - before.x, dy = after.y - before.y;
           const length = Math.hypot(dx, dy) || 1;
-          const handle = { x: point.x - dy / length * (drawnOffset - HANDLE_OFFSET), y: point.y + dx / length * (drawnOffset - HANDLE_OFFSET) };
+          const handle = { x: point.x - dy / length * (drawnOffset + HANDLE_OFFSET), y: point.y + dx / length * (drawnOffset + HANDLE_OFFSET) };
           return <g key={index} className="waypoint-handle" onPointerDown={(event) => { event.stopPropagation(); onWaypoint?.(selectedRoute, index, { x: handle.x - point.x, y: handle.y - point.y }); }} onDoubleClick={(event) => { event.stopPropagation(); onRouteBendRemove?.(route.id, index); }}>
             <line className="waypoint-leader" x1={point.x} y1={point.y} x2={handle.x} y2={handle.y} />
             <g transform={`translate(${handle.x},${handle.y})`}><circle className="waypoint-hit" r={HANDLE_HIT} /><rect x="-8" y="-8" width="16" height="16" rx="3" transform="rotate(45)" /><circle r="3" /></g>
