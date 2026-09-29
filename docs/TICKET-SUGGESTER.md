@@ -138,7 +138,7 @@ export function evaluateTicketDeck(data: MapData, options?: Partial<TicketSugges
   - `locos` is the number of `locomotiveSlots` on the shortest route.
   - `tunnel` is true when that route is drawn as a tunnel (`wagonStyle`/route type; match whatever the map uses).
 - Ignore stops that have no routes. If the graph is not connected, use the largest component and say so in the report.
-- Border countries: when the map's `countryTransit` is false (the default), a path may never pass through a country or border-flag stop. The suggester proposes only city–city tickets, so it can drop those stops from the graph (§4.8).
+- Border countries: the test loader drops country and border-flag stops from the reference maps. The editor itself has no country concept (§4.8).
 - Waypoints (kind `waypoint`) stay in the graph as junctions, but are never endpoints and never count as stops for coverage, periphery or tickets per stop.
 - Run Dijkstra from every stop to get all-pairs distances `D`.
 
@@ -240,9 +240,9 @@ Maps that do not follow the shortest path must never be used to tune targets or 
 
 ### 4.8 Border countries and waypoints
 
-- Whether a path may pass through a border country, entering at one flag and leaving at another, differs between maps. Model it as a map setting `countryTransit` with the default `false`. When it is `false`, border-flag stops are dead ends: a shortest path may start or end there but never pass through. The rulebooks of Italia, Switzerland and Märklin all say `false`; Polska has one entrance per country, so transit cannot happen there.
-- A ticket to a country is completed via any of its flags, so its distance is the shortest path to the nearest flag. The suggester may propose such tickets only if the editor supports ticket endpoints that are a group of stops; until then it only uses cities.
-- Waypoints (kind `waypoint`) are junctions only: never ticket endpoints, but paths may pass through them.
+- **Not part of the prototype.** Border countries do not change city–city tickets on the official maps. If a path may pass through a country, 0 of 34 tickets change on Switzerland, 0 of 35 on Polska and 1 of 46 on Italia. They only matter for tickets *to* a country, which need group endpoints and are out of scope. The editor gets no country setting or stop type for this.
+- The Python reference and the acceptance tests drop country and border-flag stops when they load the reference maps. That keeps the maps comparable.
+- Waypoints and other non-city stops are junctions only. Paths may pass through them, but they are never ticket endpoints.
 
 ## 5. UI
 
@@ -259,11 +259,11 @@ Maps that do not follow the shortest path must never be used to tune targets or 
 
 **Multi-map check (the main one).**
 
-1. Build every map with `useForCalibration: true` from `data/ttr-reference-maps.json` as `MapData`. Use `trainsPerPlayer` from the data, or 45 when it is missing. Treat country and border-flag stops as dead ends, and waypoints as junctions.
+1. Build every map with `useForCalibration: true` from `data/ttr-reference-maps.json` as `MapData`. Use `trainsPerPlayer` from the data, or 45 when it is missing. Drop country and border-flag stops, and keep waypoints as junctions.
 2. With `generic` (Europe with `europe`), check each map:
    - The official deck, limited to city–city tickets within reach, scores below the median of 10 random decks of the same size. Switzerland is the known exception.
    - `suggestTickets` with seeds 1 and 2 scores < 5 and below the official deck.
-   - No suggested ticket has a waypoint or a country as an endpoint.
+   - No suggested ticket has a non-city stop as an endpoint.
 3. Compare the §2b table metric by metric, not ticket by ticket.
 
 **Valuation check.** With the default `valueTicket`, the printed points of the official tickets match exactly:

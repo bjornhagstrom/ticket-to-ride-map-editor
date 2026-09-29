@@ -24,10 +24,9 @@ Add **Suggest tickets…** to the ticket editor. It proposes a complete destinat
    - Per-map opt-in modifiers, off by default: long-ticket bonus, ferry premium, manual designer adjustment.
    - Flag *value ambiguous (+1 alternative)* when a path exists that costs exactly one space more but uses fewer routes. Never raise the value automatically.
 3. **Graph rules.**
-   - A map setting `countryTransit`, default `false`. When it is false, country and border-flag stops are dead ends.
-   - Waypoints are junctions only.
    - Parallel lanes form one edge with a `lanes` count.
-   - Only city–city tickets for now.
+   - Only city–city tickets. Stops that are not cities, such as waypoints or anything else the editor marks as non-city, are junctions: never endpoints, and not counted as stops.
+   - **No country feature in the prototype.** Border countries do not affect city–city tickets: 0 of 34 on Switzerland, 0 of 35 on Polska and 1 of 46 on Italia change if transit through a country is allowed. Don't add a `countryTransit` setting or a country stop type. When the test loads reference maps, drop country stops from the graph.
 4. **UI (§5).**
    - The dialog has style, trains per player, deck size, and keep existing or replace all.
    - The preview shows the report next to the official range for each metric.
@@ -37,14 +36,14 @@ Add **Suggest tickets…** to the ticket editor. It proposes a complete destinat
    - Load each map with `useForCalibration: true` from `data/ttr-reference-maps.json`.
    - **Valuation:** the default `valueTicket` must reproduce the printed points: Nordic 46/46, India 58/58, Polska 35/35, Switzerland city tickets 34/34, Old West 41/42, Northern Lights 54/55, Europe 43/46.
    - **Score:** each official deck scores below random decks; Switzerland is the known exception.
-   - **Suggestions:** seeds 1 and 2 score < 5 and below the official deck, and no suggested ticket has a waypoint or a country as an endpoint.
+   - **Suggestions:** seeds 1 and 2 score < 5 and below the official deck, and no suggested ticket has a non-city stop as an endpoint.
    - **Determinism:** the same seed gives the same deck.
    - **Edge cases:** a map with fewer than 4 stops returns an empty deck and a reason, and does not throw.
    - Compare metrics with the Python reference, not exact ticket lists.
 
 ## Out of scope for now
 
-- Country tickets whose endpoint is a group of stops. The `Ticket` model has no group endpoints yet. Propose the model change separately.
+- Countries in general: country tickets (endpoint = a group of stops), transit rules and country bonuses.
 - Tours (R&S World) and any special-rule valuation: zones, festivals, harbours, country cards, shared tracks. Show a warning instead.
 - Tuning targets on maps with `useForCalibration: false`.
 
