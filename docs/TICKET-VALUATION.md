@@ -7,7 +7,7 @@ The data is in `data/ttr-reference-maps.json`, where each map has a `valuation` 
 The graph used everywhere:
 
 - Edge weight is the route length (the shortest lane between two stops).
-- Border-flag stops (`deadEnd: true`) may end a path but never be passed through. This rule is set per map (`countryTransit`) and is so far only confirmed for Italia.
+- Border-flag stops (`deadEnd: true`) may end a path but never be passed through. This rule is set per map (`countryTransit`) and is `false` in the rulebooks of Italia, Switzerland and Märklin (Polska: not stated).
 - A ticket to a country uses the nearest of its flags.
 
 ## 1. The baseline: points = shortest path
@@ -59,7 +59,7 @@ Open anomaly: Italia Genova–Pescara prints 7, but the shortest path is 10.
 4. **Report difficulty separately from points.** On classic maps, tunnels, locomotives and grey routes are difficulty, not value. Show them as flags on the ticket.
 5. **Rules the editor cannot model yet produce a warning, not a guess.** This covers zones, festivals, shared tracks and region bonuses. The warning should say the official maps with such rules valued tickets 1.2–1.5× the path, so the designer should expect to raise values by hand after testing.
 6. **Graph rules the suggester must respect:**
-   - Whether a path may pass through a country is a per-map rule (`countryTransit` = true, false or unknown), because rules differ between maps. Make it a map setting. The default for new maps is "no transit", since that is the safer assumption and is confirmed for Italia.
+   - Whether a path may pass through a country is a per-map rule (`countryTransit` = true, false or unknown), because rules differ between maps. Make it a map setting. The default for new maps is "no transit", since that is the rule in every rulebook that states it (Italia, Switzerland, Märklin).
    - A ticket to a country is completed via any of its entrances.
    - Waypoints are never ticket endpoints.
    - A map may have both train and ship routes (Rails & Sails). Keep `kind` on the route, and do not assume every route can be used by every piece.
