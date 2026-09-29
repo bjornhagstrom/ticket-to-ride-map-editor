@@ -172,6 +172,12 @@ Performance notes:
 - The suggester does not learn a points-per-space rate from the map's existing tickets. `reviewTickets` keeps its own fit.
 - Tickets with `locos > 0` or `tunnels > 0` are listed in `report.hard`, so the designer can see them.
 
+### 4.8 Border countries and waypoints
+
+- Stops that are border flags (kind `country` in the reference data) are dead ends: a shortest path may start or end there but must never pass through one. A country's flags are not connected to each other.
+- A ticket to a country is completed via any of its flags, so its distance is the shortest path to the nearest flag. The suggester may propose such tickets only if the editor supports ticket endpoints that are a group of stops; until then it only uses cities.
+- Waypoints (kind `waypoint`) are junctions only: never ticket endpoints, but paths may pass through them.
+
 ## 5. UI
 
 - **Suggest tickets…** opens a dialog with:
