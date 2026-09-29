@@ -1,15 +1,15 @@
 "use client";
 
 // The modal surfaces: the first-visit guide, the balance report and the route suggestions.
-import { Copy, Download, FileStack, Layers3, MapPinPlus, Pencil, Plus, Printer, Save, Trash2, Upload } from "lucide-react";
+import { Copy, Download, FileStack, Sparkles, Layers3, MapPinPlus, Pencil, Plus, Printer, Save, Trash2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { colorLabels, type MapData, realWagon, type Stop, ticketsInSet, type TicketSet } from "./map-data";
+import { colorLabels, type MapData, realWagon, type Stop, type Ticket, ticketsInSet, type TicketSet } from "./map-data";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { type SetupBalance, type TicketReview, type ColourLengthTable, type NetworkStats, type RouteSpacing, type RouteSuggestion } from "./map-analysis";
+import { TICKET_SUGGESTER, type TicketDeckReport, type TicketStyle, type SetupBalance, type TicketReview, type ColourLengthTable, type NetworkStats, type RouteSpacing, type RouteSuggestion } from "./map-analysis";
 
 export function WelcomeGuide({ open, onOpenChange, onChooseBlank, onChooseExample }: { open: boolean; onOpenChange: (open: boolean) => void; onChooseBlank: () => void; onChooseExample: () => void }) {
   const steps: Array<{ icon: React.ReactNode; title: string; text: string }> = [
@@ -102,7 +102,7 @@ export function SuggestionsDialog({ open, onOpenChange, suggestions, onAdd }: { 
 }
 
 
-export function TicketsDialog({ open, onOpenChange, data, reviews, coverage, rate, selected, activeSet, onSelect, onUpdate, onDelete, onSelectSet, onAddSet, onDuplicateSet, onRenameSet, onDeleteSet, onExport, onImport, onPrint, onStartFrom }: {
+export function TicketsDialog({ open, onOpenChange, data, reviews, coverage, rate, selected, activeSet, onSelect, onUpdate, onDelete, onSelectSet, onAddSet, onDuplicateSet, onRenameSet, onDeleteSet, onExport, onImport, onPrint, onStartFrom, onSuggest }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   data: MapData;
@@ -123,6 +123,7 @@ export function TicketsDialog({ open, onOpenChange, data, reviews, coverage, rat
   onImport: () => void;
   onPrint: () => void;
   onStartFrom: (stopId: string) => void;
+  onSuggest: () => void;
 }) {
   const name = (id: string) => data.stops.find((stop) => stop.id === id)?.name ?? "—";
   const problems = reviews.filter((review) => review.verdict !== "ok");
@@ -146,6 +147,7 @@ export function TicketsDialog({ open, onOpenChange, data, reviews, coverage, rat
           <Button size="sm" variant="outline" onClick={() => onExport("set")}><Download />Export this deck</Button>
           <Button size="sm" variant="ghost" disabled={data.ticketSets.length < 2} onClick={() => onExport("all")}><Download />Export all decks</Button>
           <Button size="sm" variant="outline" disabled={!reviews.length} onClick={onPrint}><Printer />Print cards</Button>
+          <Button size="sm" variant="outline" onClick={onSuggest}><Sparkles />Suggest a deck…</Button>
         </div>
         <p className="helper">Several decks can sit in one map, so variants can be judged side by side. Imported decks always arrive as new decks and match stops by name when the ids differ.</p>
       </div>
@@ -204,6 +206,86 @@ export function StopTicketsDialog({ open, onOpenChange, stopName, band, tickets,
         <span>{stopName} → {ticket.other}</span>
         <span className="stop-ticket-meta">{ticket.distance === null ? "not connected" : `${ticket.distance} spaces`} · {ticket.points} pt · {ticket.deck}</span>
       </button>)}</div>
+    </DialogContent>
+  </Dialog>;
+}
+
+// Suggest a whole deck for the map that is open, then let the person edit it as ordinary tickets.
+export function SuggestTicketsDialog({ open, onOpenChange, data, current, suggestion, style, onStyle, wagons, onWagons, deckSize, onDeckSize, keepExisting, onKeepExisting, busy, onShuffle, onApply }: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  data: MapData;
+  current: TicketDeckReport;
+  suggestion: { tickets: Ticket[]; report: TicketDeckReport } | null;
+  style: TicketStyle;
+  onStyle: (style: TicketStyle) => void;
+  wagons: number;
+  onWagons: (wagons: number) => void;
+  deckSize: number;
+  onDeckSize: (size: number) => void;
+  keepExisting: boolean;
+  onKeepExisting: (keep: boolean) => void;
+  busy: boolean;
+  onShuffle: () => void;
+  onApply: () => void;
+}) {
+  const report = suggestion?.report;
+  const official = TICKET_SUGGESTER.official;
+  const range = ([low, high]: [number, number], unit = "") => `official ${low}–${high}${unit}`;
+  const row = (label: string, now: string, next: string, hint: string) => <tr key={label}>
+    <td>{label}</td><td>{now}</td><td>{next}</td><td className="suggest-range">{hint}</td>
+  </tr>;
+  const pct = (value: number) => `${value.toFixed(1)} %`;
+  // On a small map, dealing a full table needs more tickets than one per stop would give.
+  const perStopSize = Math.round((TICKET_SUGGESTER.styles[style].ticketsPerStop + TICKET_SUGGESTER.styles[style].longPerStop) * data.stops.length);
+  const dealtFloor = deckSize > perStopSize ? deckSize : 0;
+
+  return <Dialog open={open} onOpenChange={onOpenChange}>
+    <DialogContent className="suggest-dialog">
+      <DialogHeader>
+        <DialogTitle>Suggest a ticket deck</DialogTitle>
+        <DialogDescription>Every target below comes from the official Ticket to Ride decks, not from this map. Applying puts the result in a new deck stamped with today&apos;s date, so nothing you already have is touched.</DialogDescription>
+      </DialogHeader>
+
+      <div className="suggest-controls">
+        <div><Label htmlFor="suggest-style">Style</Label>
+          <NativeSelect id="suggest-style" value={style} onChange={(event) => onStyle(event.target.value as TicketStyle)}>
+            {(Object.keys(TICKET_SUGGESTER.styles) as TicketStyle[]).map((key) => <NativeSelectOption key={key} value={key}>{TICKET_SUGGESTER.styles[key].label}</NativeSelectOption>)}
+          </NativeSelect></div>
+        <div><Label htmlFor="suggest-wagons">Wagons per player</Label>
+          <Input id="suggest-wagons" type="number" min={1} max={99} value={wagons} onChange={(event) => onWagons(Math.max(1, Math.round(Number(event.target.value) || 1)))} /></div>
+        <div><Label htmlFor="suggest-size">Tickets</Label>
+          <Input id="suggest-size" type="number" min={1} max={200} value={deckSize} onChange={(event) => onDeckSize(Math.max(1, Math.round(Number(event.target.value) || 1)))} /></div>
+      </div>
+      <p className="helper">{busy ? "Working out a deck… " : ""}{TICKET_SUGGESTER.styles[style].blurb} The wagon count is this map&apos;s own setting and changing it here changes it there. A player&apos;s reach is {report?.reach ?? current.reach} wagon spaces, from {TICKET_SUGGESTER.styles[style].lengthCap} × {wagons} wagons.</p>
+      {dealtFloor > 0 && <p className="helper">On a map this size, {TICKET_SUGGESTER.styles[style].ticketsPerStop} tickets per stop would leave too few to deal {data.startingTickets ?? 3} each to a table of five, so the count is held at {dealtFloor}. That is denser than the official decks; lower it if you would rather match them.</p>}
+      <label className="checkbox-row"><input type="checkbox" checked={keepExisting} onChange={(event) => onKeepExisting(event.target.checked)} />Keep the tickets this deck already has</label>
+
+      {report?.note && <p className="helper helper-warning">{report.note}</p>}
+
+      <div className={cn("analysis-table-scroll", busy && "suggest-busy")}><table className="analysis-table suggest-table">
+        <thead><tr><th>Measure</th><th>Now</th><th>Suggested</th><th>Reference</th></tr></thead>
+        <tbody>
+          {row("Tickets", `${current.regular + current.long}`, report ? `${report.regular + report.long}` : "—", `${TICKET_SUGGESTER.styles[style].ticketsPerStop} per stop`)}
+          {row("Long tickets", `${current.long}`, report ? `${report.long}` : "—", style === "europe" ? "Europe has 6 of 46" : "Classic has none")}
+          {row("Tickets per stop", current.perStop.toFixed(2), report ? report.perStop.toFixed(2) : "—", range(official.perStop))}
+          {row("Reach", `${current.reach}`, report ? `${report.reach}` : "—", "the longest ticket a player can build")}
+          {row("Stops with no ticket", `${current.zeroStops}`, report ? `${report.zeroStops}` : "—", "USA 6, Europe 0")}
+          {row("Most tickets on one stop", `${current.maxPerStop}`, report ? `${report.maxPerStop}` : "—", range(official.maxPerStop))}
+          {row("Near-duplicates", pct(current.dupPct), report ? pct(report.dupPct) : "—", range(official.dupPct, " %"))}
+          {row("Routes no ticket uses", pct(current.unusedPct), report ? pct(report.unusedPct) : "—", range(official.unusedPct, " %"))}
+          {row("Score", current.score.toFixed(1), report ? report.score.toFixed(1) : "—", "under 5 is official-like, over 10 is random")}
+        </tbody>
+      </table></div>
+
+      {report && report.bins.some((count) => count > 0) && <p className="helper">Lengths, shortest to longest: {report.bins.join(" · ")} against a target of {TICKET_SUGGESTER.styles[style].bins.map((share) => (share * report.regular).toFixed(1)).join(" · ")}.</p>}
+      {report && report.hard.length > 0 && <p className="helper">{report.hard.length} ticket{report.hard.length === 1 ? "" : "s"} cross a tunnel or need ferry locomotives. They are worth their wagon count all the same — the difficulty is yours to judge.</p>}
+
+      <DialogFooter>
+        <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
+        <Button variant="outline" disabled={busy} onClick={onShuffle}>Shuffle</Button>
+        <Button disabled={busy || !suggestion?.tickets.length} onClick={onApply}>Apply as a new deck</Button>
+      </DialogFooter>
     </DialogContent>
   </Dialog>;
 }

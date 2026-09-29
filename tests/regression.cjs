@@ -381,7 +381,34 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.keyboard.press("Escape");
   await page.waitForTimeout(300);
 
-  // 21. a background image reaches every edge and can cover the board
+  // 21. suggesting a whole deck for the map that is open
+  await page.getByRole("button", { name: /^Tickets · / }).click();
+  await page.waitForTimeout(400);
+  const decksBefore = await page.locator("#ticket-set option").count();
+  const suggestStarted = Date.now();
+  await page.getByRole("button", { name: /Suggest a deck/ }).click();
+  await page.waitForSelector(".suggest-table tbody tr", { timeout: 20000 });
+  check("the suggest dialog opens at once", Date.now() - suggestStarted < 1500, `${Date.now() - suggestStarted} ms`);
+  // The deck is worked out off the main thread, so the column fills a moment later.
+  await page.waitForFunction(() => {
+    const row = [...document.querySelectorAll(".suggest-table tbody tr")].find((tr) => tr.children[0].textContent.trim() === "Score");
+    return row && row.children[2].textContent.trim() !== "—";
+  }, null, { timeout: 30000 });
+  const suggestRows = await page.$$eval(".suggest-table tbody tr", (trs) => trs.map((tr) => Array.from(tr.children).map((td) => td.textContent.trim())));
+  const suggestedScore = Number(suggestRows.find((row) => row[0] === "Score")[2]);
+  check("it scores the suggestion against the official range", suggestedScore < 5, suggestRows.find((row) => row[0] === "Score").join(" | "));
+  check("and shows the official range beside each measure", suggestRows.some((row) => /official/.test(row[3])), suggestRows[2].join(" | "));
+  await page.getByRole("button", { name: /Apply as a new deck/ }).click();
+  await page.waitForTimeout(1000);
+  const afterSuggest = await page.locator("#ticket-set option").allTextContents();
+  check("applying leaves the old decks alone and adds a dated one", afterSuggest.length === decksBefore + 1 && afterSuggest.some((name) => /^Suggested · \d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(name)), afterSuggest.join(" | "));
+  check("and the suggested deck is the one being worked on", /^Suggested · /.test(await page.locator("#ticket-set-name").inputValue()), await page.locator("#ticket-set-name").inputValue());
+  const suggestedCount = await page.locator(".analysis-table tbody tr").count();
+  check("the suggestion arrives as ordinary, editable tickets", suggestedCount > 0 && (await page.locator(".analysis-table tbody tr .ticket-points").count()) === suggestedCount, String(suggestedCount));
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(300);
+
+  // 22. a background image reaches every edge and can cover the board
   // On a clean board: the image is drawn underneath everything, so on a busy map a click at its
   // middle lands on a route instead of on the image.
   await page.getByRole("button", { name: "Clear map" }).click();

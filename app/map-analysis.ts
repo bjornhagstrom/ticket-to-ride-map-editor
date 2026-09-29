@@ -374,3 +374,6 @@ export function ticketCoverage(data: MapData, setId?: string): { stop: Stop; cou
   for (const ticket of (setId ? ticketsInSet(data, setId) : data.tickets)) for (const id of [ticket.a, ticket.b]) counts.set(id, (counts.get(id) ?? 0) + 1);
   return data.stops.map((stop) => ({ stop, count: counts.get(stop.id) ?? 0 })).sort((a, b) => b.count - a.count);
 }
+
+// The ticket suggester lives in its own module; re-exported here so the ticket analysis has one door.
+export { suggestTickets, evaluateTicketDeck, suggestedDeckSize, defaultStyle, TICKET_SUGGESTER, type TicketStyle, type TicketSuggestOptions, type TicketDeckReport } from "./ticket-suggester";

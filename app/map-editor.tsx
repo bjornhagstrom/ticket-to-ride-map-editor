@@ -13,18 +13,19 @@ import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { MapArtwork, type Tool } from "./map-artwork";
-import { AnalysisDialog, StopTicketsDialog, SuggestionsDialog, TicketsDialog, WelcomeGuide } from "./map-dialogs";
+import { AnalysisDialog, StopTicketsDialog, SuggestionsDialog, SuggestTicketsDialog, TicketsDialog, WelcomeGuide } from "./map-dialogs";
 import { TicketCoveragePanel, type CoverageSort, BackgroundImageProperties, BackgroundProperties, NoteProperties, RouteProperties, StopProperties, StylePicker } from "./map-properties";
 import { PrintPages, TicketPrintPages } from "./map-print";
+import { useTicketSuggestion } from "./use-ticket-suggestion";
 import { SettingsDialog, type StyleTarget } from "./map-styles";
-import { autoPlaceLabels, setupBalance, stopCoverage, ticketBand, type TicketBand, reviewTickets, ticketPointsPerSpace, ticketCoverage, type RouteSuggestion, labelCovers, labelAngleOptions, routeSamplePoints, colourLengthTable, crossingPairs, buildAdjacency, networkStats, routeSpacing, shortestPath, suggestRoutes } from "./map-analysis";
+import { defaultStyle, evaluateTicketDeck, suggestedDeckSize, type TicketStyle, autoPlaceLabels, setupBalance, stopCoverage, ticketBand, type TicketBand, reviewTickets, ticketPointsPerSpace, ticketCoverage, type RouteSuggestion, labelCovers, labelAngleOptions, routeSamplePoints, colourLengthTable, crossingPairs, buildAdjacency, networkStats, routeSpacing, shortestPath, suggestRoutes } from "./map-analysis";
 import { canvasPoint, canvasPointRaw, pointsFor, samePair, stopById } from "./map-geometry";
-import { cloneForHistory, cloneMap, formatTimestamp, GUIDE_SEEN_KEY, HISTORY_LIMIT, MAX_IMAGE_WARN_BYTES, normalizeBackgroundFile, normalizeMap, normalizeNetworkFile, normalizeTicketFile, buildTicketFile, readBackgroundImage, rescaleMapToFormat, MAP_HINT_KEY, MAP_HINT_X_KEY } from "./map-storage";
-import { colorLabels, defaultTicketSet, IMAGE_KEEP_ON_BOARD, ticketsInSet, type TicketSet, emptyMap, initialMap, type LineStyle, DEFAULT_END_GAP_MM, mapFormats, type BackgroundImage, type BackgroundShape, type BackgroundType, type MapData, type MapFormat, type Point, realWagon, type Route, type RouteType, type RouteTypeStyle, routeColors, STORAGE_KEY, type Stop, type StopSize, stopSizeMeta, type StopSymbol, stopSymbolMeta, type StopType, W } from "./map-data";
+import { cloneForHistory, cloneMap, formatTimestamp, GUIDE_SEEN_KEY, HISTORY_LIMIT, MAX_IMAGE_WARN_BYTES, normalizeBackgroundFile, normalizeMap, normalizeNetworkFile, normalizeTicketFile, buildTicketFile, formatStampLabel, readBackgroundImage, rescaleMapToFormat, MAP_HINT_KEY, MAP_HINT_X_KEY } from "./map-storage";
+import { colorLabels, defaultTicketSet, DEFAULT_WAGONS_PER_PLAYER, IMAGE_KEEP_ON_BOARD, type Ticket, ticketsInSet, type TicketSet, emptyMap, initialMap, type LineStyle, DEFAULT_END_GAP_MM, mapFormats, type BackgroundImage, type BackgroundShape, type BackgroundType, type MapData, type MapFormat, type Point, realWagon, type Route, type RouteType, type RouteTypeStyle, routeColors, STORAGE_KEY, type Stop, type StopSize, stopSizeMeta, type StopSymbol, stopSymbolMeta, type StopType, W } from "./map-data";
 
 type MeasureResult = { from: string; to: string; distance: number; routeIds: string[] } | { from: string; to: string; unreachable: true };
 type Danger = "reset" | "delete" | "load-blank" | "load-example" | "import-background" | "import-network" | "import-image" | null;
-type PendingImport = { kind: "background"; background: BackgroundShape[]; backgroundImage?: BackgroundImage } | { kind: "network"; stops: Stop[]; routes: Route[]; lineStyles: LineStyle[]; routeTypeStyles: RouteTypeStyle[] } | { kind: "image"; image: BackgroundImage };
+type PendingImport = { kind: "background"; background: BackgroundShape[]; backgroundImage?: BackgroundImage } | { kind: "network"; stops: Stop[]; routes: Route[]; lineStyles: LineStyle[]; routeTypeStyles: RouteTypeStyle[]; tickets: Ticket[] } | { kind: "image"; image: BackgroundImage };
 // Snapshots are geometry-only (see cloneForHistory), so a deep stack stays in the low megabytes
 // even for a large map. Kept in memory for the session only, never written to local storage.
 
@@ -81,6 +82,11 @@ export function MapEditor() {
   const [coverageSort, setCoverageSort] = useState<CoverageSort>({ column: "stop", descending: false });
   const [onlyUncovered, setOnlyUncovered] = useState(false);
   const [stopTicketView, setStopTicketView] = useState<{ stopId: string; band?: TicketBand } | null>(null);
+  const [showSuggest, setShowSuggest] = useState(false);
+  const [suggestStyle, setSuggestStyle] = useState<TicketStyle | null>(null);
+  const [suggestSize, setSuggestSize] = useState<number | null>(null);
+  const [suggestKeep, setSuggestKeep] = useState(false);
+  const [suggestSeed, setSuggestSeed] = useState(1);
   const [measureResult, setMeasureResult] = useState<MeasureResult | null>(null);
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -107,8 +113,6 @@ export function MapEditor() {
   const fileRef = useRef<HTMLInputElement>(null);
   const imageFileRef = useRef<HTMLInputElement>(null);
   const format = mapFormats[data.format];
-  const panelWidthMm = Math.round(format.widthMm / format.columns);
-  const panelHeightMm = Math.round(format.heightMm / format.rows);
 
   useEffect(() => { queueMicrotask(() => { try { const stored = localStorage.getItem(STORAGE_KEY); if (stored) { setData(normalizeMap(JSON.parse(stored))); localStorage.setItem(GUIDE_SEEN_KEY, "1"); } else if (!localStorage.getItem(GUIDE_SEEN_KEY)) setShowGuide(true); } catch { /* ignore invalid local state */ } setReady(true); }); }, []);
   useEffect(() => { if (!ready) return; localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); const timer = window.setTimeout(() => setSaved(true), 0); return () => window.clearTimeout(timer); }, [data, ready]);
@@ -142,6 +146,37 @@ export function MapEditor() {
   const ticketRate = useMemo(() => ticketPointsPerSpace(ticketReviews), [ticketReviews]);
   const coverageRows = useMemo(() => stopCoverage(data, activeTicketSet.id), [data, activeTicketSet.id]);
   const setup = useMemo(() => setupBalance(data, activeTicketSet.id), [data, activeTicketSet.id]);
+  // The suggester runs on the whole map, so it only needs to be asked again when the map, the deck
+  // or one of the dialog's own choices changes.
+  const suggestChoice = suggestStyle ?? defaultStyle(data, activeTicketSet.id);
+  const currentDeckReport = useMemo(() => evaluateTicketDeck(data, { style: suggestChoice, setId: activeTicketSet.id }), [data, suggestChoice, activeTicketSet.id]);
+  const suggestDefaultSize = useMemo(() => {
+    const connected = new Set(data.routes.flatMap((route) => [route.a, route.b]));
+    const size = suggestedDeckSize(data, suggestChoice, connected.size || data.stops.length);
+    return size.regular + size.long;
+  }, [data, suggestChoice]);
+  const { suggestion, busy: suggestBusy } = useTicketSuggestion(showSuggest, data, {
+    style: suggestChoice,
+    seed: suggestSeed,
+    deckSize: suggestSize ?? suggestDefaultSize,
+    setId: activeTicketSet.id,
+    keep: suggestKeep ? ticketsInSet(data, activeTicketSet.id).map((ticket) => ticket.id) : [],
+  });
+  // The new deck's id and name are stamped by the click, not by the render.
+  const applySuggestion = (id: string, label: string) => {
+    if (!suggestion?.tickets.length) return;
+    change((draft) => {
+      draft.ticketSets.push({ id, label });
+      for (const ticket of suggestion.tickets) draft.tickets.push({ ...ticket, set: id });
+      return draft;
+    });
+    setTicketSetId(id);
+    setSelectedTicket(null);
+    setShowSuggest(false);
+    setShowTickets(true);
+    toast.success(`${suggestion.tickets.length} tickets suggested into ${label}.`);
+  };
+  const openSuggest = () => { setShowTickets(false); setSuggestStyle(null); setSuggestSize(null); setSuggestSeed(1); setShowSuggest(true); };
   // The tickets behind one number in the coverage panel.
   const viewedStopTickets = useMemo(() => {
     if (!stopTicketView) return [];
@@ -477,7 +512,16 @@ export function MapEditor() {
   const exportTickets = (scope: "set" | "all") => { const ids = scope === "all" ? data.ticketSets.map((set) => set.id) : [activeTicketSet.id]; downloadJson(buildTicketFile(data, ids), `${data.name} ${scope === "all" ? "tickets" : activeTicketSet.label}`); };
   const printTickets = () => { setShowTickets(false); setPrintScope("tickets"); };
   const applyBackgroundImport = (background: BackgroundShape[], backgroundImage?: BackgroundImage) => { change((draft) => ({ ...draft, background, backgroundImage })); clearSelection(); setDanger(null); setPendingImport(null); };
-  const applyNetworkImport = (stops: Stop[], routes: Route[], lineStyles: LineStyle[], routeTypeStyles: RouteTypeStyle[]) => { change((draft) => ({ ...draft, stops, routes, lineStyles, routeTypeStyles })); clearSelection(); setDanger(null); setPendingImport(null); };
+  const applyNetworkImport = (stops: Stop[], routes: Route[], lineStyles: LineStyle[], routeTypeStyles: RouteTypeStyle[], tickets: Ticket[]) => {
+    change((draft) => {
+      const next = { ...draft, stops, routes, lineStyles, routeTypeStyles };
+      // Tickets that came with the network go into the deck being worked on.
+      if (tickets.length) next.tickets = [...draft.tickets.filter((ticket) => (ticket.set ?? draft.ticketSets[0].id) !== activeTicketSet.id), ...tickets.map((ticket) => ({ ...ticket, set: activeTicketSet.id }))];
+      return next;
+    });
+    clearSelection(); setDanger(null); setPendingImport(null);
+    if (tickets.length) toast.success(`${tickets.length} tickets came with the network and went into ${activeTicketSet.label}.`);
+  };
   const applyImageImport = (image: BackgroundImage) => { change((draft) => ({ ...draft, backgroundImage: image })); chooseImage(); setDanger(null); setPendingImport(null); };
   const importMap = (file?: File) => {
     if (!file) return;
@@ -501,9 +545,9 @@ export function MapEditor() {
           return;
         }
         if (raw && raw.kind === "network") {
-          const { stops, routes, lineStyles, routeTypeStyles } = normalizeNetworkFile(raw, format.height);
-          if (data.stops.length || data.routes.length) { setPendingImport({ kind: "network", stops, routes, lineStyles, routeTypeStyles }); setDanger("import-network"); }
-          else applyNetworkImport(stops, routes, lineStyles, routeTypeStyles);
+          const { stops, routes, lineStyles, routeTypeStyles, tickets } = normalizeNetworkFile(raw, format.height);
+          if (data.stops.length || data.routes.length) { setPendingImport({ kind: "network", stops, routes, lineStyles, routeTypeStyles, tickets }); setDanger("import-network"); }
+          else applyNetworkImport(stops, routes, lineStyles, routeTypeStyles, tickets);
           return;
         }
         const incoming = normalizeMap(raw);
@@ -612,10 +656,16 @@ export function MapEditor() {
         {selectedR && <RouteProperties route={selectedR} stops={data.stops} routes={data.routes} lineStyles={data.lineStyles} routeTypeStyles={data.routeTypeStyles} change={change} onDelete={() => setDanger("delete")} onSetStyle={assignRouteLineStyle} onAddParallel={addParallelRoute} wagonStyles={data.wagonStyles} onEditStyles={openStyles} onStraighten={straightenRoute} onSetCurved={applyRouteCurve} linkParallel={linkParallel} onLinkParallel={setLinkParallel} />}
       </aside>
     </div>
-    <AlertDialog open={danger !== null} onOpenChange={(open) => { if (!open) { setDanger(null); setPendingImport(null); } }}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{danger === "reset" ? "Clear the entire map?" : danger === "load-blank" ? "Replace the current map with a blank one?" : danger === "load-example" ? "Replace the current map with the example?" : danger === "import-background" ? "Replace the background?" : danger === "import-network" ? "Replace stops and routes?" : danger === "import-image" ? "Replace the background image?" : "Delete the selected object?"}</AlertDialogTitle><AlertDialogDescription>{danger === "reset" ? "All locally stored background objects, stops and routes will be removed. Export the map first if you want to keep it." : danger === "load-blank" ? "Your current background objects, stops and routes will be replaced with a blank map. Export the map first if you want to keep your work." : danger === "load-example" ? "Your current background objects, stops and routes will be replaced with the neutral example map. Export the map first if you want to keep your work." : danger === "import-background" ? "The imported background, including any background image, will replace the current one. Stops and routes are kept as they are." : danger === "import-network" ? "The imported stops and routes will replace the current network. Background objects are kept as they are." : danger === "import-image" ? "The new image will replace the current background image." : selectedStop ? "The stop and all connected routes will be deleted." : "The selected object will be deleted."}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => { if (danger === "reset") { change(() => cloneMap(emptyMap)); clearSelection(); setDanger(null); } else if (danger === "load-blank") applyGuideChoice(emptyMap); else if (danger === "load-example") applyGuideChoice(initialMap); else if (danger === "import-background" && pendingImport?.kind === "background") applyBackgroundImport(pendingImport.background, pendingImport.backgroundImage); else if (danger === "import-network" && pendingImport?.kind === "network") applyNetworkImport(pendingImport.stops, pendingImport.routes, pendingImport.lineStyles, pendingImport.routeTypeStyles); else if (danger === "import-image" && pendingImport?.kind === "image") applyImageImport(pendingImport.image); else deleteSelected(); }}>Continue</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+    <AlertDialog open={danger !== null} onOpenChange={(open) => { if (!open) { setDanger(null); setPendingImport(null); } }}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{danger === "reset" ? "Clear the entire map?" : danger === "load-blank" ? "Replace the current map with a blank one?" : danger === "load-example" ? "Replace the current map with the example?" : danger === "import-background" ? "Replace the background?" : danger === "import-network" ? "Replace stops and routes?" : danger === "import-image" ? "Replace the background image?" : "Delete the selected object?"}</AlertDialogTitle><AlertDialogDescription>{danger === "reset" ? "All locally stored background objects, stops and routes will be removed. Export the map first if you want to keep it." : danger === "load-blank" ? "Your current background objects, stops and routes will be replaced with a blank map. Export the map first if you want to keep your work." : danger === "load-example" ? "Your current background objects, stops and routes will be replaced with the neutral example map. Export the map first if you want to keep your work." : danger === "import-background" ? "The imported background, including any background image, will replace the current one. Stops and routes are kept as they are." : danger === "import-network" ? "The imported stops and routes will replace the current network, and any tickets in the file replace the deck you are working in. Background objects are kept as they are." : danger === "import-image" ? "The new image will replace the current background image." : selectedStop ? "The stop and all connected routes will be deleted." : "The selected object will be deleted."}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => { if (danger === "reset") { change(() => cloneMap(emptyMap)); clearSelection(); setDanger(null); } else if (danger === "load-blank") applyGuideChoice(emptyMap); else if (danger === "load-example") applyGuideChoice(initialMap); else if (danger === "import-background" && pendingImport?.kind === "background") applyBackgroundImport(pendingImport.background, pendingImport.backgroundImage); else if (danger === "import-network" && pendingImport?.kind === "network") applyNetworkImport(pendingImport.stops, pendingImport.routes, pendingImport.lineStyles, pendingImport.routeTypeStyles, pendingImport.tickets); else if (danger === "import-image" && pendingImport?.kind === "image") applyImageImport(pendingImport.image); else deleteSelected(); }}>Continue</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
     <StopTicketsDialog open={stopTicketView !== null} onOpenChange={(open) => { if (!open) setStopTicketView(null); }}
       stopName={stopTicketView ? stopById(data, stopTicketView.stopId)?.name ?? "" : ""} band={stopTicketView?.band ?? null} tickets={viewedStopTickets}
       onOpen={(ticketId) => { setStopTicketView(null); openTicket(ticketId); }} />
+    <SuggestTicketsDialog open={showSuggest} onOpenChange={setShowSuggest} data={data} current={currentDeckReport} suggestion={suggestion}
+      style={suggestChoice} onStyle={(value) => { setSuggestStyle(value); setSuggestSize(null); }}
+      wagons={data.wagonsPerPlayer ?? DEFAULT_WAGONS_PER_PLAYER} onWagons={(value) => change((draft) => { draft.wagonsPerPlayer = value; return draft; })}
+      deckSize={suggestSize ?? suggestDefaultSize} onDeckSize={setSuggestSize}
+      keepExisting={suggestKeep} onKeepExisting={setSuggestKeep}
+      busy={suggestBusy} onShuffle={() => setSuggestSeed((seed) => seed + 1)} onApply={() => applySuggestion(`ts-${Date.now()}`, nextDeckLabel(data.ticketSets, `Suggested · ${formatStampLabel()}`))} />
     <WelcomeGuide open={showGuide} onOpenChange={(open) => !open && dismissGuide()} onChooseBlank={() => chooseFromGuide("blank")} onChooseExample={() => chooseFromGuide("example")} />
     <SettingsDialog open={showStyles} onOpenChange={setShowStyles} target={styleTarget} onTarget={setStyleTarget} data={data} change={change} onChangeFormat={changeFormat} defaults={{ stopType, setStopType, stopSize, setStopSize: (value) => setStopSize(value as StopSize), routeType, setRouteType, routeColor, setRouteColor, routeCurved, setRouteCurved, routeLineStyle, setRouteLineStyle, linkParallel, setLinkParallel, scaleTarget, setScaleTarget: (value) => setScaleTarget(value as MapFormat) }} />
     <TicketsDialog open={showTickets} onOpenChange={setShowTickets} data={data} reviews={ticketReviews} coverage={ticketCoverage(data, activeTicketSet.id)} rate={ticketRate} selected={selectedTicket} activeSet={activeTicketSet} onSelect={setSelectedTicket}
@@ -624,7 +674,7 @@ export function MapEditor() {
       onDuplicateSet={() => { const id = `ts-${Date.now()}`; const stamp = Date.now(); change((draft) => { draft.ticketSets.push({ id, label: nextDeckLabel(draft.ticketSets, `${activeTicketSet.label} copy`) }); ticketsInSet(draft, activeTicketSet.id).forEach((ticket, index) => draft.tickets.push({ ...ticket, id: `t-${stamp}-${index}`, set: id })); return draft; }); setTicketSetId(id); setSelectedTicket(null); }}
       onRenameSet={(label) => change((draft) => { const set = draft.ticketSets.find((item) => item.id === activeTicketSet.id); if (set) set.label = label; return draft; })}
       onDeleteSet={() => { if (data.ticketSets.length < 2) return; const gone = activeTicketSet.id; change((draft) => { const first = draft.ticketSets[0].id; draft.tickets = draft.tickets.filter((ticket) => (ticket.set ?? first) !== gone); draft.ticketSets = draft.ticketSets.filter((set) => set.id !== gone); return draft; }); setTicketSetId(data.ticketSets.find((set) => set.id !== gone)!.id); setSelectedTicket(null); }}
-      onExport={exportTickets} onImport={() => fileRef.current?.click()} onPrint={printTickets} onStartFrom={startTicketFrom}
+      onExport={exportTickets} onImport={() => fileRef.current?.click()} onPrint={printTickets} onStartFrom={startTicketFrom} onSuggest={openSuggest}
       onUpdate={(ticketId, values) => change((draft) => { const ticket = draft.tickets.find((item) => item.id === ticketId); if (ticket) Object.assign(ticket, { ...values, long: values.long === false ? undefined : values.long ?? ticket.long }); return draft; })}
       onDelete={(ticketId) => { change((draft) => { draft.tickets = draft.tickets.filter((item) => item.id !== ticketId); return draft; }); setSelectedTicket((current) => current === ticketId ? null : current); }} />
     <AnalysisDialog setup={setup} open={showAnalysis} onOpenChange={setShowAnalysis} data={data} stats={stats} colourTable={colourTable} spacing={spacing} scaleWidthMm={scaleWidthMm} onSelectRoute={(routeId) => { setShowAnalysis(false); setSelectedRoute(routeId); setSelectedStop(null); setSelectedBackground(null); setSelectedNote(null); setImageSelected(false); setTool("select"); }} onSelectStop={(stopId) => { setShowAnalysis(false); setSelectedStop(stopId); setSelectedRoute(null); setSelectedBackground(null); setSelectedNote(null); setImageSelected(false); setTool("select"); }} />

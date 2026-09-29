@@ -7,6 +7,10 @@ Editing, scoring, coverage, decks, ticket-only transfer and card printing are bu
 - Show the distribution of ticket lengths against a reference distribution, rather than only the
   shortest, median and longest.
 - Compare two decks against each other directly, rather than by switching between them.
+- The suggester holds the deck size at what a table of five can be dealt, which on a small map is
+  denser than the official 0.83–0.98 tickets per stop. The dialog says so and the count can be
+  overridden, but a better rule would be to warn rather than to force.
+- Tickets to countries or groups of stops, as Switzerland has, are not modelled.
 - Replace the stand-in ticket length bands (short up to 7 wagon spaces, medium up to 13) with the
   real definition once it is settled. They live in `TICKET_LENGTH_BANDS` in `app/map-analysis.ts`.
 
