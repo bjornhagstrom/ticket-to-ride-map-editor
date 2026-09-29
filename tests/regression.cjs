@@ -483,6 +483,27 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.keyboard.press("Escape");
   await page.waitForTimeout(300);
 
+  // 24. a deck name long enough to break the button it is shown in
+  const longName = "A deck with a really very long name that nobody would sensibly type";
+  await page.getByRole("button", { name: /^Tickets · / }).click();
+  await page.waitForTimeout(400);
+  await page.getByRole("button", { name: "New deck" }).click();
+  await page.waitForTimeout(400);
+  await page.locator("#ticket-set-name").fill(longName);
+  await page.waitForTimeout(400);
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(400);
+  const toolsWidth = (await page.locator(".tools-panel").boundingBox()).width;
+  const longNameButton = page.locator(".tools-panel .analyze-button").filter({ hasText: "Tickets" });
+  const buttonBox = await longNameButton.evaluate((el) => ({ scroll: el.scrollWidth, client: el.clientWidth, width: el.getBoundingClientRect().width, height: el.getBoundingClientRect().height }));
+  check("a long deck name does not widen the tools panel", buttonBox.width <= toolsWidth + 1, `${buttonBox.width.toFixed(0)} in ${toolsWidth.toFixed(0)}`);
+  check("and does not spill out of its button", buttonBox.scroll <= buttonBox.client + 1 && buttonBox.height < 40, `${buttonBox.scroll} wide in ${buttonBox.client}, ${buttonBox.height.toFixed(0)} px tall`);
+  check("the whole name is still there to hover", (await longNameButton.getAttribute("title")).includes(longName));
+  await useTool("Add ticket");
+  await page.waitForTimeout(400);
+  const headingBox = await page.locator(".properties .panel-heading").evaluate((el) => ({ scroll: el.scrollWidth, client: el.clientWidth, line: el.querySelector("small").getBoundingClientRect().height }));
+  check("the right panel cuts it off rather than wrapping it", headingBox.scroll <= headingBox.client + 1 && headingBox.line < 24, `${headingBox.scroll} in ${headingBox.client}, ${headingBox.line.toFixed(0)} px tall`);
+
   console.log("PASS:"); ok.forEach((l) => console.log("  ✓ " + l));
   if (bad.length) { console.log("FAIL:"); bad.forEach((l) => console.log("  ✗ " + l)); }
   console.log(`\n${ok.length} passed, ${bad.length} failed`);

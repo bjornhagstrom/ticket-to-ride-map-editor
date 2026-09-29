@@ -238,6 +238,8 @@ export function MapEditor() {
       .map((ticket) => ({ id: ticket.id, other: stopById(data, ticket.a === selectedS.id ? ticket.b : ticket.a)?.name ?? "—", points: ticket.points })),
   })).filter((deck) => deck.tickets.length || data.ticketSets.length === 1) : [];
   const litTicket = selectedTicket && !showTickets ? data.tickets.find((ticket) => ticket.id === selectedTicket) : undefined;
+  // A deck can be given any name at all, so the button that carries it has to be able to cut it off.
+  const ticketButtonLabel = `Tickets · ${ticketsHere.length}${data.ticketSets.length > 1 ? ` in ${activeTicketSet.label}` : ""}`;
   const startTicketFrom = (stopId: string) => { setShowTickets(false); setSelectedTicket(null); enterTool("ticket"); setTicketStart(stopId); };
   const openTicket = (ticketId: string) => { const ticket = data.tickets.find((item) => item.id === ticketId); if (!ticket) return; setTicketSetId(ticket.set ?? data.ticketSets[0].id); setSelectedTicket(ticketId); setShowTickets(true); };
   const selectedR = data.routes.find((route) => route.id === selectedRoute);
@@ -632,7 +634,7 @@ export function MapEditor() {
         </TooltipContent></Tooltip>}
         <Button variant="outline" size="sm" className="analyze-button" onClick={() => openStyles({ kind: "map" })}><Settings2 />Settings</Button>
         {data.stops.length > 0 && <Button variant="outline" size="sm" className="analyze-button" onClick={() => setShowAnalysis(true)}><BarChart3 />Analyze balance</Button>}
-        <Button variant="outline" size="sm" className="analyze-button" onClick={() => setShowTickets(true)}><TicketIcon />Tickets · {ticketsHere.length}{data.ticketSets.length > 1 ? ` in ${activeTicketSet.label}` : ""}</Button>
+        <Button variant="outline" size="sm" className="analyze-button" title={ticketButtonLabel} onClick={() => setShowTickets(true)}><TicketIcon /><span className="button-label">{ticketButtonLabel}</span></Button>
         {data.stops.length > 1 && <Button variant="outline" size="sm" className="analyze-button" onClick={() => setShowSuggestions(true)}><Lightbulb />Suggest routes</Button>}
         <div className="legend"><p className="eyebrow">Stop types</p>{data.stopTypeStyles.map((meta) => <button type="button" key={meta.id} className="legend-item" title={`Edit the ${meta.label} stop type`} onClick={() => openStyles({ kind: "stop", id: meta.id })}><i style={{ background: meta.fill, borderColor: meta.stroke }} />{meta.label}</button>)}</div>
         <Button variant="ghost" className="reset-button" onClick={() => setDanger("reset")}><RotateCcw />Clear map</Button>
@@ -647,7 +649,7 @@ export function MapEditor() {
         {hint && !hint.atTop && <MapHint atTop={false} title={hint.title} open={routeHintOpen} onToggle={toggleRouteHint} offsetX={routeHintX} onOffsetChange={moveRouteHint}>{hint.body}</MapHint>}
       </section>
       <aside className="properties panel">
-        <div className="panel-heading"><span>{tool === "ticket" ? "Ticket coverage" : "Properties"}</span><small>{tool === "ticket" ? `${activeTicketSet.label} · ${ticketsHere.length} ticket${ticketsHere.length === 1 ? "" : "s"}` : imageSelected ? "Background image selected" : selectedN ? "Note selected" : selectedB ? "Background object selected" : selectedR ? "Route selected" : selectedS ? "Stop selected" : "Select an object on the map"}</small></div>
+        <div className="panel-heading"><span>{tool === "ticket" ? "Ticket coverage" : "Properties"}</span><small title={tool === "ticket" ? activeTicketSet.label : undefined}>{tool === "ticket" ? `${activeTicketSet.label} · ${ticketsHere.length} ticket${ticketsHere.length === 1 ? "" : "s"}` : imageSelected ? "Background image selected" : selectedN ? "Note selected" : selectedB ? "Background object selected" : selectedR ? "Route selected" : selectedS ? "Stop selected" : "Select an object on the map"}</small></div>
         {tool === "ticket" && <TicketCoveragePanel rows={coverageRows} deck={activeTicketSet.label} cuts={bandCuts(ticketDiameter, bandsOf(data))} onEditMix={() => openStyles({ kind: "ticket" })} sort={coverageSort} onSort={setCoverageSort} onlyUncovered={onlyUncovered} onOnlyUncovered={setOnlyUncovered} onOpen={(stopId, band) => setStopTicketView({ stopId, band })} />}
         {tool !== "ticket" && !imageSelected && !selectedN && !selectedB && !selectedR && !selectedS && <div className="empty-state"><CircleDot /><p>Edit names, types, colours, geometry and route length here.</p></div>}
         {selectedN && <NoteProperties note={selectedN} change={change} onDelete={() => setDanger("delete")} />}
