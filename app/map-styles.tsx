@@ -18,7 +18,7 @@ export type StyleKind = "map" | "ticket" | "stop" | "route" | "defaults";
 export type StyleTarget = { kind: StyleKind; id?: string };
 
 const kindMeta: Record<StyleKind, { label: string; blurb: string }> = {
-  map: { label: "Map", blurb: "Settings for the whole map: the board it is designed for and how much room every stop leaves its wagons." },
+  map: { label: "Map", blurb: "Basic map settings." },
   ticket: { label: "Ticket lengths", blurb: "Where a ticket stops being short and starts being long on this map, and how much of the deck should sit in each band." },
   stop: { label: "Stop types", blurb: "What each kind of stop looks like on the map." },
   route: { label: "Route types", blurb: "Line thickness and dash pattern per type. Colour comes from each route, so types are told apart by shape." },
@@ -128,10 +128,13 @@ export function SettingsDialog({ open, onOpenChange, target, onTarget, data, cha
               return draft;
             });
             const setMix = (next: Partial<typeof mix>) => change((draft) => { draft.ticketMix = { ...mix, ...next }; return draft; });
+            // Typed in wagon spaces, which is what a designer counts, and kept as a share of the
+            // map's longest journey, which is what carries between maps of different sizes.
             const edge = (id: string, label: string, value: number, key: "medium" | "long") => <div key={id}>
               <Label htmlFor={id}>{label}</Label>
-              <Input id={id} type="number" min={0.05} max={0.95} step={0.05} value={value}
-                onChange={(event) => setBands({ [key]: Math.min(.95, Math.max(.05, Number(event.target.value) || .05)) })} />
+              <Input id={id} type="number" min={1} max={Math.max(1, diameter)} step={1} disabled={diameter < 2}
+                value={diameter ? Math.round(value * diameter) : ""}
+                onChange={(event) => { if (!diameter) return; const spaces = Math.min(diameter, Math.max(1, Math.round(Number(event.target.value) || 1))); setBands({ [key]: spaces / diameter }); }} />
             </div>;
             const share = (id: string, label: string, value: number, key: "short" | "medium" | "long") => <div key={id}>
               <Label htmlFor={id}>{label}</Label>
@@ -140,10 +143,13 @@ export function SettingsDialog({ open, onOpenChange, target, onTarget, data, cha
             </div>;
             return <div className="ticket-mix">
               <div className="mix-fields">
-                {edge("mix-medium-edge", "Short up to", bands.medium, "medium")}
-                {edge("mix-long-edge", "Long from", bands.long, "long")}
+                {edge("mix-medium-edge", "Short up to · spaces", bands.medium, "medium")}
+                {edge("mix-long-edge", "Long from · spaces", bands.long, "long")}
               </div>
-              <p className="helper">Both are fractions of the map&apos;s own longest journey, which is {diameter} wagon spaces{diameter ? `, so short is up to ${cuts.medium} wagon spaces, medium up to ${cuts.long}, and long beyond that` : ""}. Measuring against the map rather than in fixed wagons is how the official decks were read, so a mix carries between maps of different sizes.</p>
+              <p className="helper">{diameter < 2
+                ? "Draw some routes first: the boundaries are counted against the longest journey on the map, and there is not one yet."
+                : `Counted in wagon spaces along the shortest route between two stops. The longest journey on this map is ${diameter} spaces, so a ticket of ${cuts.medium} spaces or fewer is short, one of ${cuts.long} or more is long, and the rest are medium.`}</p>
+              <p className="helper">Kept as a share of that longest journey rather than as a fixed number, so the same mix means the same thing if you change the board size or follow another map. That is also how the official decks were measured.</p>
 
               <div className="mix-fields">
                 {share("mix-short", "Short %", mix.short, "short")}

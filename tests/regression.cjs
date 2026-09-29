@@ -585,7 +585,11 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   const mixShares = async () => [await page.locator("#mix-short").inputValue(), await page.locator("#mix-medium").inputValue(), await page.locator("#mix-long").inputValue()].join("/");
   check("a map carries its own ticket length mix", await page.locator("#mix-medium-edge").isVisible() && await page.locator("#mix-short").isVisible());
   check("starting on the official USA mix", (await mixShares()) === "30/47/23", await mixShares());
-  check("the boundaries are spelled out in wagon spaces for this map", /wagon space/.test(await page.locator(".ticket-mix .helper").first().textContent()));
+  // The map has been cleared by this point, so there is no longest journey to count against: the
+  // boundaries are in wagon spaces and say so rather than showing a meaningless number.
+  const bandHelp = await page.locator(".ticket-mix .helper").first().textContent();
+  check("the boundaries are counted in wagon spaces", /wagon spaces|Draw some routes first/.test(bandHelp), bandHelp.slice(0, 80));
+  check("and are held back until there is a map to count against", await page.locator("#mix-medium-edge").isDisabled());
   const mixPresets = page.locator(".mix-preset");
   check("official maps can be followed with one click", (await mixPresets.count()) >= 3, String(await mixPresets.count()));
   await mixPresets.filter({ hasText: "Ticket to Ride: Europe" }).first().click();
