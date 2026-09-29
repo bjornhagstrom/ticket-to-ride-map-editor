@@ -172,6 +172,16 @@ Performance notes:
 - The suggester does not learn a points-per-space rate from the map's existing tickets. `reviewTickets` keeps its own fit.
 - Tickets with `locos > 0` or `tunnels > 0` are listed in `report.hard`, so the designer can see them.
 
+### 4.7b Valuation is pluggable
+
+Read `docs/TICKET-VALUATION.md` before implementing points. The default stays `points = shortest path` (§4.7), but the value must come from one function, `valueTicket(path, map, options)`, so that the following can be added as explicit per-map options without touching the search:
+
+- a long-ticket bonus
+- a ferry premium (Italia style, +0.5 per ferry space, rounded up)
+- a manual designer adjustment kept separate from the computed value
+
+Maps with rules the editor cannot model (zones, festivals, shared tracks) get a warning instead of a guessed value.
+
 ### 4.8 Border countries and waypoints
 
 - Stops that are border flags (kind `country` in the reference data) are dead ends: a shortest path may start or end there but must never pass through one. A country's flags are not connected to each other.
