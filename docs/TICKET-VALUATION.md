@@ -19,7 +19,7 @@ In every "classic" map a ticket is worth the length of the shortest path between
 | Nordic Countries | 46 / 46 | – |
 | India | 58 / 58 | – |
 | Northern Lights | 54 / 55 | Helsinki–Gdańsk +1 |
-| Old West | 41 / 42 | Seattle–Great Falls +1 |
+| Old West | 41 / 42 | Seattle–Great Falls +1 (fewer routes, see below) |
 | Polska | 35 / 35 | — (country cards are a separate bonus and do not change ticket values) |
 | Europe | 43 / 46 | London–Wien +1 (ferry), Edinburgh–Athina +1 (longest deck), Stockholm–Wien −1 (maybe a transcription error) |
 | USA | 25 / 30 | the 5 longest are +1/+2 |
@@ -36,6 +36,25 @@ Small deliberate bonuses exist:
 
 - The very longest tickets get +1–2 (USA, the Europe long deck).
 - An occasional single card gets +1.
+
+### The "fewer routes" pattern behind many +1 cards
+
+Björn noticed this on Old West. Seattle–Great Falls prints 9. The cheapest path is 8 (Seattle–Spokane 4, Spokane–Missoula 2, Missoula–Great Falls 2), but the natural path is Seattle–Spokane 4 + the red 5 to Great Falls = 9. That path has one route less, so it costs one turn less to build.
+
+The same explains 6 of the 10 deviations on the calibration maps: a path exists that is exactly +1 space and uses fewer routes, and the card follows it.
+
+- Old West: Seattle–Great Falls.
+- Northern Lights: Helsinki–Gdańsk.
+- USA: Los Angeles–Chicago, Los Angeles–Miami and Los Angeles–New York.
+- Europe: Edinburgh–Athina.
+
+It is **not** a general rule. Applied to every ticket ("use the +1 path when it has fewer routes"), it breaks many exact cards: India falls from 58/58 to 46/58, Northern Lights from 54/55 to 37/55, Old West from 41/42 to 37/42.
+
+What the suggester should do with it:
+
+- Keep points = shortest path.
+- When a path exists that costs exactly +1 and has fewer routes, flag the ticket as *value ambiguous (+1 alternative)* in the preview. The designer can then choose.
+- Never raise the value automatically.
 
 ## 2. Maps whose special rules change valuation
 
