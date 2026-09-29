@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
-import { type StopTypeStyle, type WagonStyle, colorLabels, type ImageCrop, type LineStyle, type MapData, type NoteBox, type RouteTypeStyle, type BackgroundImage, type BackgroundShape, type Route, routeColors, type Stop, stopSizeMeta, stopSymbolMeta, type StopSize, type StopSymbol, W } from "./map-data";
+import { type StopTypeStyle, colorLabels, type ImageCrop, type MapData, type NoteBox, type RouteTypeStyle, type BackgroundImage, type BackgroundShape, type Route, routeColors, type Stop, stopSizeMeta, stopSymbolMeta, type StopSize, type StopSymbol, W } from "./map-data";
 import { isCurved, samePair, stopById } from "./map-geometry";
 import { type StyleTarget } from "./map-styles";
 import { labelAngleOf, type StopCoverage, ticketBands, type TicketBand } from "./map-analysis";
@@ -73,7 +73,7 @@ export function StopProperties({ stop, change, onDelete, labelState, mapEndGapMm
 
 
 
-export function RouteProperties({ route, stops, routes, lineStyles, routeTypeStyles, change, onDelete, onSetStyle, onAddParallel, wagonStyles, onEditStyles, onStraighten, onSetCurved, linkParallel, onLinkParallel }: { route: Route; onStraighten: (routeId: string) => void; onSetCurved: (routeId: string, curved: boolean) => void; linkParallel: boolean; onLinkParallel: (value: boolean) => void; stops: Stop[]; routes: Route[]; lineStyles: LineStyle[]; routeTypeStyles: RouteTypeStyle[]; change: (fn: (draft: MapData) => MapData) => void; onDelete: () => void; onAddParallel: (routeId: string) => void; wagonStyles: WagonStyle[]; onSetStyle: (routeId: string, styleId: string | undefined) => void; onEditStyles: (target: StyleTarget) => void }) {
+export function RouteProperties({ route, stops, routes, routeTypeStyles, change, onDelete, onAddParallel, onEditStyles, onStraighten, onSetCurved, linkParallel, onLinkParallel }: { route: Route; onStraighten: (routeId: string) => void; onSetCurved: (routeId: string, curved: boolean) => void; linkParallel: boolean; onLinkParallel: (value: boolean) => void; stops: Stop[]; routes: Route[]; routeTypeStyles: RouteTypeStyle[]; change: (fn: (draft: MapData) => MapData) => void; onDelete: () => void; onAddParallel: (routeId: string) => void; onEditStyles: (target: StyleTarget) => void }) {
   const update = (values: Partial<Route>) => change((draft) => { const item = draft.routes.find((entry) => entry.id === route.id); if (item) Object.assign(item, values); return draft; });
   const infrastructure = routeTypeStyles.find((style) => style.id === route.type)?.infrastructure ?? false;
   const parallelCount = routes.filter((item) => samePair(item, route)).length;
@@ -89,7 +89,6 @@ export function RouteProperties({ route, stops, routes, lineStyles, routeTypeSty
     {!infrastructure && <>
       <div><Label>Colour</Label><NativeSelect value={route.color} onChange={(event) => update({ color: event.target.value })}>{Object.keys(routeColors).map((key) => <NativeSelectOption key={key} value={key}>{colorLabels[key]}</NativeSelectOption>)}</NativeSelect></div>
       <div><Label>Vehicle spaces</Label><div className="length-stepper"><Button variant="outline" size="icon" aria-label="Decrease" disabled={route.length <= 1} onClick={() => update({ length: Math.max(1, route.length - 1), locomotiveSlots: route.locomotiveSlots?.filter((index) => index < route.length - 1) })}><Minus /></Button><strong>{route.length}</strong><Button variant="outline" size="icon" aria-label="Increase" disabled={route.length >= 8} onClick={() => update({ length: Math.min(8, route.length + 1) })}><Plus /></Button></div><p className="helper">The change is shown directly on the route.</p></div>
-      <StylePicker label="Wagon style" value={route.wagonStyle} styles={wagonStyles} placeholder="Plain wagons" helper="Marks every wagon space on this route, to show it plays by a rule of its own." onChange={(id) => update({ wagonStyle: id })} onEdit={() => onEditStyles({ kind: "wagon", id: route.wagonStyle })} />
       <div><Label>Locomotives required · {route.locomotiveSlots?.length ?? 0} of {route.length}</Label><p className="helper">Click a wagon slot directly on the selected route to toggle it.</p>{Boolean(route.locomotiveSlots?.length) && <Button size="sm" variant="ghost" onClick={() => update({ locomotiveSlots: [] })}><TrainFront />Clear locomotives</Button>}</div>
     </>}
     <div className="bend-controls">
@@ -99,7 +98,6 @@ export function RouteProperties({ route, stops, routes, lineStyles, routeTypeSty
       {parallelCount > 1 && <label className="checkbox-row"><input type="checkbox" checked={linkParallel} onChange={(event) => onLinkParallel(event.target.checked)} />Shape the parallel line{parallelCount > 2 ? "s" : ""} together with this one</label>}
       {Boolean(route.points?.length) && <Button size="sm" variant="ghost" onClick={() => onStraighten(route.id)}>Straighten route</Button>}
     </div>
-    <StylePicker label="Special rule" value={route.lineStyle} styles={lineStyles} placeholder={lineStyles.length ? "None — an ordinary route" : "None defined yet — use Edit to make one"} helper="Overrides this one route's line, on top of its type." onChange={(id) => onSetStyle(route.id, id)} onEdit={() => onEditStyles({ kind: "line", id: route.lineStyle })} />
     <Button variant="destructive" onClick={onDelete}><Trash2 />Delete route</Button>
   </div>;
 }

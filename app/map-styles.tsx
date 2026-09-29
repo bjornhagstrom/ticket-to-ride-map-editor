@@ -12,9 +12,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { cn } from "@/lib/utils";
-import { DEFAULT_PLAYERS, LANES_OPEN_FROM, DEFAULT_TICKET_BANDS, DEFAULT_TICKET_MIX, TICKET_MIX_PRESETS, colorLabels, DEFAULT_WAGONS_PER_PLAYER, DEFAULT_STARTING_TICKETS, DEFAULT_KEPT_TICKETS, type LineStyle, type MapData, type MapFormat, mapFormats, routeColors, stopSizeMeta, type RouteTypeStyle, type StopTypeStyle, type WagonShape, type WagonStyle, wagonShapeMeta } from "./map-data";
+import { DEFAULT_PLAYERS, LANES_OPEN_FROM, DEFAULT_TICKET_BANDS, DEFAULT_TICKET_MIX, TICKET_MIX_PRESETS, colorLabels, DEFAULT_WAGONS_PER_PLAYER, DEFAULT_STARTING_TICKETS, DEFAULT_KEPT_TICKETS, type MapData, type MapFormat, mapFormats, routeColors, stopSizeMeta, type RouteTypeStyle, type StopTypeStyle, type WagonShape, wagonShapeMeta } from "./map-data";
 
-export type StyleKind = "map" | "ticket" | "stop" | "route" | "wagon" | "line" | "defaults";
+export type StyleKind = "map" | "ticket" | "stop" | "route" | "defaults";
 export type StyleTarget = { kind: StyleKind; id?: string };
 
 const kindMeta: Record<StyleKind, { label: string; blurb: string }> = {
@@ -22,11 +22,9 @@ const kindMeta: Record<StyleKind, { label: string; blurb: string }> = {
   ticket: { label: "Ticket lengths", blurb: "Where a ticket stops being short and starts being long on this map, and how much of the deck should sit in each band." },
   stop: { label: "Stop types", blurb: "What each kind of stop looks like on the map." },
   route: { label: "Route types", blurb: "Line thickness and dash pattern per type. Colour comes from each route, so types are told apart by shape." },
-  wagon: { label: "Wagon styles", blurb: "How the wagon spaces are drawn, to mark a route that plays by its own rule." },
-  line: { label: "Line styles", blurb: "A one-off override of a single route's line, on top of its type." },
   defaults: { label: "Default object style", blurb: "The style the next stop or route you draw will get. These are settings for your pen, not for the map: changing them leaves everything already drawn exactly as it is." },
 };
-const styleKinds: StyleKind[] = ["stop", "route", "wagon", "line"];
+const styleKinds: StyleKind[] = ["stop", "route"];
 
 const dashPresets = [
   { value: "", label: "Solid" },
@@ -80,7 +78,6 @@ export function SettingsDialog({ open, onOpenChange, target, onTarget, data, cha
 
   const usage = (styleId: string) => kind === "stop" ? data.stops.filter((stop) => stop.type === styleId).length
     : kind === "route" ? data.routes.filter((route) => route.type === styleId).length
-    : kind === "wagon" ? data.routes.filter((route) => route.wagonStyle === styleId).length
     : data.routes.filter((route) => route.lineStyle === styleId).length;
 
   const update = (values: Record<string, unknown>) => change((draft) => {
@@ -98,8 +95,6 @@ export function SettingsDialog({ open, onOpenChange, target, onTarget, data, cha
   const remove = (styleId: string) => {
     change((draft) => {
       draft[listKey(kind)] = (draft[listKey(kind)] as { id: string }[]).filter((style) => style.id !== styleId) as never;
-      if (kind === "wagon") draft.routes = draft.routes.map((route) => route.wagonStyle === styleId ? { ...route, wagonStyle: undefined } : route);
-      if (kind === "line") draft.routes = draft.routes.map((route) => route.lineStyle === styleId ? { ...route, lineStyle: undefined } : route);
       return draft;
     });
     onTarget({ kind });
@@ -216,7 +211,6 @@ export function SettingsDialog({ open, onOpenChange, target, onTarget, data, cha
               <div><Label>Route type</Label><NativeSelect value={defaults.routeType} onChange={(event) => defaults.setRouteType(event.target.value)}>{data.routeTypeStyles.map((style) => <NativeSelectOption key={style.id} value={style.id}>{style.label}</NativeSelectOption>)}</NativeSelect></div>
               <div><Label>Route colour</Label><NativeSelect value={defaults.routeColor} onChange={(event) => defaults.setRouteColor(event.target.value)}>{Object.keys(routeColors).map((key) => <NativeSelectOption key={key} value={key}>{colorLabels[key]}</NativeSelectOption>)}</NativeSelect></div>
             </div>
-            <div><Label>Special rule for new routes</Label><NativeSelect value={defaults.routeLineStyle ?? ""} onChange={(event) => defaults.setRouteLineStyle(event.target.value || undefined)}><NativeSelectOption value="">None — an ordinary route</NativeSelectOption>{data.lineStyles.map((style) => <NativeSelectOption key={style.id} value={style.id}>{style.label}</NativeSelectOption>)}</NativeSelect></div>
             <label className="checkbox-row"><input type="checkbox" checked={defaults.routeCurved} onChange={(event) => defaults.setRouteCurved(event.target.checked)} />Draw new routes as smooth curves</label>
             <label className="checkbox-row"><input type="checkbox" checked={defaults.linkParallel} onChange={(event) => defaults.setLinkParallel(event.target.checked)} />Shape the parallel lines of a double route together</label>
           </div>}
@@ -232,8 +226,6 @@ export function SettingsDialog({ open, onOpenChange, target, onTarget, data, cha
               <div><Label>Name</Label><Input value={selected.label} onChange={(event) => update({ label: event.target.value })} /></div>
               {kind === "stop" && <StopTypeFields style={selected as StopTypeStyle} update={update} />}
               {kind === "route" && <RouteTypeFields style={selected as RouteTypeStyle} update={update} />}
-              {kind === "wagon" && <WagonStyleFields style={selected as WagonStyle} update={update} />}
-              {kind === "line" && <LineStyleFields style={selected as LineStyle} update={update} />}
               <Button size="sm" variant="ghost" disabled={locked} onClick={() => remove(selected.id)}>
                 <Trash2 />{locked ? (list.length <= 1 ? "The only one left" : `In use by ${usage(selected.id)}`) : "Delete"}
               </Button>
@@ -249,12 +241,10 @@ export function SettingsDialog({ open, onOpenChange, target, onTarget, data, cha
   </Dialog>;
 }
 
-const listKey = (kind: StyleKind) => kind === "stop" ? "stopTypeStyles" : kind === "route" ? "routeTypeStyles" : kind === "wagon" ? "wagonStyles" : "lineStyles";
+const listKey = (kind: StyleKind) => kind === "stop" ? "stopTypeStyles" : "routeTypeStyles";
 
 const blankStyle = (kind: StyleKind, id: string) => kind === "stop" ? { id, label: "New stop type", fill: "#fffaf0", stroke: "#736d64" }
-  : kind === "route" ? { id, label: "New route type", stroke: "#736d64", dash: "", strokeWidth: 3, infrastructure: false }
-  : kind === "wagon" ? { id, label: "New wagon style", shape: "notched" }
-  : { id, label: "New line style", strokeWidth: 6, dash: "10 6" };
+  : { id, label: "New route type", stroke: "#736d64", dash: "", strokeWidth: 3, infrastructure: false, shape: "plain" };
 
 type Update = (values: Record<string, unknown>) => void;
 
@@ -279,21 +269,12 @@ function RouteTypeFields({ style, update }: { style: RouteTypeStyle; update: Upd
       : <p className="helper">Every route keeps its own wagon colour, so a type is told apart by thickness and dash pattern — not by colour.</p>}
     <div><Label>Thickness · {style.strokeWidth}px</Label><input className="range-input" type="range" min="2" max="14" value={style.strokeWidth} onChange={(event) => update({ strokeWidth: Number(event.target.value) })} /></div>
     <div><Label>Dash pattern</Label><NativeSelect value={style.dash} onChange={(event) => update({ dash: event.target.value })}>{dashOptions(style.dash).map((preset) => <NativeSelectOption key={preset.value} value={preset.value}>{preset.label}</NativeSelectOption>)}</NativeSelect></div>
+    <div><Label>Wagon spaces</Label><NativeSelect value={style.shape ?? "plain"} onChange={(event) => update({ shape: event.target.value as WagonShape })}>{Object.entries(wagonShapeMeta).map(([key, meta]) => <NativeSelectOption key={key} value={key}>{meta.label}</NativeSelectOption>)}</NativeSelect>
+      <p className="helper">The shape of every space along a route of this type. A shape says at a glance that a route plays by its own rule.</p></div>
+    <div><Label>Mark in the space</Label><Input maxLength={2} value={style.glyph ?? ""} onChange={(event) => update({ glyph: event.target.value || undefined })} />
+      <p className="helper">One or two characters, drawn inside every space. A shape alone can get lost on a small print; a letter survives it.</p></div>
     <label className="checkbox-row"><input type="checkbox" checked={style.infrastructure} onChange={(event) => update({ infrastructure: event.target.checked })} />Pre-built infrastructure (no train cards or wagon slots)</label>
   </>;
 }
 
-function WagonStyleFields({ style, update }: { style: WagonStyle; update: Update }) {
-  return <>
-    <div><Label>Shape</Label><NativeSelect value={style.shape} onChange={(event) => update({ shape: event.target.value as WagonShape })}>{Object.entries(wagonShapeMeta).map(([key, meta]) => <NativeSelectOption key={key} value={key}>{meta.label}</NativeSelectOption>)}</NativeSelect></div>
-    <div><Label>Mark in the space</Label><Input maxLength={2} value={style.glyph ?? ""} onChange={(event) => update({ glyph: event.target.value || undefined })} />
-      <p className="helper">One or two characters, drawn inside every space. A shape alone can get lost on a small print; a letter survives it.</p></div>
-  </>;
-}
 
-function LineStyleFields({ style, update }: { style: LineStyle; update: Update }) {
-  return <>
-    <div><Label>Thickness · {style.strokeWidth}px</Label><input className="range-input" type="range" min="2" max="14" value={style.strokeWidth} onChange={(event) => update({ strokeWidth: Number(event.target.value) })} /></div>
-    <div><Label>Dash pattern</Label><NativeSelect value={style.dash} onChange={(event) => update({ dash: event.target.value })}>{dashOptions(style.dash).map((preset) => <NativeSelectOption key={preset.value} value={preset.value}>{preset.label}</NativeSelectOption>)}</NativeSelect></div>
-  </>;
-}

@@ -35,7 +35,7 @@
      border already separates them, and the height it saves is what the sheet was overflowing by. */
   .print-caption{display:flex;align-items:baseline;justify-content:space-between;gap:6mm;margin-bottom:2.5mm;color:#24211d}
   .print-caption strong{font:700 12pt Georgia,serif}
-  .print-caption span{font:7.5pt "Segoe UI",Arial,sans-serif;color:#696157;white-space:nowrap}
+  .print-caption span{font:7.5pt "Segoe UI",Arial,sans-serif;color:#24221e;white-space:nowrap}
   .format-board-2x3 .print-page,.format-board-2x3-large .print-page,.format-board-2x4 .print-page{width:210mm;height:297mm;padding:10mm}
     .format-a4 .print-page{width:297mm;height:210mm;padding:10mm}
   .format-a3 .print-page{width:420mm;height:297mm;padding:12mm}
@@ -53,5 +53,5 @@
   .ticket-card-from,.ticket-card-to{font:700 10.5pt Georgia,serif;color:#24211d;line-height:1.15}
   .ticket-card-arrow{font:9pt "Segoe UI",Arial,sans-serif;color:#81786c}
   .ticket-card-points{margin-top:2.5mm!important;width:11mm;height:11mm;border:.4mm solid #24211d;border-radius:50%;font:700 12pt Georgia,serif;line-height:10.2mm;color:#24211d}
-  .ticket-card-flag{font:6.5pt "Segoe UI",Arial,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:#696157}
+  .ticket-card-flag{font:6.5pt "Segoe UI",Arial,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:#24221e}
 }

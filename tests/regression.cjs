@@ -42,7 +42,9 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
 
   // 2. per-route colours, not per-type
   const strokes = await page.evaluate(() => Array.from(document.querySelectorAll(".map-canvas .route-group")).map((g) => g.querySelector(".route-guide").getAttribute("stroke")));
-  check("routes keep their own colours", new Set(strokes).size >= 9, `${new Set(strokes).size} distinct`);
+  // Every route now carries its own wagon colour: the example map has no infrastructure type left,
+  // whose line colour came from the type rather than the route.
+  check("routes keep their own colours", new Set(strokes).size >= 8, `${new Set(strokes).size} distinct`);
   check("no route forced to a type colour", !strokes.includes("#23749b") && !strokes.includes("#00877c"));
 
   // 3. tools + tooltip
@@ -113,7 +115,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     const h = Array.from(document.querySelectorAll(".analysis-section h3")).find((x) => x.textContent === "Room per wagon");
     return h ? h.parentElement.querySelectorAll("tbody tr").length : 0;
   });
-  check("room-per-wagon table lists the card routes", roomRows === 9, `${roomRows} rows`);
+  check("room-per-wagon table lists the card routes", roomRows === 11, `${roomRows} rows`);
   const hubRows = await page.evaluate(() => document.querySelectorAll(".analysis-section table tbody tr").length);
   check("balance dialog renders its tables", hubRows > 10);
   await page.keyboard.press("Escape");

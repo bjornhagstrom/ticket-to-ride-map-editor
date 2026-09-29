@@ -20,12 +20,13 @@ export type LineStyle = { id: string; label: string; strokeWidth: number; dash: 
 // deliberately a short list: a space prints at 20 x 9 mm on a board and about 7.5 x 3.4 mm on an A4
 // proof, so anything subtler than these disappears. `glyph` is what survives that shrink, and what
 // still reads in black and white.
-export type WagonShape = "plain" | "serrated" | "notched" | "heavy";
+export type WagonShape = "plain" | "serrated" | "notched" | "heavy" | "oval";
 export type WagonStyle = { id: string; label: string; shape: WagonShape; glyph?: string };
 
 export const wagonShapeMeta: Record<WagonShape, { label: string }> = {
   plain: { label: "Plain" },
   serrated: { label: "Serrated (tunnel)" },
+  oval: { label: "Oval (boat)" },
   notched: { label: "Notched corners" },
   heavy: { label: "Heavy outline" },
 };
@@ -35,7 +36,11 @@ export const wagonShapeMeta: Record<WagonShape, { label: string }> = {
 export const defaultWagonStyles: WagonStyle[] = [
   { id: "tunnel", label: "Tunnel", shape: "serrated" },
 ];
-export type RouteTypeStyle = { id: string; label: string; stroke: string; dash: string; strokeWidth: number; infrastructure: boolean };
+// A route type describes the whole route: the line it is drawn with and the wagon spaces along it.
+// `shape` and `glyph` used to live in a separate wagon-style list, which meant defining two things
+// and remembering to apply both. A tunnel is a kind of route, not a line that happens to carry
+// tunnel wagons.
+export type RouteTypeStyle = { id: string; label: string; stroke: string; dash: string; strokeWidth: number; infrastructure: boolean; shape?: WagonShape; glyph?: string };
 export type BackgroundShape = {
   id: string;
   type: BackgroundType;
@@ -233,14 +238,11 @@ export const defaultStopTypeStyles: StopTypeStyle[] = [
 export const fallbackStopTypeStyle: StopTypeStyle = { id: "city", label: "Stop", fill: "#fffaf0", stroke: "#721c24" };
 
 export const defaultRouteTypeStyles: RouteTypeStyle[] = [
-  // Card routes carry each route's own wagon colour, so these are told apart by width and dash.
-  // `stroke` is only drawn when a type is marked as pre-built infrastructure.
-  { id: "city", label: "City route", stroke: "#721c24", dash: "", strokeWidth: 3, infrastructure: false },
-  { id: "region", label: "Regional route", stroke: "#b05b2a", dash: "", strokeWidth: 6, infrastructure: false },
-  { id: "brt", label: "Rapid transit", stroke: "#00877c", dash: "2 5", strokeWidth: 4, infrastructure: false },
-  { id: "ferry", label: "Ferry", stroke: "#23749b", dash: "10 6", strokeWidth: 3, infrastructure: false },
-  { id: "rail", label: "Railway", stroke: "#292b2f", dash: "4 4", strokeWidth: 4, infrastructure: true },
-  { id: "trail", label: "Trail", stroke: "#53723b", dash: "14 4 2 4", strokeWidth: 5, infrastructure: true },
+  // Three to start with. Card routes carry each route's own wagon colour, so these are told apart by
+  // the shape of their spaces as much as by the line. `stroke` is only drawn for infrastructure.
+  { id: "city", label: "Railway", stroke: "#721c24", dash: "", strokeWidth: 3, infrastructure: false, shape: "plain" },
+  { id: "tunnel", label: "Tunnel", stroke: "#736d64", dash: "", strokeWidth: 3, infrastructure: false, shape: "serrated" },
+  { id: "boat", label: "Boat", stroke: "#23749b", dash: "10 6", strokeWidth: 3, infrastructure: false, shape: "oval" },
 ];
 
 export const routeColors: Record<string, string> = {
@@ -356,12 +358,12 @@ export const initialMap: MapData = {
   ],
   routes: [
     { id: "example-route-1", a: "example-westport", b: "example-central", length: 4, type: "city", color: "red", points: [{ x: 265, y: 235 }] },
-    { id: "example-route-2", a: "example-westport", b: "example-pine-hill", length: 3, type: "region", color: "orange", points: [{ x: 170, y: 420 }] },
-    { id: "example-route-3", a: "example-pine-hill", b: "example-central", length: 3, type: "trail", color: "neutral", points: [{ x: 350, y: 500 }] },
-    { id: "example-route-4", a: "example-central", b: "example-lakeside", length: 3, type: "rail", color: "neutral", points: [{ x: 525, y: 225 }] },
+    { id: "example-route-2", a: "example-westport", b: "example-pine-hill", length: 3, type: "city", color: "orange", points: [{ x: 170, y: 420 }] },
+    { id: "example-route-3", a: "example-pine-hill", b: "example-central", length: 3, type: "city", color: "neutral", points: [{ x: 350, y: 500 }] },
+    { id: "example-route-4", a: "example-central", b: "example-lakeside", length: 3, type: "city", color: "neutral", points: [{ x: 525, y: 225 }] },
     { id: "example-route-5", a: "example-central", b: "example-old-town", length: 4, type: "city", color: "blue", points: [{ x: 545, y: 485 }], wagonStyle: "tunnel" },
-    { id: "example-route-6", a: "example-lakeside", b: "example-eastgate", length: 4, type: "brt", color: "neutral", points: [{ x: 815, y: 165 }] },
-    { id: "example-route-7", a: "example-lakeside", b: "example-harbour", length: 3, type: "ferry", color: "neutral", points: [{ x: 800, y: 270 }, { x: 855, y: 370 }], locomotiveSlots: [0] },
+    { id: "example-route-6", a: "example-lakeside", b: "example-eastgate", length: 4, type: "city", color: "neutral", points: [{ x: 815, y: 165 }] },
+    { id: "example-route-7", a: "example-lakeside", b: "example-harbour", length: 3, type: "boat", color: "neutral", points: [{ x: 800, y: 270 }, { x: 855, y: 370 }], locomotiveSlots: [0] },
     { id: "example-route-8", a: "example-old-town", b: "example-harbour", length: 3, type: "city", color: "green", points: [{ x: 790, y: 585 }] },
     { id: "example-route-9", a: "example-harbour", b: "example-eastgate", length: 3, type: "city", color: "yellow", points: [{ x: 950, y: 335 }], lineStyle: "example-restricted" },
     { id: "example-route-10", a: "example-old-town", b: "example-quarry", length: 2, type: "city", color: "purple", points: [{ x: 850, y: 645 }] },

@@ -74,7 +74,7 @@ const normalizeStopTypeStyles = (value: Partial<MapData>): StopTypeStyle[] => {
 //  - a file from a newer build is refused with a message, never quietly stripped,
 //  - anything a reader does not understand is carried along and written back out untouched.
 export const FILE_FORMAT = "ticket-to-ride-map";
-export const FILE_VERSION = 2;
+export const FILE_VERSION = 3;
 export const APP_NAME = "Map prototypes";
 export const APP_VERSION = "0.1.0";
 
@@ -166,7 +166,51 @@ export function networkPayload(data: MapData): Record<string, unknown> {
   };
 }
 
-export const normalizeMap = (value: Partial<MapData>): MapData => ({
+// File version 3 folded wagon styles and line styles into route types: a type now describes the
+// whole route. A map written before that keeps its look by getting one route type per combination
+// it actually used, cloned from the base type and carrying the shape and line it had.
+function mergeStylesIntoRouteTypes(value: Partial<MapData> & { wagonStyles?: WagonStyle[]; lineStyles?: LineStyle[] }): Partial<MapData> {
+  const routes = Array.isArray(value.routes) ? value.routes : [];
+  if (!routes.some((route) => route.wagonStyle || route.lineStyle)) return value;
+
+  const types = [...(Array.isArray(value.routeTypeStyles) ? value.routeTypeStyles : [])];
+  const wagons = Array.isArray(value.wagonStyles) ? value.wagonStyles : [];
+  const lines = Array.isArray(value.lineStyles) ? value.lineStyles : [];
+  const made = new Map<string, string>();
+
+  const migrated = routes.map((route) => {
+    if (!route.wagonStyle && !route.lineStyle) return route;
+    const key = `${route.type}|${route.wagonStyle ?? ""}|${route.lineStyle ?? ""}`;
+    let id = made.get(key);
+    if (!id) {
+      const base = types.find((type) => type.id === route.type);
+      const wagon = wagons.find((style) => style.id === route.wagonStyle);
+      const line = lines.find((style) => style.id === route.lineStyle);
+      const parts = [wagon?.label, line?.label].filter(Boolean).join(", ");
+      id = `${route.type}-${[route.wagonStyle, route.lineStyle].filter(Boolean).join("-")}`;
+      types.push({
+        id,
+        label: base ? `${base.label}${parts ? ` (${parts})` : ""}` : id,
+        stroke: base?.stroke ?? "#736d64",
+        dash: line?.dash ?? base?.dash ?? "",
+        strokeWidth: line?.strokeWidth ?? base?.strokeWidth ?? 3,
+        infrastructure: base?.infrastructure ?? false,
+        shape: wagon?.shape ?? base?.shape ?? "plain",
+        glyph: wagon?.glyph ?? base?.glyph,
+      });
+      made.set(key, id);
+    }
+    const { wagonStyle, lineStyle, ...rest } = route;
+    void wagonStyle; void lineStyle;
+    return { ...rest, type: id };
+  });
+
+  return { ...value, routes: migrated, routeTypeStyles: types };
+}
+
+export const normalizeMap = (raw: Partial<MapData>): MapData => normalizeMapFields(mergeStylesIntoRouteTypes(raw));
+
+const normalizeMapFields = (value: Partial<MapData>): MapData => ({
   name: typeof value.name === "string" ? value.name : "Imported map",
   format: isMapFormat(value.format) ? value.format : "board-2x3",
   background: Array.isArray(value.background) ? value.background : [],
