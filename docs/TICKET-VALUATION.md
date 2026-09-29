@@ -7,7 +7,7 @@ The data is in `data/ttr-reference-maps.json`, where each map has a `valuation` 
 The graph used everywhere:
 
 - Edge weight is the route length (the shortest lane between two stops).
-- Border-flag stops (`deadEnd: true`) may end a path but never be passed through. This rule is set per map (`countryTransit`) and is `false` in the rulebooks of Italia, Switzerland and Märklin (Polska: not stated).
+- Border-flag stops (`deadEnd: true`) may end a path but never be passed through. This rule is set per map (`countryTransit`) and is `false` in the rulebooks of Italia, Switzerland and Märklin (Polska has only one entrance per country).
 - A ticket to a country uses the nearest of its flags.
 
 ## 1. The baseline: points = shortest path

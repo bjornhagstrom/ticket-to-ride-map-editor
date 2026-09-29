@@ -184,7 +184,7 @@ Maps with rules the editor cannot model (zones, festivals, shared tracks) get a 
 
 ### 4.8 Border countries and waypoints
 
-- Whether a path may pass through a border country, entering at one flag and leaving at another, differs between maps. Model it as a map setting `countryTransit` with the default `false`. When it is `false`, border-flag stops are dead ends: a shortest path may start or end there but never pass through. The rulebooks of Italia, Switzerland and Märklin all say `false`; Polska does not say (`null` in the reference data).
+- Whether a path may pass through a border country, entering at one flag and leaving at another, differs between maps. Model it as a map setting `countryTransit` with the default `false`. When it is `false`, border-flag stops are dead ends: a shortest path may start or end there but never pass through. The rulebooks of Italia, Switzerland and Märklin all say `false`; Polska has one entrance per country, so transit cannot happen there.
 - A ticket to a country is completed via any of its flags, so its distance is the shortest path to the nearest flag. The suggester may propose such tickets only if the editor supports ticket endpoints that are a group of stops; until then it only uses cities.
 - Waypoints (kind `waypoint`) are junctions only: never ticket endpoints, but paths may pass through them.
 
