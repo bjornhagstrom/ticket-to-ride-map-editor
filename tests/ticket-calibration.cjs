@@ -27,6 +27,12 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
 const reference = JSON.parse(fs.readFileSync(path.join(root, "data/ttr-reference-maps.json"), "utf8"));
 const calibrationMaps = reference.maps.filter((map) => map.useForCalibration);
 
+// "2-5" and the like, as the data writes it.
+const playersOf = (source) => {
+  const match = /^(\d+)\s*-\s*(\d+)$/.exec(String(source.players || ""));
+  return match ? { min: Number(match[1]), max: Number(match[2]) } : { min: 2, max: 5 };
+};
+
 const trainsOf = (source) => {
   const value = source.trainsPerPlayer ?? (source.setup || {}).trainsPerPlayer;
   return typeof value === "number" ? value : 45;
@@ -55,6 +61,10 @@ const buildMap = (source) => {
     stopTypeStyles: [{ id: "city", label: "City", fill: "#fff", stroke: "#000" }, { id: "junction", label: "Junction", fill: "#eee", stroke: "#888", junction: true }],
     tickets, ticketSets: [{ id: "main", label: "Main deck" }],
     wagonsPerPlayer: trainsOf(source), startingTickets: 3, keptTickets: 2,
+    // The map's own player range and double-route rule, so the score counts the lanes a player may
+    // actually use at the largest table it is built for (docs/ROUTE-LOAD.md §5).
+    players: playersOf(source),
+    lanesUsableByPlayers: source.lanesUsableByPlayers,
   };
 };
 

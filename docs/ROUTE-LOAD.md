@@ -75,6 +75,14 @@ For every map with `useForCalibration: true`:
 - For suggestions (seeds 1 and 2), the ratio is ≥ the random median. Report it next to the official value.
 - Only if suggestions fall clearly below the official ratio on most maps, strengthen the load term, for example by raising the `f_load` weight from 0.5, and rerun all §6 checks in `docs/TICKET-SUGGESTER.md`. Don't tune before the test says so.
 
+## Built
+
+A, B and C are built. `lanesUsableByPlayers` came into the editor's own map model, the score counts
+the lanes open at the map's largest table, and the balancing view lists crowded routes at a table
+the designer picks inside the map's range, marking them on the map. Feeding the real per-map lane
+rules into the calibration changed no score on any of the eight maps, which is what §5.3 predicted
+and is now checked rather than assumed.
+
 ## Outcome of C
 
 The test was built and run on all eight calibration maps. Two things came out of it.

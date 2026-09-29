@@ -88,7 +88,7 @@ export type NoteBox = {
   locked?: boolean;
   collapsed?: boolean;
 };
-export type MapData = { name: string; format: MapFormat; endGapMm?: number; background: BackgroundShape[]; stops: Stop[]; routes: Route[]; backgroundImage?: BackgroundImage; notes: NoteBox[]; lineStyles: LineStyle[]; routeTypeStyles: RouteTypeStyle[]; wagonStyles: WagonStyle[]; stopTypeStyles: StopTypeStyle[]; tickets: Ticket[]; ticketSets: TicketSet[]; wagonsPerPlayer?: number; startingTickets?: number; keptTickets?: number; players?: PlayerRange; ticketBands?: TicketBands; ticketMix?: TicketMix; ticketValuation?: { longBonus?: boolean; ferryPremium?: number };
+export type MapData = { name: string; format: MapFormat; endGapMm?: number; background: BackgroundShape[]; stops: Stop[]; routes: Route[]; backgroundImage?: BackgroundImage; notes: NoteBox[]; lineStyles: LineStyle[]; routeTypeStyles: RouteTypeStyle[]; wagonStyles: WagonStyle[]; stopTypeStyles: StopTypeStyle[]; tickets: Ticket[]; ticketSets: TicketSet[]; wagonsPerPlayer?: number; startingTickets?: number; keptTickets?: number; players?: PlayerRange; lanesUsableByPlayers?: LaneRule; ticketBands?: TicketBands; ticketMix?: TicketMix; ticketValuation?: { longBonus?: boolean; ferryPremium?: number };
   // Fields from a file this build does not know about. Kept so that opening and re-exporting a map
   // written by a newer version never quietly throws its work away.
   unknown?: Record<string, unknown> };
@@ -156,6 +156,29 @@ export const DEFAULT_KEPT_TICKETS = 2;
 export type PlayerRange = { min: number; max: number };
 export const DEFAULT_PLAYERS: PlayerRange = { min: 2, max: 5 };
 export const LANES_OPEN_FROM = 4;
+
+// How many lanes of a multi-lane route a player may use, by player count. Every official map sets
+// its own threshold, and Northern Lights' triple routes open one lane at a time, which no single
+// threshold catches — so the map carries the counts rather than a rule name. Keys are a player
+// count or "N+"; values a number of lanes or "all".
+export type LaneRule = Record<string, number | "all">;
+
+export function lanesUsableAt(players: number, lanes: number, rule?: LaneRule): number {
+  if (rule) {
+    const exact = rule[String(players)];
+    if (exact !== undefined) return exact === "all" ? lanes : Math.max(1, Math.min(lanes, exact));
+    let best: number | "all" | undefined;
+    let from = -1;
+    for (const [key, value] of Object.entries(rule)) {
+      if (!key.endsWith("+")) continue;
+      const at = Number(key.slice(0, -1));
+      if (Number.isFinite(at) && at <= players && at > from) { from = at; best = value; }
+    }
+    if (best !== undefined) return best === "all" ? lanes : Math.max(1, Math.min(lanes, best));
+  }
+  // The standard rule when a map says nothing: one lane below four players, all of them from four.
+  return players >= LANES_OPEN_FROM ? lanes : 1;
+}
 
 // Where a ticket stops being short and where it becomes long, as fractions of the map's own
 // diameter — the same measure the official decks were read with, so a mix carries between maps of

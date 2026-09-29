@@ -11,7 +11,7 @@ import { DEFAULT_TICKET_MIX, colorLabels, type MapData, realWagon, type Stop, ty
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { TICKET_SUGGESTER, type TicketDeckReport, type TicketStyle, type SetupBalance, type TicketReview, type ColourLengthTable, type NetworkStats, type RouteSpacing, type RouteSuggestion } from "./map-analysis";
+import { type Bottleneck, TICKET_SUGGESTER, type TicketDeckReport, type TicketStyle, type SetupBalance, type TicketReview, type ColourLengthTable, type NetworkStats, type RouteSpacing, type RouteSuggestion } from "./map-analysis";
 
 export function WelcomeGuide({ open, onOpenChange, onChooseBlank, onChooseExample }: { open: boolean; onOpenChange: (open: boolean) => void; onChooseBlank: () => void; onChooseExample: () => void }) {
   const steps: Array<{ icon: React.ReactNode; title: string; text: string }> = [
@@ -36,12 +36,32 @@ export function WelcomeGuide({ open, onOpenChange, onChooseBlank, onChooseExampl
 const NUMBER_WORDS: Record<number, string> = {2: "two", 3: "three", 4: "four", 5: "five", 6: "six", 7: "seven", 8: "eight"};
 const tableWord = (count: number) => NUMBER_WORDS[count] ?? String(count);
 
-export function AnalysisDialog({ open, onOpenChange, data, stats, colourTable, spacing, scaleWidthMm, setup, onSelectRoute, onSelectStop }: { setup: SetupBalance; open: boolean; onSelectRoute: (routeId: string) => void; onSelectStop: (stopId: string) => void; onOpenChange: (open: boolean) => void; data: MapData; stats: NetworkStats; colourTable: ColourLengthTable; spacing: RouteSpacing[]; scaleWidthMm: number }) {
+export function AnalysisDialog({ open, onOpenChange, data, stats, colourTable, spacing, scaleWidthMm, setup, bottlenecks, atTable, onAtTable, onShowBottleneck, onSelectRoute, onSelectStop }: { setup: SetupBalance; bottlenecks: Bottleneck[]; atTable: number; onAtTable: (players: number) => void; onShowBottleneck: (routeIds: string[]) => void; open: boolean; onSelectRoute: (routeId: string) => void; onSelectStop: (stopId: string) => void; onOpenChange: (open: boolean) => void; data: MapData; stats: NetworkStats; colourTable: ColourLengthTable; spacing: RouteSpacing[]; scaleWidthMm: number }) {
   const stopName = (id: string) => data.stops.find((stop) => stop.id === id)?.name ?? "";
+  const players = data.players ?? { min: 2, max: 5 };
   const sortedStops = [...data.stops].sort((a, b) => (stats.hubDegree.get(b.id) ?? 0) - (stats.hubDegree.get(a.id) ?? 0));
   return <Dialog open={open} onOpenChange={onOpenChange}>
     <DialogContent className="analysis-dialog">
       <DialogHeader><DialogTitle>Map balance</DialogTitle><DialogDescription>A quick read on how evenly connected and coloured the network is.</DialogDescription></DialogHeader>
+      <div className="analysis-section bottlenecks">
+        <h3>Where the tickets crowd</h3>
+        <div className="bottleneck-players">
+          <Label htmlFor="bottleneck-players">At a table of</Label>
+          <NativeSelect id="bottleneck-players" value={String(atTable)} onChange={(event) => onAtTable(Number(event.target.value))}>
+            {Array.from({ length: Math.max(1, players.max - players.min + 1) }, (_, i) => players.min + i).map((count) => <NativeSelectOption key={count} value={String(count)}>{count} players</NativeSelectOption>)}
+          </NativeSelect>
+        </div>
+        <p className="helper">How many tickets want each route, against the lanes a player may use at that table. Only the second lane of a double route depends on the player count{players.max < 4 ? ", and on this map it never opens" : ""}.</p>
+        {bottlenecks.length === 0
+          ? <p className="helper">No route is wanted by more tickets than it can carry.</p>
+          : <>
+            <div className="bottleneck-list">{bottlenecks.slice(0, 8).map((edge) => <button type="button" key={`${edge.a}|${edge.b}`} className="bottleneck-row" onClick={() => onShowBottleneck(edge.routeIds)}>
+              <strong>{stopName(edge.a)} → {stopName(edge.b)}</strong>
+              <span>{edge.length} spaces · {edge.lanesUsable} of {edge.lanes} lane{edge.lanes === 1 ? "" : "s"} usable · {edge.tickets} ticket{edge.tickets === 1 ? "" : "s"} want it</span>
+            </button>)}</div>
+            <p className="helper">Many tickets need these routes. Consider making one a double route, adding a way round, or moving a ticket. The fix is nearly always a change to the map rather than to the deck.</p>
+          </>}
+      </div>
       <div className="analysis-section setup-balance">
         <h3>Game setup against the map</h3>
         <p className="helper">

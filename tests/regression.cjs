@@ -507,7 +507,28 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     check("the low-connection card names the stops it means", /· [A-Za-zÅÄÖåäö]/.test(lowText), lowText);
   }
 
-  // 25. a background image reaches every edge and can cover the board
+  // 25. the balancing view says where the tickets crowd
+  await page.getByRole("button", { name: "Analyze balance" }).click();
+  await page.waitForTimeout(700);
+  check("the balancing view has a bottleneck section", await page.locator(".bottlenecks").isVisible());
+  const tableChoice = page.locator("#bottleneck-players");
+  check("the table it reads at comes from the map", await tableChoice.isVisible() && (await tableChoice.inputValue()) === "5", await tableChoice.inputValue());
+  const crowded = () => page.$$eval(".bottleneck-row", (els) => els.map((el) => el.textContent.replace(/\s+/g, " ").trim()));
+  const atLargest = await crowded();
+  if (atLargest.length) {
+    check("each crowded route names its stops, lanes and tickets", /lane/.test(atLargest[0]) && /ticket/.test(atLargest[0]), atLargest[0]);
+    await tableChoice.selectOption("2");
+    await page.waitForTimeout(600);
+    const atSmallest = await crowded();
+    check("a smaller table counts a double route as one lane", atSmallest.some((row) => /1 of \d+ lanes/.test(row)) || atSmallest.every((row) => /1 of 1 lane/.test(row)), atSmallest[0] || "none");
+    await page.locator(".bottleneck-row").first().click();
+    await page.waitForTimeout(500);
+    check("picking one marks it on the map", (await page.locator(".map-canvas .route-group.bottleneck").count()) > 0);
+  }
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(300);
+
+  // 26. a background image reaches every edge and can cover the board
   // On a clean board: the image is drawn underneath everything, so on a busy map a click at its
   // middle lands on a route instead of on the image.
   await page.getByRole("button", { name: "Clear map" }).click();
@@ -554,7 +575,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   check("and to the near corner the same way", bg.x <= 0 && bg.y <= 0 && bg.x + bg.width > 0, `x ${bg.x.toFixed(0)}, y ${bg.y.toFixed(0)}`);
   fs.rmSync(probe, { force: true });
 
-  // 26. the map's own short/medium/long mix, and following an official map
+  // 27. the map's own short/medium/long mix, and following an official map
   await page.getByRole("button", { name: "Settings" }).click();
   await page.waitForTimeout(500);
   await page.locator(".settings-nav-item", { hasText: /ticket/i }).click();
@@ -579,7 +600,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.keyboard.press("Escape");
   await page.waitForTimeout(300);
 
-  // 27. a deck name long enough to break the button it is shown in
+  // 28. a deck name long enough to break the button it is shown in
   const longName = "A deck with a really very long name that nobody would sensibly type";
   await page.getByRole("button", { name: /^Tickets · / }).click();
   await page.waitForTimeout(400);
@@ -602,7 +623,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   const headingBox = await page.locator(".properties .panel-heading").evaluate((el) => ({ scroll: el.scrollWidth, client: el.clientWidth, line: el.querySelector("small").getBoundingClientRect().height }));
   check("the right panel cuts it off rather than wrapping it", headingBox.scroll <= headingBox.client + 1 && headingBox.line < 24, `${headingBox.scroll} in ${headingBox.client}, ${headingBox.line.toFixed(0)} px tall`);
 
-  // 28. the deck styles are laid out so they can be compared, and nothing is too pale to read
+  // 29. the deck styles are laid out so they can be compared, and nothing is too pale to read
   await page.getByRole("button", { name: /^Tickets · / }).click();
   await page.waitForTimeout(400);
   await page.getByRole("button", { name: /Add a deck/ }).click();

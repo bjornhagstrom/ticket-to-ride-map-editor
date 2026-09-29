@@ -6,7 +6,7 @@
 // scripts/ticket-suggester-reference.py is the Python original this was ported from. The two use
 // different random number generators, so they agree on the metrics, not on the ticket lists.
 import { valueTicket, type TicketPath } from "./ticket-valuation";
-import { DEFAULT_STARTING_TICKETS, DEFAULT_TICKET_BANDS, DEFAULT_WAGONS_PER_PLAYER, DEFAULT_PLAYERS, LANES_OPEN_FROM, type MapData, type Ticket, type TicketBands, type TicketMix, ticketsInSet } from "./map-data";
+import { DEFAULT_STARTING_TICKETS, DEFAULT_TICKET_BANDS, DEFAULT_WAGONS_PER_PLAYER, DEFAULT_PLAYERS, lanesUsableAt, type LaneRule, type MapData, type Ticket, type TicketBands, type TicketMix, ticketsInSet } from "./map-data";
 
 export type TicketStyle = "generic" | "classic" | "europe";
 
@@ -202,6 +202,8 @@ class SuggesterModel {
   private dupCache = new Map<string, boolean>();
 
   bands: TicketBands;
+  // Lanes a player may use at the largest table this map is built for, per edge.
+  lanesAtLargestTable: number[] = [];
   // Every stop the graph runs through, junctions included. `nodes` is the subset a ticket may end at.
   graphNodes: string[] = [];
 
@@ -243,6 +245,9 @@ class SuggesterModel {
       this.dist.push(dist); this.preds.push(preds); this.predFrom.push(predFrom);
       for (const d of dist) if (Number.isFinite(d) && d > this.diameter) this.diameter = d;
     }
+
+    const largestTable = data.players?.max ?? DEFAULT_PLAYERS.max;
+    this.lanesAtLargestTable = this.edges.map((edge) => lanesUsableAt(largestTable, edge.lanes, data.lanesUsableByPlayers));
 
     this.reach = Math.max(1, Math.min(this.diameter, Math.floor(lengthCap * wagonsPerPlayer)));
 
@@ -523,7 +528,7 @@ class DeckState {
     const perLane = new Float64Array(model.edges.length);
     for (let i = 0; i < model.edges.length; i++) {
       if (this.edgeLoad[i] <= 1e-9) unused += 1;
-      perLane[i] = this.edgeLoad[i] / model.edges[i].lanes;
+      perLane[i] = this.edgeLoad[i] / model.lanesAtLargestTable[i];
       loadSum += perLane[i];
     }
     const mean = model.edges.length ? loadSum / model.edges.length : 0;
@@ -593,7 +598,7 @@ const pathOf = (candidate: Candidate, longest: number): TicketPath => ({
 // the tickets that cause it are listed with it.
 const CROWDED_SHARE = .10, CROWDED_TICKETS = 3, CROWDED_MULTIPLE = 2;
 
-function findBottlenecks(model: SuggesterModel, deck: DeckState, ids: Map<Candidate, string>, atTable: number): Bottleneck[] {
+function findBottlenecks(model: SuggesterModel, deck: DeckState, ids: Map<Candidate, string>, atTable: number, rule?: LaneRule): Bottleneck[] {
   if (!model.edges.length) return [];
   const usersOf = new Map<number, Candidate[]>();
   for (const member of deck.members) {
@@ -603,7 +608,7 @@ function findBottlenecks(model: SuggesterModel, deck: DeckState, ids: Map<Candid
     }
   }
   const rows = model.edges.map((edge, index) => {
-    const lanesUsable = atTable >= LANES_OPEN_FROM ? edge.lanes : 1;
+    const lanesUsable = lanesUsableAt(atTable, edge.lanes, rule);
     const load = deck.edgeLoad[index];
     const users = usersOf.get(index) ?? [];
     return { edge, index, lanesUsable, load, ratio: load / lanesUsable, users };
@@ -644,7 +649,7 @@ function buildReport(model: SuggesterModel, deck: DeckState, styleName: TicketSt
   const hard = deck.members
     .filter((candidate) => candidate.locos > 0 || candidate.tunnels > 0)
     .map((candidate) => ({ ticketId: ids.get(candidate) ?? "", a: candidate.a, b: candidate.b, locomotives: candidate.locos, tunnels: candidate.tunnels }));
-  const bottlenecksAt = (table: number) => findBottlenecks(model, deck, ids, table);
+  const bottlenecksAt = (table: number) => findBottlenecks(model, deck, ids, table, data?.lanesUsableByPlayers);
   const players = data?.players ?? DEFAULT_PLAYERS;
   return {
     style: styleName,
