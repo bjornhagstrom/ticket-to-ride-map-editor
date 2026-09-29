@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { cn } from "@/lib/utils";
-import { DEFAULT_TICKET_BANDS, DEFAULT_TICKET_MIX, TICKET_MIX_PRESETS, colorLabels, DEFAULT_END_GAP_MM, DEFAULT_WAGONS_PER_PLAYER, DEFAULT_STARTING_TICKETS, DEFAULT_KEPT_TICKETS, type LineStyle, type MapData, type MapFormat, mapFormats, routeColors, stopSizeMeta, type RouteTypeStyle, type StopTypeStyle, type WagonShape, type WagonStyle, wagonShapeMeta } from "./map-data";
+import { DEFAULT_PLAYERS, LANES_OPEN_FROM, DEFAULT_TICKET_BANDS, DEFAULT_TICKET_MIX, TICKET_MIX_PRESETS, colorLabels, DEFAULT_END_GAP_MM, DEFAULT_WAGONS_PER_PLAYER, DEFAULT_STARTING_TICKETS, DEFAULT_KEPT_TICKETS, type LineStyle, type MapData, type MapFormat, mapFormats, routeColors, stopSizeMeta, type RouteTypeStyle, type StopTypeStyle, type WagonShape, type WagonStyle, wagonShapeMeta } from "./map-data";
 
 export type StyleKind = "map" | "ticket" | "stop" | "route" | "wagon" | "line" | "defaults";
 export type StyleTarget = { kind: StyleKind; id?: string };
@@ -74,6 +74,7 @@ export function SettingsDialog({ open, onOpenChange, target, onTarget, data, cha
   const format = mapFormats[data.format];
   const totalSpaces = data.routes.reduce((sum, route) => sum + route.length, 0);
   const diameter = useMemo(() => mapDiameter(data), [data]);
+  const players = data.players ?? DEFAULT_PLAYERS;
 
   const usage = (styleId: string) => kind === "stop" ? data.stops.filter((stop) => stop.type === styleId).length
     : kind === "route" ? data.routes.filter((route) => route.type === styleId).length
@@ -174,6 +175,16 @@ export function SettingsDialog({ open, onOpenChange, target, onTarget, data, cha
               <p className="helper">{format.note}{format.custom ? ". This is not a verified commercial Ticket to Ride size" : ""}. Changing format keeps objects in the same relative positions.</p></div>
             {format.testSheet && <div><Label htmlFor="settings-proof">This sheet is a proof of</Label><NativeSelect id="settings-proof" value={defaults.scaleTarget} onChange={(event) => defaults.setScaleTarget(event.target.value)}>{Object.entries(mapFormats).filter(([, item]) => !item.testSheet).map(([key, item]) => <NativeSelectOption key={key} value={key}>{item.shortLabel}</NativeSelectOption>)}</NativeSelect>
               <p className="helper">A test sheet is a shrunken stand-in for a real board, so the editor needs to know which board it represents.</p></div>}
+            <div className="settings-pair">
+              <div><Label htmlFor="settings-players-min">Players, fewest</Label>
+                <Input id="settings-players-min" type="number" min={1} max={8} value={players.min}
+                  onChange={(event) => change((draft) => { const min = clampCount(event.target.value, DEFAULT_PLAYERS.min); draft.players = { min, max: Math.max(min, players.max) }; return draft; })} /></div>
+              <div><Label htmlFor="settings-players-max">Players, most</Label>
+                <Input id="settings-players-max" type="number" min={1} max={8} value={players.max}
+                  onChange={(event) => change((draft) => { const max = clampCount(event.target.value, DEFAULT_PLAYERS.max); draft.players = { min: Math.min(players.min, max), max }; return draft; })} /></div>
+              <div />
+            </div>
+            <p className="helper">How many players the map is built for. It sets how big a deck has to be to deal from, and whether the second lane of a double route is ever in play: the standard rule opens it only from {LANES_OPEN_FROM} players up{players.max < LANES_OPEN_FROM ? ", so on this map a double route is always worth one lane" : ""}.</p>
             <div className="settings-pair">
               <div><Label htmlFor="settings-wagons">Wagons per player</Label>
                 <Input id="settings-wagons" type="number" min={1} max={99} value={data.wagonsPerPlayer ?? DEFAULT_WAGONS_PER_PLAYER}

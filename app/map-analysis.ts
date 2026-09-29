@@ -1,6 +1,6 @@
 // The balance layer: everything derived from the stops and routes themselves. All of it is pure,
 // computed on demand from MapData, and none of it is stored in a map file.
-import { DEFAULT_WAGONS_PER_PLAYER, DEFAULT_STARTING_TICKETS, DEFAULT_TICKET_BANDS, DEFAULT_TICKET_MIX, type TicketBands, type TicketMix, TABLE_SIZE, defaultLabelAngle, stopSizeMeta, ticketsInSet, type MapData, type Ticket, type Point, realWagon, type Route, routeColors, type Stop, W } from "./map-data";
+import { DEFAULT_WAGONS_PER_PLAYER, DEFAULT_STARTING_TICKETS, DEFAULT_TICKET_BANDS, DEFAULT_TICKET_MIX, type TicketBands, type TicketMix, DEFAULT_PLAYERS, defaultLabelAngle, stopSizeMeta, ticketsInSet, type MapData, type Ticket, type Point, realWagon, type Route, routeColors, type Stop, W } from "./map-data";
 import { curvedSamples, isCurved, intersects, parallelPoints, pointsFor, polylineLength, stopById } from "./map-geometry";
 
 export type RouteSpacing = { route: Route; drawnMm: number; neededMm: number; ratio: number; verdict: "short" | "long" | "ok" };
@@ -316,6 +316,8 @@ export type SetupBalance = {
   spaceVerdict: "tight" | "ok" | "roomy";
   deckSize: number;
   dealtAtTable: number;
+  // The largest table this map is built for.
+  table: number;
   deckVerdict: "empty" | "thin" | "ok";
 };
 
@@ -327,7 +329,8 @@ export function setupBalance(data: MapData, setId?: string): SetupBalance {
   const wagonsPerPlayer = data.wagonsPerPlayer ?? DEFAULT_WAGONS_PER_PLAYER;
   const supplies = wagonsPerPlayer > 0 ? totalSpaces / wagonsPerPlayer : 0;
   const deckSize = (setId ? ticketsInSet(data, setId) : data.tickets).length;
-  const dealtAtTable = TABLE_SIZE * (data.startingTickets ?? DEFAULT_STARTING_TICKETS);
+  const table = data.players?.max ?? DEFAULT_PLAYERS.max;
+  const dealtAtTable = table * (data.startingTickets ?? DEFAULT_STARTING_TICKETS);
   return {
     totalSpaces,
     wagonsPerPlayer,
@@ -335,6 +338,7 @@ export function setupBalance(data: MapData, setId?: string): SetupBalance {
     spaceVerdict: supplies < TIGHT_SUPPLIES ? "tight" : supplies > ROOMY_SUPPLIES ? "roomy" : "ok",
     deckSize,
     dealtAtTable,
+    table,
     deckVerdict: deckSize === 0 ? "empty" : deckSize < dealtAtTable ? "thin" : "ok",
   };
 }

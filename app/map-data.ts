@@ -88,7 +88,7 @@ export type NoteBox = {
   locked?: boolean;
   collapsed?: boolean;
 };
-export type MapData = { name: string; format: MapFormat; endGapMm?: number; background: BackgroundShape[]; stops: Stop[]; routes: Route[]; backgroundImage?: BackgroundImage; notes: NoteBox[]; lineStyles: LineStyle[]; routeTypeStyles: RouteTypeStyle[]; wagonStyles: WagonStyle[]; stopTypeStyles: StopTypeStyle[]; tickets: Ticket[]; ticketSets: TicketSet[]; wagonsPerPlayer?: number; startingTickets?: number; keptTickets?: number; ticketBands?: TicketBands; ticketMix?: TicketMix; ticketValuation?: { longBonus?: boolean; ferryPremium?: number } };
+export type MapData = { name: string; format: MapFormat; endGapMm?: number; background: BackgroundShape[]; stops: Stop[]; routes: Route[]; backgroundImage?: BackgroundImage; notes: NoteBox[]; lineStyles: LineStyle[]; routeTypeStyles: RouteTypeStyle[]; wagonStyles: WagonStyle[]; stopTypeStyles: StopTypeStyle[]; tickets: Ticket[]; ticketSets: TicketSet[]; wagonsPerPlayer?: number; startingTickets?: number; keptTickets?: number; players?: PlayerRange; ticketBands?: TicketBands; ticketMix?: TicketMix; ticketValuation?: { longBonus?: boolean; ferryPremium?: number } };
 
 export const W = 1100;
 export const STORAGE_KEY = "orebro-map-editor-public-v2";
@@ -147,6 +147,13 @@ export const DEFAULT_WAGONS_PER_PLAYER = 45;
 export const DEFAULT_STARTING_TICKETS = 3;
 export const DEFAULT_KEPT_TICKETS = 2;
 
+// How many players the map is built for. It decides how big a deck has to be to deal from, and
+// whether the second lane of a double route is ever in play: the standard rule opens it only from
+// four players up.
+export type PlayerRange = { min: number; max: number };
+export const DEFAULT_PLAYERS: PlayerRange = { min: 2, max: 5 };
+export const LANES_OPEN_FROM = 4;
+
 // Where a ticket stops being short and where it becomes long, as fractions of the map's own
 // diameter — the same measure the official decks were read with, so a mix carries between maps of
 // different sizes. The shares are what fraction of the deck should sit in each band.
@@ -162,8 +169,6 @@ export const TICKET_MIX_PRESETS: { id: string; label: string; note: string; mix:
   { id: "europe", label: "Ticket to Ride: Europe", note: "all 46 tickets: a short regular deck plus 6 long ones", mix: { short: 76, medium: 11, long: 13 } },
   { id: "europe-regular", label: "Europe, regular deck only", note: "the 40 regular tickets, without the long deck", mix: { short: 88, medium: 12, long: 0 } },
 ];
-// A full table, used to judge whether a deck is thick enough to deal from.
-export const TABLE_SIZE = 5;
 
 // Centre-to-centre distance between the lines of a double route, in millimetres on the reference
 // board: a wagon's width plus a small gap, so the two rows sit beside each other the way a real

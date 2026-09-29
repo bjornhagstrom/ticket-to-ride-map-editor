@@ -32,6 +32,9 @@ export function WelcomeGuide({ open, onOpenChange, onChooseBlank, onChooseExampl
   </Dialog>;
 }
 
+const NUMBER_WORDS: Record<number, string> = {2: "two", 3: "three", 4: "four", 5: "five", 6: "six", 7: "seven", 8: "eight"};
+const tableWord = (count: number) => NUMBER_WORDS[count] ?? String(count);
+
 export function AnalysisDialog({ open, onOpenChange, data, stats, colourTable, spacing, scaleWidthMm, setup, onSelectRoute, onSelectStop }: { setup: SetupBalance; open: boolean; onSelectRoute: (routeId: string) => void; onSelectStop: (stopId: string) => void; onOpenChange: (open: boolean) => void; data: MapData; stats: NetworkStats; colourTable: ColourLengthTable; spacing: RouteSpacing[]; scaleWidthMm: number }) {
   const stopName = (id: string) => data.stops.find((stop) => stop.id === id)?.name ?? "";
   const sortedStops = [...data.stops].sort((a, b) => (stats.hubDegree.get(b.id) ?? 0) - (stats.hubDegree.get(a.id) ?? 0));
@@ -46,7 +49,7 @@ export function AnalysisDialog({ open, onOpenChange, data, stats, colourTable, s
         {setup.spaceVerdict === "tight" && <p className="helper helper-warning space-warning">Too small for {setup.wagonsPerPlayer} wagons: even two players cannot spend their supply here. Either draw more routes or cut the wagon count to about {Math.max(1, Math.floor(setup.totalSpaces / 2))}.</p>}
         {setup.spaceVerdict === "roomy" && <p className="helper helper-warning space-warning">Very roomy: a full table would leave most of the map unclaimed, so few routes are ever contested. Either raise the wagon count or draw fewer routes.</p>}
         <p className="helper">
-          The deck holds <strong>{setup.deckSize} ticket{setup.deckSize === 1 ? "" : "s"}</strong>, against the {setup.dealtAtTable} a table of five is dealt at the start.
+          The deck holds <strong>{setup.deckSize} ticket{setup.deckSize === 1 ? "" : "s"}</strong>, against the {setup.dealtAtTable} a table of {tableWord(setup.table)} is dealt at the start.
         </p>
         {setup.deckVerdict === "empty" && <p className="helper helper-warning deck-warning">No tickets yet, so nothing sends anyone anywhere.</p>}
         {setup.deckVerdict === "thin" && <p className="helper helper-warning deck-warning">Too few tickets to deal a full table, let alone leave any to draw later. Aim for at least {setup.dealtAtTable}, and more if players should keep drawing.</p>}
@@ -298,7 +301,7 @@ export function SuggestTicketsDialog({ open, onOpenChange, data, current, sugges
         })}</div>
       </div>
       <p className="helper">{busy ? "Working out a deck… " : ""} The wagon count is this map&apos;s own setting and changing it here changes it there. A player&apos;s reach is {report?.reach ?? current.reach} wagon spaces, from {TICKET_SUGGESTER.styles[style].lengthCap} × {wagons} wagons.</p>
-      {dealtFloor > 0 && <p className="helper">On a map this size, {TICKET_SUGGESTER.styles[style].ticketsPerStop} tickets per stop would leave too few to deal {data.startingTickets ?? 3} each to a table of five, so the count is held at {dealtFloor}. That is denser than the official decks; lower it if you would rather match them.</p>}
+      {dealtFloor > 0 && <p className="helper">On a map this size, {TICKET_SUGGESTER.styles[style].ticketsPerStop} tickets per stop would leave too few to deal {data.startingTickets ?? 3} each to a table of {tableWord(data.players?.max ?? 5)}, so the count is held at {dealtFloor}. That is denser than the official decks; lower it if you would rather match them.</p>}
       <label className="checkbox-row"><input type="checkbox" checked={keepExisting} onChange={(event) => onKeepExisting(event.target.checked)} />Keep the tickets this deck already has</label>
 
       {report?.note && <p className="helper helper-warning">{report.note}</p>}

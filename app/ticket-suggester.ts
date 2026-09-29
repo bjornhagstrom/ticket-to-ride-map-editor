@@ -6,7 +6,7 @@
 // scripts/ticket-suggester-reference.py is the Python original this was ported from. The two use
 // different random number generators, so they agree on the metrics, not on the ticket lists.
 import { valueTicket, type TicketPath } from "./ticket-valuation";
-import { DEFAULT_STARTING_TICKETS, DEFAULT_TICKET_BANDS, DEFAULT_WAGONS_PER_PLAYER, TABLE_SIZE, type MapData, type Ticket, type TicketBands, type TicketMix, ticketsInSet } from "./map-data";
+import { DEFAULT_STARTING_TICKETS, DEFAULT_TICKET_BANDS, DEFAULT_WAGONS_PER_PLAYER, DEFAULT_PLAYERS, type MapData, type Ticket, type TicketBands, type TicketMix, ticketsInSet } from "./map-data";
 
 export type TicketStyle = "generic" | "classic" | "europe";
 
@@ -546,7 +546,7 @@ export function defaultStyle(data: MapData, setId?: string): TicketStyle {
 export function suggestedDeckSize(data: MapData, style: TicketStyle, stops: number): { regular: number; long: number } {
   const preset = TICKET_SUGGESTER.styles[style];
   const long = Math.round(preset.longPerStop * stops);
-  const dealt = TABLE_SIZE * (data.startingTickets ?? DEFAULT_STARTING_TICKETS);
+  const dealt = (data.players?.max ?? DEFAULT_PLAYERS.max) * (data.startingTickets ?? DEFAULT_STARTING_TICKETS);
   const regular = Math.max(Math.round(preset.ticketsPerStop * stops), dealt - long);
   return { regular, long };
 }
