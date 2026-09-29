@@ -26,6 +26,14 @@ export default function About() {
         and what nobody touched, which is the part that tells you what to change.
       </p>
       <p>
+        Two things make that feel like a real game rather than a sketch. Keep each player&apos;s
+        wagons in front of them from a real set, and put one back in the box for every space they
+        fill in: the pile in front of them is then exactly how many they have left, which is the
+        pressure the game runs on. And if you print the board at full size — the sheet formats do
+        that, whole sheets taped edge to edge — the spaces are the size of real wagons, so you can
+        lay the plastic trains on the paper instead of drawing at all.
+      </p>
+      <p>
         It is meant for the stretch before a map is any good — the ten or twenty prototypes where
         the question is whether the network hangs together at all, not whether the artwork is right.
         Nothing leaves your browser: the map you are working on is stored locally, and files move by

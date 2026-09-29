@@ -710,6 +710,8 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   check("About is a page of its own", page.url().includes("/about"), page.url());
   const aboutText = (await page.locator("body").textContent()).toLowerCase();
   check("it says where the numbers come from", /shortest path/.test(aboutText) && /official/.test(aboutText));
+  check("and how to keep track of wagons while playing on paper", /put one back in the box/.test(aboutText));
+  check("and that full size lets you use the real trains", /lay the plastic trains on the paper/.test(aboutText));
   check("and names the version", /\d+\.\d+\.\d+/.test(aboutText), (aboutText.match(/\d+\.\d+\.\d+/) || ["none"])[0]);
   await page.getByRole("link", { name: /back to the editor/i }).first().click();
   await page.waitForTimeout(1200);
