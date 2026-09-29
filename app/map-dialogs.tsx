@@ -302,12 +302,15 @@ export function SuggestTicketsDialog({ open, onOpenChange, data, current, sugges
   const dealtFloor = deckSize > perStopSize ? deckSize : 0;
 
   return <Dialog open={open} onOpenChange={onOpenChange}>
-    <DialogContent className="suggest-dialog">
+    {/* A fixed shape, set here rather than in the stylesheet so the utility classes on DialogContent
+        cannot win: shuffling repeatedly must not move the button under the pointer. */}
+    <DialogContent className="suggest-dialog" style={{ height: "86vh", maxHeight: 860 }}>
       <DialogHeader>
         <DialogTitle>Suggest a ticket deck</DialogTitle>
         <DialogDescription>Every target below comes from the official Ticket to Ride decks, not from this map. Applying puts the result in a new deck stamped with today&apos;s date, so nothing you already have is touched.</DialogDescription>
       </DialogHeader>
 
+      <div className="suggest-scroll">
       <div className="suggest-controls">
         <div><Label htmlFor="suggest-wagons">Wagons per player</Label>
           <Input id="suggest-wagons" type="number" min={1} max={99} value={wagons} onChange={(event) => onWagons(Math.max(1, Math.round(Number(event.target.value) || 1)))} /></div>
@@ -357,17 +360,19 @@ export function SuggestTicketsDialog({ open, onOpenChange, data, current, sugges
       {report && report.bins.some((count) => count > 0) && <p className="helper">Lengths, shortest to longest: {report.bins.join(" · ")} against a target of {TICKET_SUGGESTER.styles[style].bins.map((share) => (share * report.regular).toFixed(1)).join(" · ")}.</p>}
       {report && report.ambiguous.length > 0 && <p className="helper">{report.ambiguous.length} ticket{report.ambiguous.length === 1 ? " has" : "s have"} a way round that costs one space more but is built from one route fewer, so it takes a turn less. Several official cards are priced at that higher figure. These are left at the shortest path — raise them by hand if you want to follow suit.</p>}
       {report && report.hard.length > 0 && <p className="helper">{report.hard.length} ticket{report.hard.length === 1 ? "" : "s"} cross a tunnel or need ferry locomotives. They are worth their wagon count all the same — the difficulty is yours to judge.</p>}
+      </div>
 
       <div className="suggest-apply">
         <div><Label htmlFor="suggest-name">Name for a new deck</Label>
           <Input id="suggest-name" value={deckName} onChange={(event) => onDeckName(event.target.value)} placeholder="Give it a name" /></div>
+        <p className="helper">Shuffle asks for another deck from the same map: the search is not deterministic, so a second try is a genuinely different reading. Replacing throws away the tickets in {currentDeck}.</p>
         <div className="suggest-apply-buttons">
           <Button variant="outline" disabled={busy} onClick={onShuffle}>Shuffle</Button>
           <Button variant="outline" disabled={busy || !suggestion?.tickets.length} onClick={() => onApply("replace")}>Replace {currentDeck}</Button>
           <Button disabled={busy || !suggestion?.tickets.length || !deckName.trim()} onClick={() => onApply("new")}>Save as a new deck</Button>
         </div>
       </div>
-      <p className="helper">Shuffle asks for another deck from the same map: the search is not deterministic, so a second try is a genuinely different reading. Replacing throws away the tickets in {currentDeck}.</p>
+
     </DialogContent>
   </Dialog>;
 }

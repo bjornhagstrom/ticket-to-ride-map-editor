@@ -75,3 +75,22 @@ being described is something the editor already knows how to draw. Worth doing t
 For anything the editor cannot draw from its own data — the print-and-cut workflow, what a finished
 marked-up board looks like after a game — a photograph would do more than a diagram, and those have
 to come from a real playtest.
+
+## Save a map or a deck as PDF
+
+Printing to PDF already works through the browser's own print dialog — choose "Save as PDF" as the
+destination and the sheets come out as a file, at the size the editor asked for. That is enough to
+keep a milestone version, and it needs no code.
+
+What would be worth building on top:
+
+- **Say so where it matters.** The print buttons could mention that the same dialog saves a PDF, so
+  nobody has to know the trick.
+- **A name worth keeping.** The browser names the file after the page title. Setting a title like
+  `Örebro map · board · 2026-09-29` before printing would give files that sort and read well in a
+  folder of milestones.
+- **Map and deck in one file.** Today they are two print runs, because they use different paper.
+  One run that prints the board sheets and then the ticket cards would make a single milestone file.
+- **What a milestone should hold.** Probably the board, the deck, and a page of the balance numbers
+  as they stood — so that a year later the file says not just what the map looked like but what the
+  editor thought of it.

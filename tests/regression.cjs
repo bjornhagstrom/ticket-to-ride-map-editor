@@ -432,6 +432,25 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   const suggestRows = await page.$$eval(".suggest-table tbody tr", (trs) => trs.map((tr) => Array.from(tr.children).map((td) => td.textContent.trim())));
   const suggestedScore = Number(suggestRows.find((row) => row[0] === "Score")[2]);
   check("it scores the suggestion against the official range", suggestedScore < 5, suggestRows.find((row) => row[0] === "Score").join(" | "));
+  // Shuffling repeatedly must not move the button under the pointer, nor the number being watched.
+  await page.waitForTimeout(700);
+  const steady = async () => page.evaluate(() => {
+    const b = [...document.querySelectorAll("button")].find((x) => x.textContent.trim() === "Shuffle").getBoundingClientRect();
+    const row = [...document.querySelectorAll(".suggest-table tbody tr")].find((tr) => tr.children[0].textContent.trim() === "Score").getBoundingClientRect();
+    return { shuffle: Math.round(b.y), score: Math.round(row.y) };
+  });
+  const before = await steady();
+  for (let i = 0; i < 3; i++) {
+    await page.getByRole("button", { name: "Shuffle" }).click();
+    await page.waitForTimeout(150);
+    await page.waitForFunction(() => {
+      const row = [...document.querySelectorAll(".suggest-table tbody tr")].find((tr) => tr.children[0].textContent.trim() === "Score");
+      return row && row.children[2].textContent.trim() !== "—";
+    }, null, { timeout: 30000 });
+  }
+  const after = await steady();
+  check("shuffling moves neither the button nor the score row", before.shuffle === after.shuffle && before.score === after.score,
+    `${before.shuffle}/${before.score} then ${after.shuffle}/${after.score}`);
   check("the dialog offers no Cancel: closing it discards the suggestion", (await page.locator(".suggest-dialog").getByRole("button", { name: "Cancel" }).count()) === 0);
   check("Shuffle, replace and save-as-new are offered", await page.locator(".suggest-dialog").getByRole("button", { name: "Shuffle" }).isVisible() && await page.locator(".suggest-dialog").getByRole("button", { name: /^Replace/ }).isVisible() && await page.locator(".suggest-dialog").getByRole("button", { name: /Save as a new deck/ }).isVisible());
   check("and shows the official range beside each measure", suggestRows.some((row) => /official/.test(row[3])), suggestRows[2].join(" | "));
