@@ -36,7 +36,11 @@ DUP_RATE = 0.02              # official decks: 0.3–1.6 % of pairs are near-dup
 UNUSED_RATE = 0.20           # official decks: 14–27 % of routes lie on no ticket's shortest path
 MAX_PER_STOP = 5             # official decks: at most 4–5 tickets name one stop
 MAX_LOCOS = 2                # no official regular ticket needs more than 2 ferry locomotives
-W = dict(bins=10.0, ends=40.0, cov=1.0, zero=0.5, dup=4.0, unused=1.0, load=0.5, hard=2.0)
+# `load` was 0.5 when the targets were first fitted. Suggestions then spread their tickets more
+# evenly over the map than the official decks do, which run the busy corridors along routes that
+# have a second lane (docs/ROUTE-LOAD.md §2). At 2 they match that habit; at 3 the decks start
+# failing the score checks in docs/TICKET-SUGGESTER.md §6.
+W = dict(bins=10.0, ends=40.0, cov=1.0, zero=0.5, dup=4.0, unused=1.0, load=2.0, hard=2.0)
 
 # ------------------------------------------------------------------------- input
 def load(spec):

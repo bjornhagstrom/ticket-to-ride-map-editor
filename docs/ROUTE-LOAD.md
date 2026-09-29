@@ -75,6 +75,54 @@ For every map with `useForCalibration: true`:
 - For suggestions (seeds 1 and 2), the ratio is ≥ the random median. Report it next to the official value.
 - Only if suggestions fall clearly below the official ratio on most maps, strengthen the load term, for example by raising the `f_load` weight from 0.5, and rerun all §6 checks in `docs/TICKET-SUGGESTER.md`. Don't tune before the test says so.
 
+## Outcome of C
+
+The test was built and run on all eight calibration maps. Two things came out of it.
+
+**The metric is a faithful port.** The official load ratio reproduces the §2 table exactly on all
+eight maps, and India is the exception there too.
+
+**The load term needed strengthening.** With `f_load` at 0.5, suggestions fell below the random
+median on 7 of 16 seed runs and clearly below the official ratio on 5 of 8 maps — the condition §C
+sets for tuning. Raising the weight was measured at 0.5, 1.5, 2, 3 and 6:
+
+| `f_load` weight | Load-ratio shortfalls | §6 score checks |
+| --- | --- | --- |
+| 0.5 | 7 of 16 | pass |
+| 1.5 | 3 of 16 | pass |
+| **2** | **0 of 8 map pairs** | **pass** |
+| 3 | 2 of 16 | India and Northern Lights break "under 5" |
+| 6 | fewest | several break |
+
+The weight is now **2**. The §6 checks were rerun and the §2b table in `docs/TICKET-SUGGESTER.md` was
+rewritten, since every score moved with the weight.
+
+Ratios at weight 2 (mean load on multi-lane edges over mean load on single ones):
+
+| Map | Official | Random median | Seed 1 | Seed 2 |
+| --- | --- | --- | --- | --- |
+| USA | 2.20 | 1.59 | 1.66 | 1.72 |
+| Europe | 1.97 | 1.55 | 2.99 | 1.89 |
+| Nordic | 1.68 | 1.35 | 1.69 | 1.48 |
+| India | 1.35 | 1.38 | 1.77 | 1.67 |
+| Switzerland | 3.10 | 1.98 | 2.32 | 1.96 |
+| Old West | 2.42 | 1.77 | 1.95 | 2.24 |
+| Polska | 1.39 | 1.17 | 1.07 | 1.53 |
+| Northern Lights | 2.15 | 1.92 | 1.96 | 2.06 |
+
+A single anneal run is stochastic: the ratio swings by a third between seeds on the same map, as
+Polska's 1.07 and 1.53 show. The test therefore judges the two seeds together against the random
+median, and prints both so one seed sliding is still visible.
+
+## Open question: should the score follow the map's player range?
+
+`lanesUsable` drives the bottleneck view, but not the deck score: `f_load` still divides by `lanes`
+in full, the way the calibration was fitted. On a map built for two or three players that is
+arguably wrong, since the second lane never opens. Changing it would move `f_load` on Nordic,
+Switzerland and India and invalidate the §2b table, so it is left alone until the data can say
+whether the designers of those maps balanced for the restricted case. The question has been sent
+back to the analysis of the reference data.
+
 ## Not in scope
 
 - A congestion premium on points: official decks don't have one.

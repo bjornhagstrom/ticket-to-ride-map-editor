@@ -85,14 +85,21 @@ Result with `generic` (Python reference, seeds 1–2; official decks limited to 
 
 | Map | Official | Suggested | Random (median) |
 | --- | --- | --- | --- |
-| USA | 8.9 | 0.8 | 25.0 |
-| Nordic | 20.9 | 1.3–1.5 | 35.5 |
-| India | 16.2 | 0.9–1.4 | 24.7 |
-| Old West | 13.4 | 0.6 | 26.4 |
-| Polska | 6.4 | 0.8–0.9 | 16.9 |
-| Northern Lights | 23.6 | 1.5–1.6 | 35.8 |
-| Switzerland | 27.5 | 1.0–1.3 | 18.7 |
-| Europe (`europe` style) | 1.9 | 0.6–1.4 | 137 |
+| USA | 10.2 | 1.7–1.9 | 22.4 |
+| Nordic | 26.1 | 2.8–3.2 | 47.5 |
+| India | 25.5 | 3.9–4.2 | 43.6 |
+| Old West | 14.9 | 1.8–1.9 | 24.4 |
+| Polska | 9.4 | 1.8–2.1 | 20.7 |
+| Northern Lights | 27.8 | 4.3 | 36.7 |
+| Switzerland | 30.1 | 2.6–3.5 | 29.0 |
+| Europe (`europe` style) | 4.1 | 1.9–2.0 | 116.8 |
+
+These numbers are from `load` weighted 2, not the 0.5 the targets were first fitted with. The load
+term was raised after the test in `docs/ROUTE-LOAD.md` §C showed suggestions spreading their tickets
+more evenly than the official decks do. Every score above moved with it, official and random alike,
+so the relations are what matter, not the absolute figures: an official deck below random, and a
+suggestion below the official deck. At weight 3 suggestions on India and Northern Lights break the
+"under 5" check in §6, so 2 is the ceiling.
 
 Switzerland is the known exception, because a large part of its deck is country tickets, which the suggester does not model yet. The score is a guide, not a verdict. An official deck is expected to score clearly below random, and a suggestion is expected to score below the official deck.
 
@@ -198,7 +205,7 @@ f_unused = max(0, unusedRoutes − 0.20 × routes)
 f_load   = variance over edges of load / lanes
 f_hard   = Σ_tickets max(0, locos − 2)
 
-score = 10·f_bins + 400·f_ends + 1·f_cov + 0.5·zero + 4·f_dup + 1·f_unused + 0.5·f_load + 2·f_hard
+score = 10·f_bins + 400·f_ends + 1·f_cov + 0.5·zero + 4·f_dup + 1·f_unused + 2·f_load + 2·f_hard
 ```
 
 Keep the constants and weights together in one exported object, so they can be tuned and their provenance is visible. The same values are at the top of the Python reference.

@@ -6,7 +6,7 @@
 // scripts/ticket-suggester-reference.py is the Python original this was ported from. The two use
 // different random number generators, so they agree on the metrics, not on the ticket lists.
 import { valueTicket, type TicketPath } from "./ticket-valuation";
-import { DEFAULT_STARTING_TICKETS, DEFAULT_TICKET_BANDS, DEFAULT_WAGONS_PER_PLAYER, DEFAULT_PLAYERS, type MapData, type Ticket, type TicketBands, type TicketMix, ticketsInSet } from "./map-data";
+import { DEFAULT_STARTING_TICKETS, DEFAULT_TICKET_BANDS, DEFAULT_WAGONS_PER_PLAYER, DEFAULT_PLAYERS, LANES_OPEN_FROM, type MapData, type Ticket, type TicketBands, type TicketMix, ticketsInSet } from "./map-data";
 
 export type TicketStyle = "generic" | "classic" | "europe";
 
@@ -75,7 +75,11 @@ export const TICKET_SUGGESTER = {
     dupPct: [.3, 1.6] as [number, number],
     unusedPct: [14, 27] as [number, number],
   },
-  weights: { bins: 10, ends: 400, cov: 1, zero: .5, dup: 4, unused: 1, load: .5, hard: 2 },
+  // `load` was 0.5 when the targets were first fitted, which left suggestions spreading their
+  // tickets more evenly over the map than the official decks do: they run the busy corridors along
+  // routes that have a second lane. At 2 the suggestions match that habit; at 3 the deck starts
+  // failing the score checks in docs/TICKET-SUGGESTER.md §6. See docs/ROUTE-LOAD.md §C.
+  weights: { bins: 10, ends: 400, cov: 1, zero: .5, dup: 4, unused: 1, load: 2, hard: 2 },
   peripheryLong: .62,
   peripheryShortDelta: -.05,
   unusedRate: .20,
@@ -88,6 +92,9 @@ export const TICKET_SUGGESTER = {
 
 export type TicketSuggestOptions = {
   style: TicketStyle;
+  // The size of table the bottleneck reading is made for. Only the second lane of a double route
+  // depends on it, so it changes what is crowded, never what a ticket is worth.
+  atTable: number;
   // Count how many printed values the default valuation reproduces. Off by default: it is only of
   // interest when checking a deck that came with its own points, such as an official map.
   pointsAudit: boolean;
@@ -99,8 +106,20 @@ export type TicketSuggestOptions = {
   setId?: string;
 };
 
+export type Bottleneck = {
+  a: string; b: string; length: number; lanes: number; lanesUsable: number;
+  load: number; ratio: number; tickets: number; ticketIds: string[]; routeIds: string[];
+};
+
 export type TicketDeckReport = {
   style: TicketStyle;
+  // Edges that more tickets want than they can carry, read at the table given in the options, and
+  // how many there would be at each end of the map's player range.
+  bottlenecks: Bottleneck[];
+  bottleneckCounts: { smallest: number; largest: number };
+  // Mean load on edges with several lanes against mean load on single ones. The official decks put
+  // their busiest corridors on double routes, so this sits above 1 on seven of eight of them.
+  loadRatio: number | null;
   // Every pair of stops a ticket could join, within what a player can build.
   reachablePairs: [string, string][];
   // How well the default valuation matches the points the deck already carries.
@@ -140,7 +159,7 @@ export function mulberry32(seed: number): () => number {
   };
 }
 
-type Edge = { a: string; b: string; weight: number; lanes: number; locos: number; tunnel: boolean; routeId: string };
+type Edge = { a: string; b: string; weight: number; lanes: number; locos: number; tunnel: boolean; routeId: string; routeIds: string[] };
 type Candidate = {
   a: string; b: string; length: number; frac: number; bin: number; mixBand: number; routes: number; ferrySpaces: number;
   load: Map<number, number>; corridor: string[]; locos: number; tunnels: number;
@@ -158,8 +177,9 @@ function buildEdges(data: MapData): Edge[] {
     const locos = route.locomotiveSlots?.length ?? 0;
     const tunnel = route.wagonStyle === "tunnel";
     const existing = byPair.get(key);
-    if (!existing) { byPair.set(key, { a: route.a, b: route.b, weight: route.length, lanes: 1, locos, tunnel, routeId: route.id }); continue; }
+    if (!existing) { byPair.set(key, { a: route.a, b: route.b, weight: route.length, lanes: 1, locos, tunnel, routeId: route.id, routeIds: [route.id] }); continue; }
     existing.lanes += 1;
+    existing.routeIds.push(route.id);
     if (route.length < existing.weight) { existing.weight = route.length; existing.locos = locos; existing.tunnel = tunnel; existing.routeId = route.id; }
   }
   return [...byPair.values()];
@@ -520,6 +540,7 @@ class DeckState {
 function resolveOptions(data: MapData, options: Partial<TicketSuggestOptions>): TicketSuggestOptions {
   const wagons = options.wagonsPerPlayer ?? data.wagonsPerPlayer ?? DEFAULT_WAGONS_PER_PLAYER;
   return {
+    atTable: options.atTable ?? (data.players?.max ?? DEFAULT_PLAYERS.max),
     pointsAudit: options.pointsAudit ?? false,
     style: options.style ?? defaultStyle(data),
     wagonsPerPlayer: wagons,
@@ -553,7 +574,7 @@ export function suggestedDeckSize(data: MapData, style: TicketStyle, stops: numb
 
 function emptyReport(note: string, styleName: TicketStyle = "generic"): TicketDeckReport {
   return {
-    style: styleName, reachablePairs: [], valuation: { exact: 0, total: 0, off: [] },
+    style: styleName, bottlenecks: [], bottleneckCounts: { smallest: 0, largest: 0 }, loadRatio: null, reachablePairs: [], valuation: { exact: 0, total: 0, off: [] },
     mix: [0, 0, 0], diameter: 0, reach: 0, regular: 0, long: 0, bins: [0, 0, 0, 0, 0],
     longPeriphery: null, shortPeriphery: null, mapPeriphery: 0,
     zeroStops: 0, maxPerStop: 0, duplicatePairs: [], dupPct: 0,
@@ -566,7 +587,52 @@ const pathOf = (candidate: Candidate, longest: number): TicketPath => ({
   frac: candidate.frac, longest: candidate.length === longest,
 });
 
-function buildReport(model: SuggesterModel, deck: DeckState, styleName: TicketStyle, style: typeof TICKET_SUGGESTER.styles.classic, wantRegular: number, longCount: number, ids: Map<Candidate, string>, mix: TicketMix | null, audit?: TicketDeckReport["valuation"]): TicketDeckReport {
+// Which edges more tickets want than they can carry. An edge is crowded when its load per usable
+// lane stands out: among the busiest tenth and wanted by at least three tickets, or at twice the
+// average. The fix is nearly always a change to the map — another lane, or another way round — so
+// the tickets that cause it are listed with it.
+const CROWDED_SHARE = .10, CROWDED_TICKETS = 3, CROWDED_MULTIPLE = 2;
+
+function findBottlenecks(model: SuggesterModel, deck: DeckState, ids: Map<Candidate, string>, atTable: number): Bottleneck[] {
+  if (!model.edges.length) return [];
+  const usersOf = new Map<number, Candidate[]>();
+  for (const member of deck.members) {
+    for (const edge of member.load.keys()) {
+      const list = usersOf.get(edge);
+      if (list) list.push(member); else usersOf.set(edge, [member]);
+    }
+  }
+  const rows = model.edges.map((edge, index) => {
+    const lanesUsable = atTable >= LANES_OPEN_FROM ? edge.lanes : 1;
+    const load = deck.edgeLoad[index];
+    const users = usersOf.get(index) ?? [];
+    return { edge, index, lanesUsable, load, ratio: load / lanesUsable, users };
+  });
+  const mean = rows.reduce((sum, row) => sum + row.ratio, 0) / rows.length;
+  const cut = [...rows].sort((a, b) => b.ratio - a.ratio)[Math.max(0, Math.floor(rows.length * CROWDED_SHARE) - 1)]?.ratio ?? Infinity;
+  return rows
+    .filter((row) => row.load > 0 && ((row.ratio >= cut && row.users.length >= CROWDED_TICKETS) || row.ratio >= CROWDED_MULTIPLE * mean))
+    .sort((a, b) => b.ratio - a.ratio)
+    .map((row) => ({
+      a: row.edge.a, b: row.edge.b, length: row.edge.weight, lanes: row.edge.lanes, lanesUsable: row.lanesUsable,
+      load: row.load, ratio: row.ratio, tickets: row.users.length,
+      ticketIds: row.users.map((user) => ids.get(user) ?? "").filter(Boolean),
+      routeIds: row.edge.routeIds,
+    }));
+}
+
+// Mean load on edges with several lanes against mean load on single ones.
+function loadRatioOf(model: SuggesterModel, deck: DeckState): number | null {
+  let multi = 0, multiCount = 0, single = 0, singleCount = 0;
+  model.edges.forEach((edge, index) => {
+    if (edge.lanes > 1) { multi += deck.edgeLoad[index]; multiCount += 1; }
+    else { single += deck.edgeLoad[index]; singleCount += 1; }
+  });
+  if (!multiCount || !singleCount || single === 0) return null;
+  return (multi / multiCount) / (single / singleCount);
+}
+
+function buildReport(model: SuggesterModel, deck: DeckState, styleName: TicketStyle, style: typeof TICKET_SUGGESTER.styles.classic, wantRegular: number, longCount: number, ids: Map<Candidate, string>, mix: TicketMix | null, audit: TicketDeckReport["valuation"] | undefined, data: MapData | undefined, atTable: number): TicketDeckReport {
   const duplicatePairs: [string, string][] = [];
   for (let i = 0; i < deck.members.length; i++) {
     for (let j = i + 1; j < deck.members.length; j++) {
@@ -578,8 +644,13 @@ function buildReport(model: SuggesterModel, deck: DeckState, styleName: TicketSt
   const hard = deck.members
     .filter((candidate) => candidate.locos > 0 || candidate.tunnels > 0)
     .map((candidate) => ({ ticketId: ids.get(candidate) ?? "", a: candidate.a, b: candidate.b, locomotives: candidate.locos, tunnels: candidate.tunnels }));
+  const bottlenecksAt = (table: number) => findBottlenecks(model, deck, ids, table);
+  const players = data?.players ?? DEFAULT_PLAYERS;
   return {
     style: styleName,
+    bottlenecks: bottlenecksAt(atTable),
+    bottleneckCounts: { smallest: bottlenecksAt(players.min).length, largest: bottlenecksAt(players.max).length },
+    loadRatio: loadRatioOf(model, deck),
     reachablePairs: model.reachablePairs(),
     valuation: audit ?? { exact: 0, total: 0, off: [] },
     mix: [...deck.mixCounts],
@@ -724,7 +795,7 @@ export function suggestTickets(data: MapData, options: Partial<TicketSuggestOpti
     });
   });
 
-  return { tickets, report: buildReport(model, deck, resolved.style, style, targets[0], groups[1].length, ids, mix) };
+  return { tickets, report: buildReport(model, deck, resolved.style, style, targets[0], groups[1].length, ids, mix, undefined, data, resolved.atTable) };
 }
 
 // Score the deck the map already has, on the same scale.
@@ -768,7 +839,7 @@ export function evaluateTicketDeck(data: MapData, options: Partial<TicketSuggest
     if (isLong) long += 1;
     deck.add(candidate, !isLong);
   }
-  const report = buildReport(model, deck, resolved.style, style, Math.max(deck.regularCount, 1), long, ids, mix, audit);
+  const report = buildReport(model, deck, resolved.style, style, Math.max(deck.regularCount, 1), long, ids, mix, audit, data, resolved.atTable);
   if (skipped) report.note = `${report.note ? `${report.note} ` : ""}${skipped} ticket${skipped === 1 ? "" : "s"} could not be measured and ${skipped === 1 ? "was" : "were"} left out.`;
   return report;
 }

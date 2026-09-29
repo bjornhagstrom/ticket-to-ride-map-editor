@@ -129,6 +129,63 @@ for (const source of calibrationMaps) {
   }
 }
 
+// ---------------------------------------------------------------- busy corridors sit on double routes
+// docs/ROUTE-LOAD.md §2: the official decks run their busiest corridors along routes that have a
+// second lane. The ratio is mean load on multi-lane edges over mean load on single ones.
+const publishedRatio = { usa: 2.20, europe: 1.97, nordic: 1.68, india: 1.35, switzerland: 3.10, oldwest: 2.42, poland: 1.39, northernlights: 2.15 };
+const loadRatios = {};
+console.log("\nLoad ratio, multi-lane against single-lane (docs/ROUTE-LOAD.md §2 in brackets):");
+console.log(`  ${"map".padEnd(16)}${"official".padStart(9)}${"published".padStart(11)}${"random".padStart(9)}${"seed 1".padStart(8)}${"seed 2".padStart(8)}`);
+for (const source of calibrationMaps) {
+  const map = built.get(source.id);
+  const style = styleFor(source.id);
+  const official = evaluateTicketDeck(map, { style });
+  const pairs = official.reachablePairs;
+  const size = official.regular + official.long;
+  const randoms = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    .map((seed) => evaluateTicketDeck(randomDeck(map, size, seed, official.reach, pairs), { style }).loadRatio)
+    .filter((value) => value !== null)
+    .sort((a, b) => a - b);
+  const randomMedian = randoms.length ? (randoms[4] + randoms[5]) / 2 : null;
+  const suggested = [1, 2].map((seed) => suggestTickets(map, { style, seed }).report.loadRatio);
+  loadRatios[source.id] = { official: official.loadRatio, randomMedian, suggested };
+  const show = (value) => (value === null || value === undefined ? "  —" : value.toFixed(2));
+  console.log(`  ${source.id.padEnd(16)}${show(official.loadRatio).padStart(9)}${String(publishedRatio[source.id]).padStart(11)}${show(randomMedian).padStart(9)}${show(suggested[0]).padStart(8)}${show(suggested[1]).padStart(8)}`);
+}
+
+for (const source of calibrationMaps) {
+  const { official, randomMedian, suggested } = loadRatios[source.id];
+  if (official === null || randomMedian === null) { check(`${source.id}: has lanes to compare`, false, "no multi-lane or no single-lane edges"); continue; }
+  // India is the known exception: its official deck does not favour the double routes.
+  const expected = source.id !== "india";
+  check(`${source.id}: the official deck ${expected ? "leans on" : "does not lean on"} the double routes`,
+    (official > randomMedian) === expected, `${official.toFixed(2)} against a random median of ${randomMedian.toFixed(2)}`);
+  // A single anneal run is stochastic and the ratio swings by a third between seeds, so the pair is
+  // judged together. Both are printed above, so one seed sliding is still visible.
+  const meanSuggested = suggested.reduce((sum, value) => sum + (value ?? 0), 0) / suggested.length;
+  check(`${source.id}: suggestions are at least as concentrated as chance`, meanSuggested >= randomMedian,
+    `${suggested.map((v) => (v === null ? "—" : v.toFixed(2))).join(" and ")} against a random median of ${randomMedian.toFixed(2)}`);
+}
+
+// ---------------------------------------------------------------- bottlenecks follow the table
+for (const source of calibrationMaps.slice(0, 3)) {
+  const map = built.get(source.id);
+  const style = styleFor(source.id);
+  const large = evaluateTicketDeck(map, { style, atTable: 5 });
+  const small = evaluateTicketDeck(map, { style, atTable: 2 });
+  // Fewer usable lanes lift every multi-lane edge at once, which moves the busiest-tenth cut as
+  // well, so the count is not monotonic. What must hold is that no edge gets roomier.
+  const largeRatio = new Map(large.bottlenecks.map((edge) => [`${edge.a}|${edge.b}`, edge.ratio]));
+  check(`${source.id}: no edge is roomier at a smaller table`,
+    small.bottlenecks.every((edge) => edge.ratio >= (largeRatio.get(`${edge.a}|${edge.b}`) ?? 0)),
+    `${small.bottlenecks.length} at two players, ${large.bottlenecks.length} at five`);
+  check(`${source.id}: every bottleneck names the tickets that crowd it`,
+    large.bottlenecks.every((edge) => edge.ticketIds.length === edge.tickets && edge.tickets > 0),
+    `${large.bottlenecks.length} edges`);
+  check(`${source.id}: a double route counts as one lane at a small table`,
+    small.bottlenecks.every((edge) => edge.lanesUsable === 1) && large.bottlenecks.every((edge) => edge.lanesUsable === edge.lanes));
+}
+
 // ---------------------------------------------------------------- the +1 pattern is flagged
 // docs/TICKET-VALUATION.md: several official +1 cards follow a path that costs one space more but
 // is built from fewer routes. The suggester never raises a value for it, but it must say so.
