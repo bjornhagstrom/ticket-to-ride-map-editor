@@ -30,7 +30,7 @@ Add **Suggest tickets…** to the ticket editor. It proposes a complete destinat
 4. **UI (§5).**
    - The dialog has style, trains per player, deck size, and keep existing or replace all.
    - The preview shows the report next to the official range for each metric.
-   - Buttons: Apply, Shuffle (seed + 1), Cancel.
+   - Buttons: Apply and Shuffle (seed + 1). No Cancel button; closing the dialog discards the suggestion.
    - Applied tickets are ordinary tickets.
 5. **Tests (§6).**
    - Load each map with `useForCalibration: true` from `data/ttr-reference-maps.json`.
