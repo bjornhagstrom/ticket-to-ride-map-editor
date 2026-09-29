@@ -6,6 +6,7 @@
 import { useMemo } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { bandCuts, mapDiameter } from "./map-analysis";
+import { notchedSlotPath, ovalSlotPath, tunnelSlotPath } from "./map-artwork";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -268,6 +269,20 @@ function StopTypeFields({ style, update }: { style: StopTypeStyle; update: Updat
   </>;
 }
 
+// The shape drawn by the same functions the map uses, so what is shown here cannot drift from what
+// is printed.
+function ShapePreview({ shape, glyph, stroke }: { shape: WagonShape; glyph?: string; stroke: string }) {
+  const w = 34, h = 15;
+  const path = shape === "notched" ? notchedSlotPath(w, h, 3.5)
+    : shape === "serrated" ? tunnelSlotPath(w, h, 2.6)
+    : shape === "oval" ? ovalSlotPath(w, h)
+    : `M${-w / 2},${-h / 2} h${w} v${h} h${-w} Z`;
+  return <svg className="shape-preview" viewBox="-22 -12 44 24" role="img" aria-label={`${wagonShapeMeta[shape].label} wagon space`}>
+    <path d={path} fill="#fffaf0" stroke={stroke} strokeWidth={shape === "heavy" ? 3 : 2} strokeLinejoin="round" />
+    {glyph?.trim() && <text x="0" y="0" dominantBaseline="central" textAnchor="middle" fontSize="9" fill={stroke} fontWeight="700">{glyph.trim()}</text>}
+  </svg>;
+}
+
 function RouteTypeFields({ style, update }: { style: RouteTypeStyle; update: Update }) {
   return <>
     {style.infrastructure
@@ -275,11 +290,16 @@ function RouteTypeFields({ style, update }: { style: RouteTypeStyle; update: Upd
       : <p className="helper">Every route keeps its own wagon colour, so a type is told apart by thickness and dash pattern — not by colour.</p>}
     <div><Label>Thickness · {style.strokeWidth}px</Label><input className="range-input" type="range" min="2" max="14" value={style.strokeWidth} onChange={(event) => update({ strokeWidth: Number(event.target.value) })} /></div>
     <div><Label>Dash pattern</Label><NativeSelect value={style.dash} onChange={(event) => update({ dash: event.target.value })}>{dashOptions(style.dash).map((preset) => <NativeSelectOption key={preset.value} value={preset.value}>{preset.label}</NativeSelectOption>)}</NativeSelect></div>
-    <div><Label>Wagon spaces</Label><NativeSelect value={style.shape ?? "plain"} onChange={(event) => update({ shape: event.target.value as WagonShape })}>{Object.entries(wagonShapeMeta).map(([key, meta]) => <NativeSelectOption key={key} value={key}>{meta.label}</NativeSelectOption>)}</NativeSelect>
-      <p className="helper">The shape of every space along a route of this type. A shape says at a glance that a route plays by its own rule.</p></div>
+    {!style.infrastructure && <div><Label>Wagon spaces</Label>
+      <div className="shape-row">
+        <NativeSelect value={style.shape ?? "plain"} onChange={(event) => update({ shape: event.target.value as WagonShape })}>{Object.entries(wagonShapeMeta).map(([key, meta]) => <NativeSelectOption key={key} value={key}>{meta.label}</NativeSelectOption>)}</NativeSelect>
+        <ShapePreview shape={style.shape ?? "plain"} glyph={style.glyph} stroke={style.infrastructure ? style.stroke : "#721c24"} />
+      </div>
+      <p className="helper">The shape of every space along a route of this type, drawn here exactly as it will appear on the map. A shape says at a glance that a route plays by its own rule.</p></div>}
     <div><Label>Mark in the space</Label><Input maxLength={2} value={style.glyph ?? ""} onChange={(event) => update({ glyph: event.target.value || undefined })} />
-      <p className="helper">One or two characters, drawn inside every space. A shape alone can get lost on a small print; a letter survives it.</p></div>
-    <label className="checkbox-row"><input type="checkbox" checked={style.infrastructure} onChange={(event) => update({ infrastructure: event.target.checked })} />Pre-built infrastructure (no train cards or wagon slots)</label>
+      <p className="helper">One or two characters, drawn inside every space. A shape alone can get lost on a small print; a letter survives it. It is also the quickest way to mark a rule you are trying out — put a letter in the spaces and write down what it means beside the board.</p></div>
+    <label className="checkbox-row"><input type="checkbox" checked={style.infrastructure} onChange={(event) => update({ infrastructure: event.target.checked })} />Already built — nobody claims it</label>
+    <p className="helper">For something that is on the board from the start and free to travel along: a canal, a road, an existing railway. It is drawn as a plain line in this type&apos;s colour, with no wagon spaces, and it is left out of everything that counts what players compete over — the colour and length table, the crossing check, and how crowded a route is. Journeys still run along it. This has nothing to do with how a route looks; it is about whether it is part of the game&apos;s economy.</p>
   </>;
 }
 

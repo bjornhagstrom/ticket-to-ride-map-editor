@@ -60,3 +60,18 @@ Worth deciding before building: whether a version bump is manual or comes from t
 whether the changelog is one entry per release or one per user-visible change. The file format has
 its own version, separate from the app's, and the changelog should say when the two move together.
 
+
+## Illustrations for the settings that are hard to picture
+
+The wagon-space shape is now drawn live beside its picker, by the same functions that draw the map,
+so the preview cannot drift from the print. That pattern is better than a picture wherever the thing
+being described is something the editor already knows how to draw. Worth doing the same for:
+
+- **Dash patterns and line thickness** — a short line drawn with the chosen values, beside the picker.
+- **Stop types** — the circle, square and symbol as they will appear, at real size.
+- **Board formats** — a small diagram of the panel grid, showing how many sheets and at what scale.
+- **Label angles** — where a stop's name lands, which is currently eight numbers with no picture.
+
+For anything the editor cannot draw from its own data — the print-and-cut workflow, what a finished
+marked-up board looks like after a game — a photograph would do more than a diagram, and those have
+to come from a real playtest.
