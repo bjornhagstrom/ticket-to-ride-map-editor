@@ -7,12 +7,12 @@ import { useMemo } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { bandCuts, mapDiameter } from "./map-analysis";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { cn } from "@/lib/utils";
-import { DEFAULT_PLAYERS, LANES_OPEN_FROM, DEFAULT_TICKET_BANDS, DEFAULT_TICKET_MIX, TICKET_MIX_PRESETS, colorLabels, DEFAULT_END_GAP_MM, DEFAULT_WAGONS_PER_PLAYER, DEFAULT_STARTING_TICKETS, DEFAULT_KEPT_TICKETS, type LineStyle, type MapData, type MapFormat, mapFormats, routeColors, stopSizeMeta, type RouteTypeStyle, type StopTypeStyle, type WagonShape, type WagonStyle, wagonShapeMeta } from "./map-data";
+import { DEFAULT_PLAYERS, LANES_OPEN_FROM, DEFAULT_TICKET_BANDS, DEFAULT_TICKET_MIX, TICKET_MIX_PRESETS, colorLabels, DEFAULT_WAGONS_PER_PLAYER, DEFAULT_STARTING_TICKETS, DEFAULT_KEPT_TICKETS, type LineStyle, type MapData, type MapFormat, mapFormats, routeColors, stopSizeMeta, type RouteTypeStyle, type StopTypeStyle, type WagonShape, type WagonStyle, wagonShapeMeta } from "./map-data";
 
 export type StyleKind = "map" | "ticket" | "stop" | "route" | "wagon" | "line" | "defaults";
 export type StyleTarget = { kind: StyleKind; id?: string };
@@ -75,6 +75,8 @@ export function SettingsDialog({ open, onOpenChange, target, onTarget, data, cha
   const totalSpaces = data.routes.reduce((sum, route) => sum + route.length, 0);
   const diameter = useMemo(() => mapDiameter(data), [data]);
   const players = data.players ?? DEFAULT_PLAYERS;
+  // A map with nothing on it yet: say what is worth doing now and what can wait.
+  const fresh = data.stops.length === 0 && data.routes.length === 0;
 
   const usage = (styleId: string) => kind === "stop" ? data.stops.filter((stop) => stop.type === styleId).length
     : kind === "route" ? data.routes.filter((route) => route.type === styleId).length
@@ -170,11 +172,12 @@ export function SettingsDialog({ open, onOpenChange, target, onTarget, data, cha
           })()}
 
           {kind === "map" && <div className="style-fields">
+            {fresh && <p className="helper settings-start">A board format is all you need to begin. The rest — ticket lengths, stop and route types, what a new object looks like — is listed on the left and can wait until you want it.</p>}
             <div><Label htmlFor="settings-format">Board format</Label><NativeSelect id="settings-format" value={data.format} onChange={(event) => onChangeFormat(event.target.value as MapFormat)}>{Object.entries(mapFormats).map(([key, item]) => <NativeSelectOption key={key} value={key}>{item.label}</NativeSelectOption>)}</NativeSelect>
               <dl className="format-measurements"><div><dt>Finished size</dt><dd>{format.widthMm.toLocaleString("en-GB")} × {format.heightMm.toLocaleString("en-GB")} mm{format.imperial ? ` (${format.imperial})` : ""}</dd></div>{format.columns > 1 && <div><dt>Panel size</dt><dd>about {Math.round(format.widthMm / format.columns)} × {Math.round(format.heightMm / format.rows)} mm</dd></div>}</dl>
-              <p className="helper">{format.note}{format.custom ? ". This is not a verified commercial Ticket to Ride size" : ""}. Changing format keeps objects in the same relative positions.</p></div>
-            {format.testSheet && <div><Label htmlFor="settings-proof">This sheet is a proof of</Label><NativeSelect id="settings-proof" value={defaults.scaleTarget} onChange={(event) => defaults.setScaleTarget(event.target.value)}>{Object.entries(mapFormats).filter(([, item]) => !item.testSheet).map(([key, item]) => <NativeSelectOption key={key} value={key}>{item.shortLabel}</NativeSelectOption>)}</NativeSelect>
-              <p className="helper">A test sheet is a shrunken stand-in for a real board, so the editor needs to know which board it represents.</p></div>}
+              <p className="helper">{format.note}{format.custom ? ". This is not a verified commercial Ticket to Ride size" : ""}. <strong>You can change this whenever you like</strong> — objects keep their relative positions, so switching between a test sheet and a full board while you work costs you nothing.</p></div>
+            {format.testSheet && <div><Label htmlFor="settings-proof">This sheet stands in for</Label><NativeSelect id="settings-proof" value={defaults.scaleTarget} onChange={(event) => defaults.setScaleTarget(event.target.value)}>{Object.entries(mapFormats).filter(([, item]) => !item.testSheet).map(([key, item]) => <NativeSelectOption key={key} value={key}>{item.shortLabel}</NativeSelectOption>)}</NativeSelect>
+              <p className="helper">A test sheet is a whole board shrunk onto one sheet of paper. Telling the editor which board it stands in for lets it shrink the wagon spaces by the same amount, so what you print is a true miniature: everything sits where it would on the real thing, just smaller. Without it, wagon spaces would be drawn at full size on a sheet far too small for them.</p></div>}
             <div className="settings-pair">
               <div><Label htmlFor="settings-players-min">Players, fewest</Label>
                 <Input id="settings-players-min" type="number" min={1} max={8} value={players.min}
@@ -186,10 +189,10 @@ export function SettingsDialog({ open, onOpenChange, target, onTarget, data, cha
             </div>
             <p className="helper">How many players the map is built for. It sets how big a deck has to be to deal from, and whether the second lane of a double route is ever in play: the standard rule opens it only from {LANES_OPEN_FROM} players up{players.max < LANES_OPEN_FROM ? ", so on this map a double route is always worth one lane" : ""}.</p>
             <div className="settings-pair">
-              <div><Label htmlFor="settings-wagons">Wagons per player</Label>
+              <div><Label htmlFor="settings-wagons">Wagons each</Label>
                 <Input id="settings-wagons" type="number" min={1} max={99} value={data.wagonsPerPlayer ?? DEFAULT_WAGONS_PER_PLAYER}
                   onChange={(event) => change((draft) => { draft.wagonsPerPlayer = clampCount(event.target.value, DEFAULT_WAGONS_PER_PLAYER); return draft; })} /></div>
-              <div><Label htmlFor="settings-starting-tickets">Tickets dealt at the start</Label>
+              <div><Label htmlFor="settings-starting-tickets">Tickets dealt</Label>
                 <Input id="settings-starting-tickets" type="number" min={1} max={20} value={data.startingTickets ?? DEFAULT_STARTING_TICKETS}
                   onChange={(event) => change((draft) => {
                     draft.startingTickets = clampCount(event.target.value, DEFAULT_STARTING_TICKETS);
@@ -197,14 +200,11 @@ export function SettingsDialog({ open, onOpenChange, target, onTarget, data, cha
                     draft.keptTickets = Math.min(draft.keptTickets ?? DEFAULT_KEPT_TICKETS, draft.startingTickets);
                     return draft;
                   })} /></div>
-              <div><Label htmlFor="settings-kept-tickets">Tickets a player must keep</Label>
+              <div><Label htmlFor="settings-kept-tickets">Tickets kept</Label>
                 <Input id="settings-kept-tickets" type="number" min={1} max={data.startingTickets ?? DEFAULT_STARTING_TICKETS} value={data.keptTickets ?? DEFAULT_KEPT_TICKETS}
                   onChange={(event) => change((draft) => { draft.keptTickets = Math.min(clampCount(event.target.value, DEFAULT_KEPT_TICKETS), draft.startingTickets ?? DEFAULT_STARTING_TICKETS); return draft; })} /></div>
             </div>
             <p className="helper">How a game on this map is set up. The original game gives each player {DEFAULT_WAGONS_PER_PLAYER} wagons and deals {DEFAULT_STARTING_TICKETS} tickets, of which {DEFAULT_KEPT_TICKETS} must be kept; a smaller map usually wants fewer wagons. {totalSpaces > 0 ? `This map has ${totalSpaces} wagon spaces in all, so one player's supply could claim about ${Math.round((data.wagonsPerPlayer ?? DEFAULT_WAGONS_PER_PLAYER) / totalSpaces * 100)}% of it.` : ""}</p>
-            <div><Label htmlFor="settings-gap">Space at stops · {data.endGapMm ?? DEFAULT_END_GAP_MM} mm</Label>
-              <input id="settings-gap" className="range-input" type="range" min="0" max="30" step="1" value={data.endGapMm ?? DEFAULT_END_GAP_MM} onChange={(event) => change((draft) => { draft.endGapMm = Number(event.target.value); return draft; })} />
-              <p className="helper">The default room beyond a stop&apos;s own circle before the first wagon. A single stop can override it from its own panel. Past about 4 mm the wagons start losing their real spacing.</p></div>
           </div>}
 
           {kind === "defaults" && <div className="style-fields">
@@ -241,6 +241,10 @@ export function SettingsDialog({ open, onOpenChange, target, onTarget, data, cha
           </div>}
         </div>
       </div>
+      <DialogFooter className="settings-foot">
+        <p className="helper">Everything here is saved as you change it, and Settings is always a click away. Nothing is waiting for you to confirm it.</p>
+        <Button onClick={() => onOpenChange(false)}>{fresh ? "Start drawing" : "Done"}</Button>
+      </DialogFooter>
     </DialogContent>
   </Dialog>;
 }
@@ -261,8 +265,10 @@ function StopTypeFields({ style, update }: { style: StopTypeStyle; update: Updat
       <label>Outline<input className="colour-input" type="color" value={style.stroke} onChange={(event) => update({ stroke: event.target.value })} /></label>
     </div>
     <label className="checkbox-row"><input type="checkbox" checked={Boolean(style.square)} onChange={(event) => update({ square: event.target.checked || undefined })} />Draw a square inside the circle</label>
-    <label className="checkbox-row"><input type="checkbox" checked={Boolean(style.junction)} onChange={(event) => update({ junction: event.target.checked || undefined })} />No tickets end here</label>
-    <p className="helper">A junction only joins routes. Journeys run through it, but no ticket is ever drawn to it, and it does not count as a stop when a ticket deck is judged.</p>
+    <div className="style-aside">
+      <label className="checkbox-row"><input type="checkbox" checked={Boolean(style.junction)} onChange={(event) => update({ junction: event.target.checked || undefined })} />No tickets end here</label>
+      <p className="helper">This stop type only joins routes. Journeys run through it, but no ticket is ever drawn to one, and it does not count as a stop when a ticket deck is judged.</p>
+    </div>
   </>;
 }
 

@@ -685,6 +685,45 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.waitForTimeout(1200);
   check("and leads back to the editor", (await page.locator(".map-canvas").count()) === 1, page.url());
 
+  // 31. the setup fields: selectable labels, lined up, and no stray detail
+  await page.getByRole("button", { name: "Settings" }).click();
+  await page.waitForTimeout(500);
+  const labelSelectable = await page.evaluate(() => {
+    const label = document.querySelector('label[for="settings-wagons"]');
+    return label ? getComputedStyle(label).userSelect : null;
+  });
+  check("a label can be selected and copied like any other text", labelSelectable !== "none", String(labelSelectable));
+  // Per row: the settings are laid out as two rows of fields, and each row must line up.
+  const rows = await page.$$eval(".settings-pair", (pairs) => pairs.map((pair) => Array.from(pair.querySelectorAll("input")).map((el) => Math.round(el.getBoundingClientRect().top))));
+  check("the setup fields line up within each row", rows.every((row) => new Set(row).size <= 1), rows.map((row) => row.join("/")).join(" · "));
+  check("setting a map up no longer asks about space at stops", (await page.locator("#settings-gap").count()) === 0);
+  check("the fields it does ask about are all there", await page.locator("#settings-wagons").isVisible() && await page.locator("#settings-starting-tickets").isVisible() && await page.locator("#settings-kept-tickets").isVisible());
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(300);
+
+  // 32. Settings can be left with confidence
+  await page.getByRole("button", { name: "Settings" }).click();
+  await page.waitForTimeout(500);
+  const settingsFooter = await page.locator(".settings-foot").textContent();
+  check("Settings says its changes are already saved", /saved as you change/i.test(settingsFooter), settingsFooter.slice(0, 70));
+  const doneButton = page.locator(".settings-foot button");
+  check("and offers a way out that feels like confirming", (await doneButton.count()) === 1, await doneButton.textContent());
+  await doneButton.click();
+  await page.waitForTimeout(400);
+  check("which closes it", (await page.locator("#settings-format").count()) === 0);
+
+  // On a map with nothing on it, it says what is worth doing now and what can wait.
+  await page.getByRole("button", { name: "Clear map" }).click();
+  await page.waitForTimeout(300);
+  await page.getByRole("button", { name: "Continue" }).click();
+  await page.waitForTimeout(600);
+  await page.getByRole("button", { name: "Settings" }).click();
+  await page.waitForTimeout(500);
+  check("a new map is told the board format is all it needs to start", await page.locator(".settings-start").isVisible(), await page.locator(".settings-start").textContent());
+  check("and the way out invites drawing", /start drawing/i.test(await page.locator(".settings-foot button").textContent()), await page.locator(".settings-foot button").textContent());
+  await page.locator(".settings-foot button").click();
+  await page.waitForTimeout(400);
+
   console.log("PASS:"); ok.forEach((l) => console.log("  ✓ " + l));
   if (bad.length) { console.log("FAIL:"); bad.forEach((l) => console.log("  ✗ " + l)); }
   console.log(`\n${ok.length} passed, ${bad.length} failed`);

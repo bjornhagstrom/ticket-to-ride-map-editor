@@ -223,14 +223,12 @@ export const stopSymbolMeta: Record<StopSymbol, { label: string }> = {
 
 // Stop appearance is data, like route appearance. `square` draws the small centred square the
 // railway station has always had, so that look survives as an option rather than a hard-coded type.
+// Three to start with, not seven: a plain stop, a junction that no ticket goes to, and a ferry port.
+// More are made in Settings when a map needs them, and a map that already has its own keeps them.
 export const defaultStopTypeStyles: StopTypeStyle[] = [
-  { id: "city", label: "City stop", fill: "#fffaf0", stroke: "#721c24" },
+  { id: "city", label: "Regular", fill: "#fffaf0", stroke: "#721c24" },
   { id: "junction", label: "Junction", fill: "#e7e1d6", stroke: "#8a8277", junction: true },
-  { id: "region", label: "Regional stop", fill: "#fff4dc", stroke: "#b05b2a" },
-  { id: "brt", label: "Rapid transit", fill: "#d9f2ef", stroke: "#00877c" },
-  { id: "rail", label: "Railway station", fill: "#e8e9eb", stroke: "#292b2f", square: true },
   { id: "ferry", label: "Ferry port", fill: "#dceff8", stroke: "#23749b" },
-  { id: "outing", label: "Destination", fill: "#e8f0dc", stroke: "#53723b" },
 ];
 export const fallbackStopTypeStyle: StopTypeStyle = { id: "city", label: "Stop", fill: "#fffaf0", stroke: "#721c24" };
 
@@ -348,13 +346,13 @@ export const initialMap: MapData = {
   ],
   stops: [
     { id: "example-westport", name: "Westport", type: "city", x: 130, y: 205, symbol: "dot", labelAngle: 195 },
-    { id: "example-pine-hill", name: "Pine Hill", type: "outing", x: 280, y: 575, size: "small", labelAngle: 105 },
-    { id: "example-central", name: "Central", type: "rail", x: 420, y: 345, labelAngle: 165 },
+    { id: "example-pine-hill", name: "Pine Hill", type: "city", x: 280, y: 575, size: "small", labelAngle: 105 },
+    { id: "example-central", name: "Central", type: "city", x: 420, y: 345, labelAngle: 165 },
     { id: "example-lakeside", name: "Lakeside", type: "city", x: 640, y: 185, labelAngle: 270 },
-    { id: "example-old-town", name: "Old Town", type: "region", x: 690, y: 600, labelAngle: 120 },
+    { id: "example-old-town", name: "Old Town", type: "city", x: 690, y: 600, labelAngle: 120 },
     { id: "example-harbour", name: "Harbour", type: "ferry", x: 875, y: 455, symbol: "letter", letter: "F", labelAngle: 345 },
-    { id: "example-eastgate", name: "Eastgate", type: "brt", x: 980, y: 210, size: "large", labelAngle: 300 },
-    { id: "example-quarry", name: "Quarry", type: "outing", x: 1010, y: 625, size: "small", labelAngle: 210 },
+    { id: "example-eastgate", name: "Eastgate", type: "city", x: 980, y: 210, size: "large", labelAngle: 300 },
+    { id: "example-quarry", name: "Quarry", type: "city", x: 1010, y: 625, size: "small", labelAngle: 210 },
   ],
   routes: [
     { id: "example-route-1", a: "example-westport", b: "example-central", length: 4, type: "city", color: "red", points: [{ x: 265, y: 235 }] },
@@ -364,9 +362,9 @@ export const initialMap: MapData = {
     { id: "example-route-5", a: "example-central", b: "example-old-town", length: 4, type: "city", color: "blue", points: [{ x: 545, y: 485 }], wagonStyle: "tunnel" },
     { id: "example-route-6", a: "example-lakeside", b: "example-eastgate", length: 4, type: "brt", color: "neutral", points: [{ x: 815, y: 165 }] },
     { id: "example-route-7", a: "example-lakeside", b: "example-harbour", length: 3, type: "ferry", color: "neutral", points: [{ x: 800, y: 270 }, { x: 855, y: 370 }], locomotiveSlots: [0] },
-    { id: "example-route-8", a: "example-old-town", b: "example-harbour", length: 3, type: "region", color: "green", points: [{ x: 790, y: 585 }] },
+    { id: "example-route-8", a: "example-old-town", b: "example-harbour", length: 3, type: "city", color: "green", points: [{ x: 790, y: 585 }] },
     { id: "example-route-9", a: "example-harbour", b: "example-eastgate", length: 3, type: "city", color: "yellow", points: [{ x: 950, y: 335 }], lineStyle: "example-restricted" },
-    { id: "example-route-10", a: "example-old-town", b: "example-quarry", length: 2, type: "region", color: "purple", points: [{ x: 850, y: 645 }] },
+    { id: "example-route-10", a: "example-old-town", b: "example-quarry", length: 2, type: "city", color: "purple", points: [{ x: 850, y: 645 }] },
     // A double route: same stops and type as route 1, different wagon colour, drawn alongside it.
     { id: "example-route-11", a: "example-westport", b: "example-central", length: 4, type: "city", color: "black", points: [{ x: 265, y: 235 }] },
   ],
