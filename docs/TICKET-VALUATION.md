@@ -1,6 +1,6 @@
 # How official maps value destination tickets
 
-What the ticket points on 11 official Ticket to Ride maps say about valuation, and what the ticket suggester must allow for.
+What the ticket points on 13 official Ticket to Ride maps say about valuation, and what the ticket suggester must allow for.
 
 The data is in `data/ttr-reference-maps.json`, where each map has a `valuation` object; see `data/README.md` for the format. All numbers below come from comparing every printed ticket with shortest paths on the transcribed boards.
 
@@ -58,7 +58,7 @@ What the suggester should do with it:
 
 ## 2. Maps whose special rules change valuation
 
-On maps with a mechanism that makes some connections harder or more rewarding than their length, the designer priced tickets above the shortest path, never below.
+On maps with a mechanism that makes some connections harder or more rewarding than their length, the designer priced tickets above the shortest path. The exception is Great Lakes, where many tickets are below it.
 
 | Map | Plain shortest path | What changes | Best simple model |
 | --- | --- | --- | --- |
@@ -66,6 +66,7 @@ On maps with a mechanism that makes some connections harder or more rewarding th
 | **Iberia** | 29 / 50 | Festival bonus cards pull players toward the cities on display | No simple rule. 21 tickets are +1 to +5, including every long one to Palma. |
 | **South Korea** | 20 / 44 | Coloured zones strongly affect play | No simple rule. The longest tickets are up to ~1.5× the path (Gangneung–Ulsan 20 vs 13). Route lengths were checked on the board. |
 | **Japan** | 7 / 54 | Shared bullet-train track that everyone builds and uses | No shortest-path rule fits. Counting bullet spaces as half gives 11–18 / 54. Tickets inside the Tokyo inset are ~1.4× their path. The values look hand-set. |
+| **Rails & Sails – Great Lakes** | 11 / 55 | Trains and ships; separate pieces | No path rule fits, and 30 cards are *below* the shortest path (Marquette–Albany 10 vs 16). Weighting ship spaces ×0.7 gives 25 / 55 at best. The values look hand-set, possibly based on the distance on the map rather than on the route network. |
 
 Open anomaly: Italia Genova–Pescara prints 7, but the shortest path is 10.
 
