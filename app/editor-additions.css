@@ -47,10 +47,11 @@
   .print-page .stop text{font-size:12px}
   .print-page .wagon-slot-outline{stroke-width:4px}
   /* Ticket cards: a 4x4 grid of 45x67 mm cards on portrait A4, sized so the sheet needs no bleed. */
-  .ticket-page{width:210mm;height:297mm;padding:7mm 15mm;overflow:hidden}
-  .ticket-page svg{display:none}
-  .ticket-sheet{flex:1;display:grid;grid-template-columns:repeat(4,45mm);grid-auto-rows:67mm;justify-content:center;align-content:start}
-  .ticket-card{border:.25mm dashed #81786c;padding:4mm 3mm;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:1mm;overflow:hidden;background:white}
+  .ticket-run{width:100%}
+  .ticket-run svg{display:none}
+  .ticket-sheet{display:grid;grid-template-columns:repeat(4,45mm);grid-auto-rows:62mm;justify-content:center;align-content:start}
+  .print-tickets .print-caption{break-after:avoid}
+  .ticket-card{break-inside:avoid;page-break-inside:avoid;border:.25mm dashed #81786c;padding:4mm 3mm;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:1mm;overflow:hidden;background:white}
   .ticket-card p{margin:0}
   .ticket-card-from,.ticket-card-to{font:700 10.5pt Georgia,serif;color:#24211d;line-height:1.15}
   .ticket-card-arrow{font:9pt "Segoe UI",Arial,sans-serif;color:#81786c}

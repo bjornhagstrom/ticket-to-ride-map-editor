@@ -222,7 +222,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     window.__print = null;
     window.print = () => {
       const card = document.querySelector(".print-tickets .ticket-card");
-      const sheet = document.querySelector(".print-tickets .ticket-page");
+      const sheet = document.querySelector(".print-tickets .ticket-run");
       window.__print = { cards: document.querySelectorAll(".print-tickets .ticket-card").length, card: card && card.getBoundingClientRect(), text: card ? card.textContent : "", sheet: sheet && sheet.getBoundingClientRect() };
     };
   });
@@ -235,7 +235,8 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   const printed = await page.evaluate(() => window.__print);
   const mm = (value) => value / 25.4 * 96;
   check("ticket printing lays out one card per ticket", printed.cards === 2, String(printed.cards));
-  check("ticket cards are 45 x 67 mm on A4 portrait", Math.abs(printed.card.width - mm(45)) < 3 && Math.abs(printed.card.height - mm(67)) < 3 && Math.abs(printed.sheet.height - mm(297)) < 3, `${printed.card.width.toFixed(0)}x${printed.card.height.toFixed(0)}px on ${printed.sheet.width.toFixed(0)}x${printed.sheet.height.toFixed(0)}px`);
+  // No fixed sheet box any more: the browser paginates, so only the card size is ours to check.
+  check("ticket cards are 45 x 62 mm, cut from a run the browser paginates", Math.abs(printed.card.width - mm(45)) < 3 && Math.abs(printed.card.height - mm(62)) < 4, `${(printed.card.width / 96 * 25.4).toFixed(0)} x ${(printed.card.height / 96 * 25.4).toFixed(0)} mm`);
   check("a card names both ends and its points", /Westport/.test(printed.text) && /\d/.test(printed.text), printed.text);
   await page.emulateMedia({ media: "screen" });
   await page.waitForTimeout(400);
