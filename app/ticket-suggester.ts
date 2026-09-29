@@ -79,6 +79,9 @@ export const TICKET_SUGGESTER = {
 
 export type TicketSuggestOptions = {
   style: TicketStyle;
+  // Count how many printed values the default valuation reproduces. Off by default: it is only of
+  // interest when checking a deck that came with its own points, such as an official map.
+  pointsAudit: boolean;
   wagonsPerPlayer: number;
   deckSize?: number;
   seed: number;
@@ -88,6 +91,11 @@ export type TicketSuggestOptions = {
 };
 
 export type TicketDeckReport = {
+  style: TicketStyle;
+  // Every pair of stops a ticket could join, within what a player can build.
+  reachablePairs: [string, string][];
+  // How well the default valuation matches the points the deck already carries.
+  valuation: { exact: number; total: number; off: { a: string; b: string; printed: number; path: number }[] };
   // How many tickets sit in the map's own short, medium and long bands.
   mix: number[];
   diameter: number;
@@ -222,7 +230,8 @@ class SuggesterModel {
   }
 
   private dijkstra(source: number) {
-    const n = this.nodes.length;
+    // Over every stop in the graph, junctions included: a journey may well run through one.
+    const n = this.graphNodes.length;
     const dist = new Array<number>(n).fill(Infinity);
     const preds: number[][] = Array.from({ length: n }, () => []);
     const predFrom: number[][] = Array.from({ length: n }, () => []);
@@ -295,7 +304,7 @@ class SuggesterModel {
 
     const value: Candidate = {
       a: aId, b: bId, length, frac, bin, mixBand, routes, ferrySpaces, load,
-      corridor: [...corridor].map((i) => this.nodes[i]),
+      corridor: [...corridor].map((i) => this.graphNodes[i]),
       locos: cost(easiest),
       tunnels: easiest.edges.reduce((sum, edge) => sum + (this.edges[edge].tunnel ? 1 : 0), 0),
     };
@@ -319,13 +328,26 @@ class SuggesterModel {
       if (node < 0) break;
       done[slack][node] = true;
       for (const step of this.adjacency[node]) {
+        // A stop the source cannot reach has no slack to speak of.
+        if (!Number.isFinite(this.dist[a][node]) || !Number.isFinite(this.dist[a][step.to])) continue;
         const extra = this.dist[a][node] + step.weight - this.dist[a][step.to];
         const next = slack + extra;
-        if (next > 1) continue;
+        if (next !== 0 && next !== 1) continue;
         if (fewest + 1 < best[next][step.to]) best[next][step.to] = fewest + 1;
       }
     }
     return best[1][b] < best[0][b];
+  }
+
+  reachablePairs(): [string, string][] {
+    const pairs: [string, string][] = [];
+    for (let i = 0; i < this.nodes.length; i++) {
+      for (let j = i + 1; j < this.nodes.length; j++) {
+        const length = this.dist[this.index.get(this.nodes[i])!][this.index.get(this.nodes[j])!];
+        if (length > 0 && length <= this.reach) pairs.push([this.nodes[i], this.nodes[j]]);
+      }
+    }
+    return pairs;
   }
 
   // Two tickets are near-duplicates when they are of similar length and one of them costs at most
@@ -489,6 +511,7 @@ class DeckState {
 function resolveOptions(data: MapData, options: Partial<TicketSuggestOptions>): TicketSuggestOptions {
   const wagons = options.wagonsPerPlayer ?? data.wagonsPerPlayer ?? DEFAULT_WAGONS_PER_PLAYER;
   return {
+    pointsAudit: options.pointsAudit ?? false,
     style: options.style ?? defaultStyle(data),
     wagonsPerPlayer: wagons,
     deckSize: options.deckSize,
@@ -519,8 +542,9 @@ export function suggestedDeckSize(data: MapData, style: TicketStyle, stops: numb
   return { regular, long };
 }
 
-function emptyReport(note: string): TicketDeckReport {
+function emptyReport(note: string, styleName: TicketStyle = "generic"): TicketDeckReport {
   return {
+    style: styleName, reachablePairs: [], valuation: { exact: 0, total: 0, off: [] },
     mix: [0, 0, 0], diameter: 0, reach: 0, regular: 0, long: 0, bins: [0, 0, 0, 0, 0],
     longPeriphery: null, shortPeriphery: null, mapPeriphery: 0,
     zeroStops: 0, maxPerStop: 0, duplicatePairs: [], dupPct: 0,
@@ -533,7 +557,7 @@ const pathOf = (candidate: Candidate, longest: number): TicketPath => ({
   frac: candidate.frac, longest: candidate.length === longest,
 });
 
-function buildReport(model: SuggesterModel, deck: DeckState, style: typeof TICKET_SUGGESTER.styles.classic, wantRegular: number, longCount: number, ids: Map<Candidate, string>, mix: TicketMix | null): TicketDeckReport {
+function buildReport(model: SuggesterModel, deck: DeckState, styleName: TicketStyle, style: typeof TICKET_SUGGESTER.styles.classic, wantRegular: number, longCount: number, ids: Map<Candidate, string>, mix: TicketMix | null, audit?: TicketDeckReport["valuation"]): TicketDeckReport {
   const duplicatePairs: [string, string][] = [];
   for (let i = 0; i < deck.members.length; i++) {
     for (let j = i + 1; j < deck.members.length; j++) {
@@ -546,6 +570,9 @@ function buildReport(model: SuggesterModel, deck: DeckState, style: typeof TICKE
     .filter((candidate) => candidate.locos > 0 || candidate.tunnels > 0)
     .map((candidate) => ({ ticketId: ids.get(candidate) ?? "", a: candidate.a, b: candidate.b, locomotives: candidate.locos, tunnels: candidate.tunnels }));
   return {
+    style: styleName,
+    reachablePairs: model.reachablePairs(),
+    valuation: audit ?? { exact: 0, total: 0, off: [] },
     mix: [...deck.mixCounts],
     diameter: model.diameter,
     reach: model.reach,
@@ -688,7 +715,7 @@ export function suggestTickets(data: MapData, options: Partial<TicketSuggestOpti
     });
   });
 
-  return { tickets, report: buildReport(model, deck, style, targets[0], groups[1].length, ids, mix) };
+  return { tickets, report: buildReport(model, deck, resolved.style, style, targets[0], groups[1].length, ids, mix) };
 }
 
 // Score the deck the map already has, on the same scale.
@@ -696,13 +723,27 @@ export function evaluateTicketDeck(data: MapData, options: Partial<TicketSuggest
   const resolved = resolveOptions(data, options);
   const style = TICKET_SUGGESTER.styles[resolved.style];
   const deckTickets = resolved.setId ? ticketsInSet(data, resolved.setId) : data.tickets;
-  if (data.stops.length < 4 || data.routes.length < 3) return emptyReport("A map needs at least four stops and a few routes before a deck can be judged.");
+  if (data.stops.length < 4 || data.routes.length < 3) return emptyReport("A map needs at least four stops and a few routes before a deck can be judged.", resolved.style);
   const mix = data.ticketMix ?? null;
   const model = new SuggesterModel(data, resolved.wagonsPerPlayer, style.lengthCap);
-  if (model.nodes.length < 4) return emptyReport("Fewer than four stops are connected to anything.");
+  if (model.nodes.length < 4) return emptyReport("Fewer than four stops are connected to anything.", resolved.style);
   if (!deckTickets.length) {
-    const report = emptyReport("This deck has no tickets yet.");
+    const report = emptyReport("This deck has no tickets yet.", resolved.style);
     return { ...report, diameter: model.diameter, reach: model.reach, zeroStops: model.nodes.length };
+  }
+
+  // How closely the deck's own points follow the shortest path. Measured over every ticket the
+  // graph can reach, before the reach filter below, since a printed value is a printed value.
+  const audit: TicketDeckReport["valuation"] = { exact: 0, total: 0, off: [] };
+  if (resolved.pointsAudit) {
+    for (const ticket of deckTickets) {
+      const candidate = model.candidate(ticket.a, ticket.b);
+      if (!candidate) continue;
+      audit.total += 1;
+      const value = valueTicket(pathOf(candidate, Infinity), data);
+      if (value.points === ticket.points) audit.exact += 1;
+      else audit.off.push({ a: ticket.a, b: ticket.b, printed: ticket.points, path: value.points });
+    }
   }
 
   const deck = new DeckState(model);
@@ -710,13 +751,15 @@ export function evaluateTicketDeck(data: MapData, options: Partial<TicketSuggest
   let long = 0, skipped = 0;
   for (const ticket of deckTickets) {
     const candidate = model.candidate(ticket.a, ticket.b);
-    if (!candidate) { skipped += 1; continue; }
+    // Only a ticket a player could actually build is part of the shape being judged: an over-long
+    // ticket, or one to a stop the graph does not reach, says nothing about the deck's balance.
+    if (!candidate || candidate.length > model.reach) { skipped += 1; continue; }
     ids.set(candidate, ticket.id);
     const isLong = Boolean(ticket.long);
     if (isLong) long += 1;
     deck.add(candidate, !isLong);
   }
-  const report = buildReport(model, deck, style, Math.max(deck.regularCount, 1), long, ids, mix);
+  const report = buildReport(model, deck, resolved.style, style, Math.max(deck.regularCount, 1), long, ids, mix, audit);
   if (skipped) report.note = `${report.note ? `${report.note} ` : ""}${skipped} ticket${skipped === 1 ? "" : "s"} could not be measured and ${skipped === 1 ? "was" : "were"} left out.`;
   return report;
 }

@@ -1,0 +1,173 @@
+// Acceptance checks for the ticket suggester against the eight official maps marked
+// `useForCalibration` in data/ttr-reference-maps.json. The targets come from
+// docs/TICKET-SUGGESTER.md §6 and docs/TICKET-VALUATION.md.
+//
+//   npm run test:calibration
+//
+// The suggester is plain logic, so it is compiled with the project's own TypeScript and run in Node.
+// The Python reference in scripts/ticket-suggester-reference.py produces the same metrics; the
+// ticket lists differ because the two use different random number generators.
+const { execFileSync } = require("child_process");
+const fs = require("fs");
+const os = require("os");
+const path = require("path");
+
+const root = path.join(__dirname, "..");
+const out = fs.mkdtempSync(path.join(os.tmpdir(), "ttr-calibration-"));
+execFileSync("npx", ["tsc", "app/ticket-suggester.ts", "app/map-data.ts",
+  "--outDir", out, "--module", "commonjs", "--target", "es2022", "--moduleResolution", "node", "--skipLibCheck"],
+  { cwd: root, stdio: "inherit" });
+const { suggestTickets, evaluateTicketDeck, mulberry32 } = require(path.join(out, "ticket-suggester.js"));
+
+const ok = [];
+const bad = [];
+const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${detail ? " — " + detail : ""}`); };
+
+// ---------------------------------------------------------------- reference maps as MapData
+const reference = JSON.parse(fs.readFileSync(path.join(root, "data/ttr-reference-maps.json"), "utf8"));
+const calibrationMaps = reference.maps.filter((map) => map.useForCalibration);
+
+const trainsOf = (source) => {
+  const value = source.trainsPerPlayer ?? (source.setup || {}).trainsPerPlayer;
+  return typeof value === "number" ? value : 45;
+};
+
+// Border flags are dead ends the suggester has no concept of, so they are dropped. Waypoints stay in
+// the graph as junctions: journeys run through them, no ticket ends at one.
+const buildMap = (source) => {
+  const dropped = new Set(source.stops.filter((stop) => stop.deadEnd || stop.kind === "country" || stop.kind === "country-group").map((stop) => stop.id));
+  const stops = source.stops.filter((stop) => !dropped.has(stop.id)).map((stop, i) => ({
+    id: stop.id, name: stop.name, type: stop.kind === "waypoint" ? "junction" : "city",
+    x: stop.x ?? i * 10, y: stop.y ?? i * 10,
+  }));
+  const routes = source.routes.filter((route) => !dropped.has(route.a) && !dropped.has(route.b)).map((route, i) => ({
+    id: `r-${i}`, a: route.a, b: route.b, length: route.length, type: "city", color: route.color ?? "neutral",
+    locomotiveSlots: Array.from({ length: route.ferryLocomotives ?? 0 }, (_, k) => k),
+    wagonStyle: route.tunnel ? "tunnel" : undefined,
+  }));
+  const tickets = (source.tickets || [])
+    .filter((ticket) => ticket.a && ticket.b && !dropped.has(ticket.a) && !dropped.has(ticket.b))
+    .map((ticket, i) => ({ id: `t-${i}`, a: ticket.a, b: ticket.b, points: ticket.points, long: ticket.long || undefined, set: "main" }));
+  return {
+    name: source.name, format: "board-2x3", background: [], stops, routes, notes: [],
+    lineStyles: [], routeTypeStyles: [{ id: "city", label: "City", stroke: "#736d64", dash: "", strokeWidth: 3, infrastructure: false }],
+    wagonStyles: [],
+    stopTypeStyles: [{ id: "city", label: "City", fill: "#fff", stroke: "#000" }, { id: "junction", label: "Junction", fill: "#eee", stroke: "#888", junction: true }],
+    tickets, ticketSets: [{ id: "main", label: "Main deck" }],
+    wagonsPerPlayer: trainsOf(source), startingTickets: 3, keptTickets: 2,
+  };
+};
+
+const styleFor = (id) => (id === "europe" ? "europe" : "generic");
+const built = new Map(calibrationMaps.map((source) => [source.id, buildMap(source)]));
+check("all eight calibration maps build", built.size === 8, [...built.keys()].join(", "));
+
+// ---------------------------------------------------------------- valuation: the printed points
+// The real test that the graph is right: dead ends, waypoints and parallel lanes all have to be
+// handled correctly for the printed points to come back out.
+const expectedExact = {
+  nordic: [46, 46], india: [58, 58], poland: [35, 35], switzerland: [34, 34],
+  oldwest: [41, 42], northernlights: [54, 55], europe: [43, 46], usa: [25, 30],
+};
+for (const source of calibrationMaps) {
+  const map = built.get(source.id);
+  const report = evaluateTicketDeck(map, { style: styleFor(source.id), pointsAudit: true });
+  const [wanted, total] = expectedExact[source.id];
+  const audit = report.valuation;
+  check(`${source.id}: the printed points come back out of the graph`,
+    audit.exact === wanted && audit.total === total,
+    `${audit.exact} of ${audit.total} exact, expected ${wanted} of ${total}${audit.off.length ? ` · off: ${audit.off.slice(0, 4).map((x) => `${x.a}–${x.b} ${x.printed}≠${x.path}`).join(", ")}` : ""}`);
+}
+
+// ---------------------------------------------------------------- the official decks beat random
+const randomDeck = (map, size, seed, reach, pairs) => {
+  const random = mulberry32(seed);
+  const picked = [];
+  const used = new Set();
+  while (picked.length < size && used.size < pairs.length) {
+    const pair = pairs[Math.floor(random() * pairs.length)];
+    const key = pair.join("|");
+    if (used.has(key)) continue;
+    used.add(key);
+    picked.push({ id: `rand-${picked.length}`, a: pair[0], b: pair[1], points: 1, set: "main" });
+  }
+  return { ...map, tickets: picked };
+};
+
+const officialScores = {};
+for (const source of calibrationMaps) {
+  const map = built.get(source.id);
+  const style = styleFor(source.id);
+  const official = evaluateTicketDeck(map, { style });
+  officialScores[source.id] = official;
+  const pairs = official.reachablePairs;
+  const scores = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    .map((seed) => evaluateTicketDeck(randomDeck(map, official.regular + official.long, seed, official.reach, pairs), { style }).score)
+    .sort((a, b) => a - b);
+  const median = (scores[4] + scores[5]) / 2;
+  // Switzerland is the known exception: much of its real deck is country tickets, which the
+  // suggester does not model, so what is left scores worse than a random draw.
+  const expected = source.id !== "switzerland";
+  check(`${source.id}: the official deck ${expected ? "beats" : "does not beat"} random decks`,
+    (official.score < median) === expected, `official ${official.score.toFixed(1)} against random median ${median.toFixed(1)}`);
+}
+
+// ---------------------------------------------------------------- suggestions
+for (const source of calibrationMaps) {
+  const map = built.get(source.id);
+  const style = styleFor(source.id);
+  const official = officialScores[source.id];
+  for (const seed of [1, 2]) {
+    const { tickets, report } = suggestTickets(map, { style, seed });
+    check(`${source.id}: seed ${seed} scores under 5`, report.score < 5, report.score.toFixed(1));
+    check(`${source.id}: seed ${seed} scores better than the official deck`, report.score < official.score,
+      `${report.score.toFixed(1)} against ${official.score.toFixed(1)}`);
+    const junctions = new Set(map.stops.filter((stop) => stop.type === "junction").map((stop) => stop.id));
+    check(`${source.id}: seed ${seed} never ends a ticket at a junction`,
+      tickets.every((ticket) => !junctions.has(ticket.a) && !junctions.has(ticket.b)),
+      `${junctions.size} junctions on the map`);
+  }
+}
+
+// ---------------------------------------------------------------- the +1 pattern is flagged
+// docs/TICKET-VALUATION.md: several official +1 cards follow a path that costs one space more but
+// is built from fewer routes. The suggester never raises a value for it, but it must say so.
+const flagged = (mapId, a, b) => {
+  const map = built.get(mapId);
+  const report = evaluateTicketDeck({ ...map, tickets: [{ id: "x", a, b, points: 1, set: "main" }] }, { style: styleFor(mapId) });
+  return report.ambiguous.length === 1;
+};
+check("Old West: Seattle–Great Falls is flagged as value ambiguous", flagged("oldwest", "seattle", "great-falls"));
+check("Northern Lights: Helsinki–Gdansk is flagged as value ambiguous", flagged("northernlights", "helsinki", "gdansk"));
+check("a plain ticket is not flagged", !flagged("poland", built.get("poland").tickets[0].a, built.get("poland").tickets[0].b),
+  `${built.get("poland").tickets[0].a}–${built.get("poland").tickets[0].b}`);
+
+// ---------------------------------------------------------------- determinism and edge cases
+const usa = built.get("usa");
+const sameDeck = (x, y) => JSON.stringify(x.map((t) => [t.a, t.b, t.points].join()).sort()) === JSON.stringify(y.map((t) => [t.a, t.b, t.points].join()).sort());
+check("the same seed gives the same deck", sameDeck(suggestTickets(usa, { seed: 4 }).tickets, suggestTickets(usa, { seed: 4 }).tickets));
+check("a different seed gives a different deck", !sameDeck(suggestTickets(usa, { seed: 4 }).tickets, suggestTickets(usa, { seed: 5 }).tickets));
+check("the default style is generic", suggestTickets(usa, { seed: 1 }).report.style === "generic", suggestTickets(usa, { seed: 1 }).report.style);
+
+const tiny = { ...usa, stops: usa.stops.slice(0, 3), routes: usa.routes.slice(0, 2), tickets: [] };
+const tinyResult = suggestTickets(tiny, {});
+check("a map with too few stops returns an empty deck and a reason", tinyResult.tickets.length === 0 && Boolean(tinyResult.report.note), tinyResult.report.note || "no note");
+check("a map with no routes does not throw", suggestTickets({ ...usa, routes: [], tickets: [] }, {}).tickets.length === 0);
+check("evaluating an empty deck does not throw", evaluateTicketDeck({ ...usa, tickets: [] }, {}).regular === 0);
+
+// ---------------------------------------------------------------- the table in §2b
+console.log("\nMetrics against docs/TICKET-SUGGESTER.md §2b (Python reference in brackets):");
+const published = { usa: [8.9, 0.8], nordic: [20.9, 1.4], india: [16.2, 1.15], oldwest: [13.4, 0.6], poland: [6.4, 0.85], northernlights: [23.6, 1.55], switzerland: [27.5, 1.15], europe: [1.9, 1.0] };
+console.log(`  ${"map".padEnd(16)}${"official".padStart(9)}${"published".padStart(11)}${"suggested".padStart(11)}${"published".padStart(11)}`);
+for (const source of calibrationMaps) {
+  const style = styleFor(source.id);
+  const suggested = suggestTickets(built.get(source.id), { style, seed: 1 }).report.score;
+  const [pubOfficial, pubSuggested] = published[source.id];
+  console.log(`  ${source.id.padEnd(16)}${officialScores[source.id].score.toFixed(1).padStart(9)}${String(pubOfficial).padStart(11)}${suggested.toFixed(1).padStart(11)}${String(pubSuggested).padStart(11)}`);
+}
+
+console.log("\nPASS:"); ok.forEach((line) => console.log("  ✓ " + line));
+if (bad.length) { console.log("FAIL:"); bad.forEach((line) => console.log("  ✗ " + line)); }
+console.log(`\n${ok.length} passed, ${bad.length} failed`);
+fs.rmSync(out, { recursive: true, force: true });
+process.exit(bad.length ? 1 : 0);
