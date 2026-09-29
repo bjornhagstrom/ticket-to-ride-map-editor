@@ -264,7 +264,7 @@ export function StopTicketsDialog({ open, onOpenChange, stopName, band, tickets,
 }
 
 // Suggest a whole deck for the map that is open, then let the person edit it as ordinary tickets.
-export function SuggestTicketsDialog({ open, onOpenChange, data, current, suggestion, style, onStyle, wagons, onWagons, deckSize, onDeckSize, keepExisting, onKeepExisting, busy, onShuffle, onApply }: {
+export function SuggestTicketsDialog({ open, onOpenChange, data, current, suggestion, style, onStyle, wagons, onWagons, deckSize, onDeckSize, keepExisting, onKeepExisting, busy, deckName, onDeckName, currentDeck, onShuffle, onApply }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   data: MapData;
@@ -279,8 +279,11 @@ export function SuggestTicketsDialog({ open, onOpenChange, data, current, sugges
   keepExisting: boolean;
   onKeepExisting: (keep: boolean) => void;
   busy: boolean;
+  deckName: string;
+  onDeckName: (name: string) => void;
+  currentDeck: string;
   onShuffle: () => void;
-  onApply: () => void;
+  onApply: (mode: "new" | "replace") => void;
 }) {
   const report = suggestion?.report;
   const official = TICKET_SUGGESTER.official;
@@ -355,10 +358,16 @@ export function SuggestTicketsDialog({ open, onOpenChange, data, current, sugges
       {report && report.ambiguous.length > 0 && <p className="helper">{report.ambiguous.length} ticket{report.ambiguous.length === 1 ? " has" : "s have"} a way round that costs one space more but is built from one route fewer, so it takes a turn less. Several official cards are priced at that higher figure. These are left at the shortest path — raise them by hand if you want to follow suit.</p>}
       {report && report.hard.length > 0 && <p className="helper">{report.hard.length} ticket{report.hard.length === 1 ? "" : "s"} cross a tunnel or need ferry locomotives. They are worth their wagon count all the same — the difficulty is yours to judge.</p>}
 
-      <DialogFooter>
-        <Button variant="outline" disabled={busy} onClick={onShuffle}>Shuffle</Button>
-        <Button disabled={busy || !suggestion?.tickets.length} onClick={onApply}>Apply as a new deck</Button>
-      </DialogFooter>
+      <div className="suggest-apply">
+        <div><Label htmlFor="suggest-name">Name for a new deck</Label>
+          <Input id="suggest-name" value={deckName} onChange={(event) => onDeckName(event.target.value)} placeholder="Give it a name" /></div>
+        <div className="suggest-apply-buttons">
+          <Button variant="outline" disabled={busy} onClick={onShuffle}>Shuffle</Button>
+          <Button variant="outline" disabled={busy || !suggestion?.tickets.length} onClick={() => onApply("replace")}>Replace {currentDeck}</Button>
+          <Button disabled={busy || !suggestion?.tickets.length || !deckName.trim()} onClick={() => onApply("new")}>Save as a new deck</Button>
+        </div>
+      </div>
+      <p className="helper">Shuffle asks for another deck from the same map: the search is not deterministic, so a second try is a genuinely different reading. Replacing throws away the tickets in {currentDeck}.</p>
     </DialogContent>
   </Dialog>;
 }

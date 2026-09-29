@@ -435,13 +435,19 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   const suggestedScore = Number(suggestRows.find((row) => row[0] === "Score")[2]);
   check("it scores the suggestion against the official range", suggestedScore < 5, suggestRows.find((row) => row[0] === "Score").join(" | "));
   check("the dialog offers no Cancel: closing it discards the suggestion", (await page.locator(".suggest-dialog").getByRole("button", { name: "Cancel" }).count()) === 0);
-  check("only Shuffle and Apply are offered", await page.locator(".suggest-dialog").getByRole("button", { name: "Shuffle" }).isVisible() && await page.locator(".suggest-dialog").getByRole("button", { name: /Apply/ }).isVisible());
+  check("Shuffle, replace and save-as-new are offered", await page.locator(".suggest-dialog").getByRole("button", { name: "Shuffle" }).isVisible() && await page.locator(".suggest-dialog").getByRole("button", { name: /^Replace/ }).isVisible() && await page.locator(".suggest-dialog").getByRole("button", { name: /Save as a new deck/ }).isVisible());
   check("and shows the official range beside each measure", suggestRows.some((row) => /official/.test(row[3])), suggestRows[2].join(" | "));
-  await page.getByRole("button", { name: /Apply as a new deck/ }).click();
+  // A suggestion goes either into a deck you name yourself or over the one you are in.
+  check("a new deck cannot be saved without a name", await page.getByRole("button", { name: /Save as a new deck/ }).isDisabled());
+  await page.locator("#suggest-name").fill("Trial deck");
+  await page.waitForTimeout(300);
+  check("and can once it has one", !(await page.getByRole("button", { name: /Save as a new deck/ }).isDisabled()));
+  check("replacing names the deck it would overwrite", /Replace/.test(await page.getByRole("button", { name: /^Replace/ }).textContent()), await page.getByRole("button", { name: /^Replace/ }).textContent());
+  await page.getByRole("button", { name: /Save as a new deck/ }).click();
   await page.waitForTimeout(1000);
   const afterSuggest = await page.locator("#ticket-set option").allTextContents();
-  check("applying leaves the old decks alone and adds a dated one", afterSuggest.length === decksBefore + 1 && afterSuggest.some((name) => /^Suggested · \d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(name)), afterSuggest.join(" | "));
-  check("and the suggested deck is the one being worked on", /^Suggested · /.test(await page.locator("#ticket-set-name").inputValue()), await page.locator("#ticket-set-name").inputValue());
+  check("applying leaves the old decks alone and adds the one you named", afterSuggest.length === decksBefore + 1 && afterSuggest.some((name) => name.startsWith("Trial deck")), afterSuggest.join(" | "));
+  check("and the suggested deck is the one being worked on", (await page.locator("#ticket-set-name").inputValue()) === "Trial deck", await page.locator("#ticket-set-name").inputValue());
   const suggestedCount = await page.locator(".analysis-table tbody tr").count();
   check("the suggestion arrives as ordinary, editable tickets", suggestedCount > 0 && (await page.locator(".analysis-table tbody tr .ticket-points").count()) === suggestedCount, String(suggestedCount));
   await page.keyboard.press("Escape");

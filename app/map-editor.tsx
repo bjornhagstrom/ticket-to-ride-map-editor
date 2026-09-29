@@ -20,7 +20,7 @@ import { useTicketSuggestion } from "./use-ticket-suggestion";
 import { SettingsDialog, type StyleTarget } from "./map-styles";
 import { bandsOf, bandCuts, mapDiameter, defaultStyle, evaluateTicketDeck, suggestedDeckSize, type TicketStyle, autoPlaceLabels, setupBalance, stopCoverage, ticketBand, type TicketBand, reviewTickets, ticketPointsPerSpace, ticketCoverage, type RouteSuggestion, labelCovers, labelAngleOptions, routeSamplePoints, colourLengthTable, crossingPairs, buildAdjacency, networkStats, routeSpacing, shortestPath, suggestRoutes } from "./map-analysis";
 import { canvasPoint, canvasPointRaw, pointsFor, samePair, stopById } from "./map-geometry";
-import { cloneForHistory, cloneMap, formatTimestamp, GUIDE_SEEN_KEY, HISTORY_LIMIT, MAX_IMAGE_WARN_BYTES, normalizeBackgroundFile, normalizeMap, normalizeNetworkFile, normalizeTicketFile, buildTicketFile, formatStampLabel, readMapFile, writeMapFile, mapPayload, networkPayload, readBackgroundImage, rescaleMapToFormat, MAP_HINT_KEY, MAP_HINT_X_KEY } from "./map-storage";
+import { cloneForHistory, cloneMap, formatTimestamp, GUIDE_SEEN_KEY, HISTORY_LIMIT, MAX_IMAGE_WARN_BYTES, normalizeBackgroundFile, normalizeMap, normalizeNetworkFile, normalizeTicketFile, buildTicketFile, readMapFile, writeMapFile, mapPayload, networkPayload, readBackgroundImage, rescaleMapToFormat, MAP_HINT_KEY, MAP_HINT_X_KEY } from "./map-storage";
 import { colorLabels, defaultTicketSet, DEFAULT_PLAYERS, DEFAULT_WAGONS_PER_PLAYER, IMAGE_KEEP_ON_BOARD, type Ticket, type StopTypeStyle, type WagonStyle, ticketsInSet, type TicketSet, emptyMap, initialMap, type LineStyle, DEFAULT_END_GAP_MM, mapFormats, type BackgroundImage, type BackgroundShape, type BackgroundType, type MapData, type MapFormat, type Point, realWagon, type Route, type RouteType, type RouteTypeStyle, routeColors, STORAGE_KEY, type Stop, type StopSize, stopSizeMeta, type StopSymbol, stopSymbolMeta, type StopType, W } from "./map-data";
 
 type MeasureResult = { from: string; to: string; distance: number; routeIds: string[] } | { from: string; to: string; unreachable: true };
@@ -89,6 +89,7 @@ export function MapEditor() {
   const [suggestSize, setSuggestSize] = useState<number | null>(null);
   const [suggestKeep, setSuggestKeep] = useState(false);
   const [suggestSeed, setSuggestSeed] = useState(1);
+  const [suggestName, setSuggestName] = useState("");
   const [measureResult, setMeasureResult] = useState<MeasureResult | null>(null);
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -169,21 +170,24 @@ export function MapEditor() {
     setId: activeTicketSet.id,
     keep: suggestKeep ? ticketsInSet(data, activeTicketSet.id).map((ticket) => ticket.id) : [],
   });
-  // The new deck's id and name are stamped by the click, not by the render.
-  const applySuggestion = (id: string, label: string) => {
+  // Either into a deck of its own, named by the person, or over the one being worked on.
+  const applySuggestion = (mode: "new" | "replace", id: string) => {
     if (!suggestion?.tickets.length) return;
+    const target = mode === "replace" ? activeTicketSet.id : id;
+    const label = suggestName.trim();
     change((draft) => {
-      draft.ticketSets.push({ id, label });
-      for (const ticket of suggestion.tickets) draft.tickets.push({ ...ticket, set: id });
+      if (mode === "new") draft.ticketSets.push({ id: target, label });
+      else draft.tickets = draft.tickets.filter((ticket) => (ticket.set ?? draft.ticketSets[0].id) !== target);
+      for (const ticket of suggestion.tickets) draft.tickets.push({ ...ticket, set: target });
       return draft;
     });
-    setTicketSetId(id);
+    setTicketSetId(target);
     setSelectedTicket(null);
     setShowSuggest(false);
     setShowTickets(true);
-    toast.success(`${suggestion.tickets.length} tickets suggested into ${label}.`);
+    toast.success(`${suggestion.tickets.length} tickets suggested into ${mode === "replace" ? activeTicketSet.label : label}.`);
   };
-  const openSuggest = () => { setShowTickets(false); setSuggestStyle(null); setSuggestSize(null); setSuggestSeed(1); setShowSuggest(true); };
+  const openSuggest = () => { setShowTickets(false); setSuggestStyle(null); setSuggestSize(null); setSuggestSeed(1); setSuggestName(""); setShowSuggest(true); };
   // The tickets behind one number in the coverage panel.
   const viewedStopTickets = useMemo(() => {
     if (!stopTicketView) return [];
@@ -682,7 +686,8 @@ export function MapEditor() {
       wagons={data.wagonsPerPlayer ?? DEFAULT_WAGONS_PER_PLAYER} onWagons={(value) => change((draft) => { draft.wagonsPerPlayer = value; return draft; })}
       deckSize={suggestSize ?? suggestDefaultSize} onDeckSize={setSuggestSize}
       keepExisting={suggestKeep} onKeepExisting={setSuggestKeep}
-      busy={suggestBusy} onShuffle={() => setSuggestSeed((seed) => seed + 1)} onApply={() => applySuggestion(`ts-${Date.now()}`, nextDeckLabel(data.ticketSets, `Suggested · ${formatStampLabel()}`))} />
+      busy={suggestBusy} deckName={suggestName} onDeckName={setSuggestName} currentDeck={activeTicketSet.label}
+      onShuffle={() => setSuggestSeed((seed) => seed + 1)} onApply={(mode) => applySuggestion(mode, `ts-${Date.now()}`)} />
     <WelcomeGuide open={showGuide} onOpenChange={(open) => !open && dismissGuide()} onChooseBlank={() => chooseFromGuide("blank")} onChooseExample={() => chooseFromGuide("example")} />
     <SettingsDialog open={showStyles} onOpenChange={setShowStyles} target={styleTarget} onTarget={setStyleTarget} data={data} change={change} onChangeFormat={changeFormat} defaults={{ stopType, setStopType, stopSize, setStopSize: (value) => setStopSize(value as StopSize), routeType, setRouteType, routeColor, setRouteColor, routeCurved, setRouteCurved, routeLineStyle, setRouteLineStyle, linkParallel, setLinkParallel, scaleTarget, setScaleTarget: (value) => setScaleTarget(value as MapFormat) }} />
     <TicketsDialog open={showTickets} onOpenChange={setShowTickets} data={data} reviews={ticketReviews} coverage={ticketCoverage(data, activeTicketSet.id)} rate={ticketRate} selected={selectedTicket} activeSet={activeTicketSet} onSelect={setSelectedTicket}
