@@ -24,7 +24,7 @@ const kindMeta: Record<StyleKind, { label: string; blurb: string }> = {
   route: { label: "Route types", blurb: "Line thickness and dash pattern per type. Colour comes from each route, so types are told apart by shape." },
   wagon: { label: "Wagon styles", blurb: "How the wagon spaces are drawn, to mark a route that plays by its own rule." },
   line: { label: "Line styles", blurb: "A one-off override of a single route's line, on top of its type." },
-  defaults: { label: "New objects", blurb: "What a stop or route gets when you draw it. Changing these leaves what is already on the map alone." },
+  defaults: { label: "Default object style", blurb: "The style the next stop or route you draw will get. These are settings for your pen, not for the map: changing them leaves everything already drawn exactly as it is." },
 };
 const styleKinds: StyleKind[] = ["stop", "route", "wagon", "line"];
 
@@ -216,7 +216,7 @@ export function SettingsDialog({ open, onOpenChange, target, onTarget, data, cha
               <div><Label>Route type</Label><NativeSelect value={defaults.routeType} onChange={(event) => defaults.setRouteType(event.target.value)}>{data.routeTypeStyles.map((style) => <NativeSelectOption key={style.id} value={style.id}>{style.label}</NativeSelectOption>)}</NativeSelect></div>
               <div><Label>Route colour</Label><NativeSelect value={defaults.routeColor} onChange={(event) => defaults.setRouteColor(event.target.value)}>{Object.keys(routeColors).map((key) => <NativeSelectOption key={key} value={key}>{colorLabels[key]}</NativeSelectOption>)}</NativeSelect></div>
             </div>
-            <div><Label>Special rule style for new routes</Label><NativeSelect value={defaults.routeLineStyle ?? ""} onChange={(event) => defaults.setRouteLineStyle(event.target.value || undefined)}><NativeSelectOption value="">Default appearance</NativeSelectOption>{data.lineStyles.map((style) => <NativeSelectOption key={style.id} value={style.id}>{style.label}</NativeSelectOption>)}</NativeSelect></div>
+            <div><Label>Special rule for new routes</Label><NativeSelect value={defaults.routeLineStyle ?? ""} onChange={(event) => defaults.setRouteLineStyle(event.target.value || undefined)}><NativeSelectOption value="">None — an ordinary route</NativeSelectOption>{data.lineStyles.map((style) => <NativeSelectOption key={style.id} value={style.id}>{style.label}</NativeSelectOption>)}</NativeSelect></div>
             <label className="checkbox-row"><input type="checkbox" checked={defaults.routeCurved} onChange={(event) => defaults.setRouteCurved(event.target.checked)} />Draw new routes as smooth curves</label>
             <label className="checkbox-row"><input type="checkbox" checked={defaults.linkParallel} onChange={(event) => defaults.setLinkParallel(event.target.checked)} />Shape the parallel lines of a double route together</label>
           </div>}

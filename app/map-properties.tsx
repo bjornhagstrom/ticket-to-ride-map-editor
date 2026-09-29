@@ -99,7 +99,7 @@ export function RouteProperties({ route, stops, routes, lineStyles, routeTypeSty
       {parallelCount > 1 && <label className="checkbox-row"><input type="checkbox" checked={linkParallel} onChange={(event) => onLinkParallel(event.target.checked)} />Shape the parallel line{parallelCount > 2 ? "s" : ""} together with this one</label>}
       {Boolean(route.points?.length) && <Button size="sm" variant="ghost" onClick={() => onStraighten(route.id)}>Straighten route</Button>}
     </div>
-    <StylePicker label="Special rule style" value={route.lineStyle} styles={lineStyles} placeholder="Default appearance" helper="Overrides this one route's line, on top of its type." onChange={(id) => onSetStyle(route.id, id)} onEdit={() => onEditStyles({ kind: "line", id: route.lineStyle })} />
+    <StylePicker label="Special rule" value={route.lineStyle} styles={lineStyles} placeholder={lineStyles.length ? "None — an ordinary route" : "None defined yet — use Edit to make one"} helper="Overrides this one route's line, on top of its type." onChange={(id) => onSetStyle(route.id, id)} onEdit={() => onEditStyles({ kind: "line", id: route.lineStyle })} />
     <Button variant="destructive" onClick={onDelete}><Trash2 />Delete route</Button>
   </div>;
 }
