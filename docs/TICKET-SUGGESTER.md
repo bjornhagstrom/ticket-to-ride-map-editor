@@ -184,7 +184,7 @@ Maps with rules the editor cannot model (zones, festivals, shared tracks) get a 
 
 ### 4.8 Border countries and waypoints
 
-- Stops that are border flags (kind `country` in the reference data) are dead ends: a shortest path may start or end there but must never pass through one. A country's flags are not connected to each other.
+- Whether a path may pass through a border country, entering at one flag and leaving at another, differs between maps. Model it as a map setting `countryTransit` with the default `false`. When it is `false`, border-flag stops are dead ends: a shortest path may start or end there but never pass through. Italia is confirmed `false`. For the other maps with flags it is still unknown (`null` in the reference data).
 - A ticket to a country is completed via any of its flags, so its distance is the shortest path to the nearest flag. The suggester may propose such tickets only if the editor supports ticket endpoints that are a group of stops; until then it only uses cities.
 - Waypoints (kind `waypoint`) are junctions only: never ticket endpoints, but paths may pass through them.
 
