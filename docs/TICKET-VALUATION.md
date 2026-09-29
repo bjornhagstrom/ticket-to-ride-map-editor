@@ -19,6 +19,7 @@ In every "classic" map a ticket is worth the length of the shortest path between
 | Nordic Countries | 46 / 46 | – |
 | India | 58 / 58 | – |
 | Northern Lights | 54 / 55 | Helsinki–Gdańsk +1 |
+| Old West | 41 / 42 | Seattle–Great Falls +1 |
 | Polska | 35 / 35 | — (country cards are a separate bonus and do not change ticket values) |
 | Europe | 43 / 46 | London–Wien +1 (ferry), Edinburgh–Athina +1 (longest deck), Stockholm–Wien −1 (maybe a transcription error) |
 | USA | 25 / 30 | the 5 longest are +1/+2 |
@@ -64,7 +65,7 @@ Open anomaly: Italia Genova–Pescara prints 7, but the shortest path is 10.
    - A ticket to a country is completed via any of its entrances.
    - Waypoints are never ticket endpoints.
    - A map may have both train and ship routes (Rails & Sails). Keep `kind` on the route, and do not assume every route can be used by every piece.
-7. **Calibration uses only maps with `useForCalibration: true`:** USA, Europe, Nordic, India, Northern Lights, Switzerland and Polska. Maps with hand-set values must not pull the length targets or the per-stop targets.
+7. **Calibration uses only maps with `useForCalibration: true`:** USA, Europe, Nordic, India, Northern Lights, Switzerland, Polska and Old West. Maps with hand-set values must not pull the length targets or the per-stop targets.
 
 ## 4. How to re-check
 
