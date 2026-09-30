@@ -155,17 +155,141 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   check("the tools panel carries no board format control", (await page.locator("#map-format").count()) === 0);
   await page.getByRole("button", { name: "Settings" }).click();
   await page.waitForTimeout(400);
+  // Settings holds the board's shape and nothing else: paper and splitting are print choices.
+  const formatOptions = await page.locator("#settings-format option").evaluateAll((els) => els.map((el) => el.value));
+  check("Settings offers only the two board shapes", JSON.stringify(formatOptions) === JSON.stringify(["board-2x3", "board-2x4"]), formatOptions.join(", "));
+  check("and no longer asks which board a test sheet stands in for", (await page.locator("#settings-proof").count()) === 0);
   await page.locator("#settings-format").selectOption("board-2x4");
   await page.waitForTimeout(500);
   check("changing board format from Settings works", (await badges())[0] === "Extended board 2×4", (await badges())[0]);
   check("Settings shows what the format measures", /mm/.test(await page.locator(".format-measurements").textContent()));
   await page.keyboard.press("Escape");
   await page.waitForTimeout(400);
+  const wagonHelper = async () => page.getByText(/Wagon spaces are drawn at the size/).textContent();
+  check("wagons on a 2×4 are measured against its own 1,053 mm", /1,053 mm board/.test(await wagonHelper()), await wagonHelper());
 
-  // 10. print tree renders
-  const printPages = await page.locator(".print-pages .print-page").count();
-  check("print pages render for a 2x4 board", printPages === 8, `${printPages} pages`);
+  // 10. printing is decided per run, in a dialog behind the Print button, never in the map
+  const storedMap = () => page.evaluate(() => localStorage.getItem("orebro-map-editor-public-v2"));
+  const mapBeforePrinting = await storedMap();
+  await page.evaluate(() => {
+    window.__printCalls = 0;
+    window.__printed = null;
+    window.print = () => {
+      window.__printCalls += 1;
+      const pages = Array.from(document.querySelectorAll(".print-pages .print-page"));
+      const first = pages[0];
+      const svg = first && first.querySelector("svg");
+      const slot = document.querySelector(".print-pages .wagon-slot rect:nth-of-type(2)");
+      const unitPx = svg ? svg.getBoundingClientRect().width / svg.viewBox.baseVal.width : 0;
+      window.__printed = {
+        pages: pages.length,
+        style: Array.from(document.querySelectorAll(".print-pages style")).map((el) => el.textContent).join(" "),
+        cutMarks: document.querySelectorAll(".print-pages .cut-mark").length,
+        pageWidthMm: first ? first.getBoundingClientRect().width / 96 * 25.4 : 0,
+        wagonMm: slot ? +slot.getAttribute("width") * unitPx / 96 * 25.4 : 0,
+      };
+    };
+  });
+  const printButton = () => page.getByRole("button", { name: "Print map" });
+  const printDialog = () => page.getByRole("dialog", { name: "Print the map" });
+  await printButton().click();
+  await page.waitForTimeout(400);
+  check("the Print button opens a dialog rather than printing", await printDialog().isVisible() && (await page.evaluate(() => window.__printCalls)) === 0);
+  check("it offers three ways to split the board", (await printDialog().locator('input[name="print-split"]').count()) === 3);
+  check("and four papers", (await printDialog().locator('input[name="print-paper"]').count()) === 4);
+  const sizeRadios = () => printDialog().locator('input[name="print-size"]');
+  await printDialog().getByRole("radio", { name: "Full size" }).check();
+  await page.waitForTimeout(200);
+  check("a 2×4 board has no Anniversary size to print at", (await sizeRadios().count()) === 0);
+  const tableCells = () => printDialog().locator(".print-table tbody tr").evaluateAll((rows) => rows.map((row) => Array.from(row.querySelectorAll("td button")).map((b) => Number(b.dataset.pages))));
+  const cells2x4 = await tableCells();
+  check("the comparison table has a row per paper", cells2x4.length === 4, JSON.stringify(cells2x4));
+  check("and on a 2×4 no Anniversary column", cells2x4.every((row) => row.length === 3), JSON.stringify(cells2x4));
+  check("which says a 2×4 is 8 sheets per panel on any paper", cells2x4.every((row) => row[1] === 8), JSON.stringify(cells2x4));
+  await printDialog().getByRole("button", { name: "Cancel" }).click();
+  await page.waitForTimeout(400);
+  check("Cancel closes it without printing", !(await printDialog().isVisible()) && (await page.evaluate(() => window.__printCalls)) === 0);
 
+  // What actually reaches the printer, for a choice picked from the table.
+  const cell = (paper, column) => printDialog().locator(`.print-table tbody tr[data-paper="${paper}"] td:nth-of-type(${column}) button`);
+  const printFrom = async (paper, column) => {
+    await printButton().click();
+    await page.waitForTimeout(300);
+    await cell(paper, column).click();
+    await page.waitForTimeout(200);
+    const promised = Number(await cell(paper, column).getAttribute("data-pages"));
+    const summary = await printDialog().locator(".print-summary").textContent();
+    await page.evaluate(() => { window.__printed = null; });
+    await page.emulateMedia({ media: "print" });
+    await page.evaluate(() => Array.from(document.querySelectorAll('[role="dialog"] button')).find((b) => b.textContent.trim() === "Print").click());
+    await page.waitForFunction(() => window.__printed !== null, null, { timeout: 5000 });
+    const printed = await page.evaluate(() => window.__printed);
+    await page.emulateMedia({ media: "screen" });
+    await page.waitForTimeout(300);
+    return { ...printed, promised, summary };
+  };
+  const panels2x4 = await printFrom("a4", 2);
+  check("a 2×4 printed per panel is 8 pages", panels2x4.pages === 8, `${panels2x4.pages} pages`);
+  check("and printing it left the map as it was", (await storedMap()) === mapBeforePrinting);
+
+  // The same questions on the standard board, where Anniversary is a choice.
+  await page.getByRole("button", { name: "Settings" }).click();
+  await page.waitForTimeout(400);
+  await page.locator("#settings-format").selectOption("board-2x3");
+  await page.waitForTimeout(500);
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(400);
+  check("wagons on a 2×3 are measured against its own 790 mm", /790 mm board/.test(await wagonHelper()), await wagonHelper());
+  const mapBeforeChoices = await storedMap();
+  await printButton().click();
+  await page.waitForTimeout(400);
+  const cells2x3 = await tableCells();
+  check("the 2×3 table has an Anniversary column", cells2x3.every((row) => row.length === 4) && /Anniversary/.test(await printDialog().locator(".print-table thead").textContent()), JSON.stringify(cells2x3));
+  check("it says a standard board is 9 sheets of A4 at full size", cells2x3[0][2] === 9, String(cells2x3[0][2]));
+  check("12 of US Letter", cells2x3[2][2] === 12, String(cells2x3[2][2]));
+  check("and 16 of A4 at Anniversary size", cells2x3[0][3] === 16, String(cells2x3[0][3]));
+  await cell("letter", 3).click();
+  await page.waitForTimeout(200);
+  check("picking a cell sets the paper", await printDialog().getByRole("radio", { name: "US Letter" }).isChecked());
+  check("and the way it is split", await printDialog().getByRole("radio", { name: "Full size" }).isChecked());
+  check("and the picked cell is marked", (await cell("letter", 3).getAttribute("aria-pressed")) === "true");
+  check("and the summary follows", /12 sheets of US Letter/.test(await printDialog().locator(".print-summary").textContent()), await printDialog().locator(".print-summary").textContent());
+  check("Anniversary is offered under full size", (await sizeRadios().count()) === 2);
+  await printDialog().getByRole("radio", { name: "One sheet", exact: true }).check();
+  await page.waitForTimeout(200);
+  check("but not for one sheet", (await sizeRadios().count()) === 0);
+  await printDialog().getByRole("button", { name: "Cancel" }).click();
+  await page.waitForTimeout(300);
+
+  const oneSheet = await printFrom("a4", 1);
+  check("one sheet is one page", oneSheet.pages === 1 && oneSheet.promised === 1, `${oneSheet.pages} printed, ${oneSheet.promised} promised`);
+  check("declared as landscape A4 in millimetres", /size:\s*297mm 210mm/.test(oneSheet.style), oneSheet.style);
+  const perPanel = await printFrom("a4", 2);
+  check("a 2×3 per panel is 6 pages, as its cell says", perPanel.pages === 6 && perPanel.promised === 6, `${perPanel.pages} printed, ${perPanel.promised} promised`);
+  const fullA4 = await printFrom("a4", 3);
+  check("full size on A4 prints the 9 sheets its cell promises", fullA4.pages === 9 && fullA4.promised === 9, `${fullA4.pages} printed, ${fullA4.promised} promised`);
+  check("with a wagon space the real 20 mm long", Math.abs(fullA4.wagonMm - 20) < 0.5, `${fullA4.wagonMm.toFixed(2)} mm`);
+  check("and marks to trim at on every sheet", fullA4.cutMarks === 9 * 4, `${fullA4.cutMarks} marks`);
+  check("on pages the size of the paper", Math.abs(fullA4.pageWidthMm - 297) < 1, `${fullA4.pageWidthMm.toFixed(1)} mm`);
+  const fullLetter = await printFrom("letter", 3);
+  check("on US Letter it prints 12, as its cell says", fullLetter.pages === 12 && fullLetter.promised === 12, `${fullLetter.pages} printed, ${fullLetter.promised} promised`);
+  check("on Letter-sized pages", Math.abs(fullLetter.pageWidthMm - 279.4) < 1, `${fullLetter.pageWidthMm.toFixed(1)} mm`);
+  const anniversary = await printFrom("a4", 4);
+  check("an Anniversary board prints 16 sheets of A4", anniversary.pages === 16 && anniversary.promised === 16, `${anniversary.pages} printed, ${anniversary.promised} promised`);
+  check("with wagon spaces grown to the bigger board", Math.abs(anniversary.wagonMm - 20 * 972 / 790) < 0.6, `${anniversary.wagonMm.toFixed(2)} mm`);
+  check("and the summary names the board it adds up to", /972 × 648 mm/.test(anniversary.summary), anniversary.summary);
+  const tabloidSheet = await printFrom("tabloid", 1);
+  check("Tabloid is declared landscape in millimetres", /size:\s*431\.8mm 279\.4mm/.test(tabloidSheet.style), tabloidSheet.style);
+  check("no print choice touched the map", (await storedMap()) === mapBeforeChoices);
+  check("and the map carries no print settings", !/print-?(split|paper|choice)/i.test(await storedMap()));
+
+  await page.reload({ waitUntil: "networkidle" });
+  await page.waitForTimeout(700);
+  await printButton().click();
+  await page.waitForTimeout(400);
+  check("the last print choice is remembered in this browser", await printDialog().getByRole("radio", { name: "Tabloid" }).isChecked() && await printDialog().getByRole("radio", { name: "One sheet", exact: true }).isChecked());
+  await printDialog().getByRole("button", { name: "Cancel" }).click();
+  await page.waitForTimeout(300);
   // 11. persistence across reload
   await page.reload({ waitUntil: "networkidle" });
   await page.waitForTimeout(700);
@@ -773,6 +897,16 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   check("and the wagon spaces along it", drawn.slots >= 2, `${drawn.slots} spaces`);
   await page.keyboard.press("Escape");
   await page.waitForTimeout(300);
+
+  // 34. a map saved on a format that is now a print choice opens on its board
+  await page.evaluate(() => {
+    const map = JSON.parse(localStorage.getItem("orebro-map-editor-public-v2"));
+    localStorage.setItem("orebro-map-editor-public-v2", JSON.stringify({ ...map, format: "a4" }));
+  });
+  await page.reload({ waitUntil: "networkidle" });
+  await page.waitForTimeout(700);
+  check("a map saved as an A4 test sheet opens as a standard board", (await badges())[0] === "Standard board 2×3", (await badges())[0]);
+  check("with everything on it", /\d+ stops/.test((await badges())[2]), (await badges())[2]);
 
   console.log("PASS:"); ok.forEach((l) => console.log("  ✓ " + l));
   if (bad.length) { console.log("FAIL:"); bad.forEach((l) => console.log("  ✗ " + l)); }
