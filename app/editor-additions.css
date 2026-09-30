@@ -95,3 +95,14 @@
   .ticket-card-points{margin-top:2.5mm!important;width:11mm;height:11mm;border:.4mm solid #24211d;border-radius:50%;font:700 12pt Georgia,serif;line-height:10.2mm;color:#24211d}
   .ticket-card-flag{font:6.5pt "Segoe UI",Arial,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:#24221e}
 }
+
+/* A dialog's content is as wide as the dialog, never wider: its grid column would otherwise take the
+   width of its widest child and push text and tables past the edge, where they are cut off. Tables
+   scroll inside their own wrappers. */
+.analysis-dialog,.style-dialog{grid-template-columns:minmax(0,1fr)}
+.analysis-dialog>*,.analysis-section{min-width:0}
+/* A select in the Properties panel fills its column, so its choice is shown whole. The wrapper is
+   w-fit by default, which clipped "No symbol". */
+.property-form [data-slot="native-select-wrapper"]{width:100%}
+/* The Properties panel is too narrow for two selects side by side at this text size ("No symbol"
+   needed 106px of a 105px column), so its pairs stack: see .property-form .grid-two in globals.css. */

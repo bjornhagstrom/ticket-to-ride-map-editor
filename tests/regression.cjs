@@ -1385,6 +1385,54 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await dragName(165);
   await page.keyboard.press("Escape");
 
+  // 33g. nothing in the editor's own panels and dialogs is smaller than 12px. The map's own lettering
+  // is to scale with the printed board and is left out, as is the hidden print tree.
+  const smallText = () => page.evaluate(() => {
+    const found = new Map();
+    for (const el of document.querySelectorAll("body *")) {
+      if (el.closest(".map-canvas, .print-pages, svg")) continue;
+      const text = Array.from(el.childNodes).filter((n) => n.nodeType === 3).map((n) => n.textContent.trim()).join(" ").trim();
+      if (!text || !el.getClientRects().length) continue;
+      const style = getComputedStyle(el);
+      if (style.visibility === "hidden" || style.display === "none") continue;
+      const size = parseFloat(style.fontSize);
+      if (size < 12) { const key = `${el.tagName.toLowerCase()}.${String(el.className || "").split(" ")[0]} ${size}px`; if (!found.has(key)) found.set(key, text.slice(0, 30)); }
+    }
+    return [...found].map(([key, text]) => `${key} "${text}"`);
+  });
+  const tooSmall = [];
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(200);
+  tooSmall.push(...(await smallText()).map((item) => `main: ${item}`));
+  // A select shows its whole choice, not a clipped start of it.
+  await clickStop("Central");
+  await page.waitForTimeout(300);
+  const clipped = await page.evaluate(() => Array.from(document.querySelectorAll(".property-form select")).filter((sel) => { const probe = document.createElement("span"); const cs = getComputedStyle(sel); probe.style.font = cs.font; probe.style.position = "absolute"; probe.style.visibility = "hidden"; probe.textContent = sel.options[sel.selectedIndex]?.text || ""; document.body.appendChild(probe); const need = probe.getBoundingClientRect().width + parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight); probe.remove(); return need > sel.getBoundingClientRect().width + 1; }).map((sel) => sel.options[sel.selectedIndex]?.text));
+  if (clipped.length) tooSmall.push(`properties: choice cut off in its select: ${clipped.join(", ")}`);
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Settings" }).click();
+  await page.waitForTimeout(400);
+  for (const section of await page.locator(".settings-nav-item").allTextContents()) {
+    await page.locator(".settings-nav-item", { hasText: section.replace(/\d+$/, "").trim() }).first().click();
+    await page.waitForTimeout(250);
+    tooSmall.push(...(await smallText()).map((item) => `Settings/${section.replace(/\d+$/, "").trim()}: ${item}`));
+  }
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(300);
+  for (const [button, name] of [["Analyze balance", "balance"], [/^Tickets · /, "tickets"], ["Print map", "print"]]) {
+    await page.getByRole("button", { name: button }).click();
+    await page.waitForTimeout(600);
+    tooSmall.push(...(await smallText()).map((item) => `${name}: ${item}`));
+    // Larger text must not push anything past the dialog's edge, where it is cut off.
+    const overflow = await page.evaluate(() => { const d = document.querySelector('[role="dialog"]'); const box = d.getBoundingClientRect(); return Array.from(d.querySelectorAll("*")).filter((el) => el.getClientRects().length && !el.closest(".analysis-table-scroll, .print-table-wrap") && el.getBoundingClientRect().right > box.right + 1).map((el) => `${el.tagName.toLowerCase()}.${String(el.className || "").split(" ")[0]}`).slice(0, 5); });
+    if (overflow.length) tooSmall.push(`${name}: runs past the dialog's edge: ${overflow.join(", ")}`);
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(300);
+  }
+  const uniqueSmall = [...new Set(tooSmall)];
+  check("no text in the editor's panels and dialogs is smaller than 12px", uniqueSmall.length === 0, `${uniqueSmall.length}: ${uniqueSmall.slice(0, 12).join(" | ")}`);
+  if (process.env.SHOW_SMALL) console.log(uniqueSmall.join("\n"));
+
   // 34. a map saved on a format that is now a print choice opens on its board
   await page.evaluate(() => {
     const map = JSON.parse(localStorage.getItem("orebro-map-editor-public-v2"));
