@@ -99,19 +99,22 @@
 /* Deck rules in Settings: the sets to choose from, then the chosen set's values, fixed or editable. */
 .deck-rules{display:grid;gap:10px;margin-bottom:14px}
 .deck-rule-list{margin:0;padding:0;border:0;display:flex;flex-wrap:wrap;gap:6px}
-.deck-rule-list legend{margin-bottom:6px;font-size:12px;font-weight:700;color:#2e2a24}
+.deck-rule-list legend{margin-bottom:6px;font-size:13px;font-weight:700;color:#1f1c18}
 .deck-rule-choice{display:flex;gap:6px;align-items:center;padding:5px 10px;border:1px solid #d8cfc0;border-radius:8px;cursor:pointer}
 .deck-rule-choice.chosen{border-color:#721c24;background:#f7e9e6}
 .deck-rule-choice input{accent-color:#721c24}
 .deck-rule-choice strong{display:block;font-size:13px}
-.deck-rule-choice small{display:block;font-size:11px;color:#2e2a24}
-.deck-rule-values{display:grid;gap:8px;padding:10px 12px;border-radius:8px;background:#f3ede3}
-.deck-rule-table{display:grid;gap:4px;margin:0;font-size:12px}
+.deck-rule-choice small{display:block;font-size:12px;color:#1f1c18}
+.deck-rule-values{display:grid;gap:8px;padding:12px 14px;border-radius:8px;background:#fffdf8;border:1px solid #d8cfc0}
+.deck-rule-table{display:grid;gap:5px;margin:0;font-size:13px}
 .deck-rule-table div{display:grid;grid-template-columns:minmax(150px,35%) 1fr;gap:8px}
 .deck-rule-table dt{font-weight:600;color:#2e2a24}
 .deck-rule-table dd{margin:0;color:#1f1c18}
-.deck-rule-table small{color:#2e2a24}
+.deck-rule-table small{font-size:12px;color:#2e2a24}
 .deck-rule-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px}
 .deck-rule-bins{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
-.deck-rule-hint{display:block;font-size:11px;color:#2e2a24}
+.deck-rule-hint{display:block;font-size:12px;color:#2e2a24}
+.deck-rule-wide{grid-column:1/-1}
+/* Larger than the helper text elsewhere: this page is read closely. */
+.deck-rules .helper{font-size:12.5px;line-height:1.5;color:#2e2a24}
 .deck-rules-subhead{margin:6px 0 4px;font-size:13px;font-weight:700;color:#1f1c18}

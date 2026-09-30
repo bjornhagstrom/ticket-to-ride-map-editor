@@ -1404,16 +1404,42 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     await page.locator(".deck-rule-default").textContent().catch(() => "no note"));
   await page.getByRole("radio", { name: "Generic", exact: true }).check();
   await page.waitForTimeout(200);
+  // Text on the Deck rules page is measured the way the print dialog's is: 7:1 when small, 4.5:1 otherwise.
+  const rulesContrast = () => page.evaluate(() => {
+    const root = document.querySelector('[role="dialog"] .deck-rules');
+    const rgba = (value) => { const m = value.match(/[\d.]+/g).map(Number); return { r: m[0], g: m[1], b: m[2], a: m.length > 3 ? m[3] : 1 }; };
+    const lum = ({ r, g, b }) => { const c = [r, g, b].map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
+    const background = (el) => { for (let node = el; node; node = node.parentElement) { const bg = rgba(getComputedStyle(node).backgroundColor); if (bg.a > 0.5) return bg; } return { r: 255, g: 255, b: 255, a: 1 }; };
+    const failures = []; let measured = 0;
+    for (const el of root.querySelectorAll("*")) {
+      const text = Array.from(el.childNodes).filter((n) => n.nodeType === 3).map((n) => n.textContent.trim()).join("");
+      if (!text || !el.getClientRects().length) continue;
+      const style = getComputedStyle(el); const fg = rgba(style.color), bg = background(el);
+      const mixed = { r: fg.r * fg.a + bg.r * (1 - fg.a), g: fg.g * fg.a + bg.g * (1 - fg.a), b: fg.b * fg.a + bg.b * (1 - fg.a) };
+      const [hi, lo] = [lum(mixed), lum(bg)].sort((a, b) => b - a); const ratio = (hi + 0.05) / (lo + 0.05);
+      const size = parseFloat(style.fontSize); measured += 1;
+      if (ratio < (size < 14 ? 7 : 4.5)) failures.push(`"${text.slice(0, 28)}" ${ratio.toFixed(2)}:1 at ${size}px`);
+      // Contrast alone read too faintly here in small type, so nothing on this page is smaller than 12px.
+      if (size < 12) failures.push(`"${text.slice(0, 28)}" at ${size}px`);
+    }
+    return { measured, failures };
+  });
   const ruleValues = page.locator(".deck-rule-values");
   check("Generic's values are shown", /1\.1/.test(await ruleValues.textContent()) && /per stop/i.test(await ruleValues.textContent()), (await ruleValues.textContent()).slice(0, 160));
   check("and cannot be changed", (await ruleValues.locator("input:not([disabled]), select:not([disabled])").count()) === 0);
   check("with the official decks' range beside a value", /official/i.test(await ruleValues.textContent()));
+  const fixedContrast = await rulesContrast();
+  check("every piece of text on the page has strong contrast, ours shown", fixedContrast.measured > 15 && fixedContrast.failures.length === 0, `${fixedContrast.measured} measured; ${fixedContrast.failures.slice(0, 5).join("; ")}`);
+  check("where tickets start and end is said plainly, not as 'Towards the edges'", !/Towards the edges/.test(await ruleValues.textContent()) && /Where tickets start and end/.test(await ruleValues.textContent()) && /further out than an average stop/i.test(await ruleValues.textContent()), (await ruleValues.textContent()).slice(-260));
   check("and it says these length shares steer the suggester until the map sets its own mix", /until you change the ticket mix below/i.test(await ruleValues.textContent()), (await ruleValues.textContent()).slice(-200));
   await page.getByRole("button", { name: "Create your own from Generic" }).click();
   await page.waitForTimeout(300);
   let rules = await storedRules();
   check("a set of your own is made from it, and chosen", rules.rules.length === 1 && rules.rules[0].ticketsPerStop === 1.1 && rules.chosen === rules.rules[0].id, JSON.stringify(rules).slice(0, 200));
   check("its values can be changed", (await ruleValues.locator("input:not([disabled])").count()) >= 8, String(await ruleValues.locator("input:not([disabled])").count()));
+  const ownContrast = await rulesContrast();
+  check("and with your own set open, too", ownContrast.failures.length === 0, ownContrast.failures.slice(0, 5).join("; "));
+  check("your own set explains where tickets start and end", /Where tickets start and end/.test(await ruleValues.textContent()) && /how far from the middle/i.test(await ruleValues.textContent()));
   await page.locator("#rule-tickets-per-stop").fill("0.5");
   await page.locator("#rule-tickets-per-stop").blur();
   await page.locator("#rule-name").fill("Sparse");

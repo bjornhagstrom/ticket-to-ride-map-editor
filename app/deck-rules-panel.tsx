@@ -16,6 +16,12 @@ const BIN_LABELS = ["under 30 %", "30–45 %", "45–60 %", "60–75 %", "75 % a
 const pct = (share: number) => Math.round(share * 1000) / 10;
 const clamp = (value: number, low: number, high: number) => Math.min(high, Math.max(low, value));
 const official = TICKET_SUGGESTER.official;
+// "relative" and "point" in TICKET_SUGGESTER: how far from the middle of the map a deck's tickets end.
+const PERIPHERY = {
+  relative: "Long ones further out than an average stop, short ones further in",
+  point: "Long ones a set distance out, as the USA and Europe decks do",
+  explain: "How far from the middle of the map long and short tickets start and end. The first only counts tickets on the wrong side; the second aims at the distances the two official decks use.",
+};
 
 export function DeckRulesPanel({ data, change }: { data: MapData; change: (fn: (draft: MapData) => MapData) => void }) {
   const rules = deckRules(data);
@@ -80,7 +86,7 @@ function FixedRuleValues({ rule }: { rule: DeckRule }) {
       {row("Longest regular ticket", `${pct(rule.lengthCap)} % of reach`, `${pct(official.lengthCap[0])}–${pct(official.lengthCap[1])} %`)}
       {row("Most tickets at one stop", String(rule.maxPerStop), `${official.maxPerStop[0]}–${official.maxPerStop[1]}`)}
       {row("Near-duplicate tickets", `${pct(rule.dupRate)} %`, `${official.dupPct[0]}–${official.dupPct[1]} %`)}
-      {row("Towards the edges", rule.periphery === "relative" ? "only the wrong side counts" : "long tickets reach the edge")}
+      {row("Where tickets start and end", rule.periphery === "relative" ? PERIPHERY.relative : PERIPHERY.point)}
     </dl>
   </>;
 }
@@ -109,11 +115,12 @@ function OwnRuleFields({ rule, onChange, onDelete }: { rule: DeckRule; onChange:
       {number("rule-dup-rate", "Near-duplicate tickets, %", pct(rule.dupRate), (value) => onChange({ dupRate: clamp(value, 0, 100) / 100 }), 0.5, `official ${official.dupPct[0]}–${official.dupPct[1]} %`)}
       {optionalPct("rule-bonus-from", "Bonus from, % of reach", rule.bonusFrom, (value) => onChange({ bonusFrom: value }))}
       {optionalPct("rule-long-from", "Long deck reaches from, %", rule.longRange ? rule.longRange[0] : null, (value) => onChange({ longRange: value === null ? null : [value, Math.max(value, rule.longRange?.[1] ?? 1)] }))}
-      <div><Label htmlFor="rule-periphery">Towards the edges</Label>
+      <div className="deck-rule-wide"><Label htmlFor="rule-periphery">Where tickets start and end</Label>
         <NativeSelect id="rule-periphery" value={rule.periphery} onChange={(event) => onChange({ periphery: event.target.value as DeckRuleSet["periphery"] })}>
-          <NativeSelectOption value="relative">Only the wrong side counts</NativeSelectOption>
-          <NativeSelectOption value="point">Long tickets reach the edge</NativeSelectOption>
-        </NativeSelect></div>
+          <NativeSelectOption value="relative">{PERIPHERY.relative}</NativeSelectOption>
+          <NativeSelectOption value="point">{PERIPHERY.point}</NativeSelectOption>
+        </NativeSelect>
+        <small className="deck-rule-hint">{PERIPHERY.explain}</small></div>
     </div>
     <Label>Lengths, share of the regular deck, by how far a ticket reaches</Label>
     <div className="deck-rule-bins">
