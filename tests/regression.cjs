@@ -85,6 +85,38 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   check("a space that needs a locomotive", example.routes.some((r) => (r.locomotiveSlots || []).length));
   const shapeOf = (r) => (example.routeTypeStyles.find((t) => t.id === r.type) || {}).shape;
   check("tunnel and boat routes", example.routes.some((r) => shapeOf(r) === "serrated") && example.routes.some((r) => shapeOf(r) === "oval"));
+  // Bends that show: one route turns two ways, and a straight one has a corner you can see.
+  const pos = (id) => example.stops.find((st) => st.id === id);
+  const bendTurns = (r) => { const pts = [pos(r.a), ...(r.points || []), pos(r.b)]; return pts.slice(1, -1).map((p, i) => { const a = pts[i], b = pts[i + 2]; const u = { x: p.x - a.x, y: p.y - a.y }, v = { x: b.x - p.x, y: b.y - p.y }; return Math.atan2(u.x * v.y - u.y * v.x, u.x * v.x + u.y * v.y) * 180 / Math.PI; }); };
+  check("a route with two bends that turn opposite ways", example.routes.some((r) => { const t = bendTurns(r); return t.length >= 2 && t.some((a) => a > 5) && t.some((a) => a < -5); }));
+  check("a straight route with a corner you can see", example.routes.some((r) => r.curved === false && bendTurns(r).some((a) => Math.abs(a) >= 20)), example.routes.filter((r) => r.curved === false).map((r) => bendTurns(r).map((a) => a.toFixed(0)).join("/")).join(", "));
+  const pairIs = (r, x, y) => (r.a === x && r.b === y) || (r.a === y && r.b === x);
+  check("Central–Lakeside is a boat route", example.routes.some((r) => pairIs(r, "example-central", "example-lakeside") && shapeOf(r) === "oval"));
+  check("at least three spaces need a locomotive", example.routes.reduce((n, r) => n + (r.locomotiveSlots || []).length, 0) >= 3, String(example.routes.reduce((n, r) => n + (r.locomotiveSlots || []).length, 0)));
+  // A boat space has pointed ends, so it cannot be mistaken for a wagon: a point towards its corner
+  // lies outside it, where it would lie inside an ordinary space.
+  const pointed = await page.evaluate(() => {
+    const map = JSON.parse(localStorage.getItem("orebro-map-editor-public-v2"));
+    const groups = Array.from(document.querySelectorAll(".map-canvas .route-group"));
+    const shapeOfRoute = (r) => (map.routeTypeStyles.find((t) => t.id === r.type) || {}).shape;
+    const probe = (i) => { const slot = groups[i].querySelector(".wagon-slot"); const shape = slot.querySelector("path:not(.wagon-slot-outline), rect:not(.wagon-slot-outline)"); const box = shape.getBBox(); return shape.isPointInFill(new DOMPoint(box.x + box.width * 0.85, box.y + box.height * 0.2)); };
+    const boat = map.routes.findIndex((r) => shapeOfRoute(r) === "oval"), plain = map.routes.findIndex((r) => shapeOfRoute(r) === "plain");
+    return { boatInside: probe(boat), plainInside: probe(plain) };
+  });
+  check("boat spaces have pointed ends, unlike wagon spaces", pointed.boatInside === false && pointed.plainInside === true, JSON.stringify(pointed));
+  // Boats sail on water: the Lake lies under every boat route, not beside it.
+  const inside = (pt, poly) => { let hit = false; for (let a = 0, b = poly.length - 1; a < poly.length; b = a++) { if ((poly[a].y > pt.y) !== (poly[b].y > pt.y) && pt.x < (poly[b].x - poly[a].x) * (pt.y - poly[a].y) / (poly[b].y - poly[a].y) + poly[a].x) hit = !hit; } return hit; };
+  const lake = example.background.find((shape) => shape.label === "Lake");
+  const boatCover = example.routes.filter((r) => shapeOf(r) === "oval").map((r) => {
+    const pts = [pos(r.a), ...(r.points || []), pos(r.b)];
+    const samples = [];
+    for (let i = 0; i < pts.length - 1; i++) for (let k = 1; k < 10; k++) samples.push({ x: pts[i].x + (pts[i + 1].x - pts[i].x) * k / 10, y: pts[i].y + (pts[i + 1].y - pts[i].y) * k / 10 });
+    return samples.filter((pt) => inside(pt, lake.points)).length / samples.length;
+  });
+  check("the lake lies under every boat route", boatCover.length >= 2 && boatCover.every((share) => share >= 0.85), boatCover.map((share) => `${Math.round(share * 100)} %`).join(", "));
+  const harbour = pos("example-harbour");
+  const nearEdge = (pt, poly) => Math.min(...poly.map((a, i) => { const b = poly[(i + 1) % poly.length]; const t = Math.max(0, Math.min(1, ((pt.x - a.x) * (b.x - a.x) + (pt.y - a.y) * (b.y - a.y)) / ((b.x - a.x) ** 2 + (b.y - a.y) ** 2))); return Math.hypot(pt.x - a.x - t * (b.x - a.x), pt.y - a.y - t * (b.y - a.y)); }));
+  check("and reaches Harbour", inside(harbour, lake.points) || nearEdge(harbour, lake.points) <= 12, `${nearEdge(harbour, lake.points).toFixed(0)} units away`);
   check("a route type of its own, with a letter in every space", example.routes.some((r) => { const t = example.routeTypeStyles.find((x) => x.id === r.type); return t && t.glyph && !["city", "tunnel", "boat"].includes(t.id); }));
   check("at least eight wagon colours", new Set(example.routes.map((r) => r.color)).size >= 8, [...new Set(example.routes.map((r) => r.color))].join(", "));
   check("a note and all three kinds of background", example.notes.length >= 1 && ["area", "line", "label"].every((k) => example.background.some((b) => b.type === k)));
