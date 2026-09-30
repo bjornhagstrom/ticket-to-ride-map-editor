@@ -53,9 +53,13 @@ export function PrintPages({ data, plan }: { data: MapData; plan: PrintPlan }) {
     return `${format.shortLabel} · ${plan.boardMm.width} × ${plan.boardMm.height} mm · ${percent}`;
   };
   return <div className="print-pages print-map" aria-hidden="true">
-    <style>{`@media print{@page{size:${plan.pageMm.width}mm ${plan.pageMm.height}mm;margin:0}}`}</style>
+    {/* The paper and its margin are declared here, but the page box is only as wide as the paper
+        less that margin and has no fixed height. A browser that ignores @page margin and uses its
+        own — Safari does — then still has room for it; a box the size of the paper would spill
+        onto an empty sheet after every page, or be shrunk to fit and no longer print full size. */}
+    <style>{`@media print{@page{size:${plan.pageMm.width}mm ${plan.pageMm.height}mm;margin:${PRINT_MARGIN_MM}mm}}`}</style>
     {plan.pages.map((page) => <section className="print-page" key={page.index}
-      style={{ width: `${plan.pageMm.width}mm`, height: `${plan.pageMm.height}mm`, padding: `${PRINT_MARGIN_MM}mm` }}>
+      style={{ width: `${plan.pageMm.width - 2 * PRINT_MARGIN_MM}mm` }}>
       <div className="print-caption" style={{ height: `${PRINT_CAPTION_MM}mm`, width: `${page.contentMm.width}mm` }}><strong>{data.name}</strong><span>{caption(page)}</span></div>
       <div className={cn("print-art", full && "trimmed")} style={{ width: `${page.contentMm.width}mm`, height: `${page.contentMm.height}mm` }}>
         <svg viewBox={`${page.tile.x * W} ${page.tile.y * format.height} ${page.tile.width * W} ${page.tile.height * format.height}`}>

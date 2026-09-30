@@ -59,7 +59,8 @@
   .print-caption span{font:7.5pt "Segoe UI",Arial,sans-serif;color:#24221e;white-space:nowrap}
   /* The board. Page size, margin and every tile's size are set inline from the print plan in
      millimetres; this only arranges them. The tile is centred under its caption. */
-  .print-map .print-page{align-items:center}
+  /* Not clipped: the cut marks reach past the artwork into the paper's margin. */
+  .print-map .print-page{align-items:center;padding:0;overflow:visible;break-inside:avoid;page-break-inside:avoid}
   /* As wide as the artwork, and kept clear of the cut marks that rise from its corners. */
   .print-map .print-caption{flex:none;margin:0;padding:0 2.5mm;align-items:center}
   .print-art{position:relative;flex:none;background:#f7f1e5;outline:.3mm solid #81786c}

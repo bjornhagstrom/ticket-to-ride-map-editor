@@ -270,10 +270,12 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   check("full size on A4 prints the 9 sheets its cell promises", fullA4.pages === 9 && fullA4.promised === 9, `${fullA4.pages} printed, ${fullA4.promised} promised`);
   check("with a wagon space the real 20 mm long", Math.abs(fullA4.wagonMm - 20) < 0.5, `${fullA4.wagonMm.toFixed(2)} mm`);
   check("and marks to trim at on every sheet", fullA4.cutMarks === 9 * 4, `${fullA4.cutMarks} marks`);
-  check("on pages the size of the paper", Math.abs(fullA4.pageWidthMm - 297) < 1, `${fullA4.pageWidthMm.toFixed(1)} mm`);
+  // The paper's size is declared by @page. The page box itself must fit inside the paper less the
+  // margins, or a browser that picks its own margins spills it onto an extra sheet or shrinks it.
+  check("on a page box that fits A4 less its margins", fullA4.pageWidthMm <= 297 - 20 + 0.5 && fullA4.pageWidthMm > 250, `${fullA4.pageWidthMm.toFixed(1)} mm`);
   const fullLetter = await printFrom("letter", 3);
   check("on US Letter it prints 12, as its cell says", fullLetter.pages === 12 && fullLetter.promised === 12, `${fullLetter.pages} printed, ${fullLetter.promised} promised`);
-  check("on Letter-sized pages", Math.abs(fullLetter.pageWidthMm - 279.4) < 1, `${fullLetter.pageWidthMm.toFixed(1)} mm`);
+  check("on a page box that fits Letter less its margins", fullLetter.pageWidthMm <= 279.4 - 20 + 0.5 && fullLetter.pageWidthMm > 240, `${fullLetter.pageWidthMm.toFixed(1)} mm`);
   const anniversary = await printFrom("a4", 4);
   check("an Anniversary board prints 16 sheets of A4", anniversary.pages === 16 && anniversary.promised === 16, `${anniversary.pages} printed, ${anniversary.promised} promised`);
   check("with wagon spaces grown to the bigger board", Math.abs(anniversary.wagonMm - 20 * 972 / 790) < 0.6, `${anniversary.wagonMm.toFixed(2)} mm`);
@@ -290,6 +292,29 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   check("the last print choice is remembered in this browser", await printDialog().getByRole("radio", { name: "Tabloid" }).isChecked() && await printDialog().getByRole("radio", { name: "One sheet", exact: true }).isChecked());
   await printDialog().getByRole("button", { name: "Cancel" }).click();
   await page.waitForTimeout(300);
+
+  // A real PDF, printed the way Safari prints: its own margins, whatever @page asks for. A page box
+  // the size of the paper then spills a few millimetres onto an empty sheet after every page, so
+  // the same run comes out with twice the sheets. The print stub above cannot see this.
+  const pdfPages = async (paper, column, landscape) => {
+    await printButton().click();
+    await page.waitForTimeout(300);
+    await cell(paper, column).click();
+    const promised = Number(await cell(paper, column).getAttribute("data-pages"));
+    await printDialog().getByRole("button", { name: "Cancel" }).click();
+    await page.waitForTimeout(300);
+    await page.emulateMedia({ media: "print" });
+    const margins = await page.addStyleTag({ content: "@media print{@page{margin:8mm!important}}" });
+    const pdf = await page.pdf({ format: "A4", landscape, printBackground: true });
+    await margins.evaluate((el) => el.remove());
+    await page.emulateMedia({ media: "screen" });
+    await page.waitForTimeout(300);
+    return { promised, pages: (pdf.toString("latin1").match(/\/Type\s*\/Page[^s]/g) || []).length };
+  };
+  const pdfFull = await pdfPages("a4", 3, true);
+  check("full size on A4 with the browser's own margins is still 9 sheets, none blank", pdfFull.pages === pdfFull.promised, `${pdfFull.pages} sheets for ${pdfFull.promised} promised`);
+  const pdfPanels = await pdfPages("a4", 2, false);
+  check("and per panel it is still 6", pdfPanels.pages === pdfPanels.promised, `${pdfPanels.pages} sheets for ${pdfPanels.promised} promised`);
   // 11. persistence across reload
   await page.reload({ waitUntil: "networkidle" });
   await page.waitForTimeout(700);
