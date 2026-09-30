@@ -89,7 +89,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   const pos = (id) => example.stops.find((st) => st.id === id);
   const bendTurns = (r) => { const pts = [pos(r.a), ...(r.points || []), pos(r.b)]; return pts.slice(1, -1).map((p, i) => { const a = pts[i], b = pts[i + 2]; const u = { x: p.x - a.x, y: p.y - a.y }, v = { x: b.x - p.x, y: b.y - p.y }; return Math.atan2(u.x * v.y - u.y * v.x, u.x * v.x + u.y * v.y) * 180 / Math.PI; }); };
   check("a route with two bends that turn opposite ways", example.routes.some((r) => { const t = bendTurns(r); return t.length >= 2 && t.some((a) => a > 5) && t.some((a) => a < -5); }));
-  check("a straight route with a corner you can see", example.routes.some((r) => r.curved === false && bendTurns(r).some((a) => Math.abs(a) >= 20)), example.routes.filter((r) => r.curved === false).map((r) => bendTurns(r).map((a) => a.toFixed(0)).join("/")).join(", "));
+  check("a straight route with a sharp corner, at least 45°", example.routes.some((r) => r.curved === false && bendTurns(r).some((a) => Math.abs(a) >= 45)), example.routes.filter((r) => r.curved === false).map((r) => bendTurns(r).map((a) => a.toFixed(0)).join("/")).join(", "));
   const pairIs = (r, x, y) => (r.a === x && r.b === y) || (r.a === y && r.b === x);
   check("Central–Lakeside is a boat route", example.routes.some((r) => pairIs(r, "example-central", "example-lakeside") && shapeOf(r) === "oval"));
   check("at least three spaces need a locomotive", example.routes.reduce((n, r) => n + (r.locomotiveSlots || []).length, 0) >= 3, String(example.routes.reduce((n, r) => n + (r.locomotiveSlots || []).length, 0)));
