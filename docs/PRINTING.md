@@ -47,17 +47,21 @@ line** above the artwork (`PRINT_CAPTION_MM`). What is left for the board:
 
 Width is paper − 20 mm. Height is paper − 20 − 8 mm.
 
-### Always landscape
+### Upright pages, the map turned on them
 
-Every run prints landscape, whatever the paper and split. The plan used to choose the orientation
-that gave the larger scale or the fewer sheets, which made the default (per panel on A4) portrait.
-Safari does not always switch orientation from `@page`, so the person at the print dialog had to
-know which way up each run wanted. Now the answer is always Landscape, and the dialog says so.
+Every page is declared upright (portrait), and the map is laid out as a landscape sheet turned a
+quarter turn on it. Safari ignores `@page` and prints portrait unless its own dialog says otherwise;
+Chrome and Firefox follow `@page`. An upright page is the one thing all of them do alike, so nobody
+has to choose an orientation, and the dialog says to leave it on Portrait.
 
-It costs a little in a few cases: a panel on A4 is 69 % instead of 72 %, on Letter 72 % instead of
-74 %, and on Tabloid 96 % instead of 98.5 %; Anniversary is 9 sheets of A3 instead of 8, 16 of Letter
-instead of 15, and 9 of Tabloid instead of 8. `orientations()` still returns a list, so portrait can
-come back as a choice if it is missed.
+The sheet's room is still the paper's long side across and its short side down, so every count and
+scale below is the landscape one. The plan used to choose the orientation that gave the larger scale,
+which made the default (per panel on A4) portrait; then it declared landscape pages, which Safari
+ignored.
+
+Laying every sheet out landscape costs a little in a few cases, against choosing per run: a panel on
+A4 is 69 % instead of 72 %, on Letter 72 % instead of 74 %, and on Tabloid 96 % instead of 98.5 %;
+Anniversary is 9 sheets of A3 instead of 8, 16 of Letter instead of 15, and 9 of Tabloid instead of 8.
 
 ### One sheet, and one sheet per panel: the largest scale that fits
 
@@ -99,10 +103,11 @@ cells and compares.
 
 ## The page box: why it is smaller than the paper
 
-`PrintPages` declares the paper with a single global rule, `@page { size: <w>mm <h>mm; margin: 10mm }`.
-Named `@page` rules were tried first, and print dialogs do not honour them reliably. The page box
-itself is **the paper less 20 mm wide, with no fixed height and no padding**: an 8 mm caption the
-width of the tile, then the tile at its exact size in millimetres.
+`PrintPages` declares the paper, upright, with a single global rule,
+`@page { size: <w>mm <h>mm; margin: 10mm }`. Named `@page` rules were tried first, and print dialogs
+do not honour them reliably. The page box itself is **the turned sheet and nothing more**: the 8 mm
+caption plus the tile's height across, the tile's width down, at their exact sizes in millimetres.
+That always fits inside the paper less 20 mm each way.
 
 It used to be exactly the paper, with `margin: 0`. That printed every other page blank:
 
@@ -118,26 +123,25 @@ browser's own margin is 10 mm or less. With headers and footers switched on in t
 dialog, the margin can be larger. Tell people to switch them off, and to print at 100 %, not "fit to
 page".
 
-### Safari prints portrait, and turning the sheet in CSS does not help
+### How the sheet is turned, and what did not work
 
-Safari ignores `@page` size altogether, orientation included, and lays the page out on whatever paper
-is chosen in its own print dialog, portrait by default
-([mdn/browser-compat-data#28626](https://github.com/mdn/browser-compat-data/issues/28626)). Chrome and
-Firefox honour the landscape `@page` and print as planned.
+Each page is one SVG the size of the page box, in millimetres, holding the caption, the artwork and
+the frame or cut marks, turned with an SVG transform, `translate(h 0) rotate(90)`. Two other ways
+failed:
 
-Tried and rejected, on branch `print-portrait`: turning each sheet a quarter turn under
-`@media print and (orientation: portrait)`. In Safari the rule never applied, so nothing changed. In
-Chrome it applied on landscape paper, turning the sheet and splitting it over two pages. The
-orientation media query cannot be trusted to describe the paper during printing. The regression
-suite's imitation of Safari (Chromium's `page.pdf` with `@page` size switched off) said the change
-worked. That imitation is not Safari, and a print change is not done until it has been looked at in
-Safari and Chrome.
+- **Turning only on portrait paper,** with `@media print and (orientation: portrait)`. In Safari the
+  rule never applied; in Chrome it applied on landscape paper and split each sheet over two pages.
+  The orientation media query cannot be trusted to describe the paper while printing.
+- **Turning HTML with a CSS transform.** The print tree measured right, but in Chromium's PDF the SVG
+  inside the turned element came out at about 0.7 of its size while the cut marks beside it did not.
 
-In Safari, choose Landscape in its print dialog. The print dialog here says so for every run.
+The regression suite imitates Safari with Chromium's `page.pdf` and `@page` size switched off. That
+imitation said the media-query version worked; Safari showed otherwise. A print change is not done
+until it has been looked at in Safari and Chrome.
 
-Full-size sheets have **cut marks** at the tile corners instead of a border. They are drawn with CSS
-pseudo-elements that reach 6 mm into the margin, so the page box must not clip:
-`.print-map .print-page { overflow: visible }`. With it clipped, the bottom marks disappeared.
+Full-size sheets have **cut marks** at the tile corners instead of a border: short lines reaching 6 mm
+into the margin, so neither the page box nor its SVG may clip (`overflow: visible`). With it clipped,
+the bottom marks disappeared.
 
 ## The dialog
 

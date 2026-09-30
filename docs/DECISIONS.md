@@ -123,8 +123,8 @@ gets it at once, and a new map starts with a Junction type ready to use.
 wagons are always measured against that board. The Print button opens a dialog that decides the
 run: one sheet, a sheet per panel or full size; A4, A3, US Letter or Tabloid; and for a 2×3, an
 Anniversary size tick that prints the larger board at full size. The choice is remembered in the
-browser, never in the map. Every run prints landscape, so the answer in the browser's own print
-dialog is always the same. The arithmetic is in `docs/PRINTING.md`.
+browser, never in the map. Every page prints upright with the map turned on it, because that is what
+every browser does by default, Safari included. The arithmetic is in `docs/PRINTING.md`.
 
 **Why.** One list used to mix the shape of the map with how it was printed, and a test sheet needed
 a second setting to say which board it stood in for. Paper cannot be dropped — a 790 × 525 mm board

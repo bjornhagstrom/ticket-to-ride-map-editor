@@ -53,23 +53,37 @@ export function PrintPages({ data, plan }: { data: MapData; plan: PrintPlan }) {
     return `${format.shortLabel} · ${plan.boardMm.width} × ${plan.boardMm.height} mm · ${percent}`;
   };
   return <div className="print-pages print-map" aria-hidden="true">
-    {/* The paper and its margin are declared here, but the page box is only as wide as the paper
-        less that margin and has no fixed height. A browser that ignores @page margin and uses its
-        own — Safari does — then still has room for it; a box the size of the paper would spill
-        onto an empty sheet after every page, or be shrunk to fit and no longer print full size. */}
+    {/* The paper, upright, and its margin are declared here. The page box is never the paper's size:
+        it is the turned sheet, which fits inside the paper less the margin. A browser that ignores
+        @page margin and uses its own — Safari does — then still has room for it; a box the size of
+        the paper would spill onto an empty sheet after every page, or be shrunk to fit. */}
     <style>{`@media print{@page{size:${plan.pageMm.width}mm ${plan.pageMm.height}mm;margin:${PRINT_MARGIN_MM}mm}}`}</style>
-    {plan.pages.map((page) => <section className="print-page" key={page.index}
-      style={{ width: `${plan.pageMm.width - 2 * PRINT_MARGIN_MM}mm` }}>
-      <div className="print-caption" style={{ height: `${PRINT_CAPTION_MM}mm`, width: `${page.contentMm.width}mm` }}><strong>{data.name}</strong><span>{caption(page)}</span></div>
-      <div className={cn("print-art", full && "trimmed")} style={{ width: `${page.contentMm.width}mm`, height: `${page.contentMm.height}mm` }}>
-        <svg viewBox={`${page.tile.x * W} ${page.tile.y * format.height} ${page.tile.width * W} ${page.tile.height * format.height}`}>
-          {/* Wagons are always measured against the board the map is drawn for; printing larger or
-              smaller scales them with everything else. */}
-          <MapArtwork data={data} scaleWidthMm={format.widthMm} print />
+    {plan.pages.map((page) => {
+      // Each page is one SVG the size of the page box, in millimetres, holding the landscape sheet —
+      // caption, artwork, frame or cut marks — turned a quarter turn with an SVG transform. Turning
+      // HTML with a CSS transform printed the artwork shrunk in Chromium's PDF, and a CSS media query
+      // for portrait paper was not honoured in Safari: see docs/PRINTING.md.
+      const width = page.contentMm.width, artHeight = page.contentMm.height, height = PRINT_CAPTION_MM + artHeight;
+      const corners: [number, number, number, number][] = [[0, PRINT_CAPTION_MM, -1, -1], [width, PRINT_CAPTION_MM, 1, -1], [0, height, -1, 1], [width, height, 1, 1]];
+      return <section className="print-page" key={page.index} style={{ width: `${height}mm`, height: `${width}mm` }}>
+        <svg className="print-sheet" width="100%" height="100%" viewBox={`0 0 ${height} ${width}`} overflow="visible">
+          <g transform={`translate(${height} 0) rotate(90)`}>
+            <text className="print-sheet-name" x={2.5} y={PRINT_CAPTION_MM - 2.2}>{data.name}</text>
+            <text className="print-sheet-note" x={width - 2.5} y={PRINT_CAPTION_MM - 2.2} textAnchor="end">{caption(page)}</text>
+            <rect className={cn("print-sheet-art", full && "trimmed")} x={0} y={PRINT_CAPTION_MM} width={width} height={artHeight} />
+            <svg x={0} y={PRINT_CAPTION_MM} width={width} height={artHeight} viewBox={`${page.tile.x * W} ${page.tile.y * format.height} ${page.tile.width * W} ${page.tile.height * format.height}`}>
+              {/* Wagons are always measured against the board the map is drawn for; printing larger or
+                  smaller scales them with everything else. */}
+              <MapArtwork data={data} scaleWidthMm={format.widthMm} print />
+            </svg>
+            {full && corners.map(([x, y, dx, dy]) => <g className="cut-mark" key={`${x}-${y}`}>
+              <line x1={x + dx} y1={y} x2={x + dx * 6} y2={y} />
+              <line x1={x} y1={y + dy} x2={x} y2={y + dy * 6} />
+            </g>)}
+          </g>
         </svg>
-        {full && ["top-left", "top-right", "bottom-left", "bottom-right"].map((corner) => <span key={corner} className={cn("cut-mark", corner)} />)}
-      </div>
-    </section>)}
+      </section>;
+    })}
   </div>;
 }
 
@@ -134,7 +148,7 @@ export function PrintDialog({ open, onOpenChange, format, choice, onChoice, onPr
           </tr>)}</tbody>
         </table>
       </div>
-      <p className="helper print-dialog-foot">Every run prints landscape: if the browser’s print dialog does not switch by itself, choose Landscape there. Print at 100 % — “fit to page” would undo the sizes above. The same dialog can save the run as a PDF.</p>
+      <p className="helper print-dialog-foot">Every page prints upright (portrait), the default in every browser, with the map turned a quarter turn on it: leave the print dialog on Portrait. Print at 100 % — “fit to page” would undo the sizes above. The same dialog can save the run as a PDF.</p>
       <DialogFooter>
         <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
         <Button onClick={onPrint}><Printer />Print</Button>

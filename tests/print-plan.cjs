@@ -41,11 +41,11 @@ check("the extended board has no Anniversary size", printChoices("board-2x4").si
 // ---------------------------------------------------------------- one sheet
 const sheetA4 = printPlan("board-2x3", { split: "sheet", paper: "a4" });
 check("one sheet is one page", sheetA4.pages.length === 1, String(sheetA4.pages.length));
-check("a 2×3 board on one A4 lies landscape", sheetA4.orientation === "landscape" && sheetA4.pageMm.width === 297 && sheetA4.pageMm.height === 210, `${sheetA4.orientation} ${sheetA4.pageMm.width} × ${sheetA4.pageMm.height}`);
+check("a 2×3 board on one A4 is an upright page with the map turned on it", sheetA4.orientation === "portrait" && sheetA4.pageMm.width === 210 && sheetA4.pageMm.height === 297, `${sheetA4.orientation} ${sheetA4.pageMm.width} × ${sheetA4.pageMm.height}`);
 check("at 35 % on A4", pct(sheetA4) === 35, `${pct(sheetA4)} %`);
 check("at 51 % on A3", pct(printPlan("board-2x3", { split: "sheet", paper: "a3" })) === 51, `${pct(printPlan("board-2x3", { split: "sheet", paper: "a3" }))} %`);
 const sheetTabloid = printPlan("board-2x3", { split: "sheet", paper: "tabloid" });
-check("Tabloid is declared landscape in millimetres", sheetTabloid.pageMm.width === 431.8 && sheetTabloid.pageMm.height === 279.4, `${sheetTabloid.pageMm.width} × ${sheetTabloid.pageMm.height}`);
+check("Tabloid is declared upright in millimetres", sheetTabloid.pageMm.width === 279.4 && sheetTabloid.pageMm.height === 431.8, `${sheetTabloid.pageMm.width} × ${sheetTabloid.pageMm.height}`);
 
 // ---------------------------------------------------------------- one sheet per panel
 for (const paper of ["a4", "a3", "letter", "tabloid"]) {
@@ -61,7 +61,8 @@ check("a panel is never enlarged: A3 holds one at 100 %", pct(printPlan("board-2
 // in some cases; the counts below are the landscape ones.
 const everyPlan = [];
 for (const format of ["board-2x3", "board-2x4"]) for (const paper of ["a4", "a3", "letter", "tabloid"]) for (const choice of [{ split: "sheet" }, { split: "panel" }, { split: "full" }, { split: "full", size: "anniversary" }]) everyPlan.push(printPlan(format, { ...choice, paper }));
-check("every plan, on every paper, is landscape", everyPlan.every((plan) => plan.orientation === "landscape" && plan.pageMm.width > plan.pageMm.height), everyPlan.filter((plan) => plan.orientation !== "landscape").map((plan) => `${plan.choice.split} ${plan.choice.paper}`).join(", "));
+check("every sheet is laid out landscape", everyPlan.every((plan) => plan.pages.every((p) => p.contentMm.width >= p.contentMm.height - 1)), "");
+check("and every page is declared upright, the map turned on it", everyPlan.every((plan) => plan.orientation === "portrait" && plan.pageMm.height > plan.pageMm.width), everyPlan.filter((plan) => plan.orientation !== "portrait").map((plan) => `${plan.choice.split} ${plan.choice.paper}`).join(", "));
 check("Anniversary on landscape A3 is 9 sheets", printPlan("board-2x3", { split: "full", paper: "a3", size: "anniversary" }).pages.length === 9, String(printPlan("board-2x3", { split: "full", paper: "a3", size: "anniversary" }).pages.length));
 check("Anniversary on landscape Letter is 16 sheets", printPlan("board-2x3", { split: "full", paper: "letter", size: "anniversary" }).pages.length === 16, String(printPlan("board-2x3", { split: "full", paper: "letter", size: "anniversary" }).pages.length));
 
@@ -81,7 +82,8 @@ check("asking a 2×4 for Anniversary gives its standard size", full("board-2x4",
 for (const [format, paper, size] of [["board-2x3", "a4"], ["board-2x3", "letter"], ["board-2x3", "a4", "anniversary"], ["board-2x4", "tabloid"]]) {
   const plan = full(format, paper, size);
   const area = plan.pages.reduce((sum, page) => sum + page.tile.width * page.tile.height, 0);
-  const fits = plan.pages.every((page) => page.contentMm.width <= plan.pageMm.width - 20 + 1e-6 && page.contentMm.height <= plan.pageMm.height - 28 + 1e-6);
+  // The sheet is turned on the page: its width runs down the page's height.
+  const fits = plan.pages.every((page) => page.contentMm.width <= plan.pageMm.height - 20 + 1e-6 && page.contentMm.height <= plan.pageMm.width - 28 + 1e-6);
   check(`${format} on ${paper}${size ? " " + size : ""}: every tile fits the printable area`, fits);
   check(`${format} on ${paper}${size ? " " + size : ""}: the tiles cover the board exactly once`, Math.abs(area - 1) < 1e-9, String(area));
 }

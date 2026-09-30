@@ -259,12 +259,18 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
       const first = pages[0];
       const svg = first && first.querySelector("svg");
       const slot = document.querySelector(".print-pages .wagon-slot rect:nth-of-type(2)");
-      const unitPx = svg ? svg.getBoundingClientRect().width / svg.viewBox.baseVal.width : 0;
+      // Pixels per map unit from the slot's own transform: the scale of its matrix is the same
+      // whichever way the sheet or the route is turned.
+      const ctm = slot && slot.getScreenCTM();
+      const unitPx = ctm ? Math.hypot(ctm.a, ctm.b) : 0;
+      const box = first ? first.getBoundingClientRect() : null;
+      void svg;
       window.__printed = {
         pages: pages.length,
         style: Array.from(document.querySelectorAll(".print-pages style")).map((el) => el.textContent).join(" "),
         cutMarks: document.querySelectorAll(".print-pages .cut-mark").length,
-        pageWidthMm: first ? first.getBoundingClientRect().width / 96 * 25.4 : 0,
+        pageWidthMm: box ? box.width / 96 * 25.4 : 0,
+        pageHeightMm: box ? box.height / 96 * 25.4 : 0,
         wagonMm: slot ? +slot.getAttribute("width") * unitPx / 96 * 25.4 : 0,
       };
     };
@@ -363,7 +369,9 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
 
   const oneSheet = await printFrom("a4", 1);
   check("one sheet is one page", oneSheet.pages === 1 && oneSheet.promised === 1, `${oneSheet.pages} printed, ${oneSheet.promised} promised`);
-  check("declared as landscape A4 in millimetres", /size:\s*297mm 210mm/.test(oneSheet.style), oneSheet.style);
+  // Every page is upright, which is what every browser prints by default: Safari ignores @page, and
+  // Chrome and Firefox follow it. The landscape map is turned a quarter turn on the page instead.
+  check("declared as upright A4 in millimetres", /size:\s*210mm 297mm/.test(oneSheet.style), oneSheet.style);
   const perPanel = await printFrom("a4", 2);
   check("a 2×3 per panel is 6 pages, as its cell says", perPanel.pages === 6 && perPanel.promised === 6, `${perPanel.pages} printed, ${perPanel.promised} promised`);
   const fullA4 = await printFrom("a4", 3);
@@ -372,16 +380,16 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   check("and marks to trim at on every sheet", fullA4.cutMarks === 9 * 4, `${fullA4.cutMarks} marks`);
   // The paper's size is declared by @page. The page box itself must fit inside the paper less the
   // margins, or a browser that picks its own margins spills it onto an extra sheet or shrinks it.
-  check("on a page box that fits A4 less its margins", fullA4.pageWidthMm <= 297 - 20 + 0.5 && fullA4.pageWidthMm > 250, `${fullA4.pageWidthMm.toFixed(1)} mm`);
+  check("on an upright page box that fits A4 less its margins", fullA4.pageWidthMm <= 210 - 20 + 0.5 && fullA4.pageHeightMm <= 297 - 20 + 0.5 && fullA4.pageHeightMm > 250, `${fullA4.pageWidthMm.toFixed(1)} × ${fullA4.pageHeightMm.toFixed(1)} mm`);
   const fullLetter = await printFrom("letter", 3);
   check("on US Letter it prints 12, as its cell says", fullLetter.pages === 12 && fullLetter.promised === 12, `${fullLetter.pages} printed, ${fullLetter.promised} promised`);
-  check("on a page box that fits Letter less its margins", fullLetter.pageWidthMm <= 279.4 - 20 + 0.5 && fullLetter.pageWidthMm > 240, `${fullLetter.pageWidthMm.toFixed(1)} mm`);
+  check("on an upright page box that fits Letter less its margins", fullLetter.pageWidthMm <= 215.9 - 20 + 0.5 && fullLetter.pageHeightMm <= 279.4 - 20 + 0.5, `${fullLetter.pageWidthMm.toFixed(1)} × ${fullLetter.pageHeightMm.toFixed(1)} mm`);
   const anniversary = await printFrom("a4", 4);
   check("an Anniversary board prints 16 sheets of A4", anniversary.pages === 16 && anniversary.promised === 16, `${anniversary.pages} printed, ${anniversary.promised} promised`);
   check("with wagon spaces grown to the bigger board", Math.abs(anniversary.wagonMm - 20 * 972 / 790) < 0.6, `${anniversary.wagonMm.toFixed(2)} mm`);
   check("and the summary names the board it adds up to", /972 × 648 mm/.test(anniversary.summary), anniversary.summary);
   const tabloidSheet = await printFrom("tabloid", 1);
-  check("Tabloid is declared landscape in millimetres", /size:\s*431\.8mm 279\.4mm/.test(tabloidSheet.style), tabloidSheet.style);
+  check("Tabloid is declared upright in millimetres", /size:\s*279\.4mm 431\.8mm/.test(tabloidSheet.style), tabloidSheet.style);
   check("no print choice touched the map", (await storedMap()) === mapBeforeChoices);
   check("and the map carries no print settings", !/print-?(split|paper|choice)/i.test(await storedMap()));
 
@@ -411,9 +419,9 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     await page.waitForTimeout(300);
     return { promised, pages: (pdf.toString("latin1").match(/\/Type\s*\/Page[^s]/g) || []).length };
   };
-  const pdfFull = await pdfPages("a4", 3, true);
+  const pdfFull = await pdfPages("a4", 3, false);
   check("full size on A4 with the browser's own margins is still 9 sheets, none blank", pdfFull.pages === pdfFull.promised, `${pdfFull.pages} sheets for ${pdfFull.promised} promised`);
-  const pdfPanels = await pdfPages("a4", 2, true);
+  const pdfPanels = await pdfPages("a4", 2, false);
   check("and per panel it is still 6", pdfPanels.pages === pdfPanels.promised, `${pdfPanels.pages} sheets for ${pdfPanels.promised} promised`);
 
   // The dialog has to be readable, say what its table means, and hold still while choices change.
@@ -454,7 +462,8 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   });
   check("the sheet table has a heading of its own", /^H[2-4] \S/.test(described.heading), described.heading);
   check("and a description of what its numbers are", /sheets?/i.test(described.description) && /%/.test(described.description), described.description);
-  check("the dialog says to print landscape if the browser does not switch by itself", /landscape/i.test(await printDialog().locator(".print-dialog-foot").textContent()), await printDialog().locator(".print-dialog-foot").textContent());
+  const foot = await printDialog().locator(".print-dialog-foot").textContent();
+  check("the dialog says to print upright, the default, and never asks for Landscape", /portrait|upright/i.test(foot) && !/choose Landscape/i.test(foot), foot);
   check("which spells out what the percentage means", /100\s%[^.]*real size|real size[^.]*100\s%/i.test(described.description), described.description);
   check("every cell says sheets, not just a number", /\d+ sheets?/.test(described.cell), described.cell);
   const layout = () => page.evaluate(() => {

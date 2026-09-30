@@ -45,8 +45,10 @@ export type PrintTile = { x: number; y: number; width: number; height: number };
 export type PrintPage = { index: number; column: number; row: number; tile: PrintTile; contentMm: { width: number; height: number } };
 export type PrintPlan = {
   choice: Required<PrintChoice>;
-  orientation: "portrait" | "landscape";
-  /** The page as the printer should be asked for it, orientation applied. */
+  /** Always portrait: the page every browser prints by default. The sheet on it is landscape and
+   *  turned a quarter turn (PrintPages). */
+  orientation: "portrait";
+  /** The page as the printer should be asked for it: the paper, upright. */
   pageMm: { width: number; height: number };
   /** Printed size against real size, never above 1. */
   scale: number;
@@ -57,16 +59,19 @@ export type PrintPlan = {
   pages: PrintPage[];
 };
 
-type Orientation = { orientation: "portrait" | "landscape"; pageMm: { width: number; height: number }; content: { width: number; height: number } };
+type Orientation = { pageMm: { width: number; height: number }; content: { width: number; height: number } };
+// Every page is upright, and the map is laid out as a landscape sheet turned a quarter turn on it.
+// Safari ignores @page and prints portrait unless told otherwise in its own dialog; Chrome and
+// Firefox follow @page. An upright page is the one thing all three do alike, so nobody has to pick an
+// orientation. Turning the sheet only on portrait paper, by media query, was tried and failed: see
+// docs/PRINTING.md. The sheet's room is the page's long side across and its short side, less the
+// caption, down.
 const orientations = (paperId: PaperId): Orientation[] => {
   const paper = papers.find((item) => item.id === paperId) ?? papers[0];
-  // Always landscape. Portrait would save a sheet or a few percent in some cases, but one answer to
-  // "which way up" is worth more: Safari does not always switch orientation by itself, and the
-  // person at the print dialog then has to know what to pick. Kept as a list so a portrait option
-  // can come back as a choice rather than a guess.
-  return [
-    { orientation: "landscape", pageMm: { width: paper.heightMm, height: paper.widthMm } },
-  ].map((item) => ({ ...item, orientation: item.orientation as Orientation["orientation"], content: { width: item.pageMm.width - 2 * PRINT_MARGIN_MM, height: item.pageMm.height - 2 * PRINT_MARGIN_MM - PRINT_CAPTION_MM } }));
+  return [{
+    pageMm: { width: paper.widthMm, height: paper.heightMm },
+    content: { width: paper.heightMm - 2 * PRINT_MARGIN_MM, height: paper.widthMm - 2 * PRINT_MARGIN_MM - PRINT_CAPTION_MM },
+  }];
 };
 // Division that does not count a sheet for floating-point dust.
 const sheetsFor = (length: number, room: number) => Math.max(1, Math.ceil(length / room - 1e-9));
@@ -106,7 +111,7 @@ export function printPlan(format: MapFormat, raw: PrintChoice): PrintPlan {
     const tile = { x: column / columns, y: row / rows, width: 1 / columns, height: 1 / rows };
     return { index, column, row, tile, contentMm: { width: tile.width * boardMm.width * scale, height: tile.height * boardMm.height * scale } };
   });
-  return { choice, orientation: best.orientation, pageMm: best.pageMm, scale, boardMm, columns, rows, pages };
+  return { choice, orientation: "portrait", pageMm: best.pageMm, scale, boardMm, columns, rows, pages };
 }
 
 export type PrintTableCell = { choice: Required<PrintChoice>; label: string; pages: number; scale: number };
@@ -134,7 +139,7 @@ export const sameChoice = (a: PrintChoice, b: PrintChoice) => a.split === b.spli
 export function describePlan(plan: PrintPlan): string {
   const paper = papers.find((item) => item.id === plan.choice.paper)!;
   const count = plan.pages.length;
-  const sheets = `${count} sheet${count === 1 ? "" : "s"} of ${paper.label}, ${plan.orientation}`;
+  const sheets = `${count} sheet${count === 1 ? "" : "s"} of ${paper.label}, upright with the map turned`;
   if (plan.choice.split === "full") return `${sheets}, at 100 % — real size. Together they make the ${plan.boardMm.width} × ${plan.boardMm.height} mm board: trim each at its marks and butt it to its neighbours.`;
   return `${sheets}, at ${Math.round(plan.scale * 100)} % of real size: the board prints smaller than the real ${plan.boardMm.width} × ${plan.boardMm.height} mm.`;
 }

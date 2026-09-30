@@ -169,7 +169,7 @@ Shared maps and live collaboration require a server API, central storage and an 
 
 ## Printing
 
-The board's shape lives in the map; how it is printed does not. `app/print-plan.ts` turns a board and a print choice — split (one sheet, per panel, full size), paper (A4, A3, US Letter, Tabloid) and, for a 2×3, an Anniversary size tick that implies full size — into a plan: the page in millimetres with its orientation, the scale, and one tile per page as a share of the board. It allows a 10 mm printer margin and an 8 mm caption on every page, always prints landscape, and never enlarges a panel beyond full size. `tests/print-plan.cjs` pins its figures.
+The board's shape lives in the map; how it is printed does not. `app/print-plan.ts` turns a board and a print choice — split (one sheet, per panel, full size), paper (A4, A3, US Letter, Tabloid) and, for a 2×3, an Anniversary size tick that implies full size — into a plan: the page in millimetres with its orientation, the scale, and one tile per page as a share of the board. It allows a 10 mm printer margin and an 8 mm caption on every page, lays every sheet out landscape and turns it on an upright page, and never enlarges a panel beyond full size. `tests/print-plan.cjs` pins its figures.
 
 `PrintDialog` in `app/map-print.tsx` offers the choices and a table of every combination, all computed by the same `printPlan`, so the table cannot disagree with what is printed. The choice is kept in `localStorage` under `ttr-print-choice`, never in the map or the undo history.
 

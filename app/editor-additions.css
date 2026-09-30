@@ -66,25 +66,16 @@
   .print-caption{display:flex;align-items:baseline;justify-content:space-between;gap:6mm;margin-bottom:2.5mm;color:#24211d}
   .print-caption strong{font:700 12pt Georgia,serif}
   .print-caption span{font:7.5pt "Segoe UI",Arial,sans-serif;color:#24221e;white-space:nowrap}
-  /* The board. Page size, margin and every tile's size are set inline from the print plan in
-     millimetres; this only arranges them. The tile is centred under its caption. */
-  /* Not clipped: the cut marks reach past the artwork into the paper's margin. */
-  .print-map .print-page{align-items:center;padding:0;overflow:visible;break-inside:avoid;page-break-inside:avoid}
-  /* As wide as the artwork, and kept clear of the cut marks that rise from its corners. */
-  .print-map .print-caption{flex:none;margin:0;padding:0 2.5mm;align-items:center}
-  .print-art{position:relative;flex:none;background:#f7f1e5;outline:.3mm solid #81786c}
-  .print-art svg{display:block;width:100%;height:100%;background:none;border:0}
-  /* Full-size sheets are trimmed and butted, so their edge is marked, not drawn. */
-  .print-art.trimmed{outline:none}
-  .cut-mark{position:absolute;width:0;height:0}
-  .cut-mark::before,.cut-mark::after{content:"";position:absolute;background:#24211d}
-  .cut-mark::before{width:5mm;height:.2mm;top:-.1mm}
-  .cut-mark::after{width:.2mm;height:5mm;left:-.1mm}
-  .cut-mark.top-left{top:0;left:0}.cut-mark.top-right{top:0;right:0}.cut-mark.bottom-left{bottom:0;left:0}.cut-mark.bottom-right{bottom:0;right:0}
-  .cut-mark.top-left::before,.cut-mark.bottom-left::before{right:1mm}
-  .cut-mark.top-right::before,.cut-mark.bottom-right::before{left:1mm}
-  .cut-mark.top-left::after,.cut-mark.top-right::after{bottom:1mm}
-  .cut-mark.bottom-left::after,.cut-mark.bottom-right::after{top:1mm}
+  /* The board: each page is one SVG in millimetres, the sheet turned inside it (PrintPages). The page
+     box is sized inline from the plan; it is never the paper's size. Not clipped: the cut marks reach
+     past the artwork into the paper's margin. */
+  .print-map .print-page{margin:0 auto;padding:0;overflow:visible;break-inside:avoid;page-break-inside:avoid}
+  .print-sheet{display:block;overflow:visible}
+  .print-sheet-name{font:700 4.2px Georgia,serif;fill:#24211d}
+  .print-sheet-note{font:2.65px "Segoe UI",Arial,sans-serif;fill:#24221e}
+  .print-sheet-art{fill:#f7f1e5;stroke:#81786c;stroke-width:.3}
+  .print-sheet-art.trimmed{stroke:none}
+  .print-sheet .cut-mark line{stroke:#24211d;stroke-width:.2}
   .print-page .route-hit{display:none}
   .print-page .stop,.print-page .route-group{filter:none!important}
   .print-page .stop text{font-size:12px}
