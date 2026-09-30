@@ -1485,6 +1485,8 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   let rules = await storedRules();
   check("a set of your own is made from it, and chosen", rules.rules.length === 1 && rules.rules[0].ticketsPerStop === 1.1 && rules.chosen === rules.rules[0].id, JSON.stringify(rules).slice(0, 200));
   check("its values can be changed", (await ruleValues.locator("input:not([disabled])").count()) >= 8, String(await ruleValues.locator("input:not([disabled])").count()));
+  const binTops = await page.evaluate(() => [0, 1, 2, 3, 4].map((i) => Math.round(document.getElementById(`rule-bin-${i}`).getBoundingClientRect().top)));
+  check("the five length fields stand in one line", Math.max(...binTops) - Math.min(...binTops) <= 1, binTops.join(", "));
   const ownContrast = await rulesContrast();
   check("and with your own set open, too", ownContrast.failures.length === 0, ownContrast.failures.slice(0, 5).join("; "));
   check("your own set explains where tickets start and end", /Where tickets start and end/.test(await ruleValues.textContent()) && /how far from the middle/i.test(await ruleValues.textContent()));

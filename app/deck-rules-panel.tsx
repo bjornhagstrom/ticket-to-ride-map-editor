@@ -12,7 +12,8 @@ import { cn } from "@/lib/utils";
 import { deckRuleFor, deckRules, defaultStyle, type DeckRule, TICKET_SUGGESTER } from "./map-analysis";
 import type { DeckRuleSet, MapData } from "./map-data";
 
-const BIN_LABELS = ["under 30 %", "30–45 %", "45–60 %", "60–75 %", "75 % and over"];
+// Short enough to sit on one line above a field; how far a ticket reaches, as a share of reach.
+const BIN_LABELS = ["< 30 %", "30–45 %", "45–60 %", "60–75 %", "75 %+"];
 const pct = (share: number) => Math.round(share * 1000) / 10;
 const clamp = (value: number, low: number, high: number) => Math.min(high, Math.max(low, value));
 const official = TICKET_SUGGESTER.official;
@@ -122,7 +123,8 @@ function OwnRuleFields({ rule, onChange, onDelete }: { rule: DeckRule; onChange:
         </NativeSelect>
         <small className="deck-rule-hint">{PERIPHERY.explain}</small></div>
     </div>
-    <Label>Lengths, share of the regular deck, by how far a ticket reaches</Label>
+    <Label>Lengths: share of the regular deck in each band</Label>
+    <small className="deck-rule-hint">Bands are how far a ticket reaches, as a share of reach: the longest ticket a player can build.</small>
     <div className="deck-rule-bins">
       {rule.bins.map((share, index) => <div key={index}>
         <Label htmlFor={`rule-bin-${index}`}>{BIN_LABELS[index]}</Label>

@@ -112,7 +112,8 @@
 .deck-rule-table dd{margin:0;color:#1f1c18}
 .deck-rule-table small{font-size:12px;color:#2e2a24}
 .deck-rule-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px}
-.deck-rule-bins{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.deck-rule-bins{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;align-items:end}
+.deck-rule-bins label{white-space:nowrap}
 .deck-rule-hint{display:block;font-size:12px;color:#2e2a24}
 .deck-rule-wide{grid-column:1/-1}
 /* Larger than the helper text elsewhere: this page is read closely. */
