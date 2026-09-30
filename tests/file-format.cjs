@@ -87,6 +87,50 @@ const routeTypeIds = new Set((network.routeTypeStyles || []).map((s) => s.id));
 const missingRouteTypes = [...new Set(network.routes.map((route) => route.type))].filter((type) => !routeTypeIds.has(type));
 check("and every route type", missingRouteTypes.length === 0, missingRouteTypes.join(", "));
 
+// ---------------------------------------------------------------- formats that are now print choices
+// Test sheets and boards measured in sheets of paper stopped being board formats: a map is a 2×3 or
+// a 2×4 board, and paper is chosen when printing. A file that names an old format opens on the
+// nearest board, scaled uniformly and centred, so nothing is stretched out of shape.
+//
+// Heights are in map units, where the board is always 1100 wide:
+//   a4 778, a3 778, us-letter 850, board-2x3-large 733  →  board-2x3, 731
+//   a4-3x2 519, a4-4x2 389, letter-3x2 567, letter-4x2 425  →  board-2x4, 549
+const legacyFile = (format, extra = {}) => ({
+  format: "ticket-to-ride-map", version: 3, kind: "map", written: "2026-09-01T00:00:00.000Z",
+  app: { name: "Map prototypes", version: "0.1.0" }, board: { width: 1100, height: 778 },
+  payload: {
+    ...JSON.parse(JSON.stringify(sample)), format,
+    stops: [{ id: "s1", name: "Centre", x: 550, y: 389, type: sample.stops[0].type }, { id: "s2", name: "Corner", x: 0, y: 0, type: sample.stops[0].type }],
+    routes: [{ ...sample.routes[0], a: "s1", b: "s2", points: [{ x: 1100, y: 0 }] }],
+    notes: [{ id: "n1", x: 100, y: 100, width: 200, height: 100, text: "note" }],
+    background: [{ id: "b1", type: "area", points: [{ x: 0, y: 778 }], labelPoint: { x: 550, y: 389 } }],
+    ...extra,
+  },
+});
+const open = (format) => storage.normalizeMap(storage.readMapFile(JSON.parse(JSON.stringify(legacyFile(format)))).payload);
+const near = (a, b) => Math.abs(a - b) < 0.01;
+for (const [format, to] of [["a4", "board-2x3"], ["a3", "board-2x3"], ["us-letter", "board-2x3"], ["board-2x3-large", "board-2x3"],
+  ["a4-3x2", "board-2x4"], ["a4-4x2", "board-2x4"], ["letter-3x2", "board-2x4"], ["letter-4x2", "board-2x4"]]) {
+  check(`a map on the old ${format} format opens as ${to}`, open(format).format === to, open(format).format);
+}
+const a4 = open("a4");
+const s = 731 / 778;
+check("an A4 test sheet shrinks evenly to fit the board: the centre stays the centre",
+  near(a4.stops[0].x, 550) && near(a4.stops[0].y, 731 / 2), `${a4.stops[0].x}, ${a4.stops[0].y}`);
+check("and a corner moves in by the same factor both ways",
+  near(a4.stops[1].x, 550 - 550 * s) && near(a4.stops[1].y, 0), `${a4.stops[1].x}, ${a4.stops[1].y}`);
+check("bend points move with it", near(a4.routes[0].points[0].x, 550 + 550 * s) && near(a4.routes[0].points[0].y, 0), JSON.stringify(a4.routes[0].points[0]));
+check("notes move and shrink with it", near(a4.notes[0].x, 550 - 450 * s) && near(a4.notes[0].y, 100 * s) && near(a4.notes[0].width, 200 * s) && near(a4.notes[0].height, 100 * s), JSON.stringify(a4.notes[0]));
+check("background shapes and their labels too", near(a4.background[0].points[0].y, 731) && near(a4.background[0].labelPoint.y, 731 / 2), JSON.stringify(a4.background[0]));
+const strip = open("a4-4x2");
+check("a narrower strip is not stretched: it keeps its scale and is centred on the taller board",
+  near(strip.stops[1].x, 0) && near(strip.stops[1].y, (549 - 389) / 2), `${strip.stops[1].x}, ${strip.stops[1].y}`);
+const kept = open("board-2x3");
+check("a map already on a board keeps every coordinate", kept.stops[0].x === 550 && kept.stops[0].y === 389 && kept.notes[0].width === 200);
+const oldNetwork = storage.normalizeNetworkFile({ format: "a4", stops: [{ id: "s", x: 10, y: 778 }], routes: [] }, 731);
+check("a network file from an old format still lands on the board", near(oldNetwork.stops[0].y, 731), String(oldNetwork.stops[0].y));
+check("a migrated map is written back out under a board format", storage.writeMapFile("map", storage.mapPayload(a4), a4).payload.format === "board-2x3");
+
 console.log("PASS:"); ok.forEach((line) => console.log("  ✓ " + line));
 if (bad.length) { console.log("FAIL:"); bad.forEach((line) => console.log("  ✗ " + line)); }
 console.log(`\n${ok.length} passed, ${bad.length} failed`);
