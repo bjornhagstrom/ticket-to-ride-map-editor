@@ -154,3 +154,6 @@
 .balance-panel tbody tr:hover{background:#f7e9e6}
 /* The stop a Hub degree row is about. */
 .map-canvas .stop.previewed>circle:nth-of-type(2){stroke:#721c24;stroke-width:6;filter:drop-shadow(0 0 5px rgba(114,28,36,.7))}
+/* A ring of its own, clear of the stop, with a pale band under it so it shows over any route colour. */
+.map-canvas .balance-ring-halo{fill:none;stroke:#fff;stroke-width:12;opacity:.9;pointer-events:none}
+.map-canvas .balance-ring{fill:none;stroke:#b3261e;stroke-width:6;pointer-events:none}

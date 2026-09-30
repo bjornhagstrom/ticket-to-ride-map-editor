@@ -1706,6 +1706,20 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.waitForTimeout(250);
   const previewed = await page.evaluate(() => Array.from(document.querySelectorAll(".map-canvas .stop.previewed")).map((g) => g.textContent));
   check("pointing at a stop's row marks that stop on the map", previewed.length === 1 && previewed[0].includes(hubStop), `${hubStop}: ${previewed.join(", ")}`);
+  // The mark has to be found at a glance on a busy map: a ring of its own, clear of the stop and its
+  // routes, and thick enough to see. Measured on screen, where the map is scaled.
+  const ring = await page.evaluate(() => {
+    const g = document.querySelector(".map-canvas .stop.previewed");
+    const ringEl = g && g.querySelector(".balance-ring");
+    const dot = g && g.querySelector("circle:not(.stop-hit):not(.balance-ring)");
+    if (!ringEl || !dot) return null;
+    const ringBox = ringEl.getBoundingClientRect();
+    const dotBox = dot.getBoundingClientRect();
+    const scale = ringBox.width / (2 * +ringEl.getAttribute("r") + parseFloat(getComputedStyle(ringEl).strokeWidth));
+    return { gapPx: (ringBox.width - dotBox.width) / 2, strokePx: parseFloat(getComputedStyle(ringEl).strokeWidth) * scale, stroke: getComputedStyle(ringEl).stroke, fill: getComputedStyle(ringEl).fill };
+  });
+  check("the stop pointed at gets a ring of its own", ring !== null);
+  check("the ring stands clear of the stop and is thick enough to see", ring !== null && ring.gapPx >= 7 && ring.strokePx >= 3.5 && ring.fill === "none", JSON.stringify(ring));
   const roomRow = balancePanel.locator(".analysis-section", { has: page.locator("h3", { hasText: "Room per wagon" }) }).locator("tbody tr").first();
   await roomRow.hover();
   await page.waitForTimeout(250);

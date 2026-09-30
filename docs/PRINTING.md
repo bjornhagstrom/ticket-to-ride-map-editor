@@ -154,7 +154,8 @@ called. It used to be called two frames after the Print button, while the dialog
 out and the page was still locked for scrolling (`body` overflow hidden). Safari's first preview then
 spilled sheets onto a second page, and came right only when changing a setting in its dialog made it
 lay the page out again. Now `print()` waits until no dialog remains and the lock is off, for at most
-1.5 s. The regression suite clicks Print on screen, as a person does, to catch this; switching to print
+1.5 s. "Print deck" for the tickets goes through the same wait, with two frames at least because the
+cards' styles are applied after the print tree swaps to them. The regression suite clicks Print on screen, as a person does, to catch this; switching to print
 media first skipped the animation and hid the fault.
 
 **Safari's first layout is shorter.** When its print dialog opens, Safari's first layout has about
