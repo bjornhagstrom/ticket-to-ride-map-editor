@@ -121,9 +121,9 @@ gets it at once, and a new map starts with a Junction type ready to use.
 
 **Chosen.** Settings offers two board shapes, `2×3` (790 × 525 mm) and `2×4` (1053 × 526 mm), and
 wagons are always measured against that board. The Print button opens a dialog that decides the
-run: one sheet, a sheet per panel or full size; A4, A3, US Letter or Tabloid; and for a 2×3 at full
-size, the standard or the Anniversary board. The choice is remembered in the browser, never in the
-map.
+run: one sheet, a sheet per panel or full size; A4, A3, US Letter or Tabloid; and for a 2×3, an
+Anniversary size tick that prints the larger board at full size. The choice is remembered in the
+browser, never in the map. The arithmetic is in `docs/PRINTING.md`.
 
 **Why.** One list used to mix the shape of the map with how it was printed, and a test sheet needed
 a second setting to say which board it stood in for. Paper cannot be dropped — a 790 × 525 mm board
@@ -133,7 +133,9 @@ print dialog to pick the orientation — but it is a decision about one print ru
 **Rejected.** Stretching old maps onto the new boards, as a format change used to. A 4 × 2 sheet
 board is 41 % shorter than a 2×4, so stretching would distort every route; old maps are scaled
 evenly and centred instead. Also rejected: bumping the file version for this, since the ids that
-remain are ones every version 3 reader already knows.
+remain are ones every version 3 reader already knows. And a page box the size of the paper with
+`@page` margin 0: Safari ignores that margin, and full size on A4 printed 18 sheets, every other one
+blank.
 
 **Would change it.** A second official board shape worth designing for, or printers that make the
 10 mm margin and 8 mm caption a poor guess — both are constants in `app/print-plan.ts`.

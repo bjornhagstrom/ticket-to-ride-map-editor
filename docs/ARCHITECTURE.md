@@ -169,11 +169,13 @@ Shared maps and live collaboration require a server API, central storage and an 
 
 ## Printing
 
-The board's shape lives in the map; how it is printed does not. `app/print-plan.ts` turns a board and a print choice — split (one sheet, per panel, full size), paper (A4, A3, US Letter, Tabloid) and, for a 2×3 at full size, standard or Anniversary — into a plan: the page in millimetres with its orientation, the scale, and one tile per page as a share of the board. It allows a 10 mm printer margin and an 8 mm caption on every page, picks the orientation that gives the largest scale or the fewest sheets, and never enlarges a panel beyond full size. `tests/print-plan.cjs` pins its figures.
+The board's shape lives in the map; how it is printed does not. `app/print-plan.ts` turns a board and a print choice — split (one sheet, per panel, full size), paper (A4, A3, US Letter, Tabloid) and, for a 2×3, an Anniversary size tick that implies full size — into a plan: the page in millimetres with its orientation, the scale, and one tile per page as a share of the board. It allows a 10 mm printer margin and an 8 mm caption on every page, picks the orientation that gives the largest scale or the fewest sheets, and never enlarges a panel beyond full size. `tests/print-plan.cjs` pins its figures.
 
 `PrintDialog` in `app/map-print.tsx` offers the choices and a table of every combination, all computed by the same `printPlan`, so the table cannot disagree with what is printed. The choice is kept in `localStorage` under `ttr-print-choice`, never in the map or the undo history.
 
-`PrintPages` renders the plan into a hidden print-only tree. Every page, caption and tile gets its size inline in millimetres from the plan, and a single global `@page` rule declares the paper, because only one plan is live at a time. Named `@page` rules were tried first; print dialogs do not honour them reliably, and a global rule with explicit dimensions does. Everything outside the print tree is hidden so no blank trailing sheet is produced. Full-size sheets carry cut marks at the tile corners instead of a border, to be trimmed and butted.
+`PrintPages` renders the plan into a hidden print-only tree. A single global `@page` rule declares the paper and a 10 mm margin, because only one plan is live at a time; the page box is the paper less that margin with no fixed height, so a browser that ignores `@page` margin (Safari) cannot spill onto blank sheets. Captions and tiles get their size inline in millimetres from the plan. Named `@page` rules were tried first; print dialogs do not honour them reliably, and a global rule with explicit dimensions does. Everything outside the print tree is hidden so no blank trailing sheet is produced. Full-size sheets carry cut marks at the tile corners instead of a border, to be trimmed and butted.
+
+The arithmetic behind every sheet count, why the page box is smaller than the paper, the rules that keep the dialog still, and how printing is tested are in `docs/PRINTING.md`.
 
 ## Testing
 

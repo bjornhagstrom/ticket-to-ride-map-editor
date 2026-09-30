@@ -5,7 +5,8 @@
 // The board's shape is a property of the map; how it is printed is a choice made per run. These
 // checks pin down what each choice produces: how many sheets, which way up, at what scale. The
 // figures are worked out by hand from the paper sizes, a 10 mm printer margin on every side and an
-// 8 mm caption line, so a change to any of those shows up here as a changed count.
+// 8 mm caption line, so a change to any of those shows up here as a changed count. The working is
+// written out in docs/PRINTING.md.
 const { execFileSync } = require("child_process");
 const fs = require("fs");
 const os = require("os");

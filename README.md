@@ -92,7 +92,8 @@ The deployable website is generated in `out/`. Its contents are intended to be s
 | `app/map-artwork.tsx` | SVG rendering of the map |
 | `app/map-properties.tsx` | Properties panel editors |
 | `app/map-dialogs.tsx` | Welcome guide, balance report and suggestions |
-| `app/map-print.tsx` | Print pages |
+| `app/map-print.tsx` | Print pages and the print dialog |
+| `app/print-plan.ts` | How a board is cut into sheets for a print choice |
 | `app/globals.css` | Main editor layout and visual styling |
 | `app/editor-additions.css` | Route handles, mobile behaviour and print layouts |
 | `app/layout.tsx` | Page metadata and global layout |
@@ -101,6 +102,7 @@ The deployable website is generated in `out/`. Its contents are intended to be s
 | `docs/ARCHITECTURE.md` | Application structure and state flow |
 | `docs/MAP-FORMAT.md` | JSON project format and compatibility rules |
 | `docs/DEPLOYMENT.md` | Build, Websupport deployment and rollback |
+| `docs/PRINTING.md` | Board versus print choices, sheet arithmetic, page box and print testing |
 
 ## Verification
 
@@ -116,11 +118,16 @@ npm run dev
 npm run test:regression
 ```
 
-It drives the editor with Playwright and checks 25 things: the welcome guide, the example map,
-per-route colours, the tool row and its tooltips, bend points on double routes, curves, locomotive
-marking, undo, real-size wagons and stop circles, the room-per-wagon table, the balance and
-suggestion dialogs, the hint boxes, the measure tool, placing a stop, changing board format, print
-pages and reload persistence.
+It drives the editor with Playwright and makes about two hundred checks, from the welcome guide and
+the example map through route editing, real-size wagons, the balance and suggestion dialogs and the
+ticket tools to the print dialog, including real PDFs printed with the browser's own margins. If it
+breaks off part way, it still lists the checks it made before stopping.
+
+`npm test` runs the typecheck, the suggester, calibration, file-format and print-plan checks, and the
+build. Printing is described in `docs/PRINTING.md`.
+
+The dev server sends CSS pretty-printed and with properties reordered, so check a change with
+`scripts/served-css-rule.sh '<selector> {'` rather than by grepping for the line as written.
 
 It is a single script rather than a Playwright test project, and it expects the editor at
 `http://localhost:3000/ttr/`. It has caught real bugs — a handle's hit area swallowing the click
