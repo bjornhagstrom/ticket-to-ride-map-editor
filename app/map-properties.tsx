@@ -44,7 +44,7 @@ export function StopProperties({ stop, change, onDelete, labelState, mapEndGapMm
       ? <p className="helper">This is a junction: it joins routes and no ticket ends here, so its name is not drawn on the map or in print. The name is kept here so you can tell junctions apart, and shows when you point at the stop.</p>
       : <div className="label-angle">
       <Label>Name position · {Math.round(labelAngleOf(stop))}°</Label>
-      <input className="range-input" type="range" min="0" max="345" step="15" value={Math.round(labelAngleOf(stop))} onChange={(event) => update({ labelAngle: Number(event.target.value) })} />
+      <input className="range-input" type="range" min="0" max="359" step="1" value={Math.round(labelAngleOf(stop))} onChange={(event) => update({ labelAngle: Number(event.target.value) })} />
       <p className={cn("helper", labelState.covers && "helper-warning")}>
         {labelState.covers
           ? labelState.clear.length

@@ -107,6 +107,8 @@ export function MapEditor() {
   const [danger, setDanger] = useState<Danger>(null);
   const [pendingImport, setPendingImport] = useState<PendingImport | null>(null);
   const dragStopRef = useRef<string | null>(null);
+  // A stop whose name is being turned round it with the pointer.
+  const dragStopLabelRef = useRef<string | null>(null);
   const dragWaypointRef = useRef<{ routeId: string; index: number; grabOffset: Point } | null>(null);
   const dragBackgroundPointRef = useRef<{ shapeId: string; index: number } | null>(null);
   const dragBackgroundLabelRef = useRef<string | null>(null);
@@ -269,7 +271,7 @@ export function MapEditor() {
       const atTop = points.length ? above(points.reduce((sum, point) => sum + point.y, 0) / points.length) : false;
       return { atTop, title: "Editing this route", body: <>Click a <b>+</b> to add a bend point anywhere along it · drag a bend point to move it · <b>double-click a bend point to remove it</b> · routes are smooth curves by default: untick <b>Draw as a smooth curve</b> under Properties for straight segments between the bends{selectedRouteHasSlots ? <> · <b>click a wagon space to mark it as needing a locomotive</b>, and click it again to clear it</> : null}</> };
     }
-    if (selectedS) return { atTop: above(selectedS.y), title: "Editing this stop", body: <>Drag the stop to move it, and every route into it follows · <b>hold Shift to drag it even when its position is locked</b> · turn its name out of the way with <b>Name position</b> under Properties · with the Draw route tool, click this stop and then another to connect them</> };
+    if (selectedS) return { atTop: above(selectedS.y), title: "Editing this stop", body: <>Drag the stop to move it, and every route into it follows · <b>hold Shift to drag it even when its position is locked</b> · <b>drag its name round the stop</b> to move it clear of a route, or turn it with <b>Name position</b> under Properties · with the Draw route tool, click this stop and then another to connect them</> };
     return null;
   })();
   const selectedB = data.background.find((shape) => shape.id === selectedBackground);
@@ -402,7 +404,7 @@ export function MapEditor() {
     if (pendingStop) setPickTo(point);
     // Hold the pointer once a drag is under way, so it keeps reporting after it leaves the board.
     if (dragging() && !event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.setPointerCapture(event.pointerId);
-    if (dragNoteRef.current || dragImageRef.current || dragBackgroundLabelRef.current || dragBackgroundPointRef.current || dragWaypointRef.current || dragStopRef.current) draggedRef.current = true;
+    if (dragNoteRef.current || dragImageRef.current || dragBackgroundLabelRef.current || dragBackgroundPointRef.current || dragWaypointRef.current || dragStopRef.current || dragStopLabelRef.current) draggedRef.current = true;
     if (dragNoteRef.current) {
       const drag = dragNoteRef.current;
       setData((current) => ({
@@ -456,18 +458,29 @@ export function MapEditor() {
       });
       setSaved(false); return;
     }
+    if (dragStopLabelRef.current) {
+      // The name goes where the pointer is, seen from the stop, to the whole degree. The stop itself
+      // stays put, locked or not: the lock is about its position, not its name.
+      const stopId = dragStopLabelRef.current;
+      setData((current) => ({ ...current, stops: current.stops.map((stop) => {
+        if (stop.id !== stopId) return stop;
+        const angle = Math.round(Math.atan2(point.y - stop.y, point.x - stop.x) * 180 / Math.PI + 360) % 360;
+        return { ...stop, labelAngle: angle };
+      }) }));
+      setSaved(false); return;
+    }
     if (!dragStopRef.current) return;
     setData((current) => ({ ...current, stops: current.stops.map((stop) => stop.id === dragStopRef.current ? { ...stop, ...point } : stop) }));
     setSaved(false);
   };
-  const dragging = () => Boolean(dragNoteRef.current || dragImageRef.current || dragBackgroundLabelRef.current || dragBackgroundPointRef.current || dragWaypointRef.current || dragStopRef.current);
+  const dragging = () => Boolean(dragNoteRef.current || dragImageRef.current || dragBackgroundLabelRef.current || dragBackgroundPointRef.current || dragWaypointRef.current || dragStopRef.current || dragStopLabelRef.current);
   const stopDragging = () => {
     // Only a drag that actually moved something becomes an undo step — a plain click to select
     // sets the same refs and should not fill the history with no-ops.
     if (draggedRef.current && dragSnapshotRef.current) pushHistory(dragSnapshotRef.current);
     dragSnapshotRef.current = null;
     draggedRef.current = false;
-    dragStopRef.current = null; dragWaypointRef.current = null; dragBackgroundPointRef.current = null; dragBackgroundLabelRef.current = null; dragImageRef.current = null; dragNoteRef.current = null;
+    dragStopRef.current = null; dragStopLabelRef.current = null; dragWaypointRef.current = null; dragBackgroundPointRef.current = null; dragBackgroundLabelRef.current = null; dragImageRef.current = null; dragNoteRef.current = null;
   };
   const deleteSelected = () => {
     change((draft) => {
@@ -676,7 +689,7 @@ export function MapEditor() {
         <div className="map-status"><Badge variant="secondary">{format.shortLabel}</Badge><Badge variant="secondary">{format.widthMm.toLocaleString("en-GB")} × {format.heightMm.toLocaleString("en-GB")} mm</Badge><Badge variant="secondary">{data.stops.length} stops</Badge><Badge variant="secondary">{data.routes.length} routes</Badge><Badge variant="secondary">{data.background.length} background objects</Badge>{data.notes.length > 0 && <Badge variant="secondary">{data.notes.length} note{data.notes.length === 1 ? "" : "s"}</Badge>}<span>Everything is stored in the exported map file</span></div>
         {hint && hint.atTop && <MapHint atTop title={hint.title} open={routeHintOpen} onToggle={toggleRouteHint} offsetX={routeHintX} onOffsetChange={moveRouteHint}>{hint.body}</MapHint>}
         <svg className={cn("map-canvas", `tool-${tool}`)} style={{ aspectRatio: `${W} / ${format.height}` }} viewBox={`0 0 ${W} ${format.height}`} onPointerDown={onCanvasDown} onPointerMove={onCanvasMove} onPointerUp={stopDragging} onPointerCancel={stopDragging}>
-          <MapArtwork data={data} tool={tool} highlightRoutes={highlightRoutes} scaleWidthMm={scaleWidthMm} selectedRoute={selectedRoute} selectedStop={selectedStop} selectedBackground={selectedBackground} imageSelected={imageSelected} selectedNote={selectedNote} bottleneckRoutes={showAnalysis ? bottleneckRoutes : undefined} pendingStop={pendingStop} pickTo={pickTo} previewRoutes={preview?.routes} previewLabel={preview?.label ?? null} onStopHover={setHoveredStop} draft={{ type: backgroundType, points: draftPoints, fill: backgroundFill, stroke: backgroundStroke }} onRoute={(id) => { setSelectedRoute(id); setSelectedStop(null); setSelectedBackground(null); setSelectedNote(null); setTool("select"); }} onRouteSlot={toggleLocomotiveSlot} onRouteBendInsert={insertRouteBend} onRouteBendRemove={removeRouteBend} onStop={(id, shiftHeld) => { chooseStop(id); if (tool === "select" && (shiftHeld || !stopById(data, id)?.locked)) { beginDrag(); dragStopRef.current = id; } }} onWaypoint={(routeId, index, grabOffset) => { beginDrag(); dragWaypointRef.current = { routeId, index, grabOffset }; }} onBackground={(id) => { setSelectedBackground(id); setSelectedRoute(null); setSelectedStop(null); setSelectedNote(null); setTool("select"); }} onBackgroundPoint={(shapeId, index) => { beginDrag(); dragBackgroundPointRef.current = { shapeId, index }; }} onBackgroundLabel={(shapeId) => { beginDrag(); dragBackgroundLabelRef.current = shapeId; }} onImageSelect={chooseImage} onImageMove={(point) => { chooseImage(); const img = data.backgroundImage; if (img) { beginDrag(); dragImageRef.current = { mode: "move", offsetX: point.x - img.x, offsetY: point.y - img.y }; } }} onImageScale={() => { beginDrag(); dragImageRef.current = { mode: "scale" }; }} onImageRotate={() => { beginDrag(); dragImageRef.current = { mode: "rotate" }; }} onNoteSelect={chooseNote} onNoteMove={(id, point) => { chooseNote(id); const note = data.notes.find((item) => item.id === id); if (note) { beginDrag(); dragNoteRef.current = { id, mode: "move", offsetX: point.x - note.x, offsetY: point.y - note.y }; } }} onNoteResize={(id) => { beginDrag(); dragNoteRef.current = { id, mode: "resize" }; }} onNoteToggle={(id) => change((draft) => { const note = draft.notes.find((item) => item.id === id); if (note) note.collapsed = !note.collapsed || undefined; return draft; })} />
+          <MapArtwork data={data} tool={tool} highlightRoutes={highlightRoutes} scaleWidthMm={scaleWidthMm} selectedRoute={selectedRoute} selectedStop={selectedStop} selectedBackground={selectedBackground} imageSelected={imageSelected} selectedNote={selectedNote} bottleneckRoutes={showAnalysis ? bottleneckRoutes : undefined} pendingStop={pendingStop} pickTo={pickTo} previewRoutes={preview?.routes} previewLabel={preview?.label ?? null} onStopHover={setHoveredStop} draft={{ type: backgroundType, points: draftPoints, fill: backgroundFill, stroke: backgroundStroke }} onRoute={(id) => { setSelectedRoute(id); setSelectedStop(null); setSelectedBackground(null); setSelectedNote(null); setTool("select"); }} onRouteSlot={toggleLocomotiveSlot} onRouteBendInsert={insertRouteBend} onRouteBendRemove={removeRouteBend} onStop={(id, shiftHeld) => { chooseStop(id); if (tool === "select" && (shiftHeld || !stopById(data, id)?.locked)) { beginDrag(); dragStopRef.current = id; } }} onWaypoint={(routeId, index, grabOffset) => { beginDrag(); dragWaypointRef.current = { routeId, index, grabOffset }; }} onBackground={(id) => { setSelectedBackground(id); setSelectedRoute(null); setSelectedStop(null); setSelectedNote(null); setTool("select"); }} onBackgroundPoint={(shapeId, index) => { beginDrag(); dragBackgroundPointRef.current = { shapeId, index }; }} onBackgroundLabel={(shapeId) => { beginDrag(); dragBackgroundLabelRef.current = shapeId; }} onImageSelect={chooseImage} onImageMove={(point) => { chooseImage(); const img = data.backgroundImage; if (img) { beginDrag(); dragImageRef.current = { mode: "move", offsetX: point.x - img.x, offsetY: point.y - img.y }; } }} onImageScale={() => { beginDrag(); dragImageRef.current = { mode: "scale" }; }} onImageRotate={() => { beginDrag(); dragImageRef.current = { mode: "rotate" }; }} onStopLabel={(id) => { chooseStop(id); beginDrag(); dragStopLabelRef.current = id; }} onNoteSelect={chooseNote} onNoteMove={(id, point) => { chooseNote(id); const note = data.notes.find((item) => item.id === id); if (note) { beginDrag(); dragNoteRef.current = { id, mode: "move", offsetX: point.x - note.x, offsetY: point.y - note.y }; } }} onNoteResize={(id) => { beginDrag(); dragNoteRef.current = { id, mode: "resize" }; }} onNoteToggle={(id) => change((draft) => { const note = draft.notes.find((item) => item.id === id); if (note) note.collapsed = !note.collapsed || undefined; return draft; })} />
         </svg>
         {hint && !hint.atTop && <MapHint atTop={false} title={hint.title} open={routeHintOpen} onToggle={toggleRouteHint} offsetX={routeHintX} onOffsetChange={moveRouteHint}>{hint.body}</MapHint>}
       </section>

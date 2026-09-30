@@ -139,6 +139,9 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
       // By its drawn name, or by its hover title for a junction, whose name is not drawn.
       const s = Array.from(document.querySelectorAll(".map-canvas .stop")).find((g) => Array.from(g.querySelectorAll("text, title")).some((t) => t.textContent === n));
       s.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+      // A click ends where it began. Without the release, the select tool is left holding a drag of
+      // the stop, and the next real pointer movement drags it across the map.
+      s.dispatchEvent(new PointerEvent("pointerup", { bubbles: true }));
     }, name);
     await page.waitForTimeout(250);
   };
@@ -1071,6 +1074,54 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   const badGaps = turns.filter((turn) => turn.gap < -0.5 || turn.gap > turn.height).map((turn) => `${turn.angle}°: ${turn.gap.toFixed(1)}px`);
   check("and keeps the same small distance from the stop at every angle", badGaps.length === 0, badGaps.join(", "));
   await page.locator(".label-angle", { hasText: "Name position" }).locator("input[type=range]").fill("165");
+  await page.keyboard.press("Escape");
+
+  // 33d. a stop's name can be taken with the mouse and turned to any angle round the stop
+  await tool("Select & move").click();
+  const centralName = () => page.evaluate(() => {
+    const g = Array.from(document.querySelectorAll(".map-canvas .stop")).find((el) => Array.from(el.querySelectorAll("text")).some((t) => t.textContent === "Central"));
+    const c = g.querySelector("circle").getBoundingClientRect();
+    const t = Array.from(g.querySelectorAll("text")).find((el) => el.textContent === "Central").getBoundingClientRect();
+    const cx = c.x + c.width / 2, cy = c.y + c.height / 2, lx = t.x + t.width / 2, ly = t.y + t.height / 2;
+    return { cx, cy, lx, ly, bearing: (Math.atan2(ly - cy, lx - cx) * 180 / Math.PI + 360) % 360 };
+  });
+  const storedCentral = () => page.evaluate(() => JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")).stops.find((stop) => stop.name === "Central"));
+  const bearingGap = (a, b) => Math.abs(((a - b + 540) % 360) - 180);
+  const dragName = async (angle, { release = true } = {}) => {
+    const at = await centralName();
+    const to = { x: at.cx + Math.cos(angle * Math.PI / 180) * 45, y: at.cy + Math.sin(angle * Math.PI / 180) * 45 };
+    await page.mouse.move(at.lx, at.ly);
+    await page.mouse.down();
+    await page.mouse.move(to.x, to.y, { steps: 8 });
+    if (release) { await page.mouse.up(); await page.waitForTimeout(300); }
+  };
+  const beforeDrag = await storedCentral();
+  await dragName(37, { release: false });
+  // The name box is pushed out by half its width but only part of its height, so its centre points
+  // flatter than the angle; the angle itself is what the Name position slider shows.
+  const midDrag = Number(await page.locator(".label-angle", { hasText: "Name position" }).locator("input[type=range]").inputValue());
+  check("a name follows the pointer round its stop while it is dragged", bearingGap(midDrag, 37) <= 2, `${midDrag}°`);
+  await page.mouse.up();
+  await page.waitForTimeout(300);
+  const afterDrag = await storedCentral();
+  check("and stays at the angle it was let go, to the degree rather than in 15° steps", afterDrag.labelAngle !== undefined && bearingGap(afterDrag.labelAngle, 37) <= 2 && afterDrag.labelAngle % 15 !== 0, String(afterDrag.labelAngle));
+  check("dragging the name leaves the stop where it was", afterDrag.x === beforeDrag.x && afterDrag.y === beforeDrag.y, `${beforeDrag.x},${beforeDrag.y} -> ${afterDrag.x},${afterDrag.y}`);
+  const nameSlider = page.locator(".label-angle", { hasText: "Name position" }).locator("input[type=range]");
+  check("the Name position slider shows the dragged angle", Number(await nameSlider.inputValue()) === afterDrag.labelAngle, `${await nameSlider.inputValue()} vs ${afterDrag.labelAngle}`);
+  check("and the stop's hint says the name can be dragged", /drag (its|the) name/i.test(await page.locator(".map-hint").textContent()), await page.locator(".map-hint").textContent());
+  await page.evaluate(() => document.activeElement && document.activeElement.blur());
+  await page.keyboard.press("Meta+z");
+  await page.waitForTimeout(300);
+  check("one undo puts the whole drag back", (await storedCentral()).labelAngle === beforeDrag.labelAngle, `${(await storedCentral()).labelAngle} vs ${beforeDrag.labelAngle}`);
+  await clickStop("Central");
+  await page.getByRole("button", { name: "Lock position" }).click();
+  await page.waitForTimeout(200);
+  await dragName(270);
+  const lockedDrag = await storedCentral();
+  check("a locked stop's name can still be turned", bearingGap(lockedDrag.labelAngle, 270) <= 2, String(lockedDrag.labelAngle));
+  check("without the locked stop moving", lockedDrag.x === beforeDrag.x && lockedDrag.y === beforeDrag.y);
+  await page.getByRole("button", { name: "Unlock position" }).click();
+  await nameSlider.fill("165");
   await page.keyboard.press("Escape");
 
   // 34. a map saved on a format that is now a print choice opens on its board
