@@ -61,7 +61,14 @@ export function MapArtwork({ data, tool = "select", highlightRoutes, scaleWidthM
   ? <><rect className="wagon-slot-outline" x={-slotW / 2 - 1} y={-slotH / 2 - 1} width={slotW + 2} height={slotH + 2} rx="4" /><rect x={-slotW / 2} y={-slotH / 2} width={slotW} height={slotH} rx="3" fill="#fffaf0" stroke={routeColor} strokeWidth="3" /></>
   : <><path className={cn("wagon-slot-outline", wagonShape === "heavy" && "heavy")} d={slotPath} strokeLinejoin="round" /><path d={slotPath} fill="#fffaf0" stroke={routeColor} strokeWidth={wagonShape === "heavy" ? 5 : 3} strokeLinejoin="round" /></>}
 {wagonGlyph && !isLocomotive && <text className="wagon-glyph" fontSize={slotH * .62}>{wagonGlyph}</text>}
-{isLocomotive && <g className="locomotive-icon" transform={`scale(${slotW / 24})`}><rect x={-8} y={-3.5} width="11" height="7" rx="1.5" /><rect x={2} y={-1.5} width="4.5" height="5" rx="1" /><rect x={-2.5} y={-6.5} width="2.5" height="3.5" /><circle cx={-4.5} cy={4} r="1.6" /><circle cx={1.5} cy={4} r="1.6" /></g>}</g>; })}</g>; })}
+{isLocomotive && <g className="locomotive-icon" transform={`scale(${slotW / 24})`}>
+  {/* In a 24-wide space: boiler, cab with a window, chimney and three wheels, filling most of the
+      space's length and staying inside its height. The old icon was 60 % of the length and its
+      chimney stood out above the space. */}
+  <rect x={-9.5} y={-2.4} width="12.5" height="4.6" rx="2" /><rect x={2} y={-4.4} width="7.2" height="6.6" rx="1" /><rect x={-7.6} y={-4.4} width="2.4" height="2.4" rx=".4" />
+  <rect className="locomotive-window" x={4.2} y={-3.2} width="3" height="2.2" rx=".4" />
+  <circle cx={-6.4} cy={3.1} r="1.5" /><circle cx={-1.8} cy={3.1} r="1.5" /><circle cx={5.6} cy={3.1} r="1.5" />
+</g>}</g>; })}</g>; })}
     {!print && (() => {
       // The two-click tools draw a rubber band from the stop they are waiting on to the pointer, so
       // it is obvious that a pick is in progress and where it started.

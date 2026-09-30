@@ -91,8 +91,21 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   check("a route with two bends that turn opposite ways", example.routes.some((r) => { const t = bendTurns(r); return t.length >= 2 && t.some((a) => a > 5) && t.some((a) => a < -5); }));
   check("a straight route with a sharp corner, at least 45°", example.routes.some((r) => r.curved === false && bendTurns(r).some((a) => Math.abs(a) >= 45)), example.routes.filter((r) => r.curved === false).map((r) => bendTurns(r).map((a) => a.toFixed(0)).join("/")).join(", "));
   const pairIs = (r, x, y) => (r.a === x && r.b === y) || (r.a === y && r.b === x);
-  check("Central–Lakeside is a boat route", example.routes.some((r) => pairIs(r, "example-central", "example-lakeside") && shapeOf(r) === "oval"));
-  check("at least three spaces need a locomotive", example.routes.reduce((n, r) => n + (r.locomotiveSlots || []).length, 0) >= 3, String(example.routes.reduce((n, r) => n + (r.locomotiveSlots || []).length, 0)));
+  // Locomotives go on ordinary routes: no official map asks for one on a boat.
+  const locos = (r) => (r.locomotiveSlots || []).length;
+  const centralLakeside = example.routes.find((r) => pairIs(r, "example-central", "example-lakeside"));
+  check("Central–Lakeside is an ordinary train route with two locomotives", centralLakeside && shapeOf(centralLakeside) === "plain" && locos(centralLakeside) === 2, centralLakeside ? `${shapeOf(centralLakeside)}, ${locos(centralLakeside)}` : "missing");
+  check("no boat route asks for a locomotive", example.routes.filter((r) => shapeOf(r) === "oval").every((r) => locos(r) === 0));
+  check("two other ordinary routes have one locomotive each", example.routes.filter((r) => r !== centralLakeside && shapeOf(r) === "plain" && locos(r) === 1).length >= 2);
+  // The locomotive drawn in a space is big enough to read: most of the space's length, inside its height.
+  const locoSize = await page.evaluate(() => {
+    const icon = document.querySelector(".map-canvas .locomotive-icon");
+    const slot = icon.closest(".wagon-slot").querySelector("rect:not(.wagon-slot-outline), path:not(.wagon-slot-outline)");
+    const scale = icon.transform.baseVal.consolidate().matrix.a;
+    const i = icon.getBBox(), b = slot.getBBox();
+    return { width: i.width * scale / b.width, top: i.y * scale, bottom: (i.y + i.height) * scale, slotTop: b.y, slotBottom: b.y + b.height };
+  });
+  check("the locomotive fills most of its space, and stays inside it", locoSize.width >= 0.75 && locoSize.top >= locoSize.slotTop - 0.01 && locoSize.bottom <= locoSize.slotBottom + 0.01, JSON.stringify(Object.fromEntries(Object.entries(locoSize).map(([k, v]) => [k, +v.toFixed(2)]))));
   // A boat space has pointed ends, so it cannot be mistaken for a wagon: a point towards its corner
   // lies outside it, where it would lie inside an ordinary space.
   const pointed = await page.evaluate(() => {
@@ -114,6 +127,12 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     return samples.filter((pt) => inside(pt, lake.points)).length / samples.length;
   });
   check("the lake lies under every boat route", boatCover.length >= 2 && boatCover.every((share) => share >= 0.85), boatCover.map((share) => `${Math.round(share * 100)} %`).join(", "));
+  const trainOnWater = example.routes.filter((r) => shapeOf(r) !== "oval").map((r) => {
+    const pts = [pos(r.a), ...(r.points || []), pos(r.b)]; const samples = [];
+    for (let i = 0; i < pts.length - 1; i++) for (let k = 1; k < 10; k++) samples.push({ x: pts[i].x + (pts[i + 1].x - pts[i].x) * k / 10, y: pts[i].y + (pts[i + 1].y - pts[i].y) * k / 10 });
+    return { id: r.id, share: samples.filter((pt) => inside(pt, lake.points)).length / samples.length };
+  }).filter((item) => item.share > 0.2);
+  check("and no train route runs across it", trainOnWater.length === 0, trainOnWater.map((item) => `${item.id} ${Math.round(item.share * 100)} %`).join(", "));
   const harbour = pos("example-harbour");
   const nearEdge = (pt, poly) => Math.min(...poly.map((a, i) => { const b = poly[(i + 1) % poly.length]; const t = Math.max(0, Math.min(1, ((pt.x - a.x) * (b.x - a.x) + (pt.y - a.y) * (b.y - a.y)) / ((b.x - a.x) ** 2 + (b.y - a.y) ** 2))); return Math.hypot(pt.x - a.x - t * (b.x - a.x), pt.y - a.y - t * (b.y - a.y)); }));
   check("and reaches Harbour", inside(harbour, lake.points) || nearEdge(harbour, lake.points) <= 12, `${nearEdge(harbour, lake.points).toFixed(0)} units away`);

@@ -130,6 +130,10 @@ are private and live in their own repository beside this one, `../ttr-reference-
 editor itself, needs none of that data. The suggester's targets are already written into the code, so
 the data is only needed to change or re-check its calibration. Printing is described in `docs/PRINTING.md`.
 
+Edits to `app/globals.css` do not reach a running dev server: it keeps serving the old rules until
+it is restarted (stop it, delete `.next`, start it again). Edits to `app/editor-additions.css` arrive at
+once. Checked twice, in two working copies, on 30 September.
+
 The dev server sends CSS pretty-printed and with properties reordered, so check a change with
 `scripts/served-css-rule.sh '<selector> {'` rather than by grepping for the line as written.
 
