@@ -624,6 +624,41 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.waitForTimeout(700);
   check("map survives a reload", (await badges())[2] === `${stopsBefore + 1} stops`, (await badges())[2]);
 
+  // 11b. the board as a picture: a PNG from the Export menu, drawn like the print, without the editor's marks
+  {
+    const mapName = await page.evaluate(() => JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")).name);
+    const viewBox = await page.evaluate(() => document.querySelector(".map-canvas").getAttribute("viewBox").split(/\s+/).map(Number));
+    await page.getByRole("button", { name: "Export", exact: true }).click();
+    await page.waitForTimeout(250);
+    check("the Export menu offers the map as an image", (await page.getByRole("menuitem", { name: /Map as image/ }).count()) === 1);
+    const pngDownload = page.waitForEvent("download", { timeout: 15000 });
+    await page.getByRole("menuitem", { name: /Map as image/ }).click();
+    const png = await pngDownload;
+    const pngFile = path.join(os.tmpdir(), `ttr-image-${Date.now()}.png`);
+    await png.saveAs(pngFile);
+    const bytes = fs.readFileSync(pngFile);
+    check("the picture is named after the map and is a .png", png.suggestedFilename() === `${mapName}.png`, png.suggestedFilename());
+    check("and really is a PNG", bytes.subarray(0, 8).toString("hex") === "89504e470d0a1a0a");
+    const pngWidth = bytes.readUInt32BE(16), pngHeight = bytes.readUInt32BE(20);
+    check("it is big enough to print from, and has the board's proportions", pngWidth >= 2200 && Math.abs(pngWidth / pngHeight - viewBox[2] / viewBox[3]) < 0.01, `${pngWidth} x ${pngHeight}, board ${viewBox[2]} x ${viewBox[3]}`);
+    // What is in it, read back the way a person would see it: decoded, and counted by colour.
+    const pixels = await page.evaluate(async (b64) => {
+      const img = new Image(); img.src = `data:image/png;base64,${b64}`; await img.decode();
+      const c = document.createElement("canvas"); c.width = img.width; c.height = img.height;
+      const ctx = c.getContext("2d"); ctx.drawImage(img, 0, 0);
+      const d = ctx.getImageData(0, 0, c.width, c.height).data;
+      const paper = [0xf7, 0xf1, 0xe5]; let inked = 0, transparent = 0; const hues = new Set();
+      for (let i = 0; i < d.length; i += 4 * 7) {
+        if (d[i + 3] < 250) { transparent += 1; continue; }
+        if (Math.abs(d[i] - paper[0]) + Math.abs(d[i + 1] - paper[1]) + Math.abs(d[i + 2] - paper[2]) > 40) { inked += 1; hues.add(`${d[i] >> 6}${d[i + 1] >> 6}${d[i + 2] >> 6}`); }
+      }
+      return { inked: inked / (d.length / 28), transparent: transparent / (d.length / 28), hues: hues.size };
+    }, bytes.toString("base64"));
+    check("the picture has the map in it, on an opaque paper ground", pixels.inked > 0.03 && pixels.transparent === 0 && pixels.hues >= 6, JSON.stringify(pixels));
+    check("and nothing is left behind on the page", (await page.locator(".image-stage").count()) === 0);
+    fs.rmSync(pngFile, { force: true });
+  }
+
   // 12. destination tickets: decks, ticket-only export and import, card printing
   // Counted against what the map already holds, so a richer example map does not move the goalposts.
   const ticketsNow = () => page.evaluate(() => { const m = JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")); return { main: m.tickets.filter((t) => (t.set || "main") === "main").length, decks: m.ticketSets.map((d) => `${d.label} (${m.tickets.filter((t) => (t.set || "main") === d.id).length})`) }; });
