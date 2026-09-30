@@ -49,12 +49,6 @@ export type EditorDefaults = {
   linkParallel: boolean; setLinkParallel: (value: boolean) => void;
 };
 
-// Settings decides the board's shape; paper and splitting are asked for when printing.
-function printingNote(id: MapFormat): string {
-  const format = mapFormats[id];
-  return `This is the shape the map is drawn for, and what wagon spaces are measured against. How it is printed — on one sheet, a sheet per panel, or at full size across as many sheets as it takes, on A4, A3, US Letter or Tabloid${format.columns === 3 ? ", or grown to the Anniversary board" : ""} — is chosen each time you print.`;
-}
-
 const clampCount = (raw: string, fallback: number): number => {
   const number = Math.round(Number(raw));
   return Number.isFinite(number) && number >= 1 ? number : fallback;
@@ -76,7 +70,6 @@ export function SettingsDialog({ open, onOpenChange, target, onTarget, data, cha
   };
   const list = lists[kind] ?? [];
   const selected = list.find((style) => style.id === target.id) ?? list[0];
-  const format = mapFormats[data.format];
   const totalSpaces = data.routes.reduce((sum, route) => sum + route.length, 0);
   const diameter = useMemo(() => mapDiameter(data), [data]);
   const players = data.players ?? DEFAULT_PLAYERS;
@@ -181,10 +174,8 @@ export function SettingsDialog({ open, onOpenChange, target, onTarget, data, cha
 
           {kind === "map" && <div className="style-fields">
             {fresh && <p className="helper settings-start">A board format is all you need to begin. The rest — ticket lengths, stop and route types, what a new object looks like — is listed on the left and can wait until you want it.</p>}
-            <div><Label htmlFor="settings-format">Board format</Label><NativeSelect id="settings-format" value={data.format} onChange={(event) => onChangeFormat(event.target.value as MapFormat)}>{Object.entries(mapFormats).map(([key, item]) => <NativeSelectOption key={key} value={key}>{item.label}</NativeSelectOption>)}</NativeSelect>
-              <dl className="format-measurements"><div><dt>Finished size</dt><dd>{format.widthMm.toLocaleString("en-GB")} × {format.heightMm.toLocaleString("en-GB")} mm</dd></div>{format.columns > 1 && <div><dt>Panel size</dt><dd>about {Math.round(format.widthMm / format.columns)} × {Math.round(format.heightMm / format.rows)} mm</dd></div>}</dl>
-              <p className="helper">{printingNote(data.format)}</p>
-              <p className="helper">{format.note}{format.custom ? ". This is not a verified commercial Ticket to Ride size" : ""}. <strong>You can change this whenever you like</strong> — objects keep their relative positions, so switching between the two boards while you work costs you nothing.</p></div>
+            <div><Label htmlFor="settings-format">Board format (# of panels)</Label><NativeSelect id="settings-format" value={data.format} onChange={(event) => onChangeFormat(event.target.value as MapFormat)}>{Object.entries(mapFormats).map(([key, item]) => <NativeSelectOption key={key} value={key}>{item.label}</NativeSelectOption>)}</NativeSelect>
+              <p className="helper settings-format-help">The shape of the game board. <strong>You can change this whenever you like.</strong></p></div>
             <div className="settings-pair">
               <div><Label htmlFor="settings-players-min">Players, fewest</Label>
                 <Input id="settings-players-min" type="number" min={1} max={8} value={players.min}

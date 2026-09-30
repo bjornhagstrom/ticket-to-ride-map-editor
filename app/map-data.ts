@@ -308,7 +308,7 @@ export const initialMap: MapData = {
   name: "Example map",
   format: "board-2x3",
   notes: [
-    { id: "example-note", x: 815, y: 28, width: 250, height: 110, text: "Evaluation note: use notes like this to record playtesting feedback. They show on screen and in print, but are not part of the finished map." },
+    { id: "example-note", x: 40, y: 24, width: 300, height: 134, text: "Print this map for a quick playtest: claim routes by colouring in their spaces, each player with a marker of their own colour. Notes like this one keep what you learn, on screen and in print." },
   ],
   lineStyles: [],
   routeTypeStyles: [
