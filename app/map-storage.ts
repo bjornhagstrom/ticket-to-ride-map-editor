@@ -20,6 +20,42 @@ export const cloneForHistory = (data: MapData): MapData => {
   return clone;
 };
 const isMapFormat = (value: unknown): value is MapFormat => typeof value === "string" && value in mapFormats;
+
+// Formats a map could have before the board's shape and how it is printed were separated. Test
+// sheets and boards measured in sheets of paper are print choices now; a map that names one opens
+// on the nearest board. The heights are what those formats were, in map units, so a map can be
+// moved from where it was drawn.
+const legacyFormats: Record<string, { height: number; to: MapFormat }> = {
+  a4: { height: Math.round(W * 210 / 297), to: "board-2x3" },
+  a3: { height: Math.round(W * 297 / 420), to: "board-2x3" },
+  "us-letter": { height: Math.round(W * 215.9 / 279.4), to: "board-2x3" },
+  "board-2x3-large": { height: Math.round(W * 648 / 972), to: "board-2x3" },
+  "a4-3x2": { height: Math.round(W * 420 / 891), to: "board-2x4" },
+  "a4-4x2": { height: Math.round(W * 420 / 1188), to: "board-2x4" },
+  "letter-3x2": { height: Math.round(W * 432 / 838), to: "board-2x4" },
+  "letter-4x2": { height: Math.round(W * 432 / 1118), to: "board-2x4" },
+};
+
+// Moves a map drawn on an old format onto its board: scaled evenly so nothing changes shape, never
+// enlarged, and centred on the board.
+function migrateLegacyFormat(value: Partial<MapData>): Partial<MapData> {
+  const legacy = typeof value.format === "string" ? legacyFormats[value.format] : undefined;
+  if (!legacy) return value;
+  const toHeight = mapFormats[legacy.to].height;
+  const scale = Math.min(1, toHeight / legacy.height);
+  const dx = (W - W * scale) / 2, dy = (toHeight - legacy.height * scale) / 2;
+  const point = <T extends Point>(p: T): T => ({ ...p, x: dx + p.x * scale, y: dy + p.y * scale });
+  const box = <T extends { x: number; y: number; width: number; height: number }>(b: T): T => ({ ...point(b), width: b.width * scale, height: b.height * scale });
+  return {
+    ...value,
+    format: legacy.to,
+    stops: Array.isArray(value.stops) ? value.stops.map(point) : value.stops,
+    routes: Array.isArray(value.routes) ? value.routes.map((route) => (route.points ? { ...route, points: route.points.map(point) } : route)) : value.routes,
+    background: Array.isArray(value.background) ? value.background.map((shape) => ({ ...shape, points: shape.points.map(point), labelPoint: shape.labelPoint ? point(shape.labelPoint) : shape.labelPoint })) : value.background,
+    notes: Array.isArray(value.notes) ? value.notes.map(box) : value.notes,
+    backgroundImage: value.backgroundImage && typeof value.backgroundImage === "object" ? box(value.backgroundImage) : value.backgroundImage,
+  };
+}
 const clamp01 = (value: unknown): number => typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : 0;
 const normalizeBackgroundImage = (value: unknown): BackgroundImage | undefined => {
   if (!value || typeof value !== "object") return undefined;
@@ -208,7 +244,7 @@ function mergeStylesIntoRouteTypes(value: Partial<MapData> & { wagonStyles?: Wag
   return { ...value, routes: migrated, routeTypeStyles: types };
 }
 
-export const normalizeMap = (raw: Partial<MapData>): MapData => normalizeMapFields(mergeStylesIntoRouteTypes(raw));
+export const normalizeMap = (raw: Partial<MapData>): MapData => normalizeMapFields(mergeStylesIntoRouteTypes(migrateLegacyFormat(raw)));
 
 const normalizeMapFields = (value: Partial<MapData>): MapData => ({
   name: typeof value.name === "string" ? value.name : "Imported map",
@@ -250,7 +286,7 @@ const scaleStopsToHeight = (stops: Stop[], fromHeight: number, toHeight: number)
 const scaleRoutesToHeight = (routes: Route[], fromHeight: number, toHeight: number): Route[] => routes.map((route) => ({ ...route, points: route.points?.map((point) => scalePointToHeight(point, fromHeight, toHeight)) }));
 const scaleImageToHeight = (image: BackgroundImage, fromHeight: number, toHeight: number): BackgroundImage => ({ ...image, y: image.y * toHeight / fromHeight, height: image.height * toHeight / fromHeight });
 const scaleNotesToHeight = (notes: NoteBox[], fromHeight: number, toHeight: number): NoteBox[] => notes.map((note) => ({ ...note, y: note.y * toHeight / fromHeight, height: note.height * toHeight / fromHeight }));
-const sourceHeight = (value: { format?: unknown }): number => mapFormats[isMapFormat(value.format) ? value.format : "board-2x3"].height;
+const sourceHeight = (value: { format?: unknown }): number => isMapFormat(value.format) ? mapFormats[value.format].height : typeof value.format === "string" && legacyFormats[value.format] ? legacyFormats[value.format].height : mapFormats["board-2x3"].height;
 export const normalizeBackgroundFile = (value: { format?: unknown; background?: unknown; backgroundImage?: unknown }, toHeight: number): { background: BackgroundShape[]; backgroundImage?: BackgroundImage } => {
   const fromHeight = sourceHeight(value);
   const image = normalizeBackgroundImage(value.backgroundImage);

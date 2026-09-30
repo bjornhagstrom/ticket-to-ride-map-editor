@@ -46,23 +46,12 @@ export type EditorDefaults = {
   routeCurved: boolean; setRouteCurved: (value: boolean) => void;
   routeLineStyle: string | undefined; setRouteLineStyle: (value: string | undefined) => void;
   linkParallel: boolean; setLinkParallel: (value: boolean) => void;
-  scaleTarget: string; setScaleTarget: (value: string) => void;
 };
 
-// What actually comes out of the printer, and at what size against a real board.
-function printingNote(id: MapFormat, proofOf: string): string {
+// Settings decides the board's shape; paper and splitting are asked for when printing.
+function printingNote(id: MapFormat): string {
   const format = mapFormats[id];
-  const sheets = format.columns * format.rows;
-  if (format.sheets) {
-    return `Prints at full size on ${sheets} sheet${sheets === 1 ? "" : "s"} of ${format.sheets === "a4" ? "A4" : "US Letter"}, landscape, taped edge to edge. Nothing to trim.`;
-  }
-  if (format.testSheet) {
-    const target = mapFormats[proofOf as MapFormat] ?? mapFormats["board-2x3"];
-    return `One sheet, printed at its own size. That makes it ${Math.round(format.widthMm / target.widthMm * 100)} % of a ${target.shortLabel} — everything is there, just smaller.`;
-  }
-  // A real board proofed onto portrait A4: each panel is shrunk to the printable width.
-  const scale = Math.round(190 / (format.widthMm / format.columns) * 100);
-  return `Prints as ${sheets} A4 proof sheets at about ${scale} % of full size. For a board at its true ${format.widthMm} × ${format.heightMm} mm you would need 9 landscape A4 sheets, cut and taped — or pick one of the sheet sizes in this list, which is the same idea without the trimming.`;
+  return `This is the shape the map is drawn for, and what wagon spaces are measured against. How it is printed — on one sheet, a sheet per panel, or at full size across as many sheets as it takes, on A4, A3, US Letter or Tabloid${format.columns === 3 ? ", or grown to the Anniversary board" : ""} — is chosen each time you print.`;
 }
 
 const clampCount = (raw: string, fallback: number): number => {
@@ -192,11 +181,9 @@ export function SettingsDialog({ open, onOpenChange, target, onTarget, data, cha
           {kind === "map" && <div className="style-fields">
             {fresh && <p className="helper settings-start">A board format is all you need to begin. The rest — ticket lengths, stop and route types, what a new object looks like — is listed on the left and can wait until you want it.</p>}
             <div><Label htmlFor="settings-format">Board format</Label><NativeSelect id="settings-format" value={data.format} onChange={(event) => onChangeFormat(event.target.value as MapFormat)}>{Object.entries(mapFormats).map(([key, item]) => <NativeSelectOption key={key} value={key}>{item.label}</NativeSelectOption>)}</NativeSelect>
-              <dl className="format-measurements"><div><dt>Finished size</dt><dd>{format.widthMm.toLocaleString("en-GB")} × {format.heightMm.toLocaleString("en-GB")} mm{format.imperial ? ` (${format.imperial})` : ""}</dd></div>{format.columns > 1 && <div><dt>Panel size</dt><dd>about {Math.round(format.widthMm / format.columns)} × {Math.round(format.heightMm / format.rows)} mm</dd></div>}</dl>
-              <p className="helper">{printingNote(data.format, defaults.scaleTarget)}</p>
-              <p className="helper">{format.note}{format.custom ? ". This is not a verified commercial Ticket to Ride size" : ""}. <strong>You can change this whenever you like</strong> — objects keep their relative positions, so switching between a test sheet and a full board while you work costs you nothing.</p></div>
-            {format.testSheet && <div><Label htmlFor="settings-proof">This sheet stands in for</Label><NativeSelect id="settings-proof" value={defaults.scaleTarget} onChange={(event) => defaults.setScaleTarget(event.target.value)}>{Object.entries(mapFormats).filter(([, item]) => !item.testSheet).map(([key, item]) => <NativeSelectOption key={key} value={key}>{item.shortLabel}</NativeSelectOption>)}</NativeSelect>
-              <p className="helper">A test sheet is a whole board shrunk onto one sheet of paper. Telling the editor which board it stands in for lets it shrink the wagon spaces by the same amount, so what you print is a true miniature: everything sits where it would on the real thing, just smaller. Without it, wagon spaces would be drawn at full size on a sheet far too small for them.</p></div>}
+              <dl className="format-measurements"><div><dt>Finished size</dt><dd>{format.widthMm.toLocaleString("en-GB")} × {format.heightMm.toLocaleString("en-GB")} mm</dd></div>{format.columns > 1 && <div><dt>Panel size</dt><dd>about {Math.round(format.widthMm / format.columns)} × {Math.round(format.heightMm / format.rows)} mm</dd></div>}</dl>
+              <p className="helper">{printingNote(data.format)}</p>
+              <p className="helper">{format.note}{format.custom ? ". This is not a verified commercial Ticket to Ride size" : ""}. <strong>You can change this whenever you like</strong> — objects keep their relative positions, so switching between the two boards while you work costs you nothing.</p></div>
             <div className="settings-pair">
               <div><Label htmlFor="settings-players-min">Players, fewest</Label>
                 <Input id="settings-players-min" type="number" min={1} max={8} value={players.min}

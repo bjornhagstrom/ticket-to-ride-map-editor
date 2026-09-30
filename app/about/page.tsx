@@ -29,8 +29,8 @@ export default function About() {
         Two things make that feel like a real game rather than a sketch. Keep each player&apos;s
         wagons in front of them from a real set, and put one back in the box for every space they
         fill in: the pile in front of them is then exactly how many they have left, which is the
-        pressure the game runs on. And if you print the board at full size — the sheet formats do
-        that, whole sheets taped edge to edge — the spaces are the size of real wagons, so you can
+        pressure the game runs on. And if you print the board at full size — the sheets are trimmed at
+        their marks and butted edge to edge — the spaces are the size of real wagons, so you can
         lay the plastic trains on the paper instead of drawing at all.
       </p>
       <p>

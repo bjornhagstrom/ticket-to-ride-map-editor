@@ -15,7 +15,8 @@ import { cn } from "@/lib/utils";
 import { MapArtwork, type Tool } from "./map-artwork";
 import { AnalysisDialog, StopTicketsDialog, SuggestionsDialog, SuggestTicketsDialog, TicketsDialog, WelcomeGuide } from "./map-dialogs";
 import { TicketCoveragePanel, type CoverageSort, BackgroundImageProperties, BackgroundProperties, NoteProperties, RouteProperties, StopProperties, StylePicker } from "./map-properties";
-import { PrintPages, TicketPrintPages } from "./map-print";
+import { PrintDialog, PrintPages, TicketPrintPages } from "./map-print";
+import { DEFAULT_PRINT_CHOICE, PRINT_CHOICE_KEY, type PrintChoice, printPlan } from "./print-plan";
 import { useTicketSuggestion } from "./use-ticket-suggestion";
 import { SettingsDialog, type StyleTarget } from "./map-styles";
 import { bandsOf, bandCuts, mapDiameter, defaultStyle, evaluateTicketDeck, suggestedDeckSize, type TicketStyle, autoPlaceLabels, setupBalance, stopCoverage, ticketBand, type TicketBand, reviewTickets, ticketPointsPerSpace, ticketCoverage, type RouteSuggestion, labelCovers, labelAngleOptions, routeSamplePoints, colourLengthTable, crossingPairs, buildAdjacency, networkStats, routeSpacing, shortestPath, suggestRoutes } from "./map-analysis";
@@ -70,7 +71,10 @@ export function MapEditor() {
     try { window.localStorage.setItem(MAP_HINT_KEY, open ? "closed" : "open"); } catch { /* private mode */ }
     return !open;
   });
-  const [scaleTarget, setScaleTarget] = useState<MapFormat>("board-2x3");
+  // How the board is printed is chosen per run and kept in this browser, never in the map.
+  const [printChoice, setPrintChoice] = useState<PrintChoice>(DEFAULT_PRINT_CHOICE);
+  const [showPrint, setShowPrint] = useState(false);
+  const [printRequest, setPrintRequest] = useState(0);
   const [measureStart, setMeasureStart] = useState<string | null>(null);
   const [ticketStart, setTicketStart] = useState<string | null>(null);
   const [selectedTicket, setSelectedTicket] = useState<string | null>(null);
@@ -135,9 +139,9 @@ export function MapEditor() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
-  // A test sheet is a shrunken proof of a real board, so wagons are sized from the board it stands
-  // in for and then shrink with the print. A board format is measured against itself.
-  const scaleWidthMm = mapFormats[data.format].testSheet ? mapFormats[scaleTarget].widthMm : mapFormats[data.format].widthMm;
+  // Wagons are measured against the board the map is for. Printing smaller or larger scales them
+  // with everything else.
+  const scaleWidthMm = format.widthMm;
   const crossings = useMemo(() => crossingPairs(data), [data]);
   // Routes drawn too short to hold their own wagons at real component size.
   const spacing = useMemo(() => routeSpacing(data, scaleWidthMm), [data, scaleWidthMm]);
@@ -295,6 +299,16 @@ export function MapEditor() {
   }; });
   // Ticket cards print on their own paper, so the print tree swaps to them, prints, and swaps back.
   // Two frames, because the printed layout depends on styles applied after the swap renders.
+  useEffect(() => { queueMicrotask(() => { try { const stored = localStorage.getItem(PRINT_CHOICE_KEY); if (stored) setPrintChoice(JSON.parse(stored)); } catch { /* keep the default */ } }); }, []);
+  const choosePrint = (choice: PrintChoice) => { setPrintChoice(choice); try { localStorage.setItem(PRINT_CHOICE_KEY, JSON.stringify(choice)); } catch { /* not remembered, still used */ } };
+  // The dialog closes first; the print follows two frames later, once it is gone and the print tree
+  // carries the chosen plan.
+  useEffect(() => {
+    if (!printRequest) return;
+    let inner = 0;
+    const outer = requestAnimationFrame(() => { inner = requestAnimationFrame(() => window.print()); });
+    return () => { cancelAnimationFrame(outer); cancelAnimationFrame(inner); };
+  }, [printRequest]);
   useEffect(() => {
     if (printScope !== "tickets") return;
     let inner = 0;
@@ -605,7 +619,7 @@ export function MapEditor() {
     <header className="topbar">
       <div className="brand"><span className="brand-mark"><BusFront /></span><div><p>Ticket to Ride</p><h1>Map prototypes – Print and draw</h1></div></div>
       <div className="map-title"><Label htmlFor="map-name" className="sr-only">Map name</Label><Input id="map-name" value={data.name} onChange={(event) => change((draft) => ({ ...draft, name: event.target.value }))} /><span className="save-state"><Check />{saved ? "Saved locally" : "Saving…"}</span></div>
-      <div className="header-actions"><DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" size="sm"><CircleHelp />Help</Button></DropdownMenuTrigger><DropdownMenuContent align="start"><DropdownMenuItem onClick={() => setShowGuide(true)}><CircleHelp />Getting started</DropdownMenuItem><DropdownMenuItem asChild><a href="./about"><BusFront />About Map prototypes</a></DropdownMenuItem></DropdownMenuContent></DropdownMenu><Button variant="ghost" size="icon" aria-label="Undo" title="Undo (Ctrl/Cmd+Z)" disabled={!past.length} onClick={undo}><Undo2 /></Button><Button variant="ghost" size="icon" aria-label="Redo" title="Redo (Ctrl/Cmd+Shift+Z)" disabled={!future.length} onClick={redo}><Redo2 /></Button><DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" size="sm"><Upload />Import</Button></DropdownMenuTrigger><DropdownMenuContent align="start"><DropdownMenuItem onClick={() => fileRef.current?.click()}><Upload />Map project</DropdownMenuItem><DropdownMenuItem onClick={() => fileRef.current?.click()}><TicketIcon />Tickets only</DropdownMenuItem><DropdownMenuItem onClick={() => imageFileRef.current?.click()}><ImageIcon />Background image</DropdownMenuItem></DropdownMenuContent></DropdownMenu><input ref={fileRef} hidden type="file" accept="application/json" onChange={(event) => { importMap(event.target.files?.[0]); event.target.value = ""; }} /><input ref={imageFileRef} hidden type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => { importBackgroundImage(event.target.files?.[0]); event.target.value = ""; }} /><Button variant="outline" size="sm" onClick={() => window.print()}><Printer />Print {format.shortLabel}</Button><DropdownMenu><DropdownMenuTrigger asChild><Button size="sm"><Download />Export</Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onClick={exportMap}><Download />Full map</DropdownMenuItem><DropdownMenuItem onClick={exportBackground}><Layers3 />Background only</DropdownMenuItem><DropdownMenuItem onClick={exportNetwork}><Link2 />Network only</DropdownMenuItem><DropdownMenuItem onClick={() => exportTickets("all")}><TicketIcon />Tickets only</DropdownMenuItem></DropdownMenuContent></DropdownMenu></div>
+      <div className="header-actions"><DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" size="sm"><CircleHelp />Help</Button></DropdownMenuTrigger><DropdownMenuContent align="start"><DropdownMenuItem onClick={() => setShowGuide(true)}><CircleHelp />Getting started</DropdownMenuItem><DropdownMenuItem asChild><a href="./about"><BusFront />About Map prototypes</a></DropdownMenuItem></DropdownMenuContent></DropdownMenu><Button variant="ghost" size="icon" aria-label="Undo" title="Undo (Ctrl/Cmd+Z)" disabled={!past.length} onClick={undo}><Undo2 /></Button><Button variant="ghost" size="icon" aria-label="Redo" title="Redo (Ctrl/Cmd+Shift+Z)" disabled={!future.length} onClick={redo}><Redo2 /></Button><DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" size="sm"><Upload />Import</Button></DropdownMenuTrigger><DropdownMenuContent align="start"><DropdownMenuItem onClick={() => fileRef.current?.click()}><Upload />Map project</DropdownMenuItem><DropdownMenuItem onClick={() => fileRef.current?.click()}><TicketIcon />Tickets only</DropdownMenuItem><DropdownMenuItem onClick={() => imageFileRef.current?.click()}><ImageIcon />Background image</DropdownMenuItem></DropdownMenuContent></DropdownMenu><input ref={fileRef} hidden type="file" accept="application/json" onChange={(event) => { importMap(event.target.files?.[0]); event.target.value = ""; }} /><input ref={imageFileRef} hidden type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => { importBackgroundImage(event.target.files?.[0]); event.target.value = ""; }} /><Button variant="outline" size="sm" onClick={() => setShowPrint(true)}><Printer />Print map</Button><DropdownMenu><DropdownMenuTrigger asChild><Button size="sm"><Download />Export</Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onClick={exportMap}><Download />Full map</DropdownMenuItem><DropdownMenuItem onClick={exportBackground}><Layers3 />Background only</DropdownMenuItem><DropdownMenuItem onClick={exportNetwork}><Link2 />Network only</DropdownMenuItem><DropdownMenuItem onClick={() => exportTickets("all")}><TicketIcon />Tickets only</DropdownMenuItem></DropdownMenuContent></DropdownMenu></div>
     </header>
     <div className="workspace">
       <aside className="tools-panel panel">
@@ -620,7 +634,7 @@ export function MapEditor() {
           {tool === "background" && <div className="tool-options background-tools"><div className="image-import-row"><Label>Background image</Label><div className="image-import-buttons"><Button size="sm" variant="outline" onClick={() => imageFileRef.current?.click()}><ImageIcon />{data.backgroundImage ? "Replace image" : "Import image"}</Button>{data.backgroundImage && <Button size="sm" variant="ghost" onClick={() => { chooseImage(); setDanger("delete"); }}><Trash2 />Remove</Button>}</div></div><Label>Object</Label><NativeSelect value={backgroundType} onChange={(event) => { setBackgroundType(event.target.value as BackgroundType); setDraftPoints([]); }}><NativeSelectOption value="area">Area</NativeSelectOption><NativeSelectOption value="line">Line</NativeSelectOption><NativeSelectOption value="label">Label</NativeSelectOption></NativeSelect>{backgroundType !== "label" && <><div className="colour-row"><label>Fill <input type="color" value={backgroundFill} onChange={(event) => setBackgroundFill(event.target.value)} disabled={backgroundType === "line"} /></label><label>Outline <input type="color" value={backgroundStroke} onChange={(event) => setBackgroundStroke(event.target.value)} /></label></div><p className="helper">Click to add points. Finish when the shape is ready.</p><div className="draft-actions"><Button size="sm" disabled={draftPoints.length < (backgroundType === "area" ? 3 : 2)} onClick={finishBackground}>Finish shape</Button><Button size="sm" variant="ghost" disabled={!draftPoints.length} onClick={() => setDraftPoints([])}>Cancel</Button></div></>}</div>}
         </div>
         <div className="scale-control">
-          <p className="helper">Wagon spaces are drawn at the size a real {realWagon.length} × {realWagon.width} mm train takes up on a {scaleWidthMm.toLocaleString("en-GB")} mm board{format.testSheet ? `, shrunk with the sheet to about ${(realWagon.length / scaleWidthMm * format.widthMm).toFixed(1)} mm each in print` : ", so printing this format at full size gives real-size wagons"}. {tightRoutes.length || looseRoutes.length ? `${[tightRoutes.length && `${tightRoutes.length} too short`, looseRoutes.length && `${looseRoutes.length} roomier than needed`].filter(Boolean).join(", ")} — see Analyze balance.` : "Every route is drawn about the length its wagon count needs."}</p>
+          <p className="helper">Wagon spaces are drawn at the size a real {realWagon.length} × {realWagon.width} mm train takes up on a {scaleWidthMm.toLocaleString("en-GB")} mm board{", so printing it at full size gives real-size wagons"}. {tightRoutes.length || looseRoutes.length ? `${[tightRoutes.length && `${tightRoutes.length} too short`, looseRoutes.length && `${looseRoutes.length} roomier than needed`].filter(Boolean).join(", ")} — see Analyze balance.` : "Every route is drawn about the length its wagon count needs."}</p>
         </div>
         {coveredNames.length > 0 && <Tooltip><TooltipTrigger asChild>
           <div className="crossing-card has-warning name-card" tabIndex={0}>
@@ -689,7 +703,7 @@ export function MapEditor() {
       busy={suggestBusy} deckName={suggestName} onDeckName={setSuggestName} currentDeck={activeTicketSet.label}
       onShuffle={() => setSuggestSeed((seed) => seed + 1)} onApply={(mode) => applySuggestion(mode, `ts-${Date.now()}`)} />
     <WelcomeGuide open={showGuide} onOpenChange={(open) => !open && dismissGuide()} onChooseBlank={() => chooseFromGuide("blank")} onChooseExample={() => chooseFromGuide("example")} />
-    <SettingsDialog open={showStyles} onOpenChange={setShowStyles} target={styleTarget} onTarget={setStyleTarget} data={data} change={change} onChangeFormat={changeFormat} defaults={{ stopType, setStopType, stopSize, setStopSize: (value) => setStopSize(value as StopSize), routeType, setRouteType, routeColor, setRouteColor, routeCurved, setRouteCurved, routeLineStyle, setRouteLineStyle, linkParallel, setLinkParallel, scaleTarget, setScaleTarget: (value) => setScaleTarget(value as MapFormat) }} />
+    <SettingsDialog open={showStyles} onOpenChange={setShowStyles} target={styleTarget} onTarget={setStyleTarget} data={data} change={change} onChangeFormat={changeFormat} defaults={{ stopType, setStopType, stopSize, setStopSize: (value) => setStopSize(value as StopSize), routeType, setRouteType, routeColor, setRouteColor, routeCurved, setRouteCurved, routeLineStyle, setRouteLineStyle, linkParallel, setLinkParallel }} />
     <TicketsDialog open={showTickets} onOpenChange={setShowTickets} data={data} reviews={ticketReviews} coverage={ticketCoverage(data, activeTicketSet.id)} rate={ticketRate} selected={selectedTicket} activeSet={activeTicketSet} onSelect={setSelectedTicket}
       onSelectSet={(setId) => { setTicketSetId(setId); setSelectedTicket(null); }}
       onAddSet={() => { const id = `ts-${Date.now()}`; change((draft) => { draft.ticketSets.push({ id, label: nextDeckLabel(draft.ticketSets) }); return draft; }); setTicketSetId(id); setSelectedTicket(null); }}
@@ -701,7 +715,8 @@ export function MapEditor() {
       onDelete={(ticketId) => { change((draft) => { draft.tickets = draft.tickets.filter((item) => item.id !== ticketId); return draft; }); setSelectedTicket((current) => current === ticketId ? null : current); }} />
     <AnalysisDialog setup={setup} bottlenecks={deckReport.bottlenecks} atTable={atTable} onAtTable={(count) => { setBottleneckTable(count); setBottleneckRoutes(new Set()); }} onShowBottleneck={(routeIds) => setBottleneckRoutes(new Set(routeIds))} open={showAnalysis} onOpenChange={setShowAnalysis} data={data} stats={stats} colourTable={colourTable} spacing={spacing} scaleWidthMm={scaleWidthMm} onSelectRoute={(routeId) => { setShowAnalysis(false); setSelectedRoute(routeId); setSelectedStop(null); setSelectedBackground(null); setSelectedNote(null); setImageSelected(false); setTool("select"); }} onSelectStop={(stopId) => { setShowAnalysis(false); setSelectedStop(stopId); setSelectedRoute(null); setSelectedBackground(null); setSelectedNote(null); setImageSelected(false); setTool("select"); }} />
     <SuggestionsDialog open={showSuggestions} onOpenChange={setShowSuggestions} suggestions={suggestions} onAdd={addSuggestedRoute} />
-    {printScope === "tickets" ? <TicketPrintPages data={data} setId={activeTicketSet.id} /> : <PrintPages data={data} scaleWidthMm={scaleWidthMm} />}
+    {printScope === "tickets" ? <TicketPrintPages data={data} setId={activeTicketSet.id} /> : <PrintPages data={data} plan={printPlan(data.format, printChoice)} />}
+    <PrintDialog open={showPrint} onOpenChange={setShowPrint} format={data.format} choice={printChoice} onChoice={choosePrint} onPrint={() => { setShowPrint(false); setPrintRequest((count) => count + 1); }} />
   </main></TooltipProvider>;
 }
 

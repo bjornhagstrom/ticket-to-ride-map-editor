@@ -15,7 +15,7 @@ import { type Bottleneck, TICKET_SUGGESTER, type TicketDeckReport, type TicketSt
 
 export function WelcomeGuide({ open, onOpenChange, onChooseBlank, onChooseExample }: { open: boolean; onOpenChange: (open: boolean) => void; onChooseBlank: () => void; onChooseExample: () => void }) {
   const steps: Array<{ icon: React.ReactNode; title: string; text: string }> = [
-    { icon: <FileStack />, title: "Choose a board format", text: "Pick a standard, large or extended board, or an A4/A3 test sheet sized for your printer. Change it whenever you like — everything keeps its relative position, so it costs nothing to try another size while you work." },
+    { icon: <FileStack />, title: "Choose a board format", text: "Pick the standard 2×3 board or the extended 2×4. Paper, and whether to print on one sheet, a sheet per panel or at full size, is chosen each time you print. Change the board whenever you like — everything keeps its relative position." },
     { icon: <Layers3 />, title: "Draw a background", text: "Sketch areas, boundaries and labels behind the network to show land, water and regions." },
     { icon: <MapPinPlus />, title: "Add stops and connect routes", text: "Place stations and draw the routes that link them, with a length, type and colour." },
     { icon: <Save />, title: "Save locally, export a backup", text: "The map saves automatically in this browser. Export a JSON backup regularly, since browser storage is not portable." },

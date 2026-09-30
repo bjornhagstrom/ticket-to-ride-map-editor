@@ -1,9 +1,13 @@
 "use client";
 
-// The hidden print tree: one page per board panel, or a single page for a test sheet.
+// The hidden print trees, and the dialog that decides how the board is printed.
+import { Printer } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import { mapFormats, ticketsInSet, type MapData, W } from "./map-data";
+import { mapFormats, ticketsInSet, type MapData, type MapFormat, W } from "./map-data";
 import { MapArtwork } from "./map-artwork";
+import { describePlan, papers, PRINT_CAPTION_MM, PRINT_MARGIN_MM, printChoices, type PrintChoice, printPlan, type PrintPlan, sameChoice, splits } from "./print-plan";
 
 // Tickets print as cut-out cards on plain A4, 16 to a sheet. The same print-and-cut workflow as the
 // board itself: no bleed, a thin cut line, and nothing that needs colour to be readable.
@@ -35,24 +39,96 @@ export function TicketPrintPages({ data, setId }: { data: MapData; setId: string
   </div>;
 }
 
-export function PrintPages({ data, scaleWidthMm }: { data: MapData; scaleWidthMm: number }) {
+// The board as the chosen print run cuts it. Page size, margins and the size of every tile come
+// from printPlan, in millimetres, so the pages cannot disagree with what the dialog promised.
+export function PrintPages({ data, plan }: { data: MapData; plan: PrintPlan }) {
   const format = mapFormats[data.format];
-  // Ask the printer for the paper this format was laid out for. A sheet format prints at its own
-  // size, landscape; a foldable board prints its panels as portrait A4 proofs. Explicit millimetres
-  // rather than `A4 landscape`, because that form is the one print dialogs actually honour.
-  // A board made of sheets prints one panel per landscape sheet at full size; a test sheet prints at
-  // its own size; a real board is proofed onto portrait A4.
-  const page = format.sheets ? (format.sheets === "a4" ? "297mm 210mm" : "279.4mm 215.9mm")
-    : format.testSheet ? `${format.widthMm}mm ${format.heightMm}mm`
-    : "210mm 297mm";
-  const panels = Array.from({ length: format.columns * format.rows }, (_, index) => ({ column: index % format.columns, row: Math.floor(index / format.columns) }));
-  return <div className={cn("print-pages", `format-${data.format}`)} aria-hidden="true">
-    <style>{`@media print{@page{size:${page};margin:0}}`}</style>{panels.map(({ column, row }, index) => {
-    const panelWidth = W / format.columns;
-    const panelHeight = format.height / format.rows;
-    const printedPanelScale = Math.round(190 / (format.widthMm / format.columns) * 100);
-    const panelName = format.columns === 1 ? `${format.shortLabel} · ${format.widthMm} × ${format.heightMm} mm${format.imperial ? ` (${format.imperial})` : ""}` : format.sheets ? `Sheet ${index + 1} of ${panels.length} · row ${row + 1}, column ${column + 1} · full size, tape to its neighbours` : `Panel ${index + 1} of ${panels.length} · row ${row + 1}, column ${column + 1} · A4 proof at about ${printedPanelScale}%`;
-    return <section className="print-page" key={`${column}-${row}`}><div className="print-caption"><strong>{data.name}</strong><span>{panelName}</span></div><svg viewBox={`${column * panelWidth} ${row * panelHeight} ${panelWidth} ${panelHeight}`}><MapArtwork data={data} scaleWidthMm={scaleWidthMm} print /></svg></section>;
-  })}</div>;
+  const full = plan.choice.split === "full";
+  const percent = `${Math.round(plan.scale * 100)} %`;
+  const caption = (page: PrintPlan["pages"][number]) => {
+    const count = plan.pages.length;
+    const where = `row ${page.row + 1}, column ${page.column + 1}`;
+    if (full) return `Sheet ${page.index + 1} of ${count} · ${where} · full size · trim at the marks, butt to its neighbours`;
+    if (plan.choice.split === "panel") return `Panel ${page.index + 1} of ${count} · ${where} · ${percent} of full size`;
+    return `${format.shortLabel} · ${plan.boardMm.width} × ${plan.boardMm.height} mm · ${percent}`;
+  };
+  return <div className="print-pages print-map" aria-hidden="true">
+    <style>{`@media print{@page{size:${plan.pageMm.width}mm ${plan.pageMm.height}mm;margin:0}}`}</style>
+    {plan.pages.map((page) => <section className="print-page" key={page.index}
+      style={{ width: `${plan.pageMm.width}mm`, height: `${plan.pageMm.height}mm`, padding: `${PRINT_MARGIN_MM}mm` }}>
+      <div className="print-caption" style={{ height: `${PRINT_CAPTION_MM}mm`, width: `${page.contentMm.width}mm` }}><strong>{data.name}</strong><span>{caption(page)}</span></div>
+      <div className={cn("print-art", full && "trimmed")} style={{ width: `${page.contentMm.width}mm`, height: `${page.contentMm.height}mm` }}>
+        <svg viewBox={`${page.tile.x * W} ${page.tile.y * format.height} ${page.tile.width * W} ${page.tile.height * format.height}`}>
+          {/* Wagons are always measured against the board the map is drawn for; printing larger or
+              smaller scales them with everything else. */}
+          <MapArtwork data={data} scaleWidthMm={format.widthMm} print />
+        </svg>
+        {full && ["top-left", "top-right", "bottom-left", "bottom-right"].map((corner) => <span key={corner} className={cn("cut-mark", corner)} />)}
+      </div>
+    </section>)}
+  </div>;
 }
 
+// Printing is decided per run. Nothing chosen here is written to the map; the last choice is kept
+// in this browser only, for convenience.
+export function PrintDialog({ open, onOpenChange, format, choice, onChoice, onPrint }: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  format: MapFormat;
+  choice: PrintChoice;
+  onChoice: (choice: PrintChoice) => void;
+  onPrint: () => void;
+}) {
+  const plan = printPlan(format, choice);
+  const { sizes, columns, table } = printChoices(format);
+  const current = plan.choice;
+  return <Dialog open={open} onOpenChange={onOpenChange}>
+    <DialogContent className="print-dialog">
+      <DialogHeader>
+        <DialogTitle>Print the map</DialogTitle>
+        <DialogDescription>How this print run comes out. None of it changes the map: the board stays a {mapFormats[format].shortLabel}.</DialogDescription>
+      </DialogHeader>
+      <div className="print-choices">
+        <fieldset><legend>How it is split</legend>
+          {splits.map((split) => <label key={split.id} className="print-option">
+            <input type="radio" name="print-split" value={split.id} aria-label={split.label} aria-describedby={`print-split-${split.id}`}
+              checked={current.split === split.id} onChange={() => onChoice({ ...current, split: split.id })} />
+            <span><strong>{split.label}</strong><small id={`print-split-${split.id}`}>{split.note}</small></span>
+          </label>)}
+        </fieldset>
+        <fieldset><legend>Paper</legend>
+          {papers.map((paper) => <label key={paper.id} className="print-option">
+            <input type="radio" name="print-paper" value={paper.id} aria-label={paper.label} aria-describedby={`print-paper-${paper.id}`}
+              checked={current.paper === paper.id} onChange={() => onChoice({ ...current, paper: paper.id })} />
+            <span><strong>{paper.label}</strong><small id={`print-paper-${paper.id}`}>{paper.note}</small></span>
+          </label>)}
+        </fieldset>
+        {current.split === "full" && sizes.length > 1 && <fieldset><legend>Adds up to</legend>
+          {sizes.map((size) => <label key={size.id} className="print-option">
+            <input type="radio" name="print-size" value={size.id} aria-label={size.label} aria-describedby={`print-size-${size.id}`}
+              checked={current.size === size.id} onChange={() => onChoice({ ...current, size: size.id })} />
+            <span><strong>{size.label}</strong><small id={`print-size-${size.id}`}>{size.widthMm} × {size.heightMm} mm{size.id === "anniversary" ? ", bigger wagons too" : ""}</small></span>
+          </label>)}
+        </fieldset>}
+      </div>
+      <p className="print-summary">{describePlan(plan)}</p>
+      <div className="print-table-wrap">
+        <table className="print-table">
+          <caption>Sheets and scale for every choice. Pick one to use it.</caption>
+          <thead><tr><th scope="col">Paper</th>{columns.map((label) => <th scope="col" key={label}>{label}</th>)}</tr></thead>
+          <tbody>{table.map((row) => <tr key={row.paper.id} data-paper={row.paper.id}>
+            <th scope="row">{row.paper.label}</th>
+            {row.cells.map((cell) => <td key={cell.label}><button type="button" data-pages={cell.pages} aria-pressed={sameChoice(cell.choice, current)}
+              aria-label={`${row.paper.label}, ${cell.label}: ${cell.pages} sheet${cell.pages === 1 ? "" : "s"} at ${Math.round(cell.scale * 100)} %`}
+              onClick={() => onChoice(cell.choice)}>{cell.pages} <small>· {Math.round(cell.scale * 100)} %</small></button></td>)}
+          </tr>)}</tbody>
+        </table>
+      </div>
+      <p className="helper">The browser’s print dialog can also save the run as a PDF. Print at 100 % — “fit to page” would undo the sizes above.</p>
+      <DialogFooter>
+        <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+        <Button onClick={onPrint}><Printer />Print</Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>;
+}

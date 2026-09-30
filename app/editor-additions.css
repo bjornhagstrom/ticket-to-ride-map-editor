@@ -17,6 +17,28 @@
   .map-status{position:sticky!important;left:8px!important;width:max-content;z-index:3}
 }
 
+/* The print dialog: split, paper and board size side by side, then what that gives, then every
+   choice at once to compare. */
+.print-dialog{max-width:680px}
+.print-choices{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px}
+.print-choices fieldset{margin:0;padding:0;border:0;min-width:0}
+.print-choices legend{margin-bottom:6px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#6b6358}
+.print-option{display:flex;gap:8px;align-items:flex-start;padding:4px 0;cursor:pointer}
+.print-option input{margin-top:3px;accent-color:#721c24}
+.print-option strong{display:block;font-size:13px}
+.print-option small{display:block;font-size:11px;line-height:1.4;color:#5d564c}
+.print-summary{margin:0;padding:9px 12px;border-radius:8px;background:#f3ede3;font-size:12px;line-height:1.5;color:#24211d}
+.print-table-wrap{overflow-x:auto}
+.print-table{width:100%;border-collapse:collapse;font-size:12px}
+.print-table caption{caption-side:top;text-align:left;padding-bottom:6px;font-size:11px;color:#5d564c}
+.print-table th{padding:4px 6px;text-align:left;font-weight:600;color:#3b352e}
+.print-table thead th{font-size:11px;border-bottom:1px solid #ddd3c4}
+.print-table td{padding:2px}
+.print-table td button{width:100%;padding:5px 6px;border:1px solid transparent;border-radius:6px;background:none;font:inherit;font-variant-numeric:tabular-nums;text-align:left;color:#24211d;cursor:pointer}
+.print-table td button small{color:#6b6358}
+.print-table td button:hover{background:#f3ede3}
+.print-table td button[aria-pressed="true"]{border-color:#721c24;background:#f7e9e6;font-weight:700}
+
 @media print{
   /* The page box itself is set from React, in PrintPages: only one format is live at a time, so a
      single global @page rule with explicit millimetres is used. Named pages were tried first and
@@ -29,19 +51,30 @@
   .app-shell{display:block!important;min-height:0!important}
   .print-pages{display:block!important}
   .print-page{page-break-after:always;break-after:page;overflow:hidden;background:white;display:flex;flex-direction:column}
-  .print-page svg{flex:1;min-height:0;width:100%;background:#f7f1e5;border:.3mm solid #81786c}
   .print-page:last-child{page-break-after:auto;break-after:auto}
   /* One compact row: map name on the left, format on the right. No rule under it — the map's own
      border already separates them, and the height it saves is what the sheet was overflowing by. */
   .print-caption{display:flex;align-items:baseline;justify-content:space-between;gap:6mm;margin-bottom:2.5mm;color:#24211d}
   .print-caption strong{font:700 12pt Georgia,serif}
   .print-caption span{font:7.5pt "Segoe UI",Arial,sans-serif;color:#24221e;white-space:nowrap}
-  .format-board-2x3 .print-page,.format-board-2x3-large .print-page,.format-board-2x4 .print-page{width:210mm;height:297mm;padding:10mm}
-    .format-a4 .print-page{width:297mm;height:210mm;padding:10mm}
-  .format-a3 .print-page{width:420mm;height:297mm;padding:12mm}
-  .format-a4-3x2 .print-page,.format-a4-4x2 .print-page{width:297mm;height:210mm;padding:5mm}
-  .format-letter-3x2 .print-page,.format-letter-4x2 .print-page{width:279.4mm;height:215.9mm;padding:5mm}
-  .format-us-letter .print-page{width:279.4mm;height:215.9mm;padding:10mm}
+  /* The board. Page size, margin and every tile's size are set inline from the print plan in
+     millimetres; this only arranges them. The tile is centred under its caption. */
+  .print-map .print-page{align-items:center}
+  /* As wide as the artwork, and kept clear of the cut marks that rise from its corners. */
+  .print-map .print-caption{flex:none;margin:0;padding:0 2.5mm;align-items:center}
+  .print-art{position:relative;flex:none;background:#f7f1e5;outline:.3mm solid #81786c}
+  .print-art svg{display:block;width:100%;height:100%;background:none;border:0}
+  /* Full-size sheets are trimmed and butted, so their edge is marked, not drawn. */
+  .print-art.trimmed{outline:none}
+  .cut-mark{position:absolute;width:0;height:0}
+  .cut-mark::before,.cut-mark::after{content:"";position:absolute;background:#24211d}
+  .cut-mark::before{width:5mm;height:.2mm;top:-.1mm}
+  .cut-mark::after{width:.2mm;height:5mm;left:-.1mm}
+  .cut-mark.top-left{top:0;left:0}.cut-mark.top-right{top:0;right:0}.cut-mark.bottom-left{bottom:0;left:0}.cut-mark.bottom-right{bottom:0;right:0}
+  .cut-mark.top-left::before,.cut-mark.bottom-left::before{right:1mm}
+  .cut-mark.top-right::before,.cut-mark.bottom-right::before{left:1mm}
+  .cut-mark.top-left::after,.cut-mark.top-right::after{bottom:1mm}
+  .cut-mark.bottom-left::after,.cut-mark.bottom-right::after{top:1mm}
   .print-page .route-hit{display:none}
   .print-page .stop,.print-page .route-group{filter:none!important}
   .print-page .stop text{font-size:12px}

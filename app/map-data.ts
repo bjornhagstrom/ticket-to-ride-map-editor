@@ -6,7 +6,9 @@ export type StopSize = "small" | "medium" | "large";
 export type StopSymbol = "none" | "dot" | "dash" | "cross" | "letter";
 export type RouteType = string;
 export type BackgroundType = "area" | "line" | "label";
-export type MapFormat = "board-2x3" | "board-2x3-large" | "board-2x4" | "a4-3x2" | "a4-4x2" | "letter-3x2" | "letter-4x2" | "a4" | "a3" | "us-letter";
+// The shape of the board, and nothing else. How it is printed — paper, how it is split, whether it
+// adds up to a standard or an Anniversary board — is chosen per print run; see app/print-plan.ts.
+export type MapFormat = "board-2x3" | "board-2x4";
 export type Point = { x: number; y: number };
 export type Stop = Point & { id: string; name: string; type: StopType; size?: StopSize; symbol?: StopSymbol; letter?: string; labelAngle?: number; endGapMm?: number; locked?: boolean };
 
@@ -109,29 +111,14 @@ export type MapFormatDefinition = {
   height: number;
   widthMm: number;
   heightMm: number;
-  imperial?: string;
   columns: number;
   rows: number;
   custom?: boolean;
-  /** A proof sheet, not a finished board: true-scale wagons are sized from a target board instead. */
-  testSheet?: boolean;
-  /** Made of whole sheets of this paper, each printed at 100 %. */
-  sheets?: "a4" | "letter";
 };
 
 export const mapFormats: Record<MapFormat, MapFormatDefinition> = {
-  a4: { label: "A4 · one sheet", shortLabel: "A4 test sheet", note: "One landscape test sheet", width: W, height: Math.round(W * 210 / 297), widthMm: 297, heightMm: 210, columns: 1, rows: 1 , testSheet: true },
-  a3: { label: "A3 · one sheet", shortLabel: "A3 test sheet", note: "One landscape test sheet", width: W, height: Math.round(W * 297 / 420), widthMm: 420, heightMm: 297, columns: 1, rows: 1 , testSheet: true },
-  "us-letter": { label: "US Letter · one sheet", shortLabel: "US Letter test sheet", note: "One landscape test sheet", width: W, height: Math.round(W * 215.9 / 279.4), widthMm: 279.4, heightMm: 215.9, imperial: "11 × 8.5 in", columns: 1, rows: 1 , testSheet: true },
-  "a4-3x2": { label: "A4 · six sheets", shortLabel: "6 × A4", note: "Three sheets across, two down, printed at full size", width: W, height: Math.round(W * 420 / 891), widthMm: 891, heightMm: 420, columns: 3, rows: 2, sheets: "a4" },
-  "a4-4x2": { label: "A4 · eight sheets", shortLabel: "8 × A4", note: "Four sheets across, two down, printed at full size", width: W, height: Math.round(W * 420 / 1188), widthMm: 1188, heightMm: 420, columns: 4, rows: 2, sheets: "a4" },
-  "letter-3x2": { label: "US Letter · six sheets", shortLabel: "6 × Letter", note: "Three sheets across, two down, printed at full size", width: W, height: Math.round(W * 432 / 838), widthMm: 838, heightMm: 432, columns: 3, rows: 2, sheets: "letter" },
-  "letter-4x2": { label: "US Letter · eight sheets", shortLabel: "8 × Letter", note: "Four sheets across, two down, printed at full size", width: W, height: Math.round(W * 432 / 1118), widthMm: 1118, heightMm: 432, columns: 4, rows: 2, sheets: "letter" },
   "board-2x3": { label: "Standard board 2×3", shortLabel: "Standard board 2×3", note: "Verified standard Ticket to Ride size", width: W, height: Math.round(W * 525 / 790), widthMm: 790, heightMm: 525, columns: 3, rows: 2 },
-  "board-2x3-large": { label: "Anniversary board 2×3", shortLabel: "Anniversary board", note: "The larger Anniversary size: bigger board and bigger wagons", width: W, height: Math.round(W * 648 / 972), widthMm: 972, heightMm: 648, columns: 3, rows: 2 },
   "board-2x4": { label: "Extended board 2×4", shortLabel: "Extended board 2×4", note: "Custom size using standard-size square panels", width: W, height: Math.round(W * 526 / 1053), widthMm: 1053, heightMm: 526, columns: 4, rows: 2, custom: true },
-  // Boards measured in sheets of paper rather than in millimetres. Every panel prints at 100 % on one
-  // landscape sheet, so a finished board is whole sheets taped edge to edge with nothing to trim.
 };
 
 // Footprint of a real plastic train and the spacing a real board gives it, in millimetres.
