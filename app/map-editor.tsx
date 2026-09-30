@@ -267,7 +267,7 @@ export function MapEditor() {
     if (selectedR) {
       const points = pointsFor(data, selectedR);
       const atTop = points.length ? above(points.reduce((sum, point) => sum + point.y, 0) / points.length) : false;
-      return { atTop, title: "Editing this route", body: <>Click a <b>+</b> to add a bend point anywhere along it · drag a bend point to move it · <b>double-click a bend point to remove it</b> · tick <b>Draw as a smooth curve</b> under Properties to bend it into an arc{selectedRouteHasSlots ? <> · <b>click a wagon space to mark it as needing a locomotive</b>, and click it again to clear it</> : null}</> };
+      return { atTop, title: "Editing this route", body: <>Click a <b>+</b> to add a bend point anywhere along it · drag a bend point to move it · <b>double-click a bend point to remove it</b> · routes are smooth curves by default: untick <b>Draw as a smooth curve</b> under Properties for straight segments between the bends{selectedRouteHasSlots ? <> · <b>click a wagon space to mark it as needing a locomotive</b>, and click it again to clear it</> : null}</> };
     }
     if (selectedS) return { atTop: above(selectedS.y), title: "Editing this stop", body: <>Drag the stop to move it, and every route into it follows · <b>hold Shift to drag it even when its position is locked</b> · turn its name out of the way with <b>Name position</b> under Properties · with the Draw route tool, click this stop and then another to connect them</> };
     return null;

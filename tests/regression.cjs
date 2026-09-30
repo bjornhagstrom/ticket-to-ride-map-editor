@@ -59,6 +59,9 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   // 4. route editing: bends, linked double route, curve, locomotive
   await selectRoute("#cf3f3f");
   check("route hint shows", await page.locator(".map-hint").count() === 1);
+  // Curves are the default, so the hint says how to straighten a route, not how to curve one.
+  const routeHint = await page.locator(".map-hint").textContent();
+  check("the route hint does not offer a curve that is already on", !/tick Draw as a smooth curve[^.]*to bend it/i.test(routeHint) && /untick/i.test(routeHint) && /straight/i.test(routeHint), routeHint);
   check("parallel count reported", (await page.locator(".parallel-controls label").textContent()).includes("2 between"));
   await page.locator(".bend-insert-handle").first().click({ force: true });
   await page.waitForTimeout(350);
