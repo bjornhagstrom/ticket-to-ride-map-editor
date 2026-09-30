@@ -46,6 +46,19 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   // whose line colour came from the type rather than the route.
   check("routes keep their own colours", new Set(strokes).size >= 8, `${new Set(strokes).size} distinct`);
   check("no route forced to a type colour", !strokes.includes("#23749b") && !strokes.includes("#00877c"));
+  // Grey and black wagon spaces must be told apart at a glance: their rings sit inside the same dark
+  // outline, so the two colours need real contrast between them, and grey still has to show on paper.
+  const ringContrast = await page.evaluate(() => {
+    const map = JSON.parse(localStorage.getItem("orebro-map-editor-public-v2"));
+    const groups = Array.from(document.querySelectorAll(".map-canvas .route-group"));
+    const ring = (colour) => { const i = map.routes.findIndex((r) => r.color === colour); return groups[i].querySelector(".wagon-slot > :nth-child(2)").getAttribute("stroke"); };
+    const lum = (hex) => { const v = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((c) => c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4); return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2]; };
+    const ratio = (a, b) => { const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x); return (hi + 0.05) / (lo + 0.05); };
+    const grey = ring("neutral"), black = ring("black");
+    return { grey, black, between: ratio(grey, black), greyOnPaper: ratio(grey, "#f7f1e5") };
+  });
+  check("grey and black wagon spaces are clearly different", ringContrast.between >= 4.5, `${ringContrast.grey} vs ${ringContrast.black}: ${ringContrast.between.toFixed(2)}:1`);
+  check("and grey still shows on the paper", ringContrast.greyOnPaper >= 3, `${ringContrast.greyOnPaper.toFixed(2)}:1`);
 
   // 3. tools + tooltip
   const toolLabels = await page.locator(".tool-row .tool-button").evaluateAll((els) => els.map((el) => el.getAttribute("aria-label")));
@@ -71,7 +84,14 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   check("bend added to both lines of the double route", pts.length === 2 && pts[0] === 2 && pts[1] === 2, `points per line: ${pts.join("/")}`);
   await page.locator(".bend-controls input[type=checkbox]").first().check();
   await page.waitForTimeout(350);
-  const curved = await page.evaluate(() => Array.from(document.querySelectorAll(".map-canvas .route-group")).map((g) => g.querySelector(".route-guide")).filter((q) => ["#cf3f3f", "#3e4146"].includes(q.getAttribute("stroke")) && q.getAttribute("d").includes("C")).length);
+  // The two lines of the double route, found by their stops rather than by their colours.
+  const curved = await page.evaluate(() => {
+    const routes = JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")).routes;
+    const groups = Array.from(document.querySelectorAll(".map-canvas .route-group"));
+    const pair = new Set(["example-westport", "example-central"]);
+    return routes.map((r, i) => ({ r, guide: groups[i].querySelector(".route-guide") }))
+      .filter(({ r, guide }) => pair.has(r.a) && pair.has(r.b) && guide.getAttribute("d").includes("C")).length;
+  });
   check("both lines curve together", curved === 2, `${curved} curved paths`);
   const slotState = () => page.evaluate(() => Array.from(document.querySelector(".map-canvas .route-group.selected").querySelectorAll(".wagon-slot")).map((s) => s.classList.contains("locomotive") ? "L" : ".").join(""));
   await page.evaluate(() => window.scrollTo(0, 0));

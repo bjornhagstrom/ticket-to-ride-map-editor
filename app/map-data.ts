@@ -251,9 +251,12 @@ export const defaultRouteTypeStyles: RouteTypeStyle[] = [
   { id: "boat", label: "Boat", stroke: "#23749b", dash: "10 6", strokeWidth: 3, infrastructure: false, shape: "oval" },
 ];
 
+// Wagon space colours. Grey and black sit inside the same dark outline, so they are set far apart:
+// a light grey and a true black, at least 4.5:1 against each other, with grey still 3:1 on the paper.
+// The regression suite measures both.
 export const routeColors: Record<string, string> = {
-  neutral: "#f2ead8", red: "#cf3f3f", blue: "#3b72b9", green: "#4c8b58",
-  yellow: "#e2b83b", black: "#3e4146", white: "#fffdf5", orange: "#da7a31", purple: "#8a5aa5",
+  neutral: "#8c877d", red: "#cf3f3f", blue: "#3b72b9", green: "#4c8b58",
+  yellow: "#e2b83b", black: "#1d1e21", white: "#fffdf5", orange: "#da7a31", purple: "#8a5aa5",
 };
 
 export const colorLabels: Record<string, string> = {
