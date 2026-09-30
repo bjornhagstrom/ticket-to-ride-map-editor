@@ -254,10 +254,11 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   check("and the way it is split", await printDialog().getByRole("radio", { name: "Full size" }).isChecked());
   check("and the picked cell is marked", (await cell("letter", 3).getAttribute("aria-pressed")) === "true");
   check("and the summary follows", /12 sheets of US Letter/.test(await printDialog().locator(".print-summary").textContent()), await printDialog().locator(".print-summary").textContent());
-  check("Anniversary is offered under full size", (await sizeRadios().count()) === 2);
+  check("Anniversary is offered under full size", (await sizeRadios().count()) === 2 && !(await sizeRadios().first().isDisabled()));
   await printDialog().getByRole("radio", { name: "One sheet", exact: true }).check();
   await page.waitForTimeout(200);
-  check("but not for one sheet", (await sizeRadios().count()) === 0);
+  // Still shown, so the dialog does not change height under the pointer, but not choosable.
+  check("but not for one sheet, where it stays in place and is switched off", (await sizeRadios().count()) === 2 && await sizeRadios().first().isDisabled() && await sizeRadios().last().isDisabled());
   await printDialog().getByRole("button", { name: "Cancel" }).click();
   await page.waitForTimeout(300);
 
@@ -315,6 +316,70 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   check("full size on A4 with the browser's own margins is still 9 sheets, none blank", pdfFull.pages === pdfFull.promised, `${pdfFull.pages} sheets for ${pdfFull.promised} promised`);
   const pdfPanels = await pdfPages("a4", 2, false);
   check("and per panel it is still 6", pdfPanels.pages === pdfPanels.promised, `${pdfPanels.pages} sheets for ${pdfPanels.promised} promised`);
+
+  // The dialog has to be readable, say what its table means, and hold still while choices change.
+  await printButton().click();
+  await page.waitForTimeout(400);
+  check("a panel is offered by the game board's own name", await printDialog().getByRole("radio", { name: "One sheet per panel of the game board", exact: true }).count() === 1);
+  const contrast = await page.evaluate(() => {
+    const dialog = document.querySelector('[role="dialog"]');
+    const rgba = (value) => { const m = value.match(/[\d.]+/g).map(Number); return { r: m[0], g: m[1], b: m[2], a: m.length > 3 ? m[3] : 1 }; };
+    const lum = ({ r, g, b }) => { const c = [r, g, b].map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
+    const background = (el) => { for (let node = el; node; node = node.parentElement) { const bg = rgba(getComputedStyle(node).backgroundColor); if (bg.a > 0.5) return bg; } return { r: 255, g: 255, b: 255, a: 1 }; };
+    const failures = [];
+    let measured = 0;
+    for (const el of dialog.querySelectorAll("*")) {
+      const text = Array.from(el.childNodes).filter((n) => n.nodeType === 3).map((n) => n.textContent.trim()).join("");
+      if (!text || !el.getClientRects().length) continue;
+      const style = getComputedStyle(el);
+      if (style.visibility === "hidden") continue;
+      const fg = rgba(style.color), bg = background(el);
+      // Text colour drawn with transparency is mixed into its background first.
+      const mixed = { r: fg.r * fg.a + bg.r * (1 - fg.a), g: fg.g * fg.a + bg.g * (1 - fg.a), b: fg.b * fg.a + bg.b * (1 - fg.a) };
+      const [hi, lo] = [lum(mixed), lum(bg)].sort((a, b) => b - a);
+      const ratio = (hi + 0.05) / (lo + 0.05);
+      const size = parseFloat(style.fontSize);
+      const disabled = Boolean(el.closest("fieldset:disabled, [aria-disabled='true']"));
+      const needed = size < 14 ? 7 : 4.5;
+      measured += 1;
+      if (!disabled && ratio < needed) failures.push(`"${text.slice(0, 30)}" ${ratio.toFixed(2)}:1 at ${size}px`);
+    }
+    return { measured, failures };
+  });
+  check("every piece of text in the print dialog has strong contrast (7:1 when small, 4.5:1 otherwise)", contrast.measured > 20 && contrast.failures.length === 0, `${contrast.measured} measured; ${contrast.failures.slice(0, 6).join("; ")}`);
+  const described = await page.evaluate(() => {
+    const table = document.querySelector('[role="dialog"] .print-table');
+    const heading = table && document.getElementById(table.getAttribute("aria-labelledby") || "");
+    const description = table && document.getElementById(table.getAttribute("aria-describedby") || "");
+    return { heading: heading ? `${heading.tagName} ${heading.textContent}` : "", description: description ? description.textContent : "", cell: table ? table.querySelector("td button").textContent : "" };
+  });
+  check("the sheet table has a heading of its own", /^H[2-4] \S/.test(described.heading), described.heading);
+  check("and a description of what its numbers are", /sheets?/i.test(described.description) && /%/.test(described.description), described.description);
+  check("which spells out what the percentage means", /100\s%[^.]*real size|real size[^.]*100\s%/i.test(described.description), described.description);
+  check("every cell says sheets, not just a number", /\d+ sheets?/.test(described.cell), described.cell);
+  const layout = () => page.evaluate(() => {
+    const table = document.querySelector('[role="dialog"] .print-table');
+    const box = table.getBoundingClientRect();
+    return { x: box.x, y: box.y, columns: Array.from(table.querySelectorAll("thead th")).map((th) => th.getBoundingClientRect().x) };
+  });
+  const start = await layout();
+  const moves = [];
+  for (const [paper, column] of [["a4", 2], ["a3", 2], ["a4", 3], ["letter", 3], ["a4", 1], ["tabloid", 4], ["a4", 2]]) {
+    await cell(paper, column).click();
+    await page.waitForTimeout(150);
+    const now = await layout();
+    const shift = Math.max(Math.abs(now.x - start.x), Math.abs(now.y - start.y), ...now.columns.map((x, i) => Math.abs(x - start.columns[i])));
+    if (shift > 0.5) moves.push(`${paper}/${column}: ${shift.toFixed(1)}px`);
+  }
+  check("the table holds still while choices change, 72 % to 100 % included", moves.length === 0, moves.join(", "));
+  await printDialog().getByRole("radio", { name: "One sheet per panel of the game board", exact: true }).check();
+  const beforeRadio = await layout();
+  await printDialog().getByRole("radio", { name: "Full size" }).check();
+  await page.waitForTimeout(150);
+  const afterRadio = await layout();
+  check("and when full size brings the board sizes in", Math.abs(afterRadio.y - beforeRadio.y) < 0.5, `${(afterRadio.y - beforeRadio.y).toFixed(1)}px`);
+  await printDialog().getByRole("button", { name: "Cancel" }).click();
+  await page.waitForTimeout(300);
   // 11. persistence across reload
   await page.reload({ waitUntil: "networkidle" });
   await page.waitForTimeout(700);
@@ -939,4 +1004,11 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   console.log("CONSOLE ERRORS:", errors.length ? JSON.stringify(errors.slice(0, 5)) : "none");
   await browser.close();
   process.exit(bad.length ? 1 : 0);
-})().catch((e) => { console.error("HARNESS FAILED", e); process.exit(2); });
+})().catch((e) => {
+  // Show what was checked before the run broke off, so one missing control does not hide the rest.
+  ok.forEach((l) => console.log("  ✓ " + l));
+  bad.forEach((l) => console.log("  ✗ " + l));
+  console.log(`\n${ok.length} passed, ${bad.length} failed before the harness stopped`);
+  console.error("HARNESS FAILED", e.message.split("\n").slice(0, 3).join(" | "));
+  process.exit(2);
+});

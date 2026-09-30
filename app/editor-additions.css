@@ -19,25 +19,33 @@
 
 /* The print dialog: split, paper and board size side by side, then what that gives, then every
    choice at once to compare. */
-.print-dialog{max-width:680px}
-.print-choices{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px}
+.print-dialog{max-width:700px;color:#24211d}
+.print-dialog [data-slot="dialog-description"]{color:#2e2a24}
+.print-choices{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px}
 .print-choices fieldset{margin:0;padding:0;border:0;min-width:0}
-.print-choices legend{margin-bottom:6px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#6b6358}
+.print-choices fieldset:disabled .print-option{cursor:default;opacity:.55}
+.print-choices legend{margin-bottom:6px;font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#2e2a24}
+.print-choices legend small{font-weight:600;letter-spacing:0;text-transform:none}
 .print-option{display:flex;gap:8px;align-items:flex-start;padding:4px 0;cursor:pointer}
 .print-option input{margin-top:3px;accent-color:#721c24}
-.print-option strong{display:block;font-size:13px}
-.print-option small{display:block;font-size:11px;line-height:1.4;color:#5d564c}
-.print-summary{margin:0;padding:9px 12px;border-radius:8px;background:#f3ede3;font-size:12px;line-height:1.5;color:#24211d}
+.print-option strong{display:block;font-size:13px;color:#1f1c18}
+.print-option small{display:block;font-size:12px;line-height:1.4;color:#2e2a24}
+/* Room for the longest summary, so a shorter one does not pull the table up. */
+.print-summary{margin:0;padding:9px 12px;min-height:calc(2 * 1.5em + 18px);border-radius:8px;background:#f3ede3;font-size:13px;line-height:1.5;color:#1f1c18}
+.print-table-heading{margin:4px 0 0;font-size:14px;font-weight:700;color:#1f1c18}
+.print-table-note{margin:0;font-size:12px;line-height:1.5;color:#2e2a24}
 .print-table-wrap{overflow-x:auto}
-.print-table{width:100%;border-collapse:collapse;font-size:12px}
-.print-table caption{caption-side:top;text-align:left;padding-bottom:6px;font-size:11px;color:#5d564c}
-.print-table th{padding:4px 6px;text-align:left;font-weight:600;color:#3b352e}
-.print-table thead th{font-size:11px;border-bottom:1px solid #ddd3c4}
+/* Fixed columns, and a choice marked without bold, so marking one never moves the others. */
+.print-table{width:100%;table-layout:fixed;border-collapse:collapse;font-size:13px}
+.print-table-paper{width:18%}
+.print-table th{padding:4px 6px;text-align:left;font-weight:700;color:#1f1c18}
+.print-table thead th{font-size:12px;border-bottom:1px solid #b9ad9b}
 .print-table td{padding:2px}
-.print-table td button{width:100%;padding:5px 6px;border:1px solid transparent;border-radius:6px;background:none;font:inherit;font-variant-numeric:tabular-nums;text-align:left;color:#24211d;cursor:pointer}
-.print-table td button small{color:#6b6358}
+.print-table td button{width:100%;padding:5px 6px;border:1.5px solid transparent;border-radius:6px;background:none;font:inherit;font-variant-numeric:tabular-nums;text-align:left;color:#1f1c18;cursor:pointer;white-space:nowrap}
+.print-table td button small{margin-left:4px;font-size:12px;color:#2e2a24}
 .print-table td button:hover{background:#f3ede3}
-.print-table td button[aria-pressed="true"]{border-color:#721c24;background:#f7e9e6;font-weight:700}
+.print-table td button[aria-pressed="true"]{border-color:#721c24;background:#f7e9e6;box-shadow:inset 0 0 0 1px #721c24}
+.print-dialog-foot{font-size:12px!important;color:#2e2a24!important}
 
 @media print{
   /* The page box itself is set from React, in PrintPages: only one format is live at a time, so a

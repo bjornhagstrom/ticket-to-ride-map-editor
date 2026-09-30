@@ -22,7 +22,7 @@ export const papers: { id: PaperId; label: string; widthMm: number; heightMm: nu
 
 export const splits: { id: SplitId; label: string; note: string }[] = [
   { id: "sheet", label: "One sheet", note: "The whole board shrunk onto one sheet" },
-  { id: "panel", label: "One sheet per panel", note: "Each fold panel on its own sheet, never enlarged" },
+  { id: "panel", label: "One sheet per panel of the game board", note: "Each fold panel on its own sheet, never enlarged" },
   { id: "full", label: "Full size", note: "Real size, spread over as many sheets as it takes" },
 ];
 
@@ -50,7 +50,7 @@ export type PrintPlan = {
   pageMm: { width: number; height: number };
   /** Printed size against real size, never above 1. */
   scale: number;
-  /** The board the pages add up to at 100 %. */
+  /** The board the pages add up to at 100 %. */
   boardMm: { width: number; height: number };
   columns: number;
   rows: number;
@@ -85,7 +85,7 @@ export function printPlan(format: MapFormat, raw: PrintChoice): PrintPlan {
 
   let columns: number, rows: number, scale: number, best: Orientation;
   if (choice.split === "full") {
-    // As few sheets as possible, each tile the same size, at 100 %.
+    // As few sheets as possible, each tile the same size, at 100 %.
     const counted = orientations(choice.paper).map((item) => ({ item, columns: sheetsFor(boardMm.width, item.content.width), rows: sheetsFor(boardMm.height, item.content.height) }));
     const pick = counted.reduce((a, b) => (b.columns * b.rows < a.columns * a.rows ? b : a));
     ({ columns, rows } = pick); best = pick.item; scale = 1;
@@ -133,6 +133,6 @@ export function describePlan(plan: PrintPlan): string {
   const paper = papers.find((item) => item.id === plan.choice.paper)!;
   const count = plan.pages.length;
   const sheets = `${count} sheet${count === 1 ? "" : "s"} of ${paper.label}, ${plan.orientation}`;
-  if (plan.choice.split === "full") return `${sheets}, at 100 %. They add up to ${plan.boardMm.width} × ${plan.boardMm.height} mm: trim each at its marks and butt it to its neighbours.`;
-  return `${sheets}, at ${Math.round(plan.scale * 100)} % of the real ${plan.boardMm.width} × ${plan.boardMm.height} mm board.`;
+  if (plan.choice.split === "full") return `${sheets}, at 100 % — real size. Together they make the ${plan.boardMm.width} × ${plan.boardMm.height} mm board: trim each at its marks and butt it to its neighbours.`;
+  return `${sheets}, at ${Math.round(plan.scale * 100)} % of real size: the board prints smaller than the real ${plan.boardMm.width} × ${plan.boardMm.height} mm.`;
 }

@@ -44,7 +44,7 @@ export function TicketPrintPages({ data, setId }: { data: MapData; setId: string
 export function PrintPages({ data, plan }: { data: MapData; plan: PrintPlan }) {
   const format = mapFormats[data.format];
   const full = plan.choice.split === "full";
-  const percent = `${Math.round(plan.scale * 100)} %`;
+  const percent = `${Math.round(plan.scale * 100)} %`;
   const caption = (page: PrintPlan["pages"][number]) => {
     const count = plan.pages.length;
     const where = `row ${page.row + 1}, column ${page.column + 1}`;
@@ -107,7 +107,9 @@ export function PrintDialog({ open, onOpenChange, format, choice, onChoice, onPr
             <span><strong>{paper.label}</strong><small id={`print-paper-${paper.id}`}>{paper.note}</small></span>
           </label>)}
         </fieldset>
-        {current.split === "full" && sizes.length > 1 && <fieldset><legend>Adds up to</legend>
+        {/* Always shown on a board that has sizes to choose from, and switched off until full size
+            is picked, so the dialog does not change height under the pointer. */}
+        {sizes.length > 1 && <fieldset disabled={current.split !== "full"}><legend>Adds up to{current.split !== "full" && <small> · full size only</small>}</legend>
           {sizes.map((size) => <label key={size.id} className="print-option">
             <input type="radio" name="print-size" value={size.id} aria-label={size.label} aria-describedby={`print-size-${size.id}`}
               checked={current.size === size.id} onChange={() => onChoice({ ...current, size: size.id })} />
@@ -116,19 +118,21 @@ export function PrintDialog({ open, onOpenChange, format, choice, onChoice, onPr
         </fieldset>}
       </div>
       <p className="print-summary">{describePlan(plan)}</p>
+      <h3 id="print-table-heading" className="print-table-heading">Sheets for every choice</h3>
+      <p id="print-table-note" className="print-table-note">Each cell shows how many sheets a print run takes, and its scale: how big the printed board is against the real one. 100 % is real size; 50 % is half as wide and half as tall. Pick a cell to use it.</p>
       <div className="print-table-wrap">
-        <table className="print-table">
-          <caption>Sheets and scale for every choice. Pick one to use it.</caption>
+        <table className="print-table" aria-labelledby="print-table-heading" aria-describedby="print-table-note">
+          <colgroup><col className="print-table-paper" />{columns.map((label) => <col key={label} />)}</colgroup>
           <thead><tr><th scope="col">Paper</th>{columns.map((label) => <th scope="col" key={label}>{label}</th>)}</tr></thead>
           <tbody>{table.map((row) => <tr key={row.paper.id} data-paper={row.paper.id}>
             <th scope="row">{row.paper.label}</th>
             {row.cells.map((cell) => <td key={cell.label}><button type="button" data-pages={cell.pages} aria-pressed={sameChoice(cell.choice, current)}
-              aria-label={`${row.paper.label}, ${cell.label}: ${cell.pages} sheet${cell.pages === 1 ? "" : "s"} at ${Math.round(cell.scale * 100)} %`}
-              onClick={() => onChoice(cell.choice)}>{cell.pages} <small>· {Math.round(cell.scale * 100)} %</small></button></td>)}
+              aria-label={`${row.paper.label}, ${cell.label}: ${cell.pages} sheet${cell.pages === 1 ? "" : "s"} at ${Math.round(cell.scale * 100)} %`}
+              onClick={() => onChoice(cell.choice)}><span>{cell.pages} sheet{cell.pages === 1 ? "" : "s"}</span> <small>{Math.round(cell.scale * 100)} %</small></button></td>)}
           </tr>)}</tbody>
         </table>
       </div>
-      <p className="helper">The browser’s print dialog can also save the run as a PDF. Print at 100 % — “fit to page” would undo the sizes above.</p>
+      <p className="helper print-dialog-foot">The browser’s print dialog can also save the run as a PDF. Print at 100 % — “fit to page” would undo the sizes above.</p>
       <DialogFooter>
         <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
         <Button onClick={onPrint}><Printer />Print</Button>
