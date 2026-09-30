@@ -1398,11 +1398,17 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   check("the ticket length bands and mix are on the Deck rules page", await page.locator("#mix-medium-edge").isVisible() && await page.locator("#mix-short").isVisible());
   const ruleChoices = await page.locator(".deck-rule-choice").allTextContents();
   check("our three sets are offered", ["Generic", "Classic", "Europe"].every((name) => ruleChoices.some((text) => text.includes(name))), ruleChoices.join(" | "));
-  check("and the map starts on Generic", (await storedRules()).chosen === undefined && await page.getByRole("radio", { name: "Generic", exact: true }).isChecked());
+  // With no choice of its own, the page shows what the suggester would pick: the example deck has
+  // long tickets, so that is Europe, and the page says why.
+  check("with no choice made, it shows the suggester's own pick, and why", (await storedRules()).chosen === undefined && await page.getByRole("radio", { name: "Europe", exact: true }).isChecked() && /long tickets/i.test(await page.locator(".deck-rule-default").textContent()),
+    await page.locator(".deck-rule-default").textContent().catch(() => "no note"));
+  await page.getByRole("radio", { name: "Generic", exact: true }).check();
+  await page.waitForTimeout(200);
   const ruleValues = page.locator(".deck-rule-values");
   check("Generic's values are shown", /1\.1/.test(await ruleValues.textContent()) && /per stop/i.test(await ruleValues.textContent()), (await ruleValues.textContent()).slice(0, 160));
   check("and cannot be changed", (await ruleValues.locator("input:not([disabled]), select:not([disabled])").count()) === 0);
   check("with the official decks' range beside a value", /official/i.test(await ruleValues.textContent()));
+  check("and it says these length shares steer the suggester until the map sets its own mix", /until you change the ticket mix below/i.test(await ruleValues.textContent()), (await ruleValues.textContent()).slice(-200));
   await page.getByRole("button", { name: "Create your own from Generic" }).click();
   await page.waitForTimeout(300);
   let rules = await storedRules();
@@ -1423,6 +1429,10 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.locator("#rule-bin-0").blur();
   await page.waitForTimeout(200);
   check("and the flag goes when they do", (await ruleValues.locator(".helper-warning").count()) === 0);
+  // The page is now taller than the window: the dialog must stay inside it and scroll within.
+  const settingsBox = await page.locator('[role="dialog"]').first().boundingBox();
+  const windowHeight = await page.evaluate(() => window.innerHeight);
+  check("Settings stays inside the window when the page grows, and scrolls within", settingsBox.y >= 0 && settingsBox.y + settingsBox.height <= windowHeight + 1, `${Math.round(settingsBox.y)} to ${Math.round(settingsBox.y + settingsBox.height)} in a ${windowHeight}px window`);
   await page.getByRole("radio", { name: "Generic", exact: true }).check();
   await page.waitForTimeout(200);
   check("choosing a built-in set again keeps your own for later", (await storedRules()).rules.length === 1 && (await storedRules()).chosen === "generic");
@@ -1441,10 +1451,12 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.waitForTimeout(250);
   await page.getByRole("menuitem", { name: /Suggest a deck/ }).click();
   await page.waitForTimeout(800);
-  check("the suggester offers your own set beside ours", (await page.locator(".style-card", { hasText: "Sparse" }).count()) === 1 && (await page.locator(".style-card").count()) === 4);
-  check("and starts on it, because the map chose it", (await page.locator(".style-card", { hasText: "Sparse" }).getAttribute("aria-pressed")) === "true");
+  // A card is found by its title: your own set's card also says which of ours it was made from.
+  const styleCard = (name) => page.locator(".style-card").filter({ has: page.locator("strong", { hasText: new RegExp(`^${name}$`) }) });
+  check("the suggester offers your own set beside ours", (await styleCard("Sparse").count()) === 1 && (await page.locator(".style-card").count()) === 4);
+  check("and starts on it, because the map chose it", (await styleCard("Sparse").getAttribute("aria-pressed")) === "true");
   const sparseSize = Number(await page.locator("#suggest-size").inputValue());
-  await page.locator(".style-card", { hasText: "Generic" }).click();
+  await styleCard("Generic").click();
   await page.waitForTimeout(400);
   const genericSize = Number(await page.locator("#suggest-size").inputValue());
   check("and aims at a deck its own size: far smaller than Generic's", sparseSize > 0 && sparseSize < genericSize && genericSize === 17 && sparseSize === 9, `${sparseSize} against ${genericSize}`);
@@ -1485,6 +1497,6 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   ok.forEach((l) => console.log("  ✓ " + l));
   bad.forEach((l) => console.log("  ✗ " + l));
   console.log(`\n${ok.length} passed, ${bad.length} failed before the harness stopped`);
-  console.error("HARNESS FAILED", e.message.split("\n").slice(0, 3).join(" | "));
+  console.error("HARNESS FAILED", e.message.split("\n").slice(0, 14).join(" | "));
   process.exit(2);
 });

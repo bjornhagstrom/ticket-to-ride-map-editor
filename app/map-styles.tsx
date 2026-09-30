@@ -6,6 +6,7 @@
 import { useMemo } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { bandCuts, mapDiameter } from "./map-analysis";
+import { DeckRulesPanel } from "./deck-rules-panel";
 import { notchedSlotPath, ovalSlotPath, tunnelSlotPath } from "./map-artwork";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -20,7 +21,7 @@ export type StyleTarget = { kind: StyleKind; id?: string };
 
 const kindMeta: Record<StyleKind, { label: string; blurb: string }> = {
   map: { label: "Map", blurb: "Basic map settings." },
-  ticket: { label: "Ticket lengths", blurb: "Where a ticket stops being short and starts being long on this map, and how much of the deck should sit in each band." },
+  ticket: { label: "Deck rules", blurb: "The rules the ticket suggester follows on this map — ours, which are fixed, or a set of your own made from one of them — and where a ticket stops being short and starts being long, with how much of the deck belongs in each band." },
   stop: { label: "Stop types", blurb: "What each kind of stop looks like on the map." },
   route: { label: "Route types", blurb: "Line thickness and dash pattern per type. Colour comes from each route, so types are told apart by shape." },
   defaults: { label: "Default object style", blurb: "The style the next stop or route you draw will get. These are settings for your pen, not for the map: changing them leaves everything already drawn exactly as it is." },
@@ -147,7 +148,7 @@ export function SettingsDialog({ open, onOpenChange, target, onTarget, data, cha
               <Input id={id} type="number" min={0} max={100} value={value}
                 onChange={(event) => setMix({ [key]: Math.min(100, Math.max(0, Math.round(Number(event.target.value) || 0))) })} />
             </div>;
-            return <div className="ticket-mix">
+            return <><DeckRulesPanel data={data} change={change} /><h4 className="deck-rules-subhead">Ticket lengths</h4><div className="ticket-mix">
               <div className="mix-fields">
                 {edge("mix-medium-edge", "Short up to · spaces", bands.medium, "medium")}
                 {edge("mix-long-edge", "Long from · spaces", bands.long, "long")}
@@ -175,7 +176,7 @@ export function SettingsDialog({ open, onOpenChange, target, onTarget, data, cha
                   <em>{preset.note}</em>
                 </button>)}
               </div>
-            </div>;
+            </div></>;
           })()}
 
           {kind === "map" && <div className="style-fields">
