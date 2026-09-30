@@ -10,8 +10,8 @@ Add **Suggest tickets…** to the ticket editor. It proposes a complete destinat
 
 1. `docs/TICKET-SUGGESTER.md`: the spec (API, algorithm, score, UI, acceptance checks). Sections §2b, §4.7b and §6 are the most recent.
 2. `docs/TICKET-VALUATION.md`: how official maps value tickets. Default points = shortest path.
-3. `data/README.md`: the format of the reference data.
-4. `scripts/ticket-suggester-reference.py`: the Python reference. Port its logic; don't redesign it. Run it with `python3 scripts/ticket-suggester-reference.py 'data/ttr-reference-maps.json#nordic' --evaluate` (needs networkx).
+3. `../ttr-reference-data/README.md`: the format of the reference data.
+4. `scripts/ticket-suggester-reference.py`: the Python reference. Port its logic; don't redesign it. Run it with `python3 scripts/ticket-suggester-reference.py '../ttr-reference-data/ttr-reference-maps.json#nordic' --evaluate` (needs networkx).
 5. `app/map-data.ts` and `app/map-analysis.ts`: the existing `Ticket`, `MapData`, `buildAdjacency`, `shortestPath` and `reviewTickets`.
 
 ## What to build
@@ -33,7 +33,7 @@ Add **Suggest tickets…** to the ticket editor. It proposes a complete destinat
    - Buttons: Apply and Shuffle (seed + 1). No Cancel button; closing the dialog discards the suggestion.
    - Applied tickets are ordinary tickets.
 5. **Tests (§6).**
-   - Load each map with `useForCalibration: true` from `data/ttr-reference-maps.json`.
+   - Load each map with `useForCalibration: true` from `../ttr-reference-data/ttr-reference-maps.json`.
    - **Valuation:** the default `valueTicket` must reproduce the printed points: Nordic 46/46, India 58/58, Polska 35/35, Switzerland city tickets 34/34, Old West 41/42, Northern Lights 54/55, Europe 43/46.
    - **Score:** each official deck scores below random decks; Switzerland is the known exception.
    - **Suggestions:** seeds 1 and 2 score < 5 and below the official deck, and no suggested ticket has a non-city stop as an endpoint.

@@ -141,11 +141,11 @@ shut across their whole range. They open at three players.
 
 ## How the numbers were produced
 
-The Python reference is `scripts/ticket-suggester-reference.py`, and the data is `data/ttr-reference-maps.json`. `Model.cand()` gives each ticket's `load`, and `Model.lanes` gives the lane counts. Official decks were limited to city–city tickets within reach, with country stops removed.
+The Python reference is `scripts/ticket-suggester-reference.py`, and the data is `../ttr-reference-data/ttr-reference-maps.json`. `Model.cand()` gives each ticket's `load`, and `Model.lanes` gives the lane counts. Official decks were limited to city–city tickets within reach, with country stops removed.
 
 ## 5. Follow-up: per-map double-route rules and whether decks are balanced for them
 
-Added 2026-09-29 at the build session's request. **Measured** = computed from `data/ttr-reference-maps.json` with the Python reference. **Confirmed** = read in the rulebook text. **Secondary** = a verbatim quote or summary on another site. **Inferred** = neither.
+Added 2026-09-29 at the build session's request. **Measured** = computed from `../ttr-reference-data/ttr-reference-maps.json` with the Python reference. **Confirmed** = read in the rulebook text. **Secondary** = a verbatim quote or summary on another site. **Inferred** = neither.
 
 ### 5.1 The rule per map (data: `doubleRouteRule`, `lanesUsableByPlayers`, `doubleRouteRuleSource`)
 

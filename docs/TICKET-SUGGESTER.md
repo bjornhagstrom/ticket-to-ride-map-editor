@@ -2,7 +2,7 @@
 
 This feature adds a **Suggest tickets…** button to the ticket editor. It proposes a complete destination-ticket deck for the current map, and the person then edits that deck. Every rule and target number below comes from the official Ticket to Ride decks. None of them come from our own maps.
 
-- **Reference data:** `data/ttr-reference-maps.json`. It holds 15 official maps with routes, and 14 of them have tickets. Eight maps have `useForCalibration: true`: USA, Europe, Nordic, India, Switzerland, Old West, Polska and Northern Lights. On these maps points equal the shortest path, with at most a few exceptions. The file also has deck profiles and volume data for about 25 more maps. `data/README.md` describes the format.
+- **Reference data:** `../ttr-reference-data/ttr-reference-maps.json`. It holds 15 official maps with routes, and 14 of them have tickets. Eight maps have `useForCalibration: true`: USA, Europe, Nordic, India, Switzerland, Old West, Polska and Northern Lights. On these maps points equal the shortest path, with at most a few exceptions. The file also has deck profiles and volume data for about 25 more maps. `../ttr-reference-data/README.md` describes the format.
 - **Valuation:** `docs/TICKET-VALUATION.md`. How official maps value tickets, and when they do not follow the shortest path.
 - **Reference implementation:** `scripts/ticket-suggester-reference.py`. It is Python and needs networkx. It suggests decks and evaluates existing decks with the same score. The numbers in this document come from running it.
 - **The default style is `generic`** (§2b). Its targets are the mean of seven official decks. `classic` (USA) and `europe` remain as presets.
@@ -270,7 +270,7 @@ Maps that do not follow the shortest path must never be used to tune targets or 
 
 **Multi-map check (the main one).**
 
-1. Build every map with `useForCalibration: true` from `data/ttr-reference-maps.json` as `MapData`. Use `trainsPerPlayer` from the data, or 45 when it is missing. Drop country and border-flag stops, and keep waypoints as junctions.
+1. Build every map with `useForCalibration: true` from `../ttr-reference-data/ttr-reference-maps.json` as `MapData`. Use `trainsPerPlayer` from the data, or 45 when it is missing. Drop country and border-flag stops, and keep waypoints as junctions.
 2. With `generic` (Europe with `europe`), check each map:
    - The official deck, limited to city–city tickets within reach, scores below the median of 10 random decks of the same size. Switzerland is the known exception.
    - `suggestTickets` with seeds 1 and 2 scores < 5 and below the official deck.
@@ -293,7 +293,7 @@ This is the test that the graph is built correctly: dead ends, waypoints and par
 
 **Classic and europe presets.** These checks still hold for the older presets:
 
-Build the USA and Europe maps from `data/ttr-reference-maps.json` as `MapData`: stops from `stops`, routes from `routes`, locomotives from `ferryLocomotives`, tunnels from `tunnel`. Then check:
+Build the USA and Europe maps from `../ttr-reference-data/ttr-reference-maps.json` as `MapData`: stops from `stops`, routes from `routes`, locomotives from `ferryLocomotives`, tunnels from `tunnel`. Then check:
 
 - `evaluateTicketDeck` on the official decks gives:
   - USA, classic: score < 5, dupPct 1.6, unusedPct 14, maxPerStop 5.

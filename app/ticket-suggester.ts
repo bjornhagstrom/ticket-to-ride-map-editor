@@ -1,7 +1,7 @@
 // Destination-ticket suggester. Proposes a whole deck for the map that is open, and scores a deck
 // the map already has, against what the official Ticket to Ride decks do.
 //
-// Every target number here comes from the USA and Europe decks in data/ttr-reference-maps.json, not
+// Every target number here comes from the USA and Europe decks in ../ttr-reference-data/ttr-reference-maps.json, not
 // from our own maps. docs/TICKET-SUGGESTER.md explains where each one comes from, and
 // scripts/ticket-suggester-reference.py is the Python original this was ported from. The two use
 // different random number generators, so they agree on the metrics, not on the ticket lists.

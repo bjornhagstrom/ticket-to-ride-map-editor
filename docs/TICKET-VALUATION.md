@@ -2,7 +2,7 @@
 
 What the ticket points on 14 official Ticket to Ride maps say about valuation, and what the ticket suggester must allow for.
 
-The data is in `data/ttr-reference-maps.json`, where each map has a `valuation` object; see `data/README.md` for the format. All numbers below come from comparing every printed ticket with shortest paths on the transcribed boards.
+The data is in `../ttr-reference-data/ttr-reference-maps.json`, where each map has a `valuation` object; see `../ttr-reference-data/README.md` for the format. All numbers below come from comparing every printed ticket with shortest paths on the transcribed boards.
 
 The graph used everywhere:
 

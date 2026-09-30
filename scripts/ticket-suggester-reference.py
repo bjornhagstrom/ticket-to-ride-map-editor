@@ -1,9 +1,9 @@
 """Reference implementation of the destination-ticket suggester (docs/TICKET-SUGGESTER.md).
 
-Calibrated on the official USA and Europe decks in data/ttr-reference-maps.json. Not shipped with
+Calibrated on the official USA and Europe decks in ../ttr-reference-data/ttr-reference-maps.json. Not shipped with
 the editor: it exists so the TypeScript port can be checked against known numbers.
 
-    python3 scripts/ticket-suggester-reference.py data/ttr-reference-maps.json#usa     # official map by id
+    python3 scripts/ticket-suggester-reference.py ../ttr-reference-data/ttr-reference-maps.json#usa     # official map by id
     python3 scripts/ticket-suggester-reference.py my-map.json                          # editor export
     options: --style generic|classic|europe  --trains 45  --seed 1  --steps 6000  --evaluate
 

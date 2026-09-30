@@ -42,3 +42,6 @@ next-env.d.ts
 /outputs/
 /work/
 
+
+# Private reference data lives in its own repository beside this one (../ttr-reference-data)
+/data/

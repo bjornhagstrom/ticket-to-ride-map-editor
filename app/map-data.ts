@@ -199,7 +199,7 @@ export const DEFAULT_TICKET_BANDS: TicketBands = { medium: .35, long: .60 };
 export const DEFAULT_TICKET_MIX: TicketMix = { short: 30, medium: 47, long: 23 };
 
 // What the official decks actually do, to follow with one click. Measured from the full route and
-// ticket data in data/ttr-reference-maps.json.
+// ticket data in ../ttr-reference-data/ttr-reference-maps.json.
 export const TICKET_MIX_PRESETS: { id: string; label: string; note: string; mix: TicketMix }[] = [
   { id: "usa", label: "Ticket to Ride (USA)", note: "30 tickets in one deck, spread across the whole map", mix: { short: 30, medium: 47, long: 23 } },
   { id: "europe", label: "Ticket to Ride: Europe", note: "all 46 tickets: a short regular deck plus 6 long ones", mix: { short: 76, medium: 11, long: 13 } },

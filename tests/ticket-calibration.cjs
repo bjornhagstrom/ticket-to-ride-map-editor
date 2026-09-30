@@ -1,5 +1,5 @@
 // Acceptance checks for the ticket suggester against the eight official maps marked
-// `useForCalibration` in data/ttr-reference-maps.json. The targets come from
+// `useForCalibration` in the private reference data (ttr-reference-maps.json). The targets come from
 // docs/TICKET-SUGGESTER.md §6 and docs/TICKET-VALUATION.md.
 //
 //   npm run test:calibration
@@ -13,6 +13,14 @@ const os = require("os");
 const path = require("path");
 
 const root = path.join(__dirname, "..");
+// The official maps are private and live in their own repository beside this one
+// (../ttr-reference-data), or wherever TTR_REFERENCE_DATA points. Without them these checks cannot
+// run, and they say so and step aside: the editor itself needs none of this data.
+const referencePath = process.env.TTR_REFERENCE_DATA || path.join(root, "..", "ttr-reference-data", "ttr-reference-maps.json");
+if (!fs.existsSync(referencePath)) {
+  console.log(`Reference data not found at ${referencePath}.\nThe 99 calibration checks need the private ttr-reference-data repository beside this one, or TTR_REFERENCE_DATA pointing at its ttr-reference-maps.json. Skipped.`);
+  process.exit(0);
+}
 const out = fs.mkdtempSync(path.join(os.tmpdir(), "ttr-calibration-"));
 execFileSync("npx", ["tsc", "app/ticket-suggester.ts", "app/map-data.ts",
   "--outDir", out, "--module", "commonjs", "--target", "es2022", "--moduleResolution", "node", "--skipLibCheck"],
@@ -24,7 +32,7 @@ const bad = [];
 const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${detail ? " — " + detail : ""}`); };
 
 // ---------------------------------------------------------------- reference maps as MapData
-const reference = JSON.parse(fs.readFileSync(path.join(root, "data/ttr-reference-maps.json"), "utf8"));
+const reference = JSON.parse(fs.readFileSync(referencePath, "utf8"));
 const calibrationMaps = reference.maps.filter((map) => map.useForCalibration);
 
 // "2-5" and the like, as the data writes it.

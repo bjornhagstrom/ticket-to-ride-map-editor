@@ -124,7 +124,11 @@ ticket tools to the print dialog, including real PDFs printed with the browser's
 breaks off part way, it still lists the checks it made before stopping.
 
 `npm test` runs the typecheck, the suggester, calibration, file-format and print-plan checks, and the
-build. Printing is described in `docs/PRINTING.md`.
+build. The suggester and calibration checks measure the ticket suggester against official maps, which
+are private and live in their own repository beside this one, `../ttr-reference-data` (or wherever
+`TTR_REFERENCE_DATA` points). Without it those two say so and are skipped; everything else, and the
+editor itself, needs none of that data. The suggester's targets are already written into the code, so
+the data is only needed to change or re-check its calibration. Printing is described in `docs/PRINTING.md`.
 
 The dev server sends CSS pretty-printed and with properties reordered, so check a change with
 `scripts/served-css-rule.sh '<selector> {'` rather than by grepping for the line as written.
