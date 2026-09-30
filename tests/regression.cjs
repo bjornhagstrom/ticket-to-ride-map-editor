@@ -6,6 +6,9 @@
 // It writes to the same local storage the editor uses, so it will replace whatever map is open in
 // that browser profile. It runs headless in its own profile, so your own browser is untouched.
 const { chromium } = require("playwright");
+// The editor to test. Another session may be serving its own working copy on 3000; point this at
+// yours with TTR_URL, for example TTR_URL=http://localhost:3001/ttr/ npm run test:regression.
+const BASE = process.env.TTR_URL || "http://localhost:3000/ttr/";
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
@@ -21,7 +24,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
   page.on("pageerror", (e) => errors.push(String(e)));
 
-  await page.goto("http://localhost:3000/ttr/", { waitUntil: "networkidle" });
+  await page.goto(BASE, { waitUntil: "networkidle" });
 
   // 1. welcome guide
   check("welcome guide appears", await page.getByRole("button", { name: "Load the example map" }).isVisible());
@@ -35,7 +38,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   {
     const safariUA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_6) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15";
     const safariPage = await (await browser.newContext({ viewport: { width: 1500, height: 1000 }, userAgent: safariUA })).newPage();
-    await safariPage.goto("http://localhost:3000/ttr/", { waitUntil: "networkidle" });
+    await safariPage.goto(BASE, { waitUntil: "networkidle" });
     await safariPage.getByRole("button", { name: "Load the example map" }).click();
     await safariPage.waitForTimeout(600);
     await safariPage.getByRole("button", { name: "Print map" }).click();
@@ -1268,6 +1271,22 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.waitForTimeout(300);
   const afterDrag = await storedCentral();
   check("and stays at the angle it was let go, to the degree rather than in 15° steps", afterDrag.labelAngle !== undefined && bearingGap(afterDrag.labelAngle, 37) <= 2 && afterDrag.labelAngle % 15 !== 0, String(afterDrag.labelAngle));
+  // A drag is not a text selection: the browser must not paint every stop name blue as the pointer
+  // sweeps across them. A short drag does not show it; a long one across other names does.
+  const selectedText = () => page.evaluate(() => { const sel = window.getSelection(); return sel && !sel.isCollapsed ? sel.toString().replace(/\s+/g, " ").slice(0, 80) : ""; });
+  const sweep = async (from) => { await page.mouse.move(from.x, from.y); await page.mouse.down(); await page.mouse.move(from.x + 600, from.y + 300, { steps: 25 }); await page.mouse.up(); await page.waitForTimeout(200); };
+  const nameStart = await centralName();
+  await sweep({ x: nameStart.lx, y: nameStart.ly });
+  const fromName = await selectedText();
+  await page.evaluate(() => window.getSelection().removeAllRanges());
+  await sweep({ x: nameStart.cx - 200, y: nameStart.cy + 120 });
+  const fromMap = await selectedText();
+  await page.evaluate(() => window.getSelection().removeAllRanges());
+  check("dragging a name across the map selects no text", fromName === "", JSON.stringify(fromName));
+  check("nor does dragging across the map from anywhere else", fromMap === "", JSON.stringify(fromMap));
+  await page.keyboard.press("Meta+z");
+  await page.waitForTimeout(300);
+  await clickStop("Central");
   check("dragging the name leaves the stop where it was", afterDrag.x === beforeDrag.x && afterDrag.y === beforeDrag.y, `${beforeDrag.x},${beforeDrag.y} -> ${afterDrag.x},${afterDrag.y}`);
   const nameSlider = page.locator(".label-angle", { hasText: "Name position" }).locator("input[type=range]");
   check("the Name position slider shows the dragged angle", Number(await nameSlider.inputValue()) === afterDrag.labelAngle, `${await nameSlider.inputValue()} vs ${afterDrag.labelAngle}`);

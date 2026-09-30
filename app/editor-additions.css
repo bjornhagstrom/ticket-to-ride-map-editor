@@ -1,4 +1,7 @@
 .print-pages{display:none}
+/* Every drag on the map is a drag, never a text selection: without this, sweeping the pointer
+   across the map painted every stop name it passed blue. */
+.map-canvas{-webkit-user-select:none;user-select:none}
 /* A stop's name can be taken and turned round its stop. */
 .map-canvas .stop-label-handle{cursor:grab;pointer-events:auto}
 /* A name is otherwise click-through (globals.css), so a stop is still easy to hit under its own name. */.map-canvas .stop-label-handle:active{cursor:grabbing}
