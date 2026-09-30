@@ -18,12 +18,12 @@ Live site: <https://hagstrom.nu/ttr/>
 - Mark specific wagon slots on a route as requiring a locomotive card.
 - Define named wagon styles to mark routes that play by their own rules: serrated tunnel edges, notched corners or a heavy outline, with an optional letter drawn in every space. A tunnel style ships with every map and can be renamed or restyled like any other.
 - Wagon spaces, stop circles and the gap between the lines of a double route are all drawn at the size a real board uses, with an adjustable amount of room left around each stop, set for the whole map or per stop so the two ends of one line can differ.
-- Wagons are always measured against the board the map is for, so you can judge how crowded the finished board will actually be. A board format printed at full size gives exactly real-size wagons; a test sheet is treated as a shrunken proof of whichever board you pick, so the layout matches the board and simply prints smaller. Routes drawn too short for their own wagon count are outlined in red.
+- Wagons are always measured against the board the map is for, so you can judge how crowded the finished board will actually be. Printed at full size, the wagons are exactly real size; printed smaller, they shrink with everything else, so the layout always matches the board. Routes drawn too short for their own wagon count are outlined in red.
 - Define reusable custom line styles (thickness and dash pattern) to flag routes that follow a special rule, and set a default style so new routes pick it up automatically.
 - Add areas, boundaries and labels behind the route network.
 - Import a background image (PNG, JPEG or WebP) — from the Import menu or the Draw background tool — and move, scale, rotate, crop, fade or lock it behind the rest of the map, or centre it and fit it to the page with a print-safe margin in one click.
 - Place resizable evaluation notes with explanatory text on the map, for reviewers and playtesters, and fold one down to a single line when it is in the way.
-- Choose standard, large and custom foldable board formats or A4/A3/US Letter test sheets.
+- Choose the board's shape in Settings: the standard 2×3 board or an extended 2×4. That is all the map itself knows about paper.
 - Detect crossings between buildable routes.
 - Check that each route is drawn about as long as its wagon count needs, and see which routes are too short or unnecessarily roomy.
 - Analyse how balanced the network is: hub degree and neighbour count per stop, a colour-by-length distribution table, and a flag for under-connected stops.
@@ -42,7 +42,7 @@ Live site: <https://hagstrom.nu/ttr/>
 - Undo and redo up to 200 changes during the current session, with Cmd/Ctrl+Z and Cmd/Ctrl+Shift+Z.
 - Save automatically in the current browser.
 - Import and export complete maps as JSON, or just the background or the route network on their own.
-- Print full test sheets or reduced A4 proofs of individual foldable-board panels.
+- Print from a dialog that decides each run without touching the map: the whole board on one sheet, one sheet per fold panel, or full size across as many sheets as it takes, with trim marks; on A4, A3, US Letter or Tabloid; and for a 2×3, full size as either the standard or the larger Anniversary board. A table compares the sheet count and scale of every combination and picks one when clicked. The last choice is remembered in the browser.
 - Show a neutral example map to first-time visitors.
 
 Styles are applied from the Properties panel and defined in one shared Styles dialog, reachable in

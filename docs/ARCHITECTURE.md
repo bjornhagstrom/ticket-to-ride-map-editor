@@ -121,7 +121,7 @@ each stop carries an invisible `stop-hit` circle so it stays comfortable to clic
 ## Wagon spacing
 
 Wagon spaces are laid out in millimetres, not in canvas units. Sizes convert through the board the map is
-for: its own format, or for a test sheet the board it stands in for. A space is drawn at
+for, the 2×3 or 2×4 board it is drawn for, whatever it is printed on. A space is drawn at
 `realWagon`'s real size and the spaces are placed at the real board's pitch, centred on the route,
 so a route always looks the way it will play. There was briefly a True-scale toggle for this; once
 the default view was calibrated the toggle did nothing on a standard board, so it was removed. Only when the wagons will not fit does the route fall back to
@@ -169,7 +169,11 @@ Shared maps and live collaboration require a server API, central storage and an 
 
 ## Printing
 
-A hidden print-only tree renders one page for the sheet formats and one reduced A4 proof per panel for foldable formats. Each format asks the printer for the paper it was laid out for through a single global `@page` rule, written from `PrintPages` in explicit millimetres because only one format is live at a time, so the sheet formats come out landscape instead of being scaled down onto portrait paper, and everything outside the print tree is hidden so no blank trailing sheet is produced. Named `@page` rules were tried first; print dialogs do not honour them reliably, and a global rule with explicit dimensions does. The foldable proof is not a full-scale production file. Its caption states the approximate reduction percentage.
+The board's shape lives in the map; how it is printed does not. `app/print-plan.ts` turns a board and a print choice — split (one sheet, per panel, full size), paper (A4, A3, US Letter, Tabloid) and, for a 2×3 at full size, standard or Anniversary — into a plan: the page in millimetres with its orientation, the scale, and one tile per page as a share of the board. It allows a 10 mm printer margin and an 8 mm caption on every page, picks the orientation that gives the largest scale or the fewest sheets, and never enlarges a panel beyond full size. `tests/print-plan.cjs` pins its figures.
+
+`PrintDialog` in `app/map-print.tsx` offers the choices and a table of every combination, all computed by the same `printPlan`, so the table cannot disagree with what is printed. The choice is kept in `localStorage` under `ttr-print-choice`, never in the map or the undo history.
+
+`PrintPages` renders the plan into a hidden print-only tree. Every page, caption and tile gets its size inline in millimetres from the plan, and a single global `@page` rule declares the paper, because only one plan is live at a time. Named `@page` rules were tried first; print dialogs do not honour them reliably, and a global rule with explicit dimensions does. Everything outside the print tree is hidden so no blank trailing sheet is produced. Full-size sheets carry cut marks at the tile corners instead of a border, to be trimmed and butted.
 
 ## Testing
 

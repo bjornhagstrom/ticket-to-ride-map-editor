@@ -43,13 +43,15 @@ Importing one of these only replaces its own part of the current map (background
 | ID | Finished size | Layout |
 | --- | --- | --- |
 | `board-2x3` | 790 × 525 mm | Standard 3 columns × 2 rows |
-| `board-2x3-large` | 972 × 648 mm | Large 3 columns × 2 rows |
 | `board-2x4` | 1,053 × 526 mm | Custom 4 columns × 2 rows |
-| `a4` | 297 × 210 mm | One landscape sheet |
-| `a3` | 420 × 297 mm | One landscape sheet |
-| `us-letter` | 279.4 × 215.9 mm (11 × 8.5 in) | One landscape sheet |
 
-Files without a recognized format open as `board-2x3`.
+The format is the board's shape only. Paper, splitting and the Anniversary size are chosen when
+printing and are not stored.
+
+Older files may name a format that has since become a print choice: `board-2x3-large`, `a4`, `a3`
+and `us-letter` open as `board-2x3`; `a4-3x2`, `a4-4x2`, `letter-3x2` and `letter-4x2` open as
+`board-2x4`. The map is scaled evenly, never enlarged, and centred, so nothing changes shape. Files
+without a recognized format open as `board-2x3`.
 
 ## Coordinates
 

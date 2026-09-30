@@ -12,7 +12,7 @@ Every file has the same wrapper.
 ```json
 {
   "format": "ticket-to-ride-map",
-  "version": 2,
+  "version": 3,
   "kind": "map",
   "written": "2026-09-29T15:12:00.000Z",
   "app": { "name": "Map prototypes", "version": "0.1.0" },
@@ -24,7 +24,7 @@ Every file has the same wrapper.
 | Field | What it is |
 | --- | --- |
 | `format` | Always `ticket-to-ride-map`. A file without it is a version 1 file (see below). |
-| `version` | The schema this file follows. Currently 2. |
+| `version` | The schema this file follows. Currently 3. |
 | `kind` | `map`, `background`, `network` or `tickets`. |
 | `written` | When it was written, ISO 8601. For your information; nothing depends on it. |
 | `app` | What wrote it. For tracing a problem back to a build. |
@@ -87,7 +87,17 @@ deck can be moved to another copy of a map where the ids differ but the cities a
 | --- | --- |
 | 1 | The original files: `kind` beside the data, no version, no envelope. Still readable. |
 | 2 | The envelope. Payload under its own key, schema version, written-at, app, board frame. Network files carry the styles they refer to. Unknown fields are preserved. |
+| 3 | Wagon styles and line styles folded into route types: a type describes the whole route. A version 2 map gets one route type per combination it used, so it keeps its look. |
 
-When version 3 comes, a reader will migrate a version 2 file to it in one named step, with a test
-that reads a real version 2 file and checks the result. `tests/file-format.cjs` is where those tests
+### Board formats that became print choices
+
+Within version 3, `format` narrowed to the board's shape: `board-2x3` or `board-2x4`. Test sheets,
+boards measured in sheets of paper and the Anniversary size are now chosen when printing and are not
+stored. The version did not move, because nothing a version 3 reader writes changed shape: the two
+remaining ids are the ones every version 3 reader already knows, so older builds read new files
+unchanged. A file naming one of the old formats is migrated when it is read — scaled evenly, never
+enlarged, and centred on the nearest board — and `docs/MAP-FORMAT.md` lists where each one lands.
+
+When version 4 comes, a reader will migrate a version 3 file to it in one named step, with a test
+that reads a real version 3 file and checks the result. `tests/file-format.cjs` is where those tests
 live.
