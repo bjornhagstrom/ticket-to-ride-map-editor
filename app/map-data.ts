@@ -95,7 +95,26 @@ export type NoteBox = {
   locked?: boolean;
   collapsed?: boolean;
 };
-export type MapData = { name: string; format: MapFormat; endGapMm?: number; background: BackgroundShape[]; stops: Stop[]; routes: Route[]; backgroundImage?: BackgroundImage; notes: NoteBox[]; lineStyles: LineStyle[]; routeTypeStyles: RouteTypeStyle[]; wagonStyles: WagonStyle[]; stopTypeStyles: StopTypeStyle[]; tickets: Ticket[]; ticketSets: TicketSet[]; wagonsPerPlayer?: number; startingTickets?: number; keptTickets?: number; players?: PlayerRange; lanesUsableByPlayers?: LaneRule; ticketBands?: TicketBands; ticketMix?: TicketMix; ticketValuation?: { longBonus?: boolean; ferryPremium?: number };
+// The terms a deck is suggested on: how many tickets, how long, how they spread. Our three sets live
+// in TICKET_SUGGESTER and cannot be changed; a map may carry sets of its own, made from one of ours,
+// and choose which one the suggester follows. Shares are fractions (0.18), as in TICKET_SUGGESTER.
+export type DeckRuleValues = {
+  ticketsPerStop: number;
+  longPerStop: number;
+  /** Five shares of the regular deck, by length as a fraction of reach: <.30, .30–.45, .45–.60, .60–.75, ≥.75. */
+  bins: number[];
+  longRange: [number, number] | null;
+  bonusFrom: number | null;
+  lengthCap: number;
+  maxPerStop: number;
+  dupRate: number;
+  periphery: "relative" | "point";
+};
+export type DeckRuleSet = DeckRuleValues & { id: string; label: string; basedOn: string };
+/** Our sets, by the id a map chooses them with. Their values are in TICKET_SUGGESTER.styles. */
+export const BUILT_IN_DECK_RULES = ["generic", "classic", "europe"] as const;
+
+export type MapData = { name: string; format: MapFormat; endGapMm?: number; background: BackgroundShape[]; stops: Stop[]; routes: Route[]; backgroundImage?: BackgroundImage; notes: NoteBox[]; lineStyles: LineStyle[]; routeTypeStyles: RouteTypeStyle[]; wagonStyles: WagonStyle[]; stopTypeStyles: StopTypeStyle[]; tickets: Ticket[]; ticketSets: TicketSet[]; wagonsPerPlayer?: number; startingTickets?: number; keptTickets?: number; players?: PlayerRange; lanesUsableByPlayers?: LaneRule; ticketBands?: TicketBands; ticketMix?: TicketMix; ticketValuation?: { longBonus?: boolean; ferryPremium?: number }; deckRules?: DeckRuleSet[]; deckRule?: string;
   // Fields from a file this build does not know about. Kept so that opening and re-exporting a map
   // written by a newer version never quietly throws its work away.
   unknown?: Record<string, unknown> };

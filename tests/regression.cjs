@@ -1013,7 +1013,8 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   // 27. the map's own short/medium/long mix, and following an official map
   await page.getByRole("button", { name: "Settings" }).click();
   await page.waitForTimeout(500);
-  await page.locator(".settings-nav-item", { hasText: /ticket/i }).click();
+  // Ticket lengths now sit on the Deck rules page, with the rules the suggester follows.
+  await page.locator(".settings-nav-item", { hasText: /deck rules/i }).click();
   await page.waitForTimeout(400);
   const mixShares = async () => [await page.locator("#mix-short").inputValue(), await page.locator("#mix-medium").inputValue(), await page.locator("#mix-long").inputValue()].join("/");
   check("a map carries its own ticket length mix", await page.locator("#mix-medium-edge").isVisible() && await page.locator("#mix-short").isVisible());
@@ -1160,6 +1161,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.waitForTimeout(600);
   await page.getByRole("button", { name: "Settings" }).click();
   await page.waitForTimeout(500);
+  check("a new map has no deck rules of its own", await page.evaluate(() => { const m = JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")); return !(m.deckRules || []).length && !m.deckRule; }));
   check("a new map starts at the original game's numbers: 45 wagons, 3 tickets, 2–5 players",
     (await page.locator("#settings-wagons").inputValue()) === "45" && (await page.locator("#settings-starting-tickets").inputValue()) === "3" && (await page.locator("#settings-players-min").inputValue()) === "2" && (await page.locator("#settings-players-max").inputValue()) === "5",
     `${await page.locator("#settings-wagons").inputValue()} / ${await page.locator("#settings-starting-tickets").inputValue()} / ${await page.locator("#settings-players-min").inputValue()}–${await page.locator("#settings-players-max").inputValue()}`);
@@ -1352,6 +1354,83 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   check("Unlock every name frees them all", await page.evaluate(() => JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")).stops.every((st) => !st.labelLocked)));
   await dragName(165);
   await page.keyboard.press("Escape");
+
+  // 33f. deck rules: our three sets are fixed, and a set of your own changes the terms for a map
+  const storedRules = () => page.evaluate(() => { const m = JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")); return { rules: m.deckRules || [], chosen: m.deckRule }; });
+  await page.getByRole("button", { name: "Settings" }).click();
+  await page.waitForTimeout(400);
+  const navItems = (await page.locator(".settings-nav-item").allTextContents()).join(" | ");
+  check("Settings has Deck rules, and Ticket lengths is part of it", /Deck rules/.test(navItems) && !/Ticket lengths/.test(navItems), navItems);
+  await page.locator(".settings-nav-item", { hasText: /deck rules/i }).click();
+  await page.waitForTimeout(400);
+  check("the ticket length bands and mix are on the Deck rules page", await page.locator("#mix-medium-edge").isVisible() && await page.locator("#mix-short").isVisible());
+  const ruleChoices = await page.locator(".deck-rule-choice").allTextContents();
+  check("our three sets are offered", ["Generic", "Classic", "Europe"].every((name) => ruleChoices.some((text) => text.includes(name))), ruleChoices.join(" | "));
+  check("and the map starts on Generic", (await storedRules()).chosen === undefined && await page.getByRole("radio", { name: "Generic", exact: true }).isChecked());
+  const ruleValues = page.locator(".deck-rule-values");
+  check("Generic's values are shown", /1\.1/.test(await ruleValues.textContent()) && /per stop/i.test(await ruleValues.textContent()), (await ruleValues.textContent()).slice(0, 160));
+  check("and cannot be changed", (await ruleValues.locator("input:not([disabled]), select:not([disabled])").count()) === 0);
+  check("with the official decks' range beside a value", /official/i.test(await ruleValues.textContent()));
+  await page.getByRole("button", { name: "Create your own from Generic" }).click();
+  await page.waitForTimeout(300);
+  let rules = await storedRules();
+  check("a set of your own is made from it, and chosen", rules.rules.length === 1 && rules.rules[0].ticketsPerStop === 1.1 && rules.chosen === rules.rules[0].id, JSON.stringify(rules).slice(0, 200));
+  check("its values can be changed", (await ruleValues.locator("input:not([disabled])").count()) >= 8, String(await ruleValues.locator("input:not([disabled])").count()));
+  await page.locator("#rule-tickets-per-stop").fill("0.5");
+  await page.locator("#rule-tickets-per-stop").blur();
+  await page.locator("#rule-name").fill("Sparse");
+  await page.locator("#rule-name").blur();
+  await page.waitForTimeout(300);
+  rules = await storedRules();
+  check("a changed value is kept in the map", rules.rules[0].ticketsPerStop === 0.5 && rules.rules[0].label === "Sparse", JSON.stringify(rules.rules[0]).slice(0, 160));
+  await page.locator("#rule-bin-0").fill("50");
+  await page.locator("#rule-bin-0").blur();
+  await page.waitForTimeout(200);
+  check("lengths that do not add up to 100 % are flagged", (await ruleValues.locator(".helper-warning").count()) >= 1);
+  await page.locator("#rule-bin-0").fill("18");
+  await page.locator("#rule-bin-0").blur();
+  await page.waitForTimeout(200);
+  check("and the flag goes when they do", (await ruleValues.locator(".helper-warning").count()) === 0);
+  await page.getByRole("radio", { name: "Generic", exact: true }).check();
+  await page.waitForTimeout(200);
+  check("choosing a built-in set again keeps your own for later", (await storedRules()).rules.length === 1 && (await storedRules()).chosen === "generic");
+  await page.getByRole("radio", { name: "Sparse", exact: true }).check();
+  await page.waitForTimeout(200);
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(300);
+  await page.reload({ waitUntil: "networkidle" });
+  await page.waitForTimeout(700);
+  check("your own set survives a reload", (await storedRules()).rules[0]?.label === "Sparse" && (await storedRules()).chosen === (await storedRules()).rules[0]?.id);
+  // The suggester follows the map's rules: half a ticket per stop, floored at what a table of three
+  // is dealt, instead of Generic's 1.1.
+  await page.getByRole("button", { name: /^Tickets · / }).click();
+  await page.waitForTimeout(400);
+  await page.getByRole("button", { name: /Add a deck/ }).click();
+  await page.waitForTimeout(250);
+  await page.getByRole("menuitem", { name: /Suggest a deck/ }).click();
+  await page.waitForTimeout(800);
+  check("the suggester offers your own set beside ours", (await page.locator(".style-card", { hasText: "Sparse" }).count()) === 1 && (await page.locator(".style-card").count()) === 4);
+  check("and starts on it, because the map chose it", (await page.locator(".style-card", { hasText: "Sparse" }).getAttribute("aria-pressed")) === "true");
+  const sparseSize = Number(await page.locator("#suggest-size").inputValue());
+  await page.locator(".style-card", { hasText: "Generic" }).click();
+  await page.waitForTimeout(400);
+  const genericSize = Number(await page.locator("#suggest-size").inputValue());
+  check("and aims at a deck its own size: far smaller than Generic's", sparseSize > 0 && sparseSize < genericSize && genericSize === 17 && sparseSize === 9, `${sparseSize} against ${genericSize}`);
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(300);
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(300);
+  // Deleting your own set falls back to Generic.
+  await page.getByRole("button", { name: "Settings" }).click();
+  await page.waitForTimeout(400);
+  await page.locator(".settings-nav-item", { hasText: /deck rules/i }).click();
+  await page.waitForTimeout(300);
+  await page.getByRole("radio", { name: "Sparse", exact: true }).check();
+  await page.getByRole("button", { name: "Delete this set" }).click();
+  await page.waitForTimeout(300);
+  check("deleting your own set goes back to Generic", (await storedRules()).rules.length === 0 && ["generic", undefined].includes((await storedRules()).chosen));
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(300);
 
   // 34. a map saved on a format that is now a print choice opens on its board
   await page.evaluate(() => {

@@ -131,6 +131,18 @@ const oldNetwork = storage.normalizeNetworkFile({ format: "a4", stops: [{ id: "s
 check("a network file from an old format still lands on the board", near(oldNetwork.stops[0].y, 731), String(oldNetwork.stops[0].y));
 check("a migrated map is written back out under a board format", storage.writeMapFile("map", storage.mapPayload(a4), a4).payload.format === "board-2x3");
 
+// ---------------------------------------------------------------- deck rules of a map's own
+// A set of rules the suggester follows instead of ours travels with the map. A value that cannot be
+// used is dropped rather than handed to the suggester.
+const own = { id: "rules-1", label: "Sparse", basedOn: "generic", ticketsPerStop: 0.5, longPerStop: 0, bins: [0.18, 0.33, 0.22, 0.16, 0.11], longRange: null, bonusFrom: null, lengthCap: 0.47, maxPerStop: 7, dupRate: 0.03, periphery: "relative" };
+const withRules = storage.normalizeMap({ ...JSON.parse(JSON.stringify(sample)), deckRules: [own], deckRule: "rules-1" });
+const rulesBack = storage.normalizeMap(storage.readMapFile(JSON.parse(JSON.stringify(storage.writeMapFile("map", storage.mapPayload(withRules), withRules)))).payload);
+check("a map's own deck rules survive a round trip", JSON.stringify(rulesBack.deckRules) === JSON.stringify([own]) && rulesBack.deckRule === "rules-1", JSON.stringify(rulesBack.deckRules));
+const broken = storage.normalizeMap({ ...JSON.parse(JSON.stringify(sample)), deckRules: [{ ...own, id: "bad", ticketsPerStop: -2 }, { label: "no id" }, own], deckRule: "gone" });
+const keptRules = broken.deckRules || [];
+check("a set with a value that cannot be used, or no id, is dropped", keptRules.length === 1 && keptRules[0].id === "rules-1", JSON.stringify(keptRules.map((r) => r.id)));
+check("and a choice that names no set falls back to ours", broken.deckRule === undefined, String(broken.deckRule));
+
 console.log("PASS:"); ok.forEach((line) => console.log("  ✓ " + line));
 if (bad.length) { console.log("FAIL:"); bad.forEach((line) => console.log("  ✗ " + line)); }
 console.log(`\n${ok.length} passed, ${bad.length} failed`);

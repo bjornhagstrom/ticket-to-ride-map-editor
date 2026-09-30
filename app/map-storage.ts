@@ -1,6 +1,6 @@
 // Loading, saving and reshaping map files: local-storage keys, the normalizers that let older
 // files open, board-format rescaling, and image reading.
-import { W, type PlayerRange, DEFAULT_WAGONS_PER_PLAYER, DEFAULT_STARTING_TICKETS, DEFAULT_KEPT_TICKETS, defaultTicketSet, type Ticket, type TicketSet, defaultStopTypeStyles, fallbackStopTypeStyle, type StopTypeStyle, defaultWagonStyles, type WagonStyle, defaultRouteTypeStyles, type LineStyle, type RouteTypeStyle, type BackgroundImage, type BackgroundShape, type ImageCrop, mapFormats, type MapData, type MapFormat, type NoteBox, type Point, type Route, type Stop, STORAGE_KEY } from "./map-data";
+import { W, BUILT_IN_DECK_RULES, type DeckRuleSet, type PlayerRange, DEFAULT_WAGONS_PER_PLAYER, DEFAULT_STARTING_TICKETS, DEFAULT_KEPT_TICKETS, defaultTicketSet, type Ticket, type TicketSet, defaultStopTypeStyles, fallbackStopTypeStyle, type StopTypeStyle, defaultWagonStyles, type WagonStyle, defaultRouteTypeStyles, type LineStyle, type RouteTypeStyle, type BackgroundImage, type BackgroundShape, type ImageCrop, mapFormats, type MapData, type MapFormat, type NoteBox, type Point, type Route, type Stop, STORAGE_KEY } from "./map-data";
 
 export const GUIDE_SEEN_KEY = `${STORAGE_KEY}-guide-seen`;
 export const MAX_IMAGE_WARN_BYTES = 2 * 1024 * 1024;
@@ -168,7 +168,7 @@ const MAP_KEYS = new Set([
   "name", "format", "background", "backgroundImage", "stops", "routes", "notes",
   "lineStyles", "routeTypeStyles", "wagonStyles", "stopTypeStyles", "tickets", "ticketSets",
   "wagonsPerPlayer", "startingTickets", "keptTickets", "players", "ticketBands", "ticketMix",
-  "ticketValuation", "lanesUsableByPlayers", "endGapMm", "unknown",
+  "ticketValuation", "lanesUsableByPlayers", "endGapMm", "deckRules", "deckRule", "unknown",
 ]);
 
 const unknownKeys = (value: Record<string, unknown>): Record<string, unknown> | undefined => {
@@ -244,6 +244,33 @@ function mergeStylesIntoRouteTypes(value: Partial<MapData> & { wagonStyles?: Wag
   return { ...value, routes: migrated, routeTypeStyles: types };
 }
 
+// A map's own deck rules, each checked value by value: a set with anything the suggester cannot use
+// is dropped whole rather than half-applied, and a choice that names no set falls back to ours.
+const share = (value: unknown) => typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1;
+const validRuleSet = (value: unknown): value is DeckRuleSet => {
+  if (!value || typeof value !== "object") return false;
+  const v = value as Partial<DeckRuleSet>;
+  return typeof v.id === "string" && v.id.length > 0 && typeof v.label === "string"
+    && typeof v.ticketsPerStop === "number" && v.ticketsPerStop > 0 && v.ticketsPerStop <= 5
+    && typeof v.longPerStop === "number" && v.longPerStop >= 0 && v.longPerStop <= 2
+    && Array.isArray(v.bins) && v.bins.length === 5 && v.bins.every(share)
+    && (v.longRange === null || (Array.isArray(v.longRange) && v.longRange.length === 2 && v.longRange.every(share) && v.longRange[0] <= v.longRange[1]))
+    && (v.bonusFrom === null || share(v.bonusFrom))
+    && typeof v.lengthCap === "number" && v.lengthCap > 0 && v.lengthCap <= 1
+    && Number.isInteger(v.maxPerStop) && (v.maxPerStop as number) >= 1
+    && share(v.dupRate)
+    && (v.periphery === "relative" || v.periphery === "point");
+};
+const normalizeDeckRules = (value: Partial<MapData>): Pick<MapData, "deckRules" | "deckRule"> => {
+  const rules = (Array.isArray(value.deckRules) ? value.deckRules : []).filter(validRuleSet)
+    .map((rule) => ({ ...rule, basedOn: typeof rule.basedOn === "string" ? rule.basedOn : "generic" }));
+  const known = new Set<string>([...BUILT_IN_DECK_RULES, ...rules.map((rule) => rule.id)]);
+  return {
+    deckRules: rules.length ? rules : undefined,
+    deckRule: typeof value.deckRule === "string" && known.has(value.deckRule) ? value.deckRule : undefined,
+  };
+};
+
 export const normalizeMap = (raw: Partial<MapData>): MapData => normalizeMapFields(mergeStylesIntoRouteTypes(migrateLegacyFormat(raw)));
 
 const normalizeMapFields = (value: Partial<MapData>): MapData => ({
@@ -267,6 +294,7 @@ const normalizeMapFields = (value: Partial<MapData>): MapData => ({
   players: normalizePlayers(value.players),
   ticketBands: value.ticketBands,
   ticketMix: value.ticketMix,
+  ...normalizeDeckRules(value),
   ticketValuation: value.ticketValuation,
   unknown: unknownKeys(value as Record<string, unknown>),
 });

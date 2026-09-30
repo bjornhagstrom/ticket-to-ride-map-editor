@@ -11,7 +11,7 @@ import { DEFAULT_TICKET_MIX, colorLabels, type MapData, realWagon, type Stop, ty
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { type Bottleneck, TICKET_SUGGESTER, type TicketDeckReport, type TicketStyle, type SetupBalance, type TicketReview, type ColourLengthTable, type NetworkStats, type RouteSpacing, type RouteSuggestion } from "./map-analysis";
+import { type Bottleneck, deckRuleFor, deckRules, TICKET_SUGGESTER, type TicketDeckReport, type TicketStyle, type SetupBalance, type TicketReview, type ColourLengthTable, type NetworkStats, type RouteSpacing, type RouteSuggestion } from "./map-analysis";
 
 export function WelcomeGuide({ open, onOpenChange, onChooseBlank, onChooseExample }: { open: boolean; onOpenChange: (open: boolean) => void; onChooseBlank: () => void; onChooseExample: () => void }) {
   const steps: Array<{ icon: React.ReactNode; title: string; text: string }> = [
@@ -298,7 +298,10 @@ export function SuggestTicketsDialog({ open, onOpenChange, data, current, sugges
     return total ? r.mix.map((count) => Math.round(100 * count / total)).join(" / ") : "—";
   };
   // On a small map, dealing a full table needs more tickets than one per stop would give.
-  const perStopSize = Math.round((TICKET_SUGGESTER.styles[style].ticketsPerStop + TICKET_SUGGESTER.styles[style].longPerStop) * data.stops.length);
+  // Ours and the map's own, and the one chosen now.
+  const rules = deckRules(data);
+  const rule = deckRuleFor(data, style);
+  const perStopSize = Math.round((rule.ticketsPerStop + rule.longPerStop) * data.stops.length);
   const dealtFloor = deckSize > perStopSize ? deckSize : 0;
 
   return <Dialog open={open} onOpenChange={onOpenChange}>
@@ -320,10 +323,10 @@ export function SuggestTicketsDialog({ open, onOpenChange, data, current, sugges
       <div className="style-choices">
         <Label htmlFor="suggest-style">Style</Label>
         <select id="suggest-style" className="visually-hidden" value={style} onChange={(event) => onStyle(event.target.value as TicketStyle)}>
-          {(Object.keys(TICKET_SUGGESTER.styles) as TicketStyle[]).map((key) => <option key={key} value={key}>{TICKET_SUGGESTER.styles[key].label}</option>)}
+          {rules.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
         </select>
-        <div className="style-cards">{(Object.keys(TICKET_SUGGESTER.styles) as TicketStyle[]).map((key) => {
-          const preset = TICKET_SUGGESTER.styles[key];
+        <div className="style-cards">{rules.map((preset) => {
+          const key = preset.id;
           return <button type="button" key={key} className={cn("style-card", key === style && "chosen")} aria-pressed={key === style} onClick={() => onStyle(key)}>
             <strong>{preset.label}</strong>
             <span>{preset.blurb}</span>
@@ -335,8 +338,8 @@ export function SuggestTicketsDialog({ open, onOpenChange, data, current, sugges
           </button>;
         })}</div>
       </div>
-      <p className="helper">{busy ? "Working out a deck… " : ""} The wagon count is this map&apos;s own setting and changing it here changes it there. A player&apos;s reach is {report?.reach ?? current.reach} wagon spaces, from {TICKET_SUGGESTER.styles[style].lengthCap} × {wagons} wagons.</p>
-      {dealtFloor > 0 && <p className="helper">On a map this size, {TICKET_SUGGESTER.styles[style].ticketsPerStop} tickets per stop would leave too few to deal {data.startingTickets ?? 3} each to a table of {tableWord(data.players?.max ?? 5)}, so the count is held at {dealtFloor}. That is denser than the official decks; lower it if you would rather match them.</p>}
+      <p className="helper">{busy ? "Working out a deck… " : ""} The wagon count is this map&apos;s own setting and changing it here changes it there. A player&apos;s reach is {report?.reach ?? current.reach} wagon spaces, from {rule.lengthCap} × {wagons} wagons.</p>
+      {dealtFloor > 0 && <p className="helper">On a map this size, {rule.ticketsPerStop} tickets per stop would leave too few to deal {data.startingTickets ?? 3} each to a table of {tableWord(data.players?.max ?? 5)}, so the count is held at {dealtFloor}. That is denser than the official decks; lower it if you would rather match them.</p>}
       <label className="checkbox-row"><input type="checkbox" checked={keepExisting} onChange={(event) => onKeepExisting(event.target.checked)} />Keep the tickets this deck already has</label>
 
       {report?.note && <p className="helper helper-warning">{report.note}</p>}
@@ -344,8 +347,8 @@ export function SuggestTicketsDialog({ open, onOpenChange, data, current, sugges
       <div className={cn("analysis-table-scroll", busy && "suggest-busy")}><table className="analysis-table suggest-table">
         <thead><tr><th>Measure</th><th>Now</th><th>Suggested</th><th>Reference</th></tr></thead>
         <tbody>
-          {row("Tickets", `${current.regular + current.long}`, report ? `${report.regular + report.long}` : "—", `${TICKET_SUGGESTER.styles[style].ticketsPerStop} per stop`)}
-          {row("Long tickets", `${current.long}`, report ? `${report.long}` : "—", style === "europe" ? "Europe draws 6 of its 46 separately" : "this style has no separate long deck")}
+          {row("Tickets", `${current.regular + current.long}`, report ? `${report.regular + report.long}` : "—", `${rule.ticketsPerStop} per stop`)}
+          {row("Long tickets", `${current.long}`, report ? `${report.long}` : "—", style === "europe" ? "Europe draws 6 of its 46 separately" : rule.longPerStop > 0 ? `a long deck of about ${rule.longPerStop} per stop` : "this style has no separate long deck")}
           {row("Tickets per stop", current.perStop.toFixed(2), report ? report.perStop.toFixed(2) : "—", range(official.perStop))}
           {row("Reach", `${current.reach}`, report ? `${report.reach}` : "—", "the longest ticket a player can build")}
           {row("Stops with no ticket", `${current.zeroStops}`, report ? `${report.zeroStops}` : "—", "USA 6, Europe 0")}
@@ -357,7 +360,7 @@ export function SuggestTicketsDialog({ open, onOpenChange, data, current, sugges
         </tbody>
       </table></div>
 
-      {report && report.bins.some((count) => count > 0) && <p className="helper">Lengths, shortest to longest: {report.bins.join(" · ")} against a target of {TICKET_SUGGESTER.styles[style].bins.map((share) => (share * report.regular).toFixed(1)).join(" · ")}.</p>}
+      {report && report.bins.some((count) => count > 0) && <p className="helper">Lengths, shortest to longest: {report.bins.join(" · ")} against a target of {rule.bins.map((share) => (share * report.regular).toFixed(1)).join(" · ")}.</p>}
       {report && report.ambiguous.length > 0 && <p className="helper">{report.ambiguous.length} ticket{report.ambiguous.length === 1 ? " has" : "s have"} a way round that costs one space more but is built from one route fewer, so it takes a turn less. Several official cards are priced at that higher figure. These are left at the shortest path — raise them by hand if you want to follow suit.</p>}
       {report && report.hard.length > 0 && <p className="helper">{report.hard.length} ticket{report.hard.length === 1 ? "" : "s"} cross a tunnel or need ferry locomotives. They are worth their wagon count all the same — the difficulty is yours to judge.</p>}
       </div>

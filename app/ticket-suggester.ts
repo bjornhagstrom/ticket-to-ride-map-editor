@@ -8,7 +8,10 @@
 import { valueTicket, type TicketPath } from "./ticket-valuation";
 import { DEFAULT_STARTING_TICKETS, DEFAULT_TICKET_BANDS, DEFAULT_WAGONS_PER_PLAYER, DEFAULT_PLAYERS, lanesUsableAt, type LaneRule, type MapData, type Ticket, type TicketBands, type TicketMix, ticketsInSet } from "./map-data";
 
-export type TicketStyle = "generic" | "classic" | "europe";
+/** Our three sets of deck rules. */
+export type BuiltInStyle = "generic" | "classic" | "europe";
+/** The id of the rules a deck is suggested on: one of ours, or a set of the map's own (DeckRuleSet). */
+export type TicketStyle = string;
 
 // Presets, weights and limits in one place, so they can be tuned and their provenance stays visible.
 export const TICKET_SUGGESTER = {
@@ -475,7 +478,7 @@ class DeckState {
     this.hardSum += sign * Math.max(0, candidate.locos - TICKET_SUGGESTER.maxLocos);
   }
 
-  score(style: typeof TICKET_SUGGESTER.styles.classic, wantRegular: number, mix: TicketMix | null): number {
+  score(style: DeckRule, wantRegular: number, mix: TicketMix | null): number {
     const w = TICKET_SUGGESTER.weights;
     const model = this.model;
     // A map that states its own short/medium/long mix is aimed at that, over the whole deck. One
@@ -560,6 +563,8 @@ function resolveOptions(data: MapData, options: Partial<TicketSuggestOptions>): 
 // Europe deals a long ticket alongside the regular ones, so a map set up to deal four or more, or a
 // deck that already has long tickets, is taken to want the Europe shape.
 export function defaultStyle(data: MapData, setId?: string): TicketStyle {
+  // The rules the map has chosen come first, whether ours or its own.
+  if (data.deckRule && deckRules(data).some((rule) => rule.id === data.deckRule)) return data.deckRule;
   const deck = setId ? ticketsInSet(data, setId) : data.tickets;
   // A deck that already has long tickets, or a map that deals four or more, is shaped like Europe.
   // Everything else starts from the average of the official maps.
@@ -567,10 +572,34 @@ export function defaultStyle(data: MapData, setId?: string): TicketStyle {
   return (data.startingTickets ?? DEFAULT_STARTING_TICKETS) >= 4 ? "europe" : "generic";
 }
 
-// How big a deck to aim for: the style's tickets per stop, but never so few that a full table
+// Every set of rules the suggester can follow on this map: ours first, fixed, then the map's own.
+// A set of the map's own carries the same values as ours, and is described from them.
+export type DeckRule = typeof TICKET_SUGGESTER.styles.generic & { id: string; custom: boolean; basedOn: string };
+const percent = (share: number) => `${Math.round(share * 100)} %`;
+export function deckRules(data: MapData): DeckRule[] {
+  const ours = (Object.keys(TICKET_SUGGESTER.styles) as BuiltInStyle[]).map((id): DeckRule => ({ ...TICKET_SUGGESTER.styles[id], id, custom: false, basedOn: id }));
+  const own = (data.deckRules ?? []).map((rule): DeckRule => {
+    const from = ours.find((item) => item.id === rule.basedOn)?.label ?? "one of ours";
+    return {
+      ...rule,
+      custom: true,
+      blurb: `This map's own rules, made from ${from}.`,
+      lengths: `Lengths, shortest to longest: ${rule.bins.map(percent).join(" / ")}.`,
+      deck: `About ${rule.ticketsPerStop} tickets per stop${rule.longPerStop > 0 ? `, plus a long deck of about ${rule.longPerStop} per stop` : ", all in one deck"}.`,
+      after: rule.bonusFrom !== null ? `The longest tickets are paid a bonus from ${percent(rule.bonusFrom)} of reach.` : "No bonus: a ticket is worth its distance.",
+    };
+  });
+  return [...ours, ...own];
+}
+export function deckRuleFor(data: MapData, id: TicketStyle): DeckRule {
+  const all = deckRules(data);
+  return all.find((rule) => rule.id === id) ?? all[0];
+}
+
+// How big a deck to aim for: the rules' tickets per stop, but never so few that a full table
 // cannot be dealt from it.
 export function suggestedDeckSize(data: MapData, style: TicketStyle, stops: number): { regular: number; long: number } {
-  const preset = TICKET_SUGGESTER.styles[style];
+  const preset = deckRuleFor(data, style);
   const long = Math.round(preset.longPerStop * stops);
   const dealt = (data.players?.max ?? DEFAULT_PLAYERS.max) * (data.startingTickets ?? DEFAULT_STARTING_TICKETS);
   const regular = Math.max(Math.round(preset.ticketsPerStop * stops), dealt - long);
@@ -637,7 +666,7 @@ function loadRatioOf(model: SuggesterModel, deck: DeckState): number | null {
   return (multi / multiCount) / (single / singleCount);
 }
 
-function buildReport(model: SuggesterModel, deck: DeckState, styleName: TicketStyle, style: typeof TICKET_SUGGESTER.styles.classic, wantRegular: number, longCount: number, ids: Map<Candidate, string>, mix: TicketMix | null, audit: TicketDeckReport["valuation"] | undefined, data: MapData | undefined, atTable: number): TicketDeckReport {
+function buildReport(model: SuggesterModel, deck: DeckState, styleName: TicketStyle, style: DeckRule, wantRegular: number, longCount: number, ids: Map<Candidate, string>, mix: TicketMix | null, audit: TicketDeckReport["valuation"] | undefined, data: MapData | undefined, atTable: number): TicketDeckReport {
   const duplicatePairs: [string, string][] = [];
   for (let i = 0; i < deck.members.length; i++) {
     for (let j = i + 1; j < deck.members.length; j++) {
@@ -685,7 +714,7 @@ function buildReport(model: SuggesterModel, deck: DeckState, styleName: TicketSt
 
 export function suggestTickets(data: MapData, options: Partial<TicketSuggestOptions> = {}): { tickets: Ticket[]; report: TicketDeckReport } {
   const resolved = resolveOptions(data, options);
-  const style = TICKET_SUGGESTER.styles[resolved.style];
+  const style = deckRuleFor(data, resolved.style);
   if (data.stops.length < 4 || data.routes.length < 3) {
     return { tickets: [], report: emptyReport("A map needs at least four stops and a few routes before a deck can be suggested.") };
   }
@@ -806,7 +835,7 @@ export function suggestTickets(data: MapData, options: Partial<TicketSuggestOpti
 // Score the deck the map already has, on the same scale.
 export function evaluateTicketDeck(data: MapData, options: Partial<TicketSuggestOptions> = {}): TicketDeckReport {
   const resolved = resolveOptions(data, options);
-  const style = TICKET_SUGGESTER.styles[resolved.style];
+  const style = deckRuleFor(data, resolved.style);
   const deckTickets = resolved.setId ? ticketsInSet(data, resolved.setId) : data.tickets;
   if (data.stops.length < 4 || data.routes.length < 3) return emptyReport("A map needs at least four stops and a few routes before a deck can be judged.", resolved.style);
   const mix = data.ticketMix ?? null;
