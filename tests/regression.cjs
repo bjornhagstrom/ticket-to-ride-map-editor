@@ -1394,6 +1394,8 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await dragName(165);
 
   // 33e. names can be locked, one at a time or all at once, the way stop positions are
+  const panelLabels = (await page.locator(".property-form label").allTextContents()).map((t) => t.trim());
+  check("the panel has one Name, for the field, and Name on the map, for where it is drawn", panelLabels.filter((t) => t === "Name").length === 1 && panelLabels.includes("Name on the map"), panelLabels.join(" | "));
   check("a stop's panel has no slider for its name any more", (await page.locator(".property-form input[type=range]").count()) === 1 && (await page.getByText(/Name position/).count()) === 0,
     `${await page.locator(".property-form input[type=range]").count()} sliders`);
   const nameBefore = (await storedCentral()).labelAngle;

@@ -43,7 +43,7 @@ export function StopProperties({ stop, change, onDelete, labelState, mapEndGapMm
     {stopTypeStyles.find((style) => style.id === stop.type)?.junction
       ? <p className="helper">This is a junction: it joins routes and no ticket ends here, so its name is not drawn on the map or in print. The name is kept here so you can tell junctions apart, and shows when you point at the stop.</p>
       : <div className="label-angle">
-      <Label>Name</Label>
+      <Label>Name on the map</Label>
       <p className={cn("helper", labelState.covers && "helper-warning")}>
         {labelState.covers
           ? labelState.clear.length
