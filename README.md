@@ -133,6 +133,11 @@ a previous server left running keeps serving the old code on 3000 while the new 
 edits somewhere you are not looking. `pgrep -f next-server` shows them; stop them all before
 starting a new one, and do not delete `.next` while a server is running.
 
+`next.config.ts` pins the Turbopack root to the project, because a `package-lock.json` in a parent
+directory otherwise makes Next take that directory as the root. A `.next` cache built under the
+wrong root keeps failing after the fix — `Can't resolve 'tailwindcss'` in a loop, which once ran the
+machine out of memory — so after changing the root, stop the server, delete `.next`, and start again.
+
 ## Source of truth
 
 The canonical local checkout is the copy under `Developer/ticket-to-ride-map-editor`. Generated folders such as `.next/`, `out/` and `node_modules/` must not be committed.
