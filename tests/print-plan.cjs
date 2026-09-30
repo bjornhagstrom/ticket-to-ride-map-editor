@@ -103,6 +103,29 @@ for (const format of ["board-2x3", "board-2x4"]) for (const paperId of ["a4", "a
 check("and no sheet count changes for it", [["board-2x3", "a3", "standard", 4], ["board-2x3", "a4", "standard", 9], ["board-2x3", "letter", "standard", 12], ["board-2x3", "a4", "anniversary", 16], ["board-2x4", "a3", "standard", 6]]
   .every(([format, paper, size, count]) => printPlan(format, { split: "full", paper, size }).pages.length === count));
 
+// ---------------------------------------------------------------- Safari
+// Safari's first print layout has about 264 mm down an upright A4 page: a 274 mm sheet spilled about
+// 10 mm onto a second page, a 268 mm one spilled too, and every later layout fitted. Nobody knows why,
+// so in Safari the sheet's length is capped at 255 mm on A4, a 21 mm clear margin at each end of the
+// long side instead of 10.
+const { PRINT_PROFILES } = require(path.join(out, "print-plan.js"));
+const safari = (format, choice) => printPlan(format, choice, PRINT_PROFILES.safari);
+const count = (plan) => plan.pages.length;
+check("Safari: full size on A4 is 12 sheets", count(safari("board-2x3", { split: "full", paper: "a4" })) === 12, String(count(safari("board-2x3", { split: "full", paper: "a4" }))));
+check("Safari: on A3 6, on Letter 12, on Tabloid 9", count(safari("board-2x3", { split: "full", paper: "a3" })) === 6 && count(safari("board-2x3", { split: "full", paper: "letter" })) === 12 && count(safari("board-2x3", { split: "full", paper: "tabloid" })) === 9,
+  ["a3", "letter", "tabloid"].map((paper) => count(safari("board-2x3", { split: "full", paper }))).join("/"));
+check("Safari: Anniversary on A4 16, on Letter 20", count(safari("board-2x3", { split: "full", paper: "a4", size: "anniversary" })) === 16 && count(safari("board-2x3", { split: "full", paper: "letter", size: "anniversary" })) === 20);
+check("Safari: a 2×4 at full size on A4 is 15", count(safari("board-2x4", { split: "full", paper: "a4" })) === 15);
+check("Safari: one sheet of A4 is 32 %", pct(safari("board-2x3", { split: "sheet", paper: "a4" })) === 32, `${pct(safari("board-2x3", { split: "sheet", paper: "a4" }))} %`);
+check("Safari: a panel on A4 is still 69 %", pct(safari("board-2x3", { split: "panel", paper: "a4" })) === 69);
+const safariReach = [];
+for (const format of ["board-2x3", "board-2x4"]) for (const split of ["sheet", "panel", "full"]) {
+  const plan = safari(format, { split, paper: "a4" });
+  for (const p of plan.pages) safariReach.push(p.contentMm.width + (split === "full" ? 2 * CUT_MARK_REACH_MM : 0));
+}
+check("Safari: no A4 sheet reaches more than 255 mm down the page, cut marks included", Math.max(...safariReach) <= 255 + 1e-6, `${Math.max(...safariReach).toFixed(1)} mm`);
+check("and without the Safari profile nothing changes", count(printPlan("board-2x3", { split: "full", paper: "a4" })) === 9 && pct(printPlan("board-2x3", { split: "sheet", paper: "a4" })) === 35);
+
 // ---------------------------------------------------------------- the comparison table is the plan
 const table = printChoices("board-2x3").table;
 check("the table has a row per paper", table.length === 4, String(table.length));

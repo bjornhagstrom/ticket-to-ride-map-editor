@@ -39,6 +39,18 @@ const boardSizes: Record<MapFormat, { id: SizeId; label: string; widthMm: number
 export const PRINT_MARGIN_MM = 10;
 /** The line naming the map and the sheet, above the artwork. */
 export const PRINT_CAPTION_MM = 8;
+/** How much of the paper's long side a browser leaves for the sheet. Safari's first print layout has
+ *  about 264 mm down an upright A4 page — a 274 mm sheet spilled about 10 mm onto a second page, a
+ *  268 mm one spilled too, and every later layout fitted — so in Safari the long side keeps 21 mm clear
+ *  at each end instead of 10. Why Safari's first layout is shorter is not known; see docs/PRINTING.md. */
+export type PrintProfile = { id: "standard" | "safari"; longMarginMm: number };
+export const PRINT_PROFILES: Record<PrintProfile["id"], PrintProfile> = {
+  standard: { id: "standard", longMarginMm: 10 },
+  safari: { id: "safari", longMarginMm: 21 },
+};
+/** Safari, but not the browsers that put Safari in their user agent too. */
+export const isSafari = (userAgent: string) => /safari/i.test(userAgent) && !/chrome|chromium|crios|fxios|edg|android/i.test(userAgent);
+
 /** Cut marks on a full-size sheet start this far past the artwork's corner… */
 export const CUT_MARK_GAP_MM = 0.5;
 /** …and end this far past it. They count against the page: Safari, with its headers and footers on,
@@ -71,11 +83,11 @@ type Orientation = { pageMm: { width: number; height: number }; content: { width
 // orientation. Turning the sheet only on portrait paper, by media query, was tried and failed: see
 // docs/PRINTING.md. The sheet's room is the page's long side across and its short side, less the
 // caption, down.
-const orientations = (paperId: PaperId): Orientation[] => {
+const orientations = (paperId: PaperId, profile: PrintProfile): Orientation[] => {
   const paper = papers.find((item) => item.id === paperId) ?? papers[0];
   return [{
     pageMm: { width: paper.widthMm, height: paper.heightMm },
-    content: { width: paper.heightMm - 2 * PRINT_MARGIN_MM, height: paper.widthMm - 2 * PRINT_MARGIN_MM - PRINT_CAPTION_MM },
+    content: { width: paper.heightMm - 2 * profile.longMarginMm, height: paper.widthMm - 2 * PRINT_MARGIN_MM - PRINT_CAPTION_MM },
   }];
 };
 // Division that does not count a sheet for floating-point dust.
@@ -89,7 +101,7 @@ export function printChoiceFor(format: MapFormat, choice: PrintChoice): Required
   return { split, paper, size };
 }
 
-export function printPlan(format: MapFormat, raw: PrintChoice): PrintPlan {
+export function printPlan(format: MapFormat, raw: PrintChoice, profile: PrintProfile = PRINT_PROFILES.standard): PrintPlan {
   const choice = printChoiceFor(format, raw);
   const board = mapFormats[format] ?? mapFormats["board-2x3"];
   const size = (boardSizes[format] ?? boardSizes["board-2x3"]).find((item) => item.id === choice.size)!;
@@ -101,7 +113,7 @@ export function printPlan(format: MapFormat, raw: PrintChoice): PrintPlan {
     // The cut marks reach past both ends of the sheet's length, and past the far edge of its depth
     // (the near edge's marks rise into the caption line), so they come out of the room first.
     const room = (item: Orientation) => ({ width: item.content.width - 2 * CUT_MARK_REACH_MM, height: item.content.height - CUT_MARK_REACH_MM });
-    const counted = orientations(choice.paper).map((item) => ({ item, columns: sheetsFor(boardMm.width, room(item).width), rows: sheetsFor(boardMm.height, room(item).height) }));
+    const counted = orientations(choice.paper, profile).map((item) => ({ item, columns: sheetsFor(boardMm.width, room(item).width), rows: sheetsFor(boardMm.height, room(item).height) }));
     const pick = counted.reduce((a, b) => (b.columns * b.rows < a.columns * a.rows ? b : a));
     ({ columns, rows } = pick); best = pick.item; scale = 1;
   } else {
@@ -109,7 +121,7 @@ export function printPlan(format: MapFormat, raw: PrintChoice): PrintPlan {
     columns = choice.split === "panel" ? board.columns : 1;
     rows = choice.split === "panel" ? board.rows : 1;
     const tile = { width: boardMm.width / columns, height: boardMm.height / rows };
-    const scored = orientations(choice.paper).map((item) => ({ item, scale: Math.min(1, item.content.width / tile.width, item.content.height / tile.height) }));
+    const scored = orientations(choice.paper, profile).map((item) => ({ item, scale: Math.min(1, item.content.width / tile.width, item.content.height / tile.height) }));
     const pick = scored.reduce((a, b) => (b.scale > a.scale ? b : a));
     best = pick.item; scale = pick.scale;
   }
@@ -124,7 +136,7 @@ export function printPlan(format: MapFormat, raw: PrintChoice): PrintPlan {
 
 export type PrintTableCell = { choice: Required<PrintChoice>; label: string; pages: number; scale: number };
 /** Every way this board can be printed: the sizes on offer, and a row per paper to compare them by. */
-export function printChoices(format: MapFormat) {
+export function printChoices(format: MapFormat, profile: PrintProfile = PRINT_PROFILES.standard) {
   const sizes = boardSizes[format] ?? boardSizes["board-2x3"];
   const columns: { label: string; choice: (paper: PaperId) => PrintChoice }[] = [
     { label: "One sheet", choice: (paper) => ({ split: "sheet", paper }) },
@@ -134,7 +146,7 @@ export function printChoices(format: MapFormat) {
   const table = papers.map((paper) => ({
     paper,
     cells: columns.map((column): PrintTableCell => {
-      const plan = printPlan(format, column.choice(paper.id));
+      const plan = printPlan(format, column.choice(paper.id), profile);
       return { choice: plan.choice, label: column.label, pages: plan.pages.length, scale: plan.scale };
     }),
   }));

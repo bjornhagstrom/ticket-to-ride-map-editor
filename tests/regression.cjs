@@ -31,6 +31,28 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   const badges = async () => (await page.locator(".map-status span").allTextContents());
   check("example map loads", (await badges())[2] === "15 stops", (await badges()).slice(0, 4).join(", "));
 
+  // 1a. Safari gets smaller sheets, and is told why. A second page claiming to be Safari.
+  {
+    const safariUA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_6) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15";
+    const safariPage = await (await browser.newContext({ viewport: { width: 1500, height: 1000 }, userAgent: safariUA })).newPage();
+    await safariPage.goto("http://localhost:3000/ttr/", { waitUntil: "networkidle" });
+    await safariPage.getByRole("button", { name: "Load the example map" }).click();
+    await safariPage.waitForTimeout(600);
+    await safariPage.getByRole("button", { name: "Print map" }).click();
+    await safariPage.waitForTimeout(400);
+    const safariCell = await safariPage.locator('.print-table tbody tr[data-paper="a4"] td:nth-of-type(3) button').getAttribute("data-pages");
+    check("in Safari the table promises 12 sheets of A4 at full size", safariCell === "12", String(safariCell));
+    const safariNote = await safariPage.locator('[role="dialog"]').first().textContent();
+    check("and the dialog says why", /Safari/.test(safariNote) && /first/i.test(safariNote), safariNote.slice(-400));
+    await safariPage.context().close();
+  }
+  await page.getByRole("button", { name: "Print map" }).click();
+  await page.waitForTimeout(400);
+  check("while Chrome keeps 9", (await page.locator('.print-table tbody tr[data-paper="a4"] td:nth-of-type(3) button').getAttribute("data-pages")) === "9");
+  check("and hears nothing about Safari", !/Safari/.test(await page.locator('[role="dialog"]').first().textContent()));
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(300);
+
   // 1b. the example map shows what the editor can do, and is itself a clean map
   const exampleStored = () => page.evaluate(() => JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")));
   const example = await exampleStored();

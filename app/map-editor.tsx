@@ -16,7 +16,7 @@ import { MapArtwork, type Tool } from "./map-artwork";
 import { AnalysisDialog, StopTicketsDialog, SuggestionsDialog, SuggestTicketsDialog, TicketsDialog, WelcomeGuide } from "./map-dialogs";
 import { TicketCoveragePanel, type CoverageSort, BackgroundImageProperties, BackgroundProperties, NoteProperties, RouteProperties, StopProperties, StylePicker } from "./map-properties";
 import { PrintDialog, PrintPages, TicketPrintPages } from "./map-print";
-import { DEFAULT_PRINT_CHOICE, PRINT_CHOICE_KEY, type PrintChoice, printPlan } from "./print-plan";
+import { DEFAULT_PRINT_CHOICE, isSafari, PRINT_CHOICE_KEY, PRINT_PROFILES, type PrintChoice, type PrintProfile, printPlan } from "./print-plan";
 import { useTicketSuggestion } from "./use-ticket-suggestion";
 import { SettingsDialog, type StyleTarget } from "./map-styles";
 import { bandsOf, bandCuts, mapDiameter, defaultStyle, evaluateTicketDeck, suggestedDeckSize, type TicketStyle, autoPlaceLabels, labelledStops, setupBalance, stopCoverage, ticketBand, type TicketBand, reviewTickets, ticketPointsPerSpace, ticketCoverage, type RouteSuggestion, labelCovers, labelAngleOptions, routeSamplePoints, colourLengthTable, crossingPairs, buildAdjacency, networkStats, routeSpacing, shortestPath, suggestRoutes } from "./map-analysis";
@@ -75,6 +75,10 @@ export function MapEditor() {
   const [printChoice, setPrintChoice] = useState<PrintChoice>(DEFAULT_PRINT_CHOICE);
   const [showPrint, setShowPrint] = useState(false);
   const [printRequest, setPrintRequest] = useState(0);
+  // Safari gets shorter sheets: its first print layout has less room (docs/PRINTING.md). Found after
+  // mounting, so the server-rendered page and the first client render agree.
+  const [printProfile, setPrintProfile] = useState<PrintProfile>(PRINT_PROFILES.standard);
+  useEffect(() => { queueMicrotask(() => { if (isSafari(navigator.userAgent)) setPrintProfile(PRINT_PROFILES.safari); }); }, []);
   const [measureStart, setMeasureStart] = useState<string | null>(null);
   const [ticketStart, setTicketStart] = useState<string | null>(null);
   const [selectedTicket, setSelectedTicket] = useState<string | null>(null);
@@ -737,8 +741,8 @@ export function MapEditor() {
       onDelete={(ticketId) => { change((draft) => { draft.tickets = draft.tickets.filter((item) => item.id !== ticketId); return draft; }); setSelectedTicket((current) => current === ticketId ? null : current); }} />
     <AnalysisDialog setup={setup} bottlenecks={deckReport.bottlenecks} atTable={atTable} onAtTable={(count) => { setBottleneckTable(count); setBottleneckRoutes(new Set()); }} onShowBottleneck={(routeIds) => setBottleneckRoutes(new Set(routeIds))} open={showAnalysis} onOpenChange={setShowAnalysis} data={data} stats={stats} colourTable={colourTable} spacing={spacing} scaleWidthMm={scaleWidthMm} onSelectRoute={(routeId) => { setShowAnalysis(false); setSelectedRoute(routeId); setSelectedStop(null); setSelectedBackground(null); setSelectedNote(null); setImageSelected(false); setTool("select"); }} onSelectStop={(stopId) => { setShowAnalysis(false); setSelectedStop(stopId); setSelectedRoute(null); setSelectedBackground(null); setSelectedNote(null); setImageSelected(false); setTool("select"); }} />
     <SuggestionsDialog open={showSuggestions} onOpenChange={setShowSuggestions} suggestions={suggestions} onAdd={addSuggestedRoute} />
-    {printScope === "tickets" ? <TicketPrintPages data={data} setId={activeTicketSet.id} /> : <PrintPages data={data} plan={printPlan(data.format, printChoice)} />}
-    <PrintDialog open={showPrint} onOpenChange={setShowPrint} format={data.format} choice={printChoice} onChoice={choosePrint} onPrint={() => { setShowPrint(false); setPrintRequest((count) => count + 1); }} />
+    {printScope === "tickets" ? <TicketPrintPages data={data} setId={activeTicketSet.id} /> : <PrintPages data={data} plan={printPlan(data.format, printChoice, printProfile)} />}
+    <PrintDialog open={showPrint} onOpenChange={setShowPrint} format={data.format} profile={printProfile} choice={printChoice} onChoice={choosePrint} onPrint={() => { setShowPrint(false); setPrintRequest((count) => count + 1); }} />
   </main></TooltipProvider>;
 }
 

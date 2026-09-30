@@ -157,6 +157,21 @@ lay the page out again. Now `print()` waits until no dialog remains and the lock
 1.5 s. The regression suite clicks Print on screen, as a person does, to catch this; switching to print
 media first skipped the animation and hid the fault.
 
+**Safari's first layout is shorter.** When its print dialog opens, Safari's first layout has about
+264 mm down an upright A4 page; as soon as any setting in the dialog is changed it lays the page out
+again with more room. A 274 mm sheet (one sheet of A4) spilled about 10 mm onto a second page, a
+268 mm full-size sheet spilled as well (18 pages for 9), and every later layout fitted, with headers
+and footers on or off. Two explanations were tested and failed: the dialog still animating out when
+`print()` was called (fixed anyway, see above), and Safari applying the `@page` margin on the first
+pass only (a 5 mm margin changed nothing).
+
+So Safari gets its own print profile, `PRINT_PROFILES.safari`: 21 mm clear at each end of the long
+side instead of 10, which caps a sheet on A4 at 255 mm, cut marks included. The editor finds Safari
+from its user agent after mounting; the dialog's table, summary and print tree all use the profile, and
+the dialog says why the counts differ. In Safari, full size is 12 sheets of A4 (9 elsewhere), 6 of A3,
+12 of Letter and 9 of Tabloid; Anniversary is 16 of A4 and 20 of Letter; a 2×4 is 15 of A4; one sheet
+of A4 is 32 %. Per panel is unchanged, because the panel's height decides it.
+
 Safari's headers and footers (title, date, URL, page number) are a setting in its print dialog, which
 Safari remembers; a page cannot switch them off. Chrome drops them when the margin is too small for
 them. So the layout is made to fit with them on.

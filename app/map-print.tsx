@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { cn } from "@/lib/utils";
 import { mapFormats, ticketsInSet, type MapData, type MapFormat, W } from "./map-data";
 import { MapArtwork } from "./map-artwork";
-import { CUT_MARK_GAP_MM, CUT_MARK_REACH_MM, describePlan, papers, PRINT_CAPTION_MM, PRINT_MARGIN_MM, printChoices, type PrintChoice, printPlan, type PrintPlan, sameChoice, splits } from "./print-plan";
+import { CUT_MARK_GAP_MM, CUT_MARK_REACH_MM, describePlan, papers, PRINT_CAPTION_MM, PRINT_MARGIN_MM, printChoices, type PrintChoice, printPlan, type PrintPlan, type PrintProfile, sameChoice, splits } from "./print-plan";
 
 // Tickets print as cut-out cards on plain A4, 16 to a sheet. The same print-and-cut workflow as the
 // board itself: no bleed, a thin cut line, and nothing that needs colour to be readable.
@@ -89,16 +89,17 @@ export function PrintPages({ data, plan }: { data: MapData; plan: PrintPlan }) {
 
 // Printing is decided per run. Nothing chosen here is written to the map; the last choice is kept
 // in this browser only, for convenience.
-export function PrintDialog({ open, onOpenChange, format, choice, onChoice, onPrint }: {
+export function PrintDialog({ open, onOpenChange, format, profile, choice, onChoice, onPrint }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   format: MapFormat;
+  profile: PrintProfile;
   choice: PrintChoice;
   onChoice: (choice: PrintChoice) => void;
   onPrint: () => void;
 }) {
-  const plan = printPlan(format, choice);
-  const { sizes, columns, table } = printChoices(format);
+  const plan = printPlan(format, choice, profile);
+  const { sizes, columns, table } = printChoices(format, profile);
   const current = plan.choice;
   const anniversary = sizes.find((size) => size.id === "anniversary");
   return <Dialog open={open} onOpenChange={onOpenChange}>
@@ -148,6 +149,7 @@ export function PrintDialog({ open, onOpenChange, format, choice, onChoice, onPr
           </tr>)}</tbody>
         </table>
       </div>
+      {profile.id === "safari" && <p className="helper print-dialog-foot print-safari-note">In Safari the sheets are cut shorter than in other browsers. Safari’s first print layout leaves less room on the page than it shows once any setting is changed, and a full-length sheet spilled onto a second page. The counts above are Safari’s.</p>}
       <p className="helper print-dialog-foot">Every page prints upright (portrait), the default in every browser, with the map turned a quarter turn on it: leave the print dialog on Portrait. Print at 100 % — “fit to page” would undo the sizes above. The same dialog can save the run as a PDF.</p>
       <DialogFooter>
         <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
