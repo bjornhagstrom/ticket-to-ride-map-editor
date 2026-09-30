@@ -1219,8 +1219,18 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await tool("Select & move").click();
   await clickStop("Central");
   await page.waitForTimeout(300);
+  // Turned by dragging the name to a point at that bearing from the stop, as a person does; there is
+  // no slider for it any more.
   const nameAt = async (angle) => {
-    await page.locator(".label-angle", { hasText: "Name position" }).locator("input[type=range]").fill(String(angle));
+    const at = await page.evaluate(() => {
+      const g = Array.from(document.querySelectorAll(".map-canvas .stop")).find((el) => Array.from(el.querySelectorAll("text")).some((t) => t.textContent === "Central"));
+      const c = g.querySelector("circle").getBoundingClientRect(), t = Array.from(g.querySelectorAll("text")).find((el) => el.textContent === "Central").getBoundingClientRect();
+      return { cx: c.x + c.width / 2, cy: c.y + c.height / 2, lx: t.x + t.width / 2, ly: t.y + t.height / 2 };
+    });
+    await page.mouse.move(at.lx, at.ly);
+    await page.mouse.down();
+    await page.mouse.move(at.cx + Math.cos(angle * Math.PI / 180) * 45, at.cy + Math.sin(angle * Math.PI / 180) * 45, { steps: 4 });
+    await page.mouse.up();
     await page.waitForTimeout(120);
     return page.evaluate(() => {
       const g = Array.from(document.querySelectorAll(".map-canvas .stop")).find((el) => Array.from(el.querySelectorAll("text")).some((t) => t.textContent === "Central"));
@@ -1239,7 +1249,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   check("a stop's name moves smoothly all the way round, top and bottom included", jumps.length === 0, jumps.map((j) => `${j.at} ${j.move.toFixed(0)}px`).join(", "));
   const badGaps = turns.filter((turn) => turn.gap < -0.5 || turn.gap > turn.height).map((turn) => `${turn.angle}°: ${turn.gap.toFixed(1)}px`);
   check("and keeps the same small distance from the stop at every angle", badGaps.length === 0, badGaps.join(", "));
-  await page.locator(".label-angle", { hasText: "Name position" }).locator("input[type=range]").fill("165");
+  await nameAt(165);
   await page.keyboard.press("Escape");
 
   // 33d. a stop's name can be taken with the mouse and turned to any angle round the stop
@@ -1264,8 +1274,8 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   const beforeDrag = await storedCentral();
   await dragName(37, { release: false });
   // The name box is pushed out by half its width but only part of its height, so its centre points
-  // flatter than the angle; the angle itself is what the Name position slider shows.
-  const midDrag = Number(await page.locator(".label-angle", { hasText: "Name position" }).locator("input[type=range]").inputValue());
+  // flatter than the angle; the angle itself is what the map stores as it goes.
+  const midDrag = (await storedCentral()).labelAngle;
   check("a name follows the pointer round its stop while it is dragged", bearingGap(midDrag, 37) <= 2, `${midDrag}°`);
   await page.mouse.up();
   await page.waitForTimeout(300);
@@ -1288,8 +1298,6 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.waitForTimeout(300);
   await clickStop("Central");
   check("dragging the name leaves the stop where it was", afterDrag.x === beforeDrag.x && afterDrag.y === beforeDrag.y, `${beforeDrag.x},${beforeDrag.y} -> ${afterDrag.x},${afterDrag.y}`);
-  const nameSlider = page.locator(".label-angle", { hasText: "Name position" }).locator("input[type=range]");
-  check("the Name position slider shows the dragged angle", Number(await nameSlider.inputValue()) === afterDrag.labelAngle, `${await nameSlider.inputValue()} vs ${afterDrag.labelAngle}`);
   check("and the stop's hint says the name can be dragged", /drag (its|the) name/i.test(await page.locator(".map-hint").textContent()), await page.locator(".map-hint").textContent());
   await page.evaluate(() => document.activeElement && document.activeElement.blur());
   await page.keyboard.press("Meta+z");
@@ -1303,7 +1311,46 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   check("a locked stop's name can still be turned", bearingGap(lockedDrag.labelAngle, 270) <= 2, String(lockedDrag.labelAngle));
   check("without the locked stop moving", lockedDrag.x === beforeDrag.x && lockedDrag.y === beforeDrag.y);
   await page.getByRole("button", { name: "Unlock position" }).click();
-  await nameSlider.fill("165");
+  await dragName(165);
+
+  // 33e. names can be locked, one at a time or all at once, the way stop positions are
+  check("a stop's panel has no slider for its name any more", (await page.locator(".property-form input[type=range]").count()) === 1 && (await page.getByText(/Name position/).count()) === 0,
+    `${await page.locator(".property-form input[type=range]").count()} sliders`);
+  const nameBefore = (await storedCentral()).labelAngle;
+  await page.getByRole("button", { name: "Lock name", exact: true }).click();
+  await page.waitForTimeout(200);
+  check("Lock name locks it in the map", (await storedCentral()).labelLocked === true);
+  await dragName(300);
+  check("a locked name does not move when dragged", (await storedCentral()).labelAngle === nameBefore, `${(await storedCentral()).labelAngle} vs ${nameBefore}`);
+  check("and the stop does not move instead", (await storedCentral()).x === beforeDrag.x && (await storedCentral()).y === beforeDrag.y);
+  await page.keyboard.down("Shift");
+  await dragName(300);
+  await page.keyboard.up("Shift");
+  check("but Shift-dragging turns it anyway", bearingGap((await storedCentral()).labelAngle, 300) <= 2, String((await storedCentral()).labelAngle));
+  await page.getByRole("button", { name: "Unlock name", exact: true }).click();
+  await page.waitForTimeout(200);
+  check("Unlock name frees it again", !(await storedCentral()).labelLocked);
+  await page.getByRole("button", { name: "Lock every name" }).click();
+  await page.waitForTimeout(200);
+  const allNamesLocked = await page.evaluate(() => JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")).stops.every((st) => st.labelLocked));
+  check("Lock every name locks them all", allNamesLocked);
+  // Put Central's name on one of its own routes, then ask for every name to be moved clear.
+  let coveredAt = null;
+  for (const angle of [225, 315, 135, 45, 180, 0, 270, 90]) {
+    await page.keyboard.down("Shift"); await dragName(angle); await page.keyboard.up("Shift");
+    await page.waitForTimeout(200);
+    if (await page.getByRole("button", { name: /^Move \d+ names? clear$/ }).count()) { coveredAt = (await storedCentral()).labelAngle; break; }
+  }
+  check("a locked name can still be found sitting on a route", coveredAt !== null, String(coveredAt));
+  if (coveredAt !== null) {
+    await page.getByRole("button", { name: /^Move \d+ names? clear$/ }).click();
+    await page.waitForTimeout(300);
+    check("and Move names clear leaves a locked name where it is", (await storedCentral()).labelAngle === coveredAt, `${(await storedCentral()).labelAngle} vs ${coveredAt}`);
+  }
+  await page.getByRole("button", { name: "Unlock every name" }).click();
+  await page.waitForTimeout(200);
+  check("Unlock every name frees them all", await page.evaluate(() => JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")).stops.every((st) => !st.labelLocked)));
+  await dragName(165);
   await page.keyboard.press("Escape");
 
   // 34. a map saved on a format that is now a print choice opens on its board

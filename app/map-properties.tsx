@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { type StopTypeStyle, colorLabels, type ImageCrop, type MapData, type NoteBox, type RouteTypeStyle, type BackgroundImage, type BackgroundShape, type Route, routeColors, type Stop, stopSizeMeta, stopSymbolMeta, type StopSize, type StopSymbol, W } from "./map-data";
 import { isCurved, samePair, stopById } from "./map-geometry";
 import { type StyleTarget } from "./map-styles";
-import { labelAngleOf, type StopCoverage, ticketBands, type TicketBand } from "./map-analysis";
+import { type StopCoverage, ticketBands, type TicketBand } from "./map-analysis";
 import { cn } from "@/lib/utils";
 
 // One ticket as the stop panel lists it: the far end and the points. Decks are kept apart, so a
@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils";
 export type StopTicket = { id: string; other: string; points: number };
 export type StopTicketDeck = { id: string; label: string; tickets: StopTicket[] };
 
-export function StopProperties({ stop, change, onDelete, labelState, mapEndGapMm, allLocked, onLockAll, stopTypeStyles, onEditStyles, tickets, onOpenTicket }: { stop: Stop; stopTypeStyles: StopTypeStyle[]; onEditStyles: (target: StyleTarget) => void; tickets: StopTicketDeck[]; onOpenTicket: (ticketId: string) => void; allLocked: boolean; onLockAll: (locked: boolean) => void; change: (fn: (draft: MapData) => MapData) => void; onDelete: () => void; mapEndGapMm: number; labelState: { covers: boolean; clear: number[]; best: number } }) {
+export function StopProperties({ stop, change, onDelete, labelState, mapEndGapMm, allLocked, onLockAll, allNamesLocked, onLockAllNames, stopTypeStyles, onEditStyles, tickets, onOpenTicket }: { stop: Stop; stopTypeStyles: StopTypeStyle[]; onEditStyles: (target: StyleTarget) => void; tickets: StopTicketDeck[]; onOpenTicket: (ticketId: string) => void; allLocked: boolean; onLockAll: (locked: boolean) => void; allNamesLocked: boolean; onLockAllNames: (locked: boolean) => void; change: (fn: (draft: MapData) => MapData) => void; onDelete: () => void; mapEndGapMm: number; labelState: { covers: boolean; clear: number[]; best: number } }) {
   const update = (values: Partial<Stop>) => change((draft) => { const item = stopById(draft, stop.id); if (item) Object.assign(item, values); return draft; });
   const symbol = stop.symbol ?? "none";
   return <div className="property-form">
@@ -43,22 +43,25 @@ export function StopProperties({ stop, change, onDelete, labelState, mapEndGapMm
     {stopTypeStyles.find((style) => style.id === stop.type)?.junction
       ? <p className="helper">This is a junction: it joins routes and no ticket ends here, so its name is not drawn on the map or in print. The name is kept here so you can tell junctions apart, and shows when you point at the stop.</p>
       : <div className="label-angle">
-      <Label>Name position · {Math.round(labelAngleOf(stop))}°</Label>
-      <input className="range-input" type="range" min="0" max="359" step="1" value={Math.round(labelAngleOf(stop))} onChange={(event) => update({ labelAngle: Number(event.target.value) })} />
+      <Label>Name</Label>
       <p className={cn("helper", labelState.covers && "helper-warning")}>
         {labelState.covers
           ? labelState.clear.length
             ? `This name sits on a route. ${labelState.clear.length} of 24 positions around the stop are clear.`
             : "This name sits on a route, and so would every other position around this stop — it is hemmed in. Move the stop, bend the route away, or accept the overlap."
-          : "Turn the name around the stop to keep it clear of the routes. It stays attached to the stop wherever you move it."}
+          : "Drag the name round the stop to keep it clear of the routes. It stays attached to the stop wherever you move it."}
+        {stop.labelLocked ? " It is locked: hold Shift to drag it anyway." : ""}
       </p>
       <div className="label-angle-actions">
-        {labelState.covers && <Button size="sm" variant="outline" onClick={() => update({ labelAngle: labelState.best })}>{labelState.clear.length ? "Move the name clear" : "Use the least covered position"}</Button>}
-        {stop.labelAngle !== undefined && <Button size="sm" variant="ghost" onClick={() => update({ labelAngle: undefined })}>Reset</Button>}
+        {labelState.covers && !stop.labelLocked && <Button size="sm" variant="outline" onClick={() => update({ labelAngle: labelState.best })}>{labelState.clear.length ? "Move the name clear" : "Use the least covered position"}</Button>}
+        {stop.labelAngle !== undefined && !stop.labelLocked && <Button size="sm" variant="ghost" onClick={() => update({ labelAngle: undefined })}>Reset</Button>}
       </div>
     </div>}
     <Button variant="outline" onClick={() => update({ locked: !stop.locked || undefined })}>{stop.locked ? <Unlock /> : <Lock />}{stop.locked ? "Unlock position" : "Lock position"}</Button>
     <Button variant="outline" size="sm" onClick={() => onLockAll(!allLocked)}>{allLocked ? <Unlock /> : <Lock />}{allLocked ? "Unlock every stop" : "Lock every stop"}</Button>
+    {/* Names lock the same way as positions: a locked name is not dragged or moved clear by accident. */}
+    <Button variant="outline" onClick={() => update({ labelLocked: !stop.labelLocked || undefined })}>{stop.labelLocked ? <Unlock /> : <Lock />}{stop.labelLocked ? "Unlock name" : "Lock name"}</Button>
+    <Button variant="outline" size="sm" onClick={() => onLockAllNames(!allNamesLocked)}>{allNamesLocked ? <Unlock /> : <Lock />}{allNamesLocked ? "Unlock every name" : "Lock every name"}</Button>
     <p className="helper">A locked stop can still be selected and edited, it just cannot be dragged by accident. Hold Shift while dragging to move it anyway, without unlocking it first.</p>
     <div className="stop-tickets">
       <Label>Tickets naming this stop</Label>

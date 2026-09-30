@@ -234,7 +234,7 @@ const bearingGap = (a: number, b: number) => { const d = Math.abs(a - b) % 360; 
 // Try to turn every name clear of the routes, and of the names already placed. Stops with the
 // fewest clear bearings go first so the hemmed-in ones get the good spots, and a name that is
 // already fine stays where it is. Whatever cannot be placed is reported rather than shuffled.
-export function autoPlaceLabels(data: MapData): { placed: Map<string, number>; unresolved: string[] } {
+export function autoPlaceLabels(data: MapData): { placed: Map<string, number>; unresolved: string[]; locked: string[] } {
   const samples = routeSamplePoints(data);
   const radiusOf = (stop: Stop) => stopSizeMeta[stop.size ?? "medium"].radius;
   const scored = labelledStops(data).map((stop) => ({ stop, options: labelAngleOptions(data, stop, samples) }));
@@ -242,7 +242,14 @@ export function autoPlaceLabels(data: MapData): { placed: Map<string, number>; u
   const taken: Box[] = [];
   const placed = new Map<string, number>();
   const unresolved: string[] = [];
+  // A locked name stays put, and others are placed around it. It is reported only if it covers a route.
+  const locked: string[] = [];
+  for (const { stop } of scored) if (stop.labelLocked) {
+    taken.push(labelBox(stop, labelAngleOf(stop), radiusOf(stop)));
+    if (labelCovers(data, stop, samples)) locked.push(stop.id);
+  }
   for (const { stop, options } of scored) {
+    if (stop.labelLocked) continue;
     const current = labelAngleOf(stop);
     const free = options.filter((option) => option.overlap === 0)
       .sort((a, b) => bearingGap(a.angle, current) - bearingGap(b.angle, current));
@@ -255,7 +262,7 @@ export function autoPlaceLabels(data: MapData): { placed: Map<string, number>; u
     taken.push(labelBox(stop, current, radiusOf(stop)));
     if (labelCovers(data, stop, samples)) unresolved.push(stop.id);
   }
-  return { placed, unresolved };
+  return { placed, unresolved, locked };
 }
 
 // Junctions only join routes: no ticket ends at one, and its name is never drawn. So they are left

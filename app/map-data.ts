@@ -10,7 +10,7 @@ export type BackgroundType = "area" | "line" | "label";
 // adds up to a standard or an Anniversary board — is chosen per print run; see app/print-plan.ts.
 export type MapFormat = "board-2x3" | "board-2x4";
 export type Point = { x: number; y: number };
-export type Stop = Point & { id: string; name: string; type: StopType; size?: StopSize; symbol?: StopSymbol; letter?: string; labelAngle?: number; endGapMm?: number; locked?: boolean };
+export type Stop = Point & { id: string; name: string; type: StopType; size?: StopSize; symbol?: StopSymbol; letter?: string; labelAngle?: number; endGapMm?: number; locked?: boolean; labelLocked?: boolean };
 
 // Where a stop's name sits, as a compass bearing around the stop in degrees (0 = right, 90 = below).
 // Undefined keeps the original behaviour: up and to the right, flipping left near the right edge.
