@@ -19,7 +19,7 @@ import { PrintDialog, PrintPages, TicketPrintPages } from "./map-print";
 import { DEFAULT_PRINT_CHOICE, PRINT_CHOICE_KEY, type PrintChoice, printPlan } from "./print-plan";
 import { useTicketSuggestion } from "./use-ticket-suggestion";
 import { SettingsDialog, type StyleTarget } from "./map-styles";
-import { bandsOf, bandCuts, mapDiameter, defaultStyle, evaluateTicketDeck, suggestedDeckSize, type TicketStyle, autoPlaceLabels, setupBalance, stopCoverage, ticketBand, type TicketBand, reviewTickets, ticketPointsPerSpace, ticketCoverage, type RouteSuggestion, labelCovers, labelAngleOptions, routeSamplePoints, colourLengthTable, crossingPairs, buildAdjacency, networkStats, routeSpacing, shortestPath, suggestRoutes } from "./map-analysis";
+import { bandsOf, bandCuts, mapDiameter, defaultStyle, evaluateTicketDeck, suggestedDeckSize, type TicketStyle, autoPlaceLabels, labelledStops, setupBalance, stopCoverage, ticketBand, type TicketBand, reviewTickets, ticketPointsPerSpace, ticketCoverage, type RouteSuggestion, labelCovers, labelAngleOptions, routeSamplePoints, colourLengthTable, crossingPairs, buildAdjacency, networkStats, routeSpacing, shortestPath, suggestRoutes } from "./map-analysis";
 import { canvasPoint, canvasPointRaw, pointsFor, samePair, stopById } from "./map-geometry";
 import { cloneForHistory, cloneMap, formatTimestamp, GUIDE_SEEN_KEY, HISTORY_LIMIT, MAX_IMAGE_WARN_BYTES, normalizeBackgroundFile, normalizeMap, normalizeNetworkFile, normalizeTicketFile, buildTicketFile, readMapFile, writeMapFile, mapPayload, networkPayload, readBackgroundImage, rescaleMapToFormat, MAP_HINT_KEY, MAP_HINT_X_KEY } from "./map-storage";
 import { colorLabels, defaultTicketSet, DEFAULT_PLAYERS, DEFAULT_WAGONS_PER_PLAYER, IMAGE_KEEP_ON_BOARD, type Ticket, type StopTypeStyle, type WagonStyle, ticketsInSet, type TicketSet, emptyMap, initialMap, type LineStyle, DEFAULT_END_GAP_MM, mapFormats, type BackgroundImage, type BackgroundShape, type BackgroundType, type MapData, type MapFormat, type Point, realWagon, type Route, type RouteType, type RouteTypeStyle, routeColors, STORAGE_KEY, type Stop, type StopSize, stopSizeMeta, type StopSymbol, stopSymbolMeta, type StopType, W } from "./map-data";
@@ -208,7 +208,7 @@ export function MapEditor() {
   }, [stopTicketView, ticketReviews, data, ticketDiameter, activeTicketSet.label]);
   const highlightRoutes = useMemo(() => new Set(selectedTicket ? ticketReviews.find((review) => review.ticket.id === selectedTicket)?.routeIds ?? [] : []), [selectedTicket, ticketReviews]);
   const routeSamples = useMemo(() => routeSamplePoints(data), [data]);
-  const coveredNames = useMemo(() => data.stops.filter((stop) => labelCovers(data, stop, routeSamples)), [data, routeSamples]);
+  const coveredNames = useMemo(() => labelledStops(data).filter((stop) => labelCovers(data, stop, routeSamples)), [data, routeSamples]);
 
   const tightRoutes = spacing.filter((item) => item.verdict === "short");
   const looseRoutes = spacing.filter((item) => item.verdict === "long");

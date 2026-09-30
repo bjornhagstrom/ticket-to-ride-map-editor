@@ -234,7 +234,7 @@ const bearingGap = (a: number, b: number) => { const d = Math.abs(a - b) % 360; 
 export function autoPlaceLabels(data: MapData): { placed: Map<string, number>; unresolved: string[] } {
   const samples = routeSamplePoints(data);
   const radiusOf = (stop: Stop) => stopSizeMeta[stop.size ?? "medium"].radius;
-  const scored = data.stops.map((stop) => ({ stop, options: labelAngleOptions(data, stop, samples) }));
+  const scored = labelledStops(data).map((stop) => ({ stop, options: labelAngleOptions(data, stop, samples) }));
   scored.sort((a, b) => a.options.filter((o) => !o.overlap).length - b.options.filter((o) => !o.overlap).length);
   const taken: Box[] = [];
   const placed = new Map<string, number>();
@@ -255,9 +255,15 @@ export function autoPlaceLabels(data: MapData): { placed: Map<string, number>; u
   return { placed, unresolved };
 }
 
+// A junction's name is never drawn, so it cannot cover a route or need moving clear of one.
+export const labelledStops = (data: MapData): Stop[] => {
+  const junctions = new Set((data.stopTypeStyles ?? []).filter((style) => style.junction).map((style) => style.id));
+  return data.stops.filter((stop) => !junctions.has(stop.type));
+};
+
 export function coveredLabels(data: MapData): Stop[] {
   const samples = routeSamplePoints(data);
-  return data.stops.filter((stop) => labelCovers(data, stop, samples));
+  return labelledStops(data).filter((stop) => labelCovers(data, stop, samples));
 }
 
 // --- Destination tickets --------------------------------------------------------------------

@@ -40,7 +40,9 @@ export function StopProperties({ stop, change, onDelete, labelState, mapEndGapMm
       {stop.endGapMm !== undefined && <Button size="sm" variant="ghost" onClick={() => update({ endGapMm: undefined })}>Use the map default ({mapEndGapMm} mm)</Button>}
       <Button size="sm" variant="ghost" onClick={() => onEditStyles({ kind: "map" })}><Pencil />Change the map default</Button>
     </div>
-    <div className="label-angle">
+    {stopTypeStyles.find((style) => style.id === stop.type)?.junction
+      ? <p className="helper">This is a junction: it joins routes and no ticket ends here, so its name is not drawn on the map or in print. The name is kept here so you can tell junctions apart, and shows when you point at the stop.</p>
+      : <div className="label-angle">
       <Label>Name position · {Math.round(labelAngleOf(stop))}°</Label>
       <input className="range-input" type="range" min="0" max="345" step="15" value={Math.round(labelAngleOf(stop))} onChange={(event) => update({ labelAngle: Number(event.target.value) })} />
       <p className={cn("helper", labelState.covers && "helper-warning")}>
@@ -54,7 +56,7 @@ export function StopProperties({ stop, change, onDelete, labelState, mapEndGapMm
         {labelState.covers && <Button size="sm" variant="outline" onClick={() => update({ labelAngle: labelState.best })}>{labelState.clear.length ? "Move the name clear" : "Use the least covered position"}</Button>}
         {stop.labelAngle !== undefined && <Button size="sm" variant="ghost" onClick={() => update({ labelAngle: undefined })}>Reset</Button>}
       </div>
-    </div>
+    </div>}
     <Button variant="outline" onClick={() => update({ locked: !stop.locked || undefined })}>{stop.locked ? <Unlock /> : <Lock />}{stop.locked ? "Unlock position" : "Lock position"}</Button>
     <Button variant="outline" size="sm" onClick={() => onLockAll(!allLocked)}>{allLocked ? <Unlock /> : <Lock />}{allLocked ? "Unlock every stop" : "Lock every stop"}</Button>
     <p className="helper">A locked stop can still be selected and edited, it just cannot be dragged by accident. Hold Shift while dragging to move it anyway, without unlocking it first.</p>

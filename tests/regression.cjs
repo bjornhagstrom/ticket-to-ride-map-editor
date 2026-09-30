@@ -133,7 +133,8 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.waitForTimeout(200);
   const clickStop = async (name) => {
     await page.evaluate((n) => {
-      const s = Array.from(document.querySelectorAll(".map-canvas .stop")).find((g) => Array.from(g.querySelectorAll("text")).some((t) => t.textContent === n));
+      // By its drawn name, or by its hover title for a junction, whose name is not drawn.
+      const s = Array.from(document.querySelectorAll(".map-canvas .stop")).find((g) => Array.from(g.querySelectorAll("text, title")).some((t) => t.textContent === n));
       s.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
     }, name);
     await page.waitForTimeout(250);
@@ -1011,6 +1012,35 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   check("and the wagon spaces along it", drawn.slots >= 2, `${drawn.slots} spaces`);
   await page.keyboard.press("Escape");
   await page.waitForTimeout(300);
+
+  // 33b. a junction keeps its name in the editor but never draws it on the map
+  await page.getByRole("button", { name: "Help" }).click();
+  await page.getByRole("menuitem", { name: "Getting started" }).click();
+  await page.waitForTimeout(300);
+  await page.getByRole("button", { name: "Load the example map" }).click();
+  await page.waitForTimeout(600);
+  await tool("Select & move").click();
+  await clickStop("Quarry");
+  await page.waitForTimeout(300);
+  const stopTypeSelect = page.locator(".line-style-section", { hasText: "Stop type" }).locator("select");
+  await stopTypeSelect.selectOption("junction");
+  await page.waitForTimeout(400);
+  const drawnNames = (root) => page.evaluate((r) => Array.from(document.querySelectorAll(`${r} .stop text`)).map((t) => t.textContent), root);
+  check("a junction's name is not drawn on the map", !(await drawnNames(".map-canvas")).includes("Quarry"), (await drawnNames(".map-canvas")).join(", "));
+  check("nor in print", !(await drawnNames(".print-pages")).includes("Quarry") && (await drawnNames(".print-pages")).includes("Westport"), (await drawnNames(".print-pages")).slice(0, 12).join(", "));
+  check("but it keeps its name in the editor", (await page.locator("#stop-name").inputValue()) === "Quarry", await page.locator("#stop-name").inputValue());
+  check("and shows it when pointed at", await page.evaluate(() => Array.from(document.querySelectorAll(".map-canvas .stop title")).some((t) => t.textContent === "Quarry")));
+  check("other stops still draw their names", (await drawnNames(".map-canvas")).includes("Westport"));
+  check("and its properties offer no name position to turn", (await page.locator(".label-angle", { hasText: "Name position" }).count()) === 0);
+  check("but say why the name is not on the map", /junction/i.test(await page.locator(".property-form").textContent()) && /not drawn/i.test(await page.locator(".property-form").textContent()));
+  await page.locator("#stop-name").fill("Quarry Junction");
+  await page.waitForTimeout(300);
+  check("renaming a junction draws nothing either", !(await drawnNames(".map-canvas")).some((n) => /Quarry/.test(n)));
+  await page.locator("#stop-name").fill("Quarry");
+  await stopTypeSelect.selectOption("city");
+  await page.waitForTimeout(400);
+  check("turned back into a regular stop, its name is drawn again", (await drawnNames(".map-canvas")).includes("Quarry"));
+  await page.keyboard.press("Escape");
 
   // 34. a map saved on a format that is now a print choice opens on its board
   await page.evaluate(() => {
