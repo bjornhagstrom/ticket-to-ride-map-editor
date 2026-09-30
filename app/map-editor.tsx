@@ -311,7 +311,6 @@ export function MapEditor() {
     else if (pendingStop) cancelPick(); else setSelectedTicket(null);
   }; });
   // Ticket cards print on their own paper, so the print tree swaps to them, prints, and swaps back.
-  // Two frames, because the printed layout depends on styles applied after the swap renders.
   useEffect(() => { queueMicrotask(() => { try { const stored = localStorage.getItem(PRINT_CHOICE_KEY); if (stored) setPrintChoice(JSON.parse(stored)); } catch { /* keep the default */ } }); }, []);
   const choosePrint = (choice: PrintChoice) => { setPrintChoice(choice); try { localStorage.setItem(PRINT_CHOICE_KEY, JSON.stringify(choice)); } catch { /* not remembered, still used */ } };
   // The dialog closes first, and print() waits until it has finished animating out and the page is no
@@ -324,19 +323,20 @@ export function MapEditor() {
     let frame = 0;
     const started = performance.now();
     const settled = () => !document.querySelector('[role="dialog"]') && !document.body.hasAttribute("data-scroll-locked") && getComputedStyle(document.body).overflow !== "hidden";
+    // The ticket cards print on their own paper: the print tree has swapped to them, and needs two frames
+    // for the styles applied after the swap, on top of waiting for the dialog.
+    const frames = printScope === "tickets" ? 2 : 1;
+    let seen = 0;
     const wait = () => {
-      if (settled() || performance.now() - started > 1500) { window.print(); return; }
+      seen += 1;
+      if ((seen >= frames && settled()) || performance.now() - started > 1500) { window.print(); setPrintScope("map"); return; }
       frame = requestAnimationFrame(wait);
     };
     frame = requestAnimationFrame(wait);
     return () => cancelAnimationFrame(frame);
+    // printScope is read when the request arrives, not a reason to start the wait again.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [printRequest]);
-  useEffect(() => {
-    if (printScope !== "tickets") return;
-    let inner = 0;
-    const outer = requestAnimationFrame(() => { inner = requestAnimationFrame(() => { window.print(); setPrintScope("map"); }); });
-    return () => { cancelAnimationFrame(outer); cancelAnimationFrame(inner); };
-  }, [printScope]);
 
   const hasContent = data.stops.length > 0 || data.routes.length > 0 || data.background.length > 0 || data.notes.length > 0 || Boolean(data.backgroundImage);
   const dismissGuide = () => { try { localStorage.setItem(GUIDE_SEEN_KEY, "1"); } catch { /* ignore unavailable storage */ } setShowGuide(false); };
@@ -571,7 +571,7 @@ export function MapEditor() {
   const exportBackground = () => downloadJson(writeMapFile("background", { format: data.format, background: data.background, backgroundImage: data.backgroundImage }, data), `${data.name} background`);
   const exportNetwork = () => downloadJson(writeMapFile("network", networkPayload(data), data), `${data.name} network`);
   const exportTickets = (scope: "set" | "all") => { const ids = scope === "all" ? data.ticketSets.map((set) => set.id) : [activeTicketSet.id]; downloadJson(writeMapFile("tickets", buildTicketFile(data, ids), data), `${data.name} ${scope === "all" ? "tickets" : activeTicketSet.label}`); };
-  const printTickets = () => { setShowTickets(false); setPrintScope("tickets"); };
+  const printTickets = () => { setShowTickets(false); setPrintScope("tickets"); setPrintRequest((count) => count + 1); };
   const applyBackgroundImport = (background: BackgroundShape[], backgroundImage?: BackgroundImage) => { change((draft) => ({ ...draft, background, backgroundImage })); clearSelection(); setDanger(null); setPendingImport(null); };
   const applyNetworkImport = (stops: Stop[], routes: Route[], lineStyles: LineStyle[], routeTypeStyles: RouteTypeStyle[], stopTypeStyles: StopTypeStyle[], wagonStyles: WagonStyle[], tickets: Ticket[]) => {
     change((draft) => {

@@ -674,6 +674,24 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   check("an imported deck carries the date and time it arrived", new RegExp(`^Main deck · ${today} \\d{2}:\\d{2}$`).test(importedName), importedName);
   fs.rmSync(ticketFile, { force: true });
 
+  // Clicked the way a person clicks, on screen: the Tickets dialog then animates out while the page is
+  // still locked for scrolling, and print() must wait for that to finish, as the board's print does.
+  await page.evaluate(() => {
+    window.__deckSettled = null;
+    window.print = () => {
+      const body = getComputedStyle(document.body);
+      window.__deckSettled = { dialog: document.querySelectorAll('[role="dialog"]').length, locked: document.body.hasAttribute("data-scroll-locked"), overflow: body.overflow, pointerEvents: body.pointerEvents, cards: document.querySelectorAll(".print-tickets .ticket-card").length };
+    };
+  });
+  await page.getByRole("button", { name: "Print deck" }).click();
+  await page.waitForFunction(() => window.__deckSettled !== null, null, { timeout: 5000 });
+  const deckSettled = await page.evaluate(() => window.__deckSettled);
+  check("printing the deck waits for the dialog to close and the page to unlock, when clicked on screen",
+    deckSettled.dialog === 0 && !deckSettled.locked && deckSettled.overflow !== "hidden" && deckSettled.pointerEvents !== "none" && deckSettled.cards > 0, JSON.stringify(deckSettled));
+  await page.waitForTimeout(400);
+  await ticketsButton.click();
+  await page.waitForTimeout(400);
+
   // Print media hides the dialog, so the button is clicked from script and the print tree is
   // measured inside the print() stub, while it is still mounted.
   await page.evaluate(() => {
