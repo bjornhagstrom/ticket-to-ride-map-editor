@@ -1478,7 +1478,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   check("with the official decks' range beside a value", /official/i.test(await ruleValues.textContent()));
   const fixedContrast = await rulesContrast();
   check("every piece of text on the page has strong contrast, ours shown", fixedContrast.measured > 15 && fixedContrast.failures.length === 0, `${fixedContrast.measured} measured; ${fixedContrast.failures.slice(0, 5).join("; ")}`);
-  check("where tickets start and end is said plainly, not as 'Towards the edges'", !/Towards the edges/.test(await ruleValues.textContent()) && /Where tickets start and end/.test(await ruleValues.textContent()) && /further out than an average stop/i.test(await ruleValues.textContent()), (await ruleValues.textContent()).slice(-260));
+  check("where tickets start and end is said plainly, not as 'Towards the edges'", !/Towards the edges/.test(await ruleValues.textContent()) && /Where tickets start and end/.test(await ruleValues.textContent()) && /average stop/i.test(await ruleValues.textContent()), (await ruleValues.textContent()).slice(-260));
   check("and it says these length shares steer the suggester until the map sets its own mix", /until you change the ticket mix below/i.test(await ruleValues.textContent()), (await ruleValues.textContent()).slice(-200));
   await page.getByRole("button", { name: "Create your own from Generic" }).click();
   await page.waitForTimeout(300);
@@ -1487,9 +1487,20 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   check("its values can be changed", (await ruleValues.locator("input:not([disabled])").count()) >= 8, String(await ruleValues.locator("input:not([disabled])").count()));
   const binTops = await page.evaluate(() => [0, 1, 2, 3, 4].map((i) => Math.round(document.getElementById(`rule-bin-${i}`).getBoundingClientRect().top)));
   check("the five length fields stand in one line", Math.max(...binTops) - Math.min(...binTops) <= 1, binTops.join(", "));
+  const pairTops = await page.evaluate(() => ["rule-max-per-stop", "rule-length-cap"].map((id) => Math.round(document.getElementById(id).getBoundingClientRect().top)));
+  check("fields side by side stand in line even when a label takes two lines", Math.abs(pairTops[0] - pairTops[1]) <= 1, pairTops.join(", "));
   const ownContrast = await rulesContrast();
   check("and with your own set open, too", ownContrast.failures.length === 0, ownContrast.failures.slice(0, 5).join("; "));
-  check("your own set explains where tickets start and end", /Where tickets start and end/.test(await ruleValues.textContent()) && /how far from the middle/i.test(await ruleValues.textContent()));
+  // Own sets say where tickets end as a distance from the map's average stop, beside what the
+  // official decks do, and start with no preference when made from Generic.
+  check("your own set asks where long and short tickets end, from an average stop", await page.locator("#rule-long-ends").count() === 1 && await page.locator("#rule-short-ends").count() === 1 && /average stop/i.test(await ruleValues.textContent()));
+  check("made from Generic, it has no preference on either end", await page.locator("#rule-long-ends-any").isChecked() && await page.locator("#rule-short-ends-any").isChecked());
+  check("with the official decks beside each, to compare against", /USA \+0\.21/.test(await ruleValues.textContent()) && /Nordic \+0\.06/.test(await ruleValues.textContent()) && /Polska −0\.10/.test(await ruleValues.textContent()), (await ruleValues.textContent()).slice(-300));
+  await page.locator("#rule-long-ends-any").uncheck();
+  await page.locator("#rule-long-ends").fill("0.15");
+  await page.locator("#rule-long-ends").blur();
+  await page.waitForTimeout(250);
+  check("a distance set for long tickets is kept in the map", (await storedRules()).rules[0].longEnds === 0.15 && (await storedRules()).rules[0].shortEnds === null, JSON.stringify((await storedRules()).rules[0]).slice(0, 220));
   await page.locator("#rule-tickets-per-stop").fill("0.5");
   await page.locator("#rule-tickets-per-stop").blur();
   await page.locator("#rule-name").fill("Sparse");
@@ -1549,6 +1560,15 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.getByRole("button", { name: "Delete this set" }).click();
   await page.waitForTimeout(300);
   check("deleting your own set goes back to Generic", (await storedRules()).rules.length === 0 && ["generic", undefined].includes((await storedRules()).chosen));
+  // A copy of Europe carries its point targets over as distances from the average stop, and says so.
+  await page.getByRole("radio", { name: "Europe", exact: true }).check();
+  await page.getByRole("button", { name: "Create your own from Europe" }).click();
+  await page.waitForTimeout(300);
+  const fromEurope = (await storedRules()).rules[0];
+  check("a copy of Europe ends long tickets +0.21 and short ones −0.05 from an average stop", fromEurope && fromEurope.longEnds === 0.21 && fromEurope.shortEnds === -0.05, JSON.stringify(fromEurope).slice(0, 200));
+  check("and explains that Europe's 0.62 becomes +0.21", /0\.62/.test(await ruleValues.textContent()) && /\+0\.21/.test(await ruleValues.textContent()));
+  await page.getByRole("button", { name: "Delete this set" }).click();
+  await page.waitForTimeout(300);
   await page.keyboard.press("Escape");
   await page.waitForTimeout(300);
   // 33g. nothing in the editor's own panels and dialogs is smaller than 12px. The map's own lettering

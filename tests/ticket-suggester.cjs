@@ -146,6 +146,18 @@ check("a map can follow another map's published mix", followShares.every((share,
 const noMix = suggestTickets(usa, { style: "classic", seed: 1 });
 check("a map without a mix of its own still follows the style", noMix.report.score < 5 && noMix.report.bins.join("/") === usaSuggestion.report.bins.join("/"), noMix.report.bins.join("/"));
 
+// ---------------------------------------------------------------- where a map's own rules end tickets
+// A set of the map's own measures ticket ends from the map's average stop. With no preference on either
+// end it is Generic's rule exactly, so an official deck scores the same under both.
+const genericValues = { ...TICKET_SUGGESTER.styles.generic };
+const ownGeneric = { id: "own", label: "Own", basedOn: "generic", ticketsPerStop: genericValues.ticketsPerStop, longPerStop: genericValues.longPerStop, bins: [...genericValues.bins], longRange: genericValues.longRange, bonusFrom: genericValues.bonusFrom, lengthCap: genericValues.lengthCap, maxPerStop: genericValues.maxPerStop, dupRate: genericValues.dupRate, periphery: genericValues.periphery, longEnds: null, shortEnds: null };
+const usaOwn = { ...usa, deckRules: [ownGeneric] };
+const genericScore = evaluateTicketDeck(usa, { style: "generic", setId: "main" }).score;
+const ownScore = evaluateTicketDeck(usaOwn, { style: "own", setId: "main" }).score;
+check("an own set with no preference on either end scores exactly as Generic", Math.abs(genericScore - ownScore) < 1e-9, `${genericScore} against ${ownScore}`);
+const farOut = evaluateTicketDeck({ ...usa, deckRules: [{ ...ownGeneric, longEnds: 0.4 }] }, { style: "own", setId: "main" }).score;
+check("and asking long tickets to end far out changes the score", farOut > ownScore, `${ownScore} to ${farOut}`);
+
 // ---------------------------------------------------------------- maps too small to work with
 const tiny = { ...usa, stops: usa.stops.slice(0, 3), routes: usa.routes.slice(0, 2), tickets: [] };
 const tinyResult = suggestTickets(tiny, {});

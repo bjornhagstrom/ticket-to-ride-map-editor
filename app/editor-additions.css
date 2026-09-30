@@ -111,7 +111,7 @@
 .deck-rule-table dt{font-weight:600;color:#2e2a24}
 .deck-rule-table dd{margin:0;color:#1f1c18}
 .deck-rule-table small{font-size:12px;color:#2e2a24}
-.deck-rule-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px}
+.deck-rule-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;align-items:end}
 .deck-rule-bins{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;align-items:end}
 .deck-rule-bins label{white-space:nowrap}
 .deck-rule-hint{display:block;font-size:12px;color:#2e2a24}
@@ -140,3 +140,8 @@
 .suggestion-panel .suggestion-row:hover,.suggestion-panel .suggestion-row:focus-within{border-color:#721c24;background:#f7e9e6}
 .suggestion-panel .suggestion-row strong{font-size:13px}
 .map-canvas .suggestion-preview{stroke:#721c24;stroke-width:5;stroke-dasharray:10 7;stroke-linecap:round;opacity:.85;pointer-events:none}
+.deck-rule-ends{display:grid;gap:10px}
+.deck-rule-end{display:grid;gap:4px}
+.deck-rule-end-row{display:flex;gap:10px;align-items:center}
+.deck-rule-end-row input{flex:1}
+.deck-rule-end-row output{min-width:44px;font-size:13px;font-weight:700;font-variant-numeric:tabular-nums;color:#1f1c18}

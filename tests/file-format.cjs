@@ -143,6 +143,13 @@ const keptRules = broken.deckRules || [];
 check("a set with a value that cannot be used, or no id, is dropped", keptRules.length === 1 && keptRules[0].id === "rules-1", JSON.stringify(keptRules.map((r) => r.id)));
 check("and a choice that names no set falls back to ours", broken.deckRule === undefined, String(broken.deckRule));
 
+// Where an own set wants tickets to end: from the map's average stop, or no preference (null).
+const ends = { ...own, id: "ends", longEnds: 0.15, shortEnds: null };
+const endsBack = storage.normalizeMap(storage.readMapFile(JSON.parse(JSON.stringify(storage.writeMapFile("map", storage.mapPayload(storage.normalizeMap({ ...JSON.parse(JSON.stringify(sample)), deckRules: [ends] })), sample)))).payload);
+check("where an own set ends its tickets survives a round trip", (endsBack.deckRules || [])[0]?.longEnds === 0.15 && (endsBack.deckRules || [])[0]?.shortEnds === null, JSON.stringify((endsBack.deckRules || [])[0]));
+const wild = storage.normalizeMap({ ...JSON.parse(JSON.stringify(sample)), deckRules: [{ ...ends, longEnds: 0.9 }] });
+check("and an end further than the map allows drops the set", !(wild.deckRules || []).length);
+
 console.log("PASS:"); ok.forEach((line) => console.log("  ✓ " + line));
 if (bad.length) { console.log("FAIL:"); bad.forEach((line) => console.log("  ✗ " + line)); }
 console.log(`\n${ok.length} passed, ${bad.length} failed`);

@@ -76,6 +76,12 @@ export const TICKET_SUGGESTER = {
     maxPerStop: [4, 10] as [number, number],
     perStop: [.83, .98] as [number, number],
     dupPct: [.3, 1.6] as [number, number],
+    // Where the official decks end their tickets, measured from each map's average stop on a scale
+    // from the middle (0) to the edge (1): long tickets further out, short ones mostly a little in.
+    // Aggregated from the reference data with evaluateTicketDeck; they vary far less this way than as
+    // distances from the middle, which run from 0.36 (Nordic) to 0.62 (USA) for long tickets.
+    longEnds: [["USA", .21], ["India", .21], ["Europe", .20], ["Polska", .17], ["Switzerland", .16], ["Northern Lights", .11], ["Old West", .09], ["Nordic", .06]] as [string, number][],
+    shortEnds: [["Northern Lights", .02], ["USA", -.03], ["India", -.06], ["Old West", -.06], ["Europe", -.07], ["Nordic", -.08], ["Switzerland", -.08], ["Polska", -.10]] as [string, number][],
     unusedPct: [14, 27] as [number, number],
   },
   // `load` was 0.5 when the targets were first fitted, which left suggestions spreading their
@@ -508,7 +514,14 @@ class DeckState {
     // the average stop and short ones sit further in. `generic` therefore only penalises the wrong
     // side; the two single-game styles keep their fitted point targets.
     let ends = 0;
-    if (style.periphery === "relative") {
+    if (style.longEnds !== undefined || style.shortEnds !== undefined) {
+      // A set of the map's own: ends measured from the map's average stop, or no preference, which
+      // only marks down the wrong side exactly as Generic does.
+      const avg = model.mapPeriphery;
+      const longEnds = style.longEnds ?? null, shortEnds = style.shortEnds ?? null;
+      if (longMean !== null) ends += longEnds === null ? Math.max(0, avg - longMean) ** 2 : (longMean - (avg + longEnds)) ** 2;
+      if (shortMean !== null) ends += shortEnds === null ? Math.max(0, shortMean - avg) ** 2 : (shortMean - (avg + shortEnds)) ** 2;
+    } else if (style.periphery === "relative") {
       if (longMean !== null) ends += Math.max(0, model.mapPeriphery - longMean) ** 2;
       if (shortMean !== null) ends += Math.max(0, shortMean - model.mapPeriphery) ** 2;
     } else {
@@ -574,7 +587,7 @@ export function defaultStyle(data: MapData, setId?: string): TicketStyle {
 
 // Every set of rules the suggester can follow on this map: ours first, fixed, then the map's own.
 // A set of the map's own carries the same values as ours, and is described from them.
-export type DeckRule = typeof TICKET_SUGGESTER.styles.generic & { id: string; custom: boolean; basedOn: string };
+export type DeckRule = typeof TICKET_SUGGESTER.styles.generic & { id: string; custom: boolean; basedOn: string; longEnds?: number | null; shortEnds?: number | null };
 const percent = (share: number) => `${Math.round(share * 100)} %`;
 export function deckRules(data: MapData): DeckRule[] {
   const ours = (Object.keys(TICKET_SUGGESTER.styles) as BuiltInStyle[]).map((id): DeckRule => ({ ...TICKET_SUGGESTER.styles[id], id, custom: false, basedOn: id }));

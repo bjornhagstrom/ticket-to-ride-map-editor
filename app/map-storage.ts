@@ -259,7 +259,8 @@ const validRuleSet = (value: unknown): value is DeckRuleSet => {
     && typeof v.lengthCap === "number" && v.lengthCap > 0 && v.lengthCap <= 1
     && Number.isInteger(v.maxPerStop) && (v.maxPerStop as number) >= 1
     && share(v.dupRate)
-    && (v.periphery === "relative" || v.periphery === "point");
+    && (v.periphery === "relative" || v.periphery === "point")
+    && [v.longEnds, v.shortEnds].every((end) => end === undefined || end === null || (typeof end === "number" && end >= -0.5 && end <= 0.5));
 };
 const normalizeDeckRules = (value: Partial<MapData>): Pick<MapData, "deckRules" | "deckRule"> => {
   const rules = (Array.isArray(value.deckRules) ? value.deckRules : []).filter(validRuleSet)

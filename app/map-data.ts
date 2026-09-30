@@ -109,6 +109,12 @@ export type DeckRuleValues = {
   maxPerStop: number;
   dupRate: number;
   periphery: "relative" | "point";
+  /** Own sets only: how much further out than the map's average stop long tickets should end, and
+   *  short ones (negative is further in), on a scale from the middle (0) to the edge (1). null means no
+   *  preference: only a deck on the wrong side of the average stop is marked down. When both are
+   *  absent, `periphery` decides, as it does for our three. */
+  longEnds?: number | null;
+  shortEnds?: number | null;
 };
 export type DeckRuleSet = DeckRuleValues & { id: string; label: string; basedOn: string };
 /** Our sets, by the id a map chooses them with. Their values are in TICKET_SUGGESTER.styles. */

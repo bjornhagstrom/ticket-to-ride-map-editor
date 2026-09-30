@@ -7,7 +7,6 @@ import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { cn } from "@/lib/utils";
 import { deckRuleFor, deckRules, defaultStyle, type DeckRule, TICKET_SUGGESTER } from "./map-analysis";
 import type { DeckRuleSet, MapData } from "./map-data";
@@ -19,10 +18,15 @@ const clamp = (value: number, low: number, high: number) => Math.min(high, Math.
 const official = TICKET_SUGGESTER.official;
 // "relative" and "point" in TICKET_SUGGESTER: how far from the middle of the map a deck's tickets end.
 const PERIPHERY = {
-  relative: "Long ones further out than an average stop, short ones further in",
-  point: "Long ones a set distance out, as the USA and Europe decks do",
-  explain: "How far from the middle of the map long and short tickets start and end. The first only counts tickets on the wrong side; the second aims at the distances the two official decks use.",
+  relative: "Long ones at least as far out as an average stop, short ones at most; no set distance",
+  point: "Long ones 0.62 from the middle, the USA deck's own distance; short ones 0.05 inside an average stop",
 };
+const signed = (value: number) => `${value > 0 ? "+" : value < 0 ? "−" : "±"}${Math.abs(value).toFixed(2)}`;
+// What a copy of one of ours starts with: Generic's no preference, or Classic's and Europe's point
+// targets, as near as a distance from the average stop comes (0.62 is +0.21 on the USA map).
+const endsFrom = (rule: DeckRule): { longEnds: number | null; shortEnds: number | null } =>
+  rule.custom ? { longEnds: rule.longEnds ?? null, shortEnds: rule.shortEnds ?? null }
+    : rule.periphery === "point" ? { longEnds: 0.21, shortEnds: -0.05 } : { longEnds: null, shortEnds: null };
 
 export function DeckRulesPanel({ data, change }: { data: MapData; change: (fn: (draft: MapData) => MapData) => void }) {
   const rules = deckRules(data);
@@ -36,6 +40,7 @@ export function DeckRulesPanel({ data, change }: { data: MapData; change: (fn: (
       ticketsPerStop: base.ticketsPerStop, longPerStop: base.longPerStop, bins: [...base.bins],
       longRange: base.longRange ? [base.longRange[0], base.longRange[1]] : null, bonusFrom: base.bonusFrom,
       lengthCap: base.lengthCap, maxPerStop: base.maxPerStop, dupRate: base.dupRate, periphery: base.periphery,
+      ...endsFrom(base),
     };
     draft.deckRules = [...(draft.deckRules ?? []), own];
     draft.deckRule = id;
@@ -116,12 +121,13 @@ function OwnRuleFields({ rule, onChange, onDelete }: { rule: DeckRule; onChange:
       {number("rule-dup-rate", "Near-duplicate tickets, %", pct(rule.dupRate), (value) => onChange({ dupRate: clamp(value, 0, 100) / 100 }), 0.5, `official ${official.dupPct[0]}–${official.dupPct[1]} %`)}
       {optionalPct("rule-bonus-from", "Bonus from, % of reach", rule.bonusFrom, (value) => onChange({ bonusFrom: value }))}
       {optionalPct("rule-long-from", "Long deck reaches from, %", rule.longRange ? rule.longRange[0] : null, (value) => onChange({ longRange: value === null ? null : [value, Math.max(value, rule.longRange?.[1] ?? 1)] }))}
-      <div className="deck-rule-wide"><Label htmlFor="rule-periphery">Where tickets start and end</Label>
-        <NativeSelect id="rule-periphery" value={rule.periphery} onChange={(event) => onChange({ periphery: event.target.value as DeckRuleSet["periphery"] })}>
-          <NativeSelectOption value="relative">{PERIPHERY.relative}</NativeSelectOption>
-          <NativeSelectOption value="point">{PERIPHERY.point}</NativeSelectOption>
-        </NativeSelect>
-        <small className="deck-rule-hint">{PERIPHERY.explain}</small></div>
+      <div className="deck-rule-wide deck-rule-ends">
+        <Label>Where tickets start and end</Label>
+        <small className="deck-rule-hint">Measured from this map&apos;s average stop, on a scale from the middle of the map (0) to its edge (1). The official decks end long tickets further out and short ones mostly a little further in.</small>
+        <EndControl id="rule-long-ends" label="Long tickets end, further out than an average stop" value={rule.longEnds ?? null} fallback={0.17} min={-0.1} max={0.35} official={official.longEnds} onChange={(value) => onChange({ longEnds: value, shortEnds: rule.shortEnds ?? null })} />
+        <EndControl id="rule-short-ends" label="Short tickets end, further out (+) or in (−) than an average stop" value={rule.shortEnds ?? null} fallback={-0.07} min={-0.25} max={0.1} official={official.shortEnds} onChange={(value) => onChange({ shortEnds: value, longEnds: rule.longEnds ?? null })} />
+        {(rule.basedOn === "classic" || rule.basedOn === "europe") && <small className="deck-rule-hint">Made from {rule.basedOn === "europe" ? "Europe" : "Classic"}, which aims its long tickets at 0.62 from the middle, the USA deck&apos;s own distance. Here that is +0.21 from an average stop: the same on a map shaped like the USA&apos;s, a little different on others.</small>}
+      </div>
     </div>
     <Label>Lengths: share of the regular deck in each band</Label>
     <small className="deck-rule-hint">Bands are how far a ticket reaches, as a share of reach: the longest ticket a player can build.</small>
@@ -134,4 +140,20 @@ function OwnRuleFields({ rule, onChange, onDelete }: { rule: DeckRule; onChange:
     <p className={cn("helper", Math.abs(binTotal - 100) > 1 && "helper-warning")}>{Math.abs(binTotal - 100) > 1 ? `These add up to ${binTotal} %, not 100 %. The suggester scales them, but the shares will not mean what they say.` : "Reach is the longest ticket a player can build with the map's wagons."}</p>
     <Button size="sm" variant="ghost" onClick={onDelete}><Trash2 />Delete this set</Button>
   </>;
+}
+
+// One end of the deck: no preference (only the wrong side of the average stop counts), or a distance
+// from the average stop, with every official deck's own value beside it to compare against.
+function EndControl({ id, label, value, fallback, min, max, official: marks, onChange }: { id: string; label: string; value: number | null; fallback: number; min: number; max: number; official: [string, number][]; onChange: (value: number | null) => void }) {
+  const any = value === null;
+  return <div className="deck-rule-end">
+    <Label htmlFor={id}>{label}</Label>
+    <label className="checkbox-row"><input type="checkbox" id={`${id}-any`} checked={any} onChange={(event) => onChange(event.target.checked ? null : fallback)} />No preference: only the wrong side of an average stop counts</label>
+    <div className="deck-rule-end-row">
+      <input id={id} className="range-input" type="range" min={min} max={max} step={0.01} disabled={any} value={any ? fallback : value}
+        onChange={(event) => onChange(Math.round(Number(event.target.value) * 100) / 100)} />
+      <output htmlFor={id}>{any ? "any" : signed(value)}</output>
+    </div>
+    <small className="deck-rule-hint">Official decks: {marks.map(([name, mark]) => `${name} ${signed(mark)}`).join(" · ")}</small>
+  </div>;
 }
