@@ -42,7 +42,7 @@ Live site: <https://hagstrom.nu/ttr/>
 - Undo and redo up to 200 changes during the current session, with Cmd/Ctrl+Z and Cmd/Ctrl+Shift+Z.
 - Save automatically in the current browser.
 - Import and export complete maps as JSON, or just the background or the route network on their own.
-- Print from a dialog that decides each run without touching the map: the whole board on one sheet, one sheet per fold panel, or full size across as many sheets as it takes, with trim marks; on A4, A3, US Letter or Tabloid; and for a 2×3, full size as either the standard or the larger Anniversary board. A table compares the sheet count and scale of every combination and picks one when clicked. The last choice is remembered in the browser.
+- Print from a dialog that decides each run without touching the map: the whole board on one sheet, one sheet per fold panel, or full size across as many sheets as it takes, with trim marks; on A4, A3, US Letter or Tabloid; and for a 2×3, an Anniversary size tick under Supersize that prints the larger Anniversary board at full size. A table compares the sheet count and scale of every combination and picks one when clicked. The last choice is remembered in the browser.
 - Show a neutral example map to first-time visitors.
 
 Styles are applied from the Properties panel and defined in one shared Styles dialog, reachable in

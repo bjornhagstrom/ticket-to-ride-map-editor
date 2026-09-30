@@ -23,9 +23,7 @@
 .print-dialog [data-slot="dialog-description"]{color:#2e2a24}
 .print-choices{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px}
 .print-choices fieldset{margin:0;padding:0;border:0;min-width:0}
-.print-choices fieldset:disabled .print-option{cursor:default;opacity:.55}
 .print-choices legend{margin-bottom:6px;font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#2e2a24}
-.print-choices legend small{font-weight:600;letter-spacing:0;text-transform:none}
 .print-option{display:flex;gap:8px;align-items:flex-start;padding:4px 0;cursor:pointer}
 .print-option input{margin-top:3px;accent-color:#721c24}
 .print-option strong{display:block;font-size:13px;color:#1f1c18}

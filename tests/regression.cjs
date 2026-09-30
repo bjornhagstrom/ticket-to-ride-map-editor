@@ -197,10 +197,11 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   check("the Print button opens a dialog rather than printing", await printDialog().isVisible() && (await page.evaluate(() => window.__printCalls)) === 0);
   check("it offers three ways to split the board", (await printDialog().locator('input[name="print-split"]').count()) === 3);
   check("and four papers", (await printDialog().locator('input[name="print-paper"]').count()) === 4);
-  const sizeRadios = () => printDialog().locator('input[name="print-size"]');
+  // Anniversary is one checkbox under Supersize, not a choice between two board sizes.
+  const supersize = () => printDialog().getByRole("checkbox", { name: "Anniversary size", exact: true });
   await printDialog().getByRole("radio", { name: "Full size" }).check();
   await page.waitForTimeout(200);
-  check("a 2×4 board has no Anniversary size to print at", (await sizeRadios().count()) === 0);
+  check("a 2×4 board has no Anniversary size to print at", (await supersize().count()) === 0 && !/Supersize/.test(await printDialog().textContent()));
   const tableCells = () => printDialog().locator(".print-table tbody tr").evaluateAll((rows) => rows.map((row) => Array.from(row.querySelectorAll("td button")).map((b) => Number(b.dataset.pages))));
   const cells2x4 = await tableCells();
   check("the comparison table has a row per paper", cells2x4.length === 4, JSON.stringify(cells2x4));
@@ -254,11 +255,30 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   check("and the way it is split", await printDialog().getByRole("radio", { name: "Full size" }).isChecked());
   check("and the picked cell is marked", (await cell("letter", 3).getAttribute("aria-pressed")) === "true");
   check("and the summary follows", /12 sheets of US Letter/.test(await printDialog().locator(".print-summary").textContent()), await printDialog().locator(".print-summary").textContent());
-  check("Anniversary is offered under full size", (await sizeRadios().count()) === 2 && !(await sizeRadios().first().isDisabled()));
+  check("the 2×3 offers Anniversary size as one checkbox under Supersize", (await supersize().count()) === 1 && /Supersize/.test(await printDialog().locator("legend", { hasText: "Supersize" }).textContent()));
+  check("and no Standard to pick, an empty box is the standard board", (await printDialog().getByRole("radio", { name: "Standard", exact: true }).count()) === 0);
+  check("standard full size leaves it unticked", !(await supersize().isChecked()));
   await printDialog().getByRole("radio", { name: "One sheet", exact: true }).check();
   await page.waitForTimeout(200);
-  // Still shown, so the dialog does not change height under the pointer, but not choosable.
-  check("but not for one sheet, where it stays in place and is switched off", (await sizeRadios().count()) === 2 && await sizeRadios().first().isDisabled() && await sizeRadios().last().isDisabled());
+  check("it is never greyed out, even on one sheet", await supersize().isEnabled() && (await printDialog().locator("fieldset:disabled").count()) === 0);
+  await supersize().check();
+  await page.waitForTimeout(200);
+  check("ticking it prints full size, since Anniversary only exists at full size", await printDialog().getByRole("radio", { name: "Full size" }).isChecked());
+  check("and marks the Anniversary cell in the table", (await cell("letter", 4).getAttribute("aria-pressed")) === "true");
+  check("and the summary names the bigger board", /972 × 648 mm/.test(await printDialog().locator(".print-summary").textContent()), await printDialog().locator(".print-summary").textContent());
+  await cell("a4", 3).click();
+  await page.waitForTimeout(200);
+  check("picking a standard cell in the table takes the tick away", !(await supersize().isChecked()));
+  await cell("a3", 4).click();
+  await page.waitForTimeout(200);
+  check("picking an Anniversary cell puts it back", await supersize().isChecked());
+  await supersize().uncheck();
+  await page.waitForTimeout(200);
+  check("unticking it keeps full size on the standard board", await printDialog().getByRole("radio", { name: "Full size" }).isChecked() && (await cell("a3", 3).getAttribute("aria-pressed")) === "true");
+  await supersize().check();
+  await printDialog().getByRole("radio", { name: "One sheet per panel of the game board", exact: true }).check();
+  await page.waitForTimeout(200);
+  check("choosing a panel run takes the tick away too", !(await supersize().isChecked()));
   await printDialog().getByRole("button", { name: "Cancel" }).click();
   await page.waitForTimeout(300);
 
@@ -377,7 +397,11 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await printDialog().getByRole("radio", { name: "Full size" }).check();
   await page.waitForTimeout(150);
   const afterRadio = await layout();
-  check("and when full size brings the board sizes in", Math.abs(afterRadio.y - beforeRadio.y) < 0.5, `${(afterRadio.y - beforeRadio.y).toFixed(1)}px`);
+  check("and when full size is picked", Math.abs(afterRadio.y - beforeRadio.y) < 0.5, `${(afterRadio.y - beforeRadio.y).toFixed(1)}px`);
+  await supersize().check();
+  await page.waitForTimeout(150);
+  const afterTick = await layout();
+  check("and when Anniversary size is ticked", Math.abs(afterTick.y - beforeRadio.y) < 0.5, `${(afterTick.y - beforeRadio.y).toFixed(1)}px`);
   await printDialog().getByRole("button", { name: "Cancel" }).click();
   await page.waitForTimeout(300);
   // 11. persistence across reload

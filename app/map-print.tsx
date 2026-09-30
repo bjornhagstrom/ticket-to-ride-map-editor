@@ -86,6 +86,7 @@ export function PrintDialog({ open, onOpenChange, format, choice, onChoice, onPr
   const plan = printPlan(format, choice);
   const { sizes, columns, table } = printChoices(format);
   const current = plan.choice;
+  const anniversary = sizes.find((size) => size.id === "anniversary");
   return <Dialog open={open} onOpenChange={onOpenChange}>
     <DialogContent className="print-dialog">
       <DialogHeader>
@@ -107,14 +108,15 @@ export function PrintDialog({ open, onOpenChange, format, choice, onChoice, onPr
             <span><strong>{paper.label}</strong><small id={`print-paper-${paper.id}`}>{paper.note}</small></span>
           </label>)}
         </fieldset>
-        {/* Always shown on a board that has sizes to choose from, and switched off until full size
-            is picked, so the dialog does not change height under the pointer. */}
-        {sizes.length > 1 && <fieldset disabled={current.split !== "full"}><legend>Adds up to{current.split !== "full" && <small> · full size only</small>}</legend>
-          {sizes.map((size) => <label key={size.id} className="print-option">
-            <input type="radio" name="print-size" value={size.id} aria-label={size.label} aria-describedby={`print-size-${size.id}`}
-              checked={current.size === size.id} onChange={() => onChoice({ ...current, size: size.id })} />
-            <span><strong>{size.label}</strong><small id={`print-size-${size.id}`}>{size.widthMm} × {size.heightMm} mm{size.id === "anniversary" ? ", bigger wagons too" : ""}</small></span>
-          </label>)}
+        {/* Anniversary exists only at full size, so ticking it asks for full size too, and a run
+            that is not full size is never Anniversary. The table and the tick follow each other. */}
+        {anniversary && <fieldset><legend>Supersize</legend>
+          <label className="print-option">
+            <input type="checkbox" name="print-anniversary" aria-label="Anniversary size" aria-describedby="print-anniversary-note"
+              checked={current.split === "full" && current.size === "anniversary"}
+              onChange={(event) => onChoice(event.target.checked ? { ...current, split: "full", size: "anniversary" } : { ...current, size: "standard" })} />
+            <span><strong>Anniversary size</strong><small id="print-anniversary-note">{anniversary.widthMm} × {anniversary.heightMm} mm, bigger wagons too. Always printed full size.</small></span>
+          </label>
         </fieldset>}
       </div>
       <p className="print-summary">{describePlan(plan)}</p>
