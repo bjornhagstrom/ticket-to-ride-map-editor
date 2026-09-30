@@ -338,7 +338,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   };
   const pdfFull = await pdfPages("a4", 3, true);
   check("full size on A4 with the browser's own margins is still 9 sheets, none blank", pdfFull.pages === pdfFull.promised, `${pdfFull.pages} sheets for ${pdfFull.promised} promised`);
-  const pdfPanels = await pdfPages("a4", 2, false);
+  const pdfPanels = await pdfPages("a4", 2, true);
   check("and per panel it is still 6", pdfPanels.pages === pdfPanels.promised, `${pdfPanels.pages} sheets for ${pdfPanels.promised} promised`);
 
   // The dialog has to be readable, say what its table means, and hold still while choices change.
@@ -379,6 +379,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   });
   check("the sheet table has a heading of its own", /^H[2-4] \S/.test(described.heading), described.heading);
   check("and a description of what its numbers are", /sheets?/i.test(described.description) && /%/.test(described.description), described.description);
+  check("the dialog says to print landscape if the browser does not switch by itself", /landscape/i.test(await printDialog().locator(".print-dialog-foot").textContent()), await printDialog().locator(".print-dialog-foot").textContent());
   check("which spells out what the percentage means", /100\s%[^.]*real size|real size[^.]*100\s%/i.test(described.description), described.description);
   check("every cell says sheets, not just a number", /\d+ sheets?/.test(described.cell), described.cell);
   const layout = () => page.evaluate(() => {

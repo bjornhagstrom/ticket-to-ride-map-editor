@@ -60,10 +60,12 @@ export type PrintPlan = {
 type Orientation = { orientation: "portrait" | "landscape"; pageMm: { width: number; height: number }; content: { width: number; height: number } };
 const orientations = (paperId: PaperId): Orientation[] => {
   const paper = papers.find((item) => item.id === paperId) ?? papers[0];
-  // Landscape first, so it wins a tie.
+  // Always landscape. Portrait would save a sheet or a few percent in some cases, but one answer to
+  // "which way up" is worth more: Safari does not always switch orientation by itself, and the
+  // person at the print dialog then has to know what to pick. Kept as a list so a portrait option
+  // can come back as a choice rather than a guess.
   return [
     { orientation: "landscape", pageMm: { width: paper.heightMm, height: paper.widthMm } },
-    { orientation: "portrait", pageMm: { width: paper.widthMm, height: paper.heightMm } },
   ].map((item) => ({ ...item, orientation: item.orientation as Orientation["orientation"], content: { width: item.pageMm.width - 2 * PRINT_MARGIN_MM, height: item.pageMm.height - 2 * PRINT_MARGIN_MM - PRINT_CAPTION_MM } }));
 };
 // Division that does not count a sheet for floating-point dust.

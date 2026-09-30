@@ -52,8 +52,18 @@ for (const paper of ["a4", "a3", "letter", "tabloid"]) {
   check(`2×3 per panel on ${paper} is 6 pages`, printPlan("board-2x3", { split: "panel", paper }).pages.length === 6);
   check(`2×4 per panel on ${paper} is 8 pages`, printPlan("board-2x4", { split: "panel", paper }).pages.length === 8);
 }
-check("a 2×3 panel on A4 prints at 72 %", pct(printPlan("board-2x3", { split: "panel", paper: "a4" })) === 72, `${pct(printPlan("board-2x3", { split: "panel", paper: "a4" }))} %`);
+check("a 2×3 panel on landscape A4 prints at 69 %", pct(printPlan("board-2x3", { split: "panel", paper: "a4" })) === 69, `${pct(printPlan("board-2x3", { split: "panel", paper: "a4" }))} %`);
 check("a panel is never enlarged: A3 holds one at 100 %", pct(printPlan("board-2x3", { split: "panel", paper: "a3" })) === 100, `${pct(printPlan("board-2x3", { split: "panel", paper: "a3" }))} %`);
+
+// ---------------------------------------------------------------- always landscape
+// Every run prints landscape, so the answer to "which way up" in the browser's own print dialog is
+// always the same. Safari does not always switch by itself. Portrait saved a sheet or a few percent
+// in some cases; the counts below are the landscape ones.
+const everyPlan = [];
+for (const format of ["board-2x3", "board-2x4"]) for (const paper of ["a4", "a3", "letter", "tabloid"]) for (const choice of [{ split: "sheet" }, { split: "panel" }, { split: "full" }, { split: "full", size: "anniversary" }]) everyPlan.push(printPlan(format, { ...choice, paper }));
+check("every plan, on every paper, is landscape", everyPlan.every((plan) => plan.orientation === "landscape" && plan.pageMm.width > plan.pageMm.height), everyPlan.filter((plan) => plan.orientation !== "landscape").map((plan) => `${plan.choice.split} ${plan.choice.paper}`).join(", "));
+check("Anniversary on landscape A3 is 9 sheets", printPlan("board-2x3", { split: "full", paper: "a3", size: "anniversary" }).pages.length === 9, String(printPlan("board-2x3", { split: "full", paper: "a3", size: "anniversary" }).pages.length));
+check("Anniversary on landscape Letter is 16 sheets", printPlan("board-2x3", { split: "full", paper: "letter", size: "anniversary" }).pages.length === 16, String(printPlan("board-2x3", { split: "full", paper: "letter", size: "anniversary" }).pages.length));
 
 // ---------------------------------------------------------------- full size
 const full = (format, paper, size = "standard") => printPlan(format, { split: "full", paper, size });

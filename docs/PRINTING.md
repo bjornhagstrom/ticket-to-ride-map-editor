@@ -38,50 +38,58 @@ All of it is in `printPlan` in `app/print-plan.ts`, and every figure below is pi
 Every page loses a **10 mm printer margin** on every side (`PRINT_MARGIN_MM`) and an **8 mm caption
 line** above the artwork (`PRINT_CAPTION_MM`). What is left for the board:
 
-| Paper | Landscape | Portrait |
-| --- | --- | --- |
-| A4 (210 × 297) | 277 × 182 | 190 × 269 |
-| A3 (297 × 420) | 400 × 269 | 277 × 392 |
-| US Letter (215.9 × 279.4) | 259.4 × 187.9 | 195.9 × 251.4 |
-| Tabloid (279.4 × 431.8) | 411.8 × 251.4 | 259.4 × 403.8 |
+| Paper | Usable, landscape |
+| --- | --- |
+| A4 (297 × 210) | 277 × 182 |
+| A3 (420 × 297) | 400 × 269 |
+| US Letter (279.4 × 215.9) | 259.4 × 187.9 |
+| Tabloid (431.8 × 279.4) | 411.8 × 251.4 |
 
 Width is paper − 20 mm. Height is paper − 20 − 8 mm.
+
+### Always landscape
+
+Every run prints landscape, whatever the paper and split. The plan used to choose the orientation
+that gave the larger scale or the fewer sheets, which made the default (per panel on A4) portrait.
+Safari does not always switch orientation from `@page`, so the person at the print dialog had to
+know which way up each run wanted. Now the answer is always Landscape, and the dialog says so.
+
+It costs a little in a few cases: a panel on A4 is 69 % instead of 72 %, on Letter 72 % instead of
+74 %, and on Tabloid 96 % instead of 98.5 %; Anniversary is 9 sheets of A3 instead of 8, 16 of Letter
+instead of 15, and 9 of Tabloid instead of 8. `orientations()` still returns a list, so portrait can
+come back as a choice if it is missed.
 
 ### One sheet, and one sheet per panel: the largest scale that fits
 
 The tile is the whole board (one sheet) or one fold panel: 263.3 × 262.5 mm on a 2×3, 263.3 × 263 mm
-on a 2×4. Its scale is `min(usable width / tile width, usable height / tile height)` in each
-orientation. The larger wins, it is **never above 100 %**, and landscape wins a tie.
+on a 2×4. Its scale is `min(usable width / tile width, usable height / tile height)`, and it is
+**never above 100 %**.
 
-- 2×3 on one A4: landscape `min(277/790, 182/525)` = 34.7 %.
-- A 2×3 panel on A4: portrait `min(190/263.3, 269/262.5)` = 72.2 %.
-- A 2×3 panel on A3: it would fit at 105 %, so it is capped at 100 %. Both orientations reach 100 %,
-  so landscape wins the tie.
-- A panel on Tabloid: 259.4 / 263.3 = 98.5 %, just short of real size.
+- 2×3 on one A4: `min(277/790, 182/525)` = 34.7 %.
+- A 2×3 panel on A4: `min(277/263.3, 182/262.5)` = 69.3 %. The height decides.
+- A 2×3 panel on A3: it would fit at 102 %, so it is capped at 100 %.
+- A panel on Tabloid: 251.4 / 262.5 = 95.8 %.
 
 ### Full size: the fewest sheets at 100 %
 
-Columns = `ceil(board width / usable width)` and rows = `ceil(board height / usable height)`, in each
-orientation. The fewer sheets win, and landscape wins a tie. The board is then cut into **equal
-tiles**, board width / columns by board height / rows, so every sheet is trimmed the same way.
+Columns = `ceil(board width / usable width)` and rows = `ceil(board height / usable height)`. The board
+is then cut into **equal tiles**, board width / columns by board height / rows, so every sheet is
+trimmed the same way.
 
 | Board | A4 | A3 | US Letter | Tabloid |
 | --- | --- | --- | --- | --- |
-| 2×3 standard, 790 × 525 | 9 (3 × 3, L) | 4 (2 × 2, L) | 12 (4 × 3, L) | 6 (2 × 3, L) |
-| 2×3 Anniversary, 972 × 648 | 16 (4 × 4, L) | 8 (4 × 2, P) | 15 (5 × 3, P) | 8 (4 × 2, P) |
-| 2×4, 1053 × 526 | 12 (4 × 3, L) | 6 (3 × 2, L) | 15 (5 × 3, L) | 9 (3 × 3, L) |
+| 2×3 standard, 790 × 525 | 9 (3 × 3) | 4 (2 × 2) | 12 (4 × 3) | 6 (2 × 3) |
+| 2×3 Anniversary, 972 × 648 | 16 (4 × 4) | 9 (3 × 3) | 16 (4 × 4) | 9 (3 × 3) |
+| 2×4, 1053 × 526 | 12 (4 × 3) | 6 (3 × 2) | 15 (5 × 3) | 9 (3 × 3) |
 
 Worked examples:
 
-- **2×3 on A4 is 9.** Landscape: 790 / 277 = 2.85 → 3 columns, 525 / 182 = 2.88 → 3 rows. Portrait
-  would need 5 × 2 = 10.
+- **2×3 on A4 is 9.** 790 / 277 = 2.85 → 3 columns, 525 / 182 = 2.88 → 3 rows.
 - **2×3 on Letter is 12, not 9.** Landscape Letter leaves 259.4 mm across, and three of those make
   778 mm, 12 mm short of 790. So it takes 4 columns: 790 / 259.4 = 3.05 → 4, times 525 / 187.9 = 2.79
-  → 3 rows. Portrait would be 5 × 3 = 15. The margin and the caption are what push it over; without
-  them it would be 9.
-- **Anniversary on A4 is 16.** 972 / 277 = 3.51 → 4 columns, 648 / 182 = 3.56 → 4 rows. Portrait
-  would be 6 × 3 = 18.
-- **2×4 on A4 is 12 either way up.** Landscape 4 × 3, portrait 6 × 2. The tie goes to landscape.
+  → 3 rows. The margin and the caption are what push it over; without them it would be 9.
+- **Anniversary on A4 is 16.** 972 / 277 = 3.51 → 4 columns, 648 / 182 = 3.56 → 4 rows.
+- **2×4 on A4 is 12.** 1053 / 277 = 3.80 → 4 columns, 526 / 182 = 2.89 → 3 rows.
 
 `ceil` subtracts 1e-9 first, so floating-point dust never adds a sheet.
 

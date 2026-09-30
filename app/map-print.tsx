@@ -134,7 +134,7 @@ export function PrintDialog({ open, onOpenChange, format, choice, onChoice, onPr
           </tr>)}</tbody>
         </table>
       </div>
-      <p className="helper print-dialog-foot">The browser’s print dialog can also save the run as a PDF. Print at 100 % — “fit to page” would undo the sizes above.</p>
+      <p className="helper print-dialog-foot">Every run prints landscape: if the browser’s print dialog does not switch by itself, choose Landscape there. Print at 100 % — “fit to page” would undo the sizes above. The same dialog can save the run as a PDF.</p>
       <DialogFooter>
         <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
         <Button onClick={onPrint}><Printer />Print</Button>
