@@ -149,6 +149,14 @@ spilled that one onto a second page. So `printPlan` takes the marks' reach off t
 counts sheets, and a full-size A4 sheet now reaches 268 mm. No sheet count changed; at 6 mm, A3
 would have gone from 4 sheets to 6.
 
+**print() waits for the dialog to leave.** Safari lays out its first preview the moment `print()` is
+called. It used to be called two frames after the Print button, while the dialog was still animating
+out and the page was still locked for scrolling (`body` overflow hidden). Safari's first preview then
+spilled sheets onto a second page, and came right only when changing a setting in its dialog made it
+lay the page out again. Now `print()` waits until no dialog remains and the lock is off, for at most
+1.5 s. The regression suite clicks Print on screen, as a person does, to catch this; switching to print
+media first skipped the animation and hid the fault.
+
 Safari's headers and footers (title, date, URL, page number) are a setting in its print dialog, which
 Safari remembers; a page cannot switch them off. Chrome drops them when the margin is too small for
 them. So the layout is made to fit with them on.

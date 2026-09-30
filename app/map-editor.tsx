@@ -303,13 +303,22 @@ export function MapEditor() {
   // Two frames, because the printed layout depends on styles applied after the swap renders.
   useEffect(() => { queueMicrotask(() => { try { const stored = localStorage.getItem(PRINT_CHOICE_KEY); if (stored) setPrintChoice(JSON.parse(stored)); } catch { /* keep the default */ } }); }, []);
   const choosePrint = (choice: PrintChoice) => { setPrintChoice(choice); try { localStorage.setItem(PRINT_CHOICE_KEY, JSON.stringify(choice)); } catch { /* not remembered, still used */ } };
-  // The dialog closes first; the print follows two frames later, once it is gone and the print tree
-  // carries the chosen plan.
+  // The dialog closes first, and print() waits until it has finished animating out and the page is no
+  // longer locked for scrolling. Safari lays out its first preview the moment print() is called: with
+  // the lock still on (body overflow hidden) it spilled sheets onto a second page, and came right only
+  // when a setting in its dialog made it lay the page out again. Waiting is capped, so a dialog that
+  // never leaves cannot stop the print.
   useEffect(() => {
     if (!printRequest) return;
-    let inner = 0;
-    const outer = requestAnimationFrame(() => { inner = requestAnimationFrame(() => window.print()); });
-    return () => { cancelAnimationFrame(outer); cancelAnimationFrame(inner); };
+    let frame = 0;
+    const started = performance.now();
+    const settled = () => !document.querySelector('[role="dialog"]') && !document.body.hasAttribute("data-scroll-locked") && getComputedStyle(document.body).overflow !== "hidden";
+    const wait = () => {
+      if (settled() || performance.now() - started > 1500) { window.print(); return; }
+      frame = requestAnimationFrame(wait);
+    };
+    frame = requestAnimationFrame(wait);
+    return () => cancelAnimationFrame(frame);
   }, [printRequest]);
   useEffect(() => {
     if (printScope !== "tickets") return;

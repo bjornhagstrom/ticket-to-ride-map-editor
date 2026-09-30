@@ -268,7 +268,11 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
       // How far the first sheet reaches down the page, its cut marks included.
       const marks = first ? Array.from(first.querySelectorAll(".cut-mark line")).map((line) => line.getBoundingClientRect()) : [];
       const reach = box ? Math.max(box.bottom, ...marks.map((r) => r.bottom)) - Math.min(box.top, ...marks.map((r) => r.top)) : 0;
+      // What the page looks like the moment print() is called: the dialog must be gone, and the page no
+      // longer locked for scrolling. Safari lays out its first preview from that moment.
+      const body = getComputedStyle(document.body);
       window.__printed = {
+        settled: { dialog: document.querySelectorAll('[role="dialog"]').length, locked: document.body.hasAttribute("data-scroll-locked"), overflow: body.overflow, paddingRight: body.paddingRight, pointerEvents: body.pointerEvents },
         reachMm: reach / 96 * 25.4,
         pages: pages.length,
         style: Array.from(document.querySelectorAll(".print-pages style")).map((el) => el.textContent).join(" "),
@@ -371,7 +375,20 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await printDialog().getByRole("button", { name: "Cancel" }).click();
   await page.waitForTimeout(300);
 
+  // Clicked the way a person clicks, on screen: the dialog then animates out while the page is still
+  // locked for scrolling, and print() must wait for that to finish.
+  await printButton().click();
+  await page.waitForTimeout(300);
+  await page.evaluate(() => { window.__printed = null; });
+  await printDialog().getByRole("button", { name: "Print", exact: true }).click();
+  await page.waitForFunction(() => window.__printed !== null, null, { timeout: 5000 });
+  const clicked = await page.evaluate(() => window.__printed.settled);
+  check("printing waits for the dialog to close and the page to unlock, when clicked on screen",
+    clicked.dialog === 0 && !clicked.locked && clicked.overflow !== "hidden" && clicked.pointerEvents !== "none", JSON.stringify(clicked));
+  await page.waitForTimeout(300);
   const oneSheet = await printFrom("a4", 1);
+  check("print is called only once the dialog has gone and the page is unlocked",
+    oneSheet.settled.dialog === 0 && !oneSheet.settled.locked && oneSheet.settled.overflow !== "hidden" && oneSheet.settled.pointerEvents !== "none", JSON.stringify(oneSheet.settled));
   check("one sheet is one page", oneSheet.pages === 1 && oneSheet.promised === 1, `${oneSheet.pages} printed, ${oneSheet.promised} promised`);
   // Every page is upright, which is what every browser prints by default: Safari ignores @page, and
   // Chrome and Firefox follow it. The landscape map is turned a quarter turn on the page instead.
