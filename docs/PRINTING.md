@@ -118,6 +118,23 @@ browser's own margin is 10 mm or less. With headers and footers switched on in t
 dialog, the margin can be larger. Tell people to switch them off, and to print at 100 %, not "fit to
 page".
 
+### Safari prints portrait, and turning the sheet in CSS does not help
+
+Safari ignores `@page` size altogether, orientation included, and lays the page out on whatever paper
+is chosen in its own print dialog, portrait by default
+([mdn/browser-compat-data#28626](https://github.com/mdn/browser-compat-data/issues/28626)). Chrome and
+Firefox honour the landscape `@page` and print as planned.
+
+Tried and rejected, on branch `print-portrait`: turning each sheet a quarter turn under
+`@media print and (orientation: portrait)`. In Safari the rule never applied, so nothing changed. In
+Chrome it applied on landscape paper, turning the sheet and splitting it over two pages. The
+orientation media query cannot be trusted to describe the paper during printing. The regression
+suite's imitation of Safari (Chromium's `page.pdf` with `@page` size switched off) said the change
+worked. That imitation is not Safari, and a print change is not done until it has been looked at in
+Safari and Chrome.
+
+In Safari, choose Landscape in its print dialog. The print dialog here says so for every run.
+
 Full-size sheets have **cut marks** at the tile corners instead of a border. They are drawn with CSS
 pseudo-elements that reach 6 mm into the margin, so the page box must not clip:
 `.print-map .print-page { overflow: visible }`. With it clipped, the bottom marks disappeared.
