@@ -68,7 +68,30 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   const typeIds = new Set(example.routeTypeStyles.map((t) => t.id));
   check("every route type it uses exists", example.routes.every((r) => typeIds.has(r.type)), example.routes.filter((r) => !typeIds.has(r.type)).map((r) => r.type).join(", "));
   const panelText = await page.locator(".tool-panel, .panel").first().textContent();
-  check("every route is drawn about as long as its wagons need", /Every route is drawn about the length its wagon count needs/.test(await page.getByText(/Wagon spaces are drawn at the size/).textContent()), await page.getByText(/Wagon spaces are drawn at the size/).textContent());
+  // How long routes are drawn against their wagons is read in the balance report; the left column
+  // no longer repeats it.
+  const roomSection = async () => {
+    await page.getByRole("button", { name: "Analyze balance" }).click();
+    await page.waitForTimeout(500);
+    const section = page.locator(".analysis-section", { has: page.locator("h3", { hasText: "Room per wagon" }) });
+    const result = { text: await section.textContent(), warnings: await section.locator(".analysis-warning-row").count() };
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(300);
+    return result;
+  };
+  check("the left column no longer explains wagon sizes", (await page.getByText(/Wagon spaces are drawn at the size/).count()) === 0);
+  const exampleRoom = await roomSection();
+  check("every route is drawn about as long as its wagons need", exampleRoom.warnings === 0, `${exampleRoom.warnings} routes flagged`);
+  const note = example.notes[0].text;
+  check("the note says the map can be printed for quick playtests with markers in different colours", /print/i.test(note) && /playtest/i.test(note) && /marker/i.test(note) && /colou?r/i.test(note), note);
+  const noteFits = await page.evaluate(() => { const el = document.querySelector(".map-canvas .note-box-text"); return { scroll: el.scrollHeight, client: el.clientHeight }; });
+  check("and the whole note fits in its box", noteFits.scroll <= noteFits.client + 1, `${noteFits.scroll}px of text in ${noteFits.client}px`);
+  const noteCovers = await page.evaluate(() => {
+    const box = document.querySelector(".map-canvas .note-box-bg").getBoundingClientRect();
+    const hit = (r) => r.left < box.right && r.right > box.left && r.top < box.bottom && r.bottom > box.top;
+    return Array.from(document.querySelectorAll(".map-canvas .stop")).filter((g) => hit(g.getBoundingClientRect())).map((g) => g.textContent);
+  });
+  check("and it covers no stop or stop name", noteCovers.length === 0, noteCovers.join(", "));
   check("no stop name sits on a route", (await page.getByText(/stop names? on a route/).count()) === 0);
   check("no crossings and no under-connected stop", (await page.getByText("No crossings").count()) === 1 && (await page.getByText("Well connected").count()) === 1);
   void panelText;
@@ -298,10 +321,14 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.locator("#settings-format").selectOption("board-2x4");
   await page.waitForTimeout(500);
   check("changing board format from Settings works", (await badges())[0] === "Extended board 2×4", (await badges())[0]);
-  check("Settings shows what the format measures", /mm/.test(await page.locator(".format-measurements").textContent()));
+  check("the board format is labelled by its panels", /Board format \(# of panels\)/.test(await page.locator('label[for="settings-format"]').textContent()), await page.locator('label[for="settings-format"]').textContent());
+  check("with no box of measurements under it", (await page.locator(".format-measurements").count()) === 0);
+  const formatHelp = page.locator(".settings-format-help");
+  check("and one short explanation, its last sentence in bold", (await formatHelp.textContent()).trim() === "The shape of the game board. You can change this whenever you like." && (await formatHelp.locator("strong").textContent()) === "You can change this whenever you like.",
+    await formatHelp.textContent().catch(() => "no explanation"));
   await page.keyboard.press("Escape");
   await page.waitForTimeout(400);
-  const wagonHelper = async () => page.getByText(/Wagon spaces are drawn at the size/).textContent();
+  const wagonHelper = async () => (await roomSection()).text;
   check("wagons on a 2×4 are measured against its own 1,053 mm", /1,053 mm board/.test(await wagonHelper()), await wagonHelper());
 
   // 10. printing is decided per run, in a dialog behind the Print button, never in the map
