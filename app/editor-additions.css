@@ -145,3 +145,12 @@
 .deck-rule-end-row{display:flex;gap:10px;align-items:center}
 .deck-rule-end-row input{flex:1}
 .deck-rule-end-row output{min-width:44px;font-size:13px;font-weight:700;font-variant-numeric:tabular-nums;color:#1f1c18}
+/* Map balance sits in the right column, which widens for its tables while the map stays in view. */
+.workspace.showing-balance{grid-template-columns:246px minmax(520px,1fr) 400px}
+.properties.showing-balance>:not(.balance-panel){display:none}
+.balance-panel{display:grid;gap:12px;align-content:start;min-width:0}
+.balance-panel>*,.balance-panel .analysis-section{min-width:0}
+.balance-panel tbody tr,.balance-panel .bottleneck-row{cursor:pointer}
+.balance-panel tbody tr:hover{background:#f7e9e6}
+/* The stop a Hub degree row is about. */
+.map-canvas .stop.previewed>circle:nth-of-type(2){stroke:#721c24;stroke-width:6;filter:drop-shadow(0 0 5px rgba(114,28,36,.7))}

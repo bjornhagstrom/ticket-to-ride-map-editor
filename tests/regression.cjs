@@ -176,7 +176,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.waitForTimeout(300);
   await page.getByRole("button", { name: "Analyze balance" }).click();
   await page.waitForTimeout(600);
-  check("the balance report finds the setup fits the map", (await page.locator(".space-warning, .deck-warning").count()) === 0, await page.locator('[role="dialog"]').first().textContent().then((t) => t.slice(0, 200)));
+  check("the balance report finds the setup fits the map", (await page.locator(".space-warning, .deck-warning").count()) === 0, await page.locator(".balance-panel").textContent().then((t) => t.slice(0, 200)));
   await page.keyboard.press("Escape");
   await page.waitForTimeout(300);
 
@@ -1610,7 +1610,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     await page.waitForTimeout(600);
     tooSmall.push(...(await smallText()).map((item) => `${name}: ${item}`));
     // Larger text must not push anything past the dialog's edge, where it is cut off.
-    const overflow = await page.evaluate(() => { const d = document.querySelector('[role="dialog"]'); const box = d.getBoundingClientRect(); return Array.from(d.querySelectorAll("*")).filter((el) => el.getClientRects().length && !el.closest(".analysis-table-scroll, .print-table-wrap") && el.getBoundingClientRect().right > box.right + 1).map((el) => `${el.tagName.toLowerCase()}.${String(el.className || "").split(" ")[0]}`).slice(0, 5); });
+    const overflow = await page.evaluate(() => { const d = document.querySelector('[role="dialog"]') || document.querySelector(".balance-panel"); const box = d.getBoundingClientRect(); return Array.from(d.querySelectorAll("*")).filter((el) => el.getClientRects().length && !el.closest(".analysis-table-scroll, .print-table-wrap") && el.getBoundingClientRect().right > box.right + 1).map((el) => `${el.tagName.toLowerCase()}.${String(el.className || "").split(" ")[0]}`).slice(0, 5); });
     if (overflow.length) tooSmall.push(`${name}: runs past the dialog's edge: ${overflow.join(", ")}`);
     await page.keyboard.press("Escape");
     await page.waitForTimeout(300);
@@ -1665,6 +1665,50 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await suggestionPanel.getByRole("button", { name: "Done" }).click();
   await page.waitForTimeout(300);
   check("Done gives the column back to Properties", (await suggestionPanel.count()) === 0 && /Properties/.test(await page.locator(".panel-heading").last().textContent()));
+
+  // 33i. the balance report sits in the right column and leaves traces on the map
+  await page.getByRole("button", { name: "Help" }).click();
+  await page.getByRole("menuitem", { name: "Getting started" }).click();
+  await page.waitForTimeout(300);
+  await page.getByRole("button", { name: "Load the example map" }).click();
+  await page.waitForTimeout(300);
+  // The map from the previous section has stops, so the editor asks before replacing it.
+  await page.getByRole("alertdialog").getByRole("button", { name: "Continue" }).click();
+  await page.waitForTimeout(700);
+  await page.getByRole("button", { name: "Analyze balance" }).click();
+  await page.waitForTimeout(700);
+  const balancePanel = page.locator(".balance-panel");
+  check("the balance report opens in the right column, not in a dialog", (await balancePanel.count()) === 1 && (await page.locator('[role="dialog"]').count()) === 0);
+  check("the map is not darkened", (await page.locator('[data-slot="dialog-overlay"]').count()) === 0);
+  const columnWidth = await page.evaluate(() => document.querySelector("aside.properties").getBoundingClientRect().width);
+  check("and the column widens to hold its tables", columnWidth >= 380, `${Math.round(columnWidth)}px`);
+  const hubRow = balancePanel.locator(".analysis-section", { has: page.locator("h3", { hasText: "Hub degree" }) }).locator("tbody tr").first();
+  const hubStop = (await hubRow.locator("td").first().textContent()).trim();
+  await hubRow.hover();
+  await page.waitForTimeout(250);
+  const previewed = await page.evaluate(() => Array.from(document.querySelectorAll(".map-canvas .stop.previewed")).map((g) => g.textContent));
+  check("pointing at a stop's row marks that stop on the map", previewed.length === 1 && previewed[0].includes(hubStop), `${hubStop}: ${previewed.join(", ")}`);
+  const roomRow = balancePanel.locator(".analysis-section", { has: page.locator("h3", { hasText: "Room per wagon" }) }).locator("tbody tr").first();
+  await roomRow.hover();
+  await page.waitForTimeout(250);
+  check("pointing at a route's row marks that route", (await page.locator(".map-canvas .route-group.on-preview").count()) >= 1 && (await page.locator(".map-canvas .stop.previewed").count()) === 0);
+  const crowdedRow = balancePanel.locator(".bottleneck-row").first();
+  if (await crowdedRow.count()) {
+    await crowdedRow.hover();
+    await page.waitForTimeout(250);
+    check("pointing at a crowded route marks it", (await page.locator(".map-canvas .route-group.on-preview").count()) >= 1);
+  }
+  await page.mouse.move(5, 5);
+  await page.waitForTimeout(250);
+  check("and the marks go when the pointer leaves", (await page.locator(".map-canvas .route-group.on-preview").count()) === 0 && (await page.locator(".map-canvas .stop.previewed").count()) === 0);
+  await balancePanel.getByRole("button", { name: "Done" }).click();
+  await page.waitForTimeout(300);
+  check("Done gives the column back to Properties", (await balancePanel.count()) === 0 && /Properties/.test(await page.locator(".panel-heading").last().textContent()));
+  await page.getByRole("button", { name: "Analyze balance" }).click();
+  await page.waitForTimeout(400);
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(300);
+  check("and Escape closes it too", (await balancePanel.count()) === 0);
 
   // 34. a map saved on a format that is now a print choice opens on its board
   await page.evaluate(() => {

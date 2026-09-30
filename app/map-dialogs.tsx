@@ -36,13 +36,15 @@ export function WelcomeGuide({ open, onOpenChange, onChooseBlank, onChooseExampl
 const NUMBER_WORDS: Record<number, string> = {2: "two", 3: "three", 4: "four", 5: "five", 6: "six", 7: "seven", 8: "eight"};
 const tableWord = (count: number) => NUMBER_WORDS[count] ?? String(count);
 
-export function AnalysisDialog({ open, onOpenChange, data, stats, colourTable, spacing, scaleWidthMm, setup, bottlenecks, atTable, onAtTable, onShowBottleneck, onSelectRoute, onSelectStop }: { setup: SetupBalance; bottlenecks: Bottleneck[]; atTable: number; onAtTable: (players: number) => void; onShowBottleneck: (routeIds: string[]) => void; open: boolean; onSelectRoute: (routeId: string) => void; onSelectStop: (stopId: string) => void; onOpenChange: (open: boolean) => void; data: MapData; stats: NetworkStats; colourTable: ColourLengthTable; spacing: RouteSpacing[]; scaleWidthMm: number }) {
+export function AnalysisPanel({ onClose, onPreviewRoutes, onPreviewStop, data, stats, colourTable, spacing, scaleWidthMm, setup, bottlenecks, atTable, onAtTable, onShowBottleneck, onSelectRoute, onSelectStop }: { setup: SetupBalance; bottlenecks: Bottleneck[]; atTable: number; onAtTable: (players: number) => void; onShowBottleneck: (routeIds: string[]) => void; onClose: () => void; onPreviewRoutes: (routeIds: string[] | null) => void; onPreviewStop: (stopId: string | null) => void; onSelectRoute: (routeId: string) => void; onSelectStop: (stopId: string) => void; data: MapData; stats: NetworkStats; colourTable: ColourLengthTable; spacing: RouteSpacing[]; scaleWidthMm: number }) {
   const stopName = (id: string) => data.stops.find((stop) => stop.id === id)?.name ?? "";
   const players = data.players ?? { min: 2, max: 5 };
   const sortedStops = [...data.stops].sort((a, b) => (stats.hubDegree.get(b.id) ?? 0) - (stats.hubDegree.get(a.id) ?? 0));
-  return <Dialog open={open} onOpenChange={onOpenChange}>
-    <DialogContent className="analysis-dialog">
-      <DialogHeader><DialogTitle>Map balance</DialogTitle><DialogDescription>A quick read on how evenly connected and coloured the network is.</DialogDescription></DialogHeader>
+  // In the right column rather than a dialog, so the map stays in view: pointing at a row marks
+  // the stop or routes it is about, and picking one selects it as before.
+  return <div className="balance-panel">
+    <div className="panel-heading"><span>Map balance</span><small>Point at a row to see it on the map</small></div>
+      <p className="helper">A quick read on how evenly connected and coloured the network is.</p>
       <div className="analysis-section bottlenecks">
         <h3>Where the tickets crowd</h3>
         <div className="bottleneck-players">
@@ -55,7 +57,7 @@ export function AnalysisDialog({ open, onOpenChange, data, stats, colourTable, s
         {bottlenecks.length === 0
           ? <p className="helper">No route is wanted by more tickets than it can carry.</p>
           : <>
-            <div className="bottleneck-list">{bottlenecks.slice(0, 8).map((edge) => <button type="button" key={`${edge.a}|${edge.b}`} className="bottleneck-row" onClick={() => onShowBottleneck(edge.routeIds)}>
+            <div className="bottleneck-list">{bottlenecks.slice(0, 8).map((edge) => <button type="button" key={`${edge.a}|${edge.b}`} className="bottleneck-row" onPointerEnter={() => onPreviewRoutes(edge.routeIds)} onPointerLeave={() => onPreviewRoutes(null)} onClick={() => onShowBottleneck(edge.routeIds)}>
               <strong>{stopName(edge.a)} → {stopName(edge.b)}</strong>
               <span>{edge.length} spaces · {edge.lanesUsable} of {edge.lanes} lane{edge.lanes === 1 ? "" : "s"} usable · {edge.tickets} ticket{edge.tickets === 1 ? "" : "s"} want it</span>
             </button>)}</div>
@@ -80,7 +82,7 @@ export function AnalysisDialog({ open, onOpenChange, data, stats, colourTable, s
         <p className="helper">Pick a row to select that stop on the map. Neighbours + weighted links (parallel routes between the same pair count extra). Higher means more central; sorted from most to least connected.</p>
         {sortedStops.length === 0 ? <p className="helper">No stops yet.</p> : <div className="analysis-table-scroll"><table className="analysis-table">
           <thead><tr><th>Stop</th><th>Neighbours</th><th>Links</th><th>Hub degree</th></tr></thead>
-          <tbody>{sortedStops.map((stop) => <tr key={stop.id} className={cn("analysis-row-link", (stats.neighbours.get(stop.id) ?? 0) < 2 && "analysis-warning-row")} tabIndex={0} role="button" onClick={() => onSelectStop(stop.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onSelectStop(stop.id); } }}><td>{stop.name}</td><td>{stats.neighbours.get(stop.id) ?? 0}</td><td>{stats.links.get(stop.id) ?? 0}</td><td>{stats.hubDegree.get(stop.id) ?? 0}</td></tr>)}</tbody>
+          <tbody>{sortedStops.map((stop) => <tr key={stop.id} className={cn("analysis-row-link", (stats.neighbours.get(stop.id) ?? 0) < 2 && "analysis-warning-row")} tabIndex={0} role="button" onPointerEnter={() => onPreviewStop(stop.id)} onPointerLeave={() => onPreviewStop(null)} onClick={() => onSelectStop(stop.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onSelectStop(stop.id); } }}><td>{stop.name}</td><td>{stats.neighbours.get(stop.id) ?? 0}</td><td>{stats.links.get(stop.id) ?? 0}</td><td>{stats.hubDegree.get(stop.id) ?? 0}</td></tr>)}</tbody>
         </table></div>}
       </div>
       <div className="analysis-section">
@@ -88,7 +90,7 @@ export function AnalysisDialog({ open, onOpenChange, data, stats, colourTable, s
         <p className="helper">Pick a row to select that route on the map. How long each route is drawn against what a real board would use for the same wagon count: {realWagon.length + realWagon.gap} mm per space plus {realWagon.endMargin} mm of end margin, on a {scaleWidthMm.toLocaleString("en-GB")} mm board. Those figures are fitted from the published Ticket to Ride Europe map, which scores 97–106% against them throughout. Well under means the wagons are cramped; well over means the line looks roomier on screen than the finished board plays.</p>
         {spacing.length === 0 ? <p className="helper">No card routes yet.</p> : <div className="analysis-table-scroll"><table className="analysis-table">
           <thead><tr><th>Route</th><th>Wagons</th><th>Drawn</th><th>Needs</th><th>Room</th></tr></thead>
-          <tbody>{[...spacing].sort((a, b) => a.ratio - b.ratio).map((item) => <tr key={item.route.id} className={cn("analysis-row-link", item.verdict !== "ok" && "analysis-warning-row")} tabIndex={0} role="button" onClick={() => onSelectRoute(item.route.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onSelectRoute(item.route.id); } }}>
+          <tbody>{[...spacing].sort((a, b) => a.ratio - b.ratio).map((item) => <tr key={item.route.id} className={cn("analysis-row-link", item.verdict !== "ok" && "analysis-warning-row")} tabIndex={0} role="button" onPointerEnter={() => onPreviewRoutes([item.route.id])} onPointerLeave={() => onPreviewRoutes(null)} onClick={() => onSelectRoute(item.route.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onSelectRoute(item.route.id); } }}>
             <td>{stopName(item.route.a)} → {stopName(item.route.b)}</td>
             <td>{item.route.length}</td>
             <td>{Math.round(item.drawnMm)} mm</td>
@@ -108,8 +110,8 @@ export function AnalysisDialog({ open, onOpenChange, data, stats, colourTable, s
           </tbody>
         </table></div>}
       </div>
-    </DialogContent>
-  </Dialog>;
+    <Button variant="outline" size="sm" onClick={onClose}>Done</Button>
+  </div>;
 }
 
 // Suggested routes live in the right column, not in a dialog: the map stays in view and undimmed,

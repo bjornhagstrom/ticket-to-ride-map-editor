@@ -154,7 +154,7 @@ map's gap) — the fitted `endMargin` is what the analysis judges against, not w
 - `colourLengthTable` cross-tabulates non-infrastructure routes by colour and length, mirroring a classic hand-built balance check (are all the length-3 routes the same colour?).
 - `suggestRoutes` proposes new routes: k-nearest-neighbour candidates by canvas distance, filtered to exclude already-connected pairs and any pair whose straight line would cross an existing route (reusing the same `intersects`/`orient` primitives as `crossingPairs`), then ranked by combined hub degree of the two endpoints so suggestions favour filling in under-connected stops first. A suggested length is scaled from the map's own existing distance-to-length ratio; a suggested colour is whichever colour is least represented at that length in `colourLengthTable`.
 
-All of this is `useMemo`d off `data` exactly like `crossingPairs`, and surfaces as: an always-visible sidebar card (low-connection-stop count), an "Analyze balance" dialog (the hub-degree table and colour×length table), a "Measure distance" tool mode, and a "Suggest routes" dialog with one-click "Add" buttons that create ordinary `Route` records — suggestions are never auto-applied.
+All of this is `useMemo`d off `data` exactly like `crossingPairs`, and surfaces as: an always-visible sidebar card (low-connection-stop count), a "Map balance" panel in the right column (bottlenecks, game setup, the hub-degree table and colour×length table; pointing at a row marks its stop or routes on the map), a "Measure distance" tool mode, and a "Suggest routes" panel in the same column with one-click "Add" buttons that create ordinary `Route` records — suggestions are never auto-applied.
 
 ## Persistence boundary
 
