@@ -29,7 +29,57 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.waitForTimeout(600);
 
   const badges = async () => (await page.locator(".map-status span").allTextContents());
-  check("example map loads", (await badges())[2] === "8 stops", (await badges()).slice(0, 4).join(", "));
+  check("example map loads", (await badges())[2] === "15 stops", (await badges()).slice(0, 4).join(", "));
+
+  // 1b. the example map shows what the editor can do, and is itself a clean map
+  const exampleStored = () => page.evaluate(() => JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")));
+  const example = await exampleStored();
+  await page.reload({ waitUntil: "networkidle" });
+  await page.waitForTimeout(700);
+  const reloaded = await exampleStored();
+  check("the example map is the same after a reload", JSON.stringify(reloaded.routeTypeStyles) === JSON.stringify(example.routeTypeStyles) && JSON.stringify(reloaded.routes) === JSON.stringify(example.routes),
+    reloaded.routeTypeStyles.map((t) => t.label).join(", "));
+  check("and uses no styles the file format folded away", example.routes.every((r) => !r.wagonStyle && !r.lineStyle) && (example.lineStyles || []).length === 0);
+  const typeIds = new Set(example.routeTypeStyles.map((t) => t.id));
+  check("every route type it uses exists", example.routes.every((r) => typeIds.has(r.type)), example.routes.filter((r) => !typeIds.has(r.type)).map((r) => r.type).join(", "));
+  const panelText = await page.locator(".tool-panel, .panel").first().textContent();
+  check("every route is drawn about as long as its wagons need", /Every route is drawn about the length its wagon count needs/.test(await page.getByText(/Wagon spaces are drawn at the size/).textContent()), await page.getByText(/Wagon spaces are drawn at the size/).textContent());
+  check("no stop name sits on a route", (await page.getByText(/stop names? on a route/).count()) === 0);
+  check("no crossings and no under-connected stop", (await page.getByText("No crossings").count()) === 1 && (await page.getByText("Well connected").count()) === 1);
+  void panelText;
+  const typeOf = (id) => example.stopTypeStyles.find((t) => t.id === id) || {};
+  const junction = example.stops.find((st) => typeOf(st.type).junction);
+  check("it has a junction", Boolean(junction));
+  check("whose name is not drawn", junction && !(await page.evaluate(() => Array.from(document.querySelectorAll(".map-canvas .stop text")).map((t) => t.textContent))).includes(junction.name));
+  check("a stop locked in place", example.stops.some((st) => st.locked));
+  check("stops of all three sizes", new Set(example.stops.map((st) => st.size || "medium")).size === 3);
+  check("more than one kind of stop marking", new Set(example.stops.map((st) => st.symbol).filter(Boolean)).size >= 2);
+  const pairKey = (r) => [r.a, r.b].sort().join("|");
+  check("a double route", example.routes.some((r, i) => example.routes.some((o, j) => j !== i && pairKey(o) === pairKey(r))));
+  check("curved routes and a straight one", example.routes.some((r) => r.curved === false) && example.routes.some((r) => r.curved !== false && (r.points || []).length));
+  check("a space that needs a locomotive", example.routes.some((r) => (r.locomotiveSlots || []).length));
+  const shapeOf = (r) => (example.routeTypeStyles.find((t) => t.id === r.type) || {}).shape;
+  check("tunnel and boat routes", example.routes.some((r) => shapeOf(r) === "serrated") && example.routes.some((r) => shapeOf(r) === "oval"));
+  check("a route type of its own, with a letter in every space", example.routes.some((r) => { const t = example.routeTypeStyles.find((x) => x.id === r.type); return t && t.glyph && !["city", "tunnel", "boat"].includes(t.id); }));
+  check("at least eight wagon colours", new Set(example.routes.map((r) => r.color)).size >= 8, [...new Set(example.routes.map((r) => r.color))].join(", "));
+  check("a note and all three kinds of background", example.notes.length >= 1 && ["area", "line", "label"].every((k) => example.background.some((b) => b.type === k)));
+  const decks = example.ticketSets.map((set) => ({ set, tickets: example.tickets.filter((t) => (t.set || "main") === set.id) }));
+  check("two ticket decks to compare", decks.length === 2 && decks.every((deck) => deck.tickets.length > 0), decks.map((d) => `${d.set.label} ${d.tickets.length}`).join(", "));
+  const mainDeck = decks[0].tickets;
+  check("the main deck can deal a full table", mainDeck.length >= (example.players?.max ?? 5) * (example.startingTickets ?? 3), `${mainDeck.length} for ${(example.players?.max ?? 5)} × ${example.startingTickets ?? 3}`);
+  check("with long tickets among the rest", mainDeck.some((t) => t.long) && mainDeck.some((t) => !t.long));
+  check("every stop but the junction is on a ticket", example.stops.filter((st) => !typeOf(st.type).junction).every((st) => mainDeck.some((t) => t.a === st.id || t.b === st.id)));
+  await page.getByRole("button", { name: /^Tickets · / }).click();
+  await page.waitForTimeout(500);
+  const ticketsDialogText = await page.locator('[role="dialog"]').first().textContent();
+  check("and the tickets dialog does not list the junction as a stop no ticket reaches", !ticketsDialogText.includes(junction.name), ticketsDialogText.slice(0, 200));
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(300);
+  await page.getByRole("button", { name: "Analyze balance" }).click();
+  await page.waitForTimeout(600);
+  check("the balance report finds the setup fits the map", (await page.locator(".space-warning, .deck-warning").count()) === 0, await page.locator('[role="dialog"]').first().textContent().then((t) => t.slice(0, 200)));
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(300);
 
   const selectRoute = async (stroke) => {
     await page.evaluate((s) => {
@@ -79,7 +129,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.locator(".bend-insert-handle").first().click({ force: true });
   await page.waitForTimeout(350);
   const pts = await page.evaluate(() => JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")).routes
-    .filter((r) => (r.a === "example-westport" && r.b === "example-central") || (r.a === "example-central" && r.b === "example-westport"))
+    .filter((r) => (r.a === "example-westport" && r.b === "example-millbrook") || (r.a === "example-millbrook" && r.b === "example-westport"))
     .map((r) => (r.points || []).length));
   check("bend added to both lines of the double route", pts.length === 2 && pts[0] === 2 && pts[1] === 2, `points per line: ${pts.join("/")}`);
   await page.locator(".bend-controls input[type=checkbox]").first().check();
@@ -88,7 +138,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   const curved = await page.evaluate(() => {
     const routes = JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")).routes;
     const groups = Array.from(document.querySelectorAll(".map-canvas .route-group"));
-    const pair = new Set(["example-westport", "example-central"]);
+    const pair = new Set(["example-westport", "example-millbrook"]);
     return routes.map((r, i) => ({ r, guide: groups[i].querySelector(".route-guide") }))
       .filter(({ r, guide }) => pair.has(r.a) && pair.has(r.b) && guide.getAttribute("d").includes("C")).length;
   });
@@ -138,7 +188,8 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     const h = Array.from(document.querySelectorAll(".analysis-section h3")).find((x) => x.textContent === "Room per wagon");
     return h ? h.parentElement.querySelectorAll("tbody tr").length : 0;
   });
-  check("room-per-wagon table lists the card routes", roomRows === 11, `${roomRows} rows`);
+  const cardRoutes = await page.evaluate(() => JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")).routes.length);
+  check("room-per-wagon table lists the card routes", roomRows === cardRoutes, `${roomRows} rows for ${cardRoutes} routes`);
   const hubRows = await page.evaluate(() => document.querySelectorAll(".analysis-section table tbody tr").length);
   check("balance dialog renders its tables", hubRows > 10);
   await page.keyboard.press("Escape");
@@ -169,6 +220,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   check("measure reports a distance", (await page.locator(".tool-status").textContent()).includes("wagon spaces"), (await page.locator(".tool-status").textContent()));
 
   // 9. adding a stop, changing format, export
+  const stopsBefore = Number((await badges())[2].match(/\d+/)[0]);
   await tool("Add stop").click();
   await page.waitForTimeout(150);
   await page.evaluate(() => {
@@ -177,7 +229,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     svg.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, clientX: r.left + r.width * 0.12, clientY: r.top + r.height * 0.85 }));
   });
   await page.waitForTimeout(350);
-  check("placing a stop works", (await badges())[2] === "9 stops", (await badges())[2]);
+  check("placing a stop works", (await badges())[2] === `${stopsBefore + 1} stops`, (await badges())[2]);
   // the board format lives in Settings, not in the tools panel
   check("the tools panel carries no board format control", (await page.locator("#map-format").count()) === 0);
   await page.getByRole("button", { name: "Settings" }).click();
@@ -435,14 +487,18 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   // 11. persistence across reload
   await page.reload({ waitUntil: "networkidle" });
   await page.waitForTimeout(700);
-  check("map survives a reload", (await badges())[2] === "9 stops", (await badges())[2]);
+  check("map survives a reload", (await badges())[2] === `${stopsBefore + 1} stops`, (await badges())[2]);
 
   // 12. destination tickets: decks, ticket-only export and import, card printing
+  // Counted against what the map already holds, so a richer example map does not move the goalposts.
+  const ticketsNow = () => page.evaluate(() => { const m = JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")); return { main: m.tickets.filter((t) => (t.set || "main") === "main").length, decks: m.ticketSets.map((d) => `${d.label} (${m.tickets.filter((t) => (t.set || "main") === d.id).length})`) }; });
+  const mainBefore = (await ticketsNow()).main;
   await tool("Add ticket").click();
   await clickStop("Westport"); await clickStop("Quarry");
   await clickStop("Pine Hill"); await clickStop("Central");
   const ticketsButton = page.getByRole("button", { name: /^Tickets · / });
-  check("tickets are added to the current deck", (await ticketsButton.textContent()).includes("Tickets · 2"), await ticketsButton.textContent());
+  const mainAfter = mainBefore + 2;
+  check("tickets are added to the current deck", (await ticketsButton.textContent()).includes(`Tickets · ${mainAfter}`), await ticketsButton.textContent());
   await ticketsButton.click();
   await page.waitForTimeout(400);
 
@@ -456,7 +512,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   check("an exported file says what it is and which schema it follows", ticketFileJson.format === "ticket-to-ride-map" && ticketFileJson.version >= 2 && ticketFileJson.kind === "tickets",
     `${ticketFileJson.format} v${ticketFileJson.version} ${ticketFileJson.kind}`);
   const ticketPayload = ticketFileJson.payload;
-  check("ticket-only export writes a ticket file", ticketPayload.tickets.length === 2, String(ticketPayload.tickets.length));
+  check("ticket-only export writes a ticket file", ticketPayload.tickets.length === mainAfter, `${ticketPayload.tickets.length} of ${mainAfter}`);
   check("exported tickets carry stop names for re-matching", ticketPayload.tickets.every((t) => t.aName && t.bName), JSON.stringify(ticketPayload.tickets[0]));
 
   await page.getByRole("button", { name: /Add a deck/ }).click();
@@ -467,11 +523,12 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.waitForTimeout(400);
   await page.locator("#ticket-set").selectOption({ index: 0 });
   await page.waitForTimeout(300);
-  check("two decks live side by side", (await page.locator("#ticket-set option").allTextContents()).join(" | ") === "Main deck (2) | Variant (2)", (await page.locator("#ticket-set option").allTextContents()).join(" | "));
+  const deckOptions = await page.locator("#ticket-set option").allTextContents();
+  check("decks live side by side, the duplicate beside its original", deckOptions.length === (await ticketsNow()).decks.length && deckOptions[0] === `Main deck (${mainAfter})` && deckOptions.includes(`Variant (${mainAfter})`), deckOptions.join(" | "));
 
   await page.locator('input[type="file"][accept="application/json"]').setInputFiles(ticketFile);
   await page.waitForTimeout(800);
-  check("importing tickets adds a deck instead of overwriting", (await page.locator("#ticket-set option").count()) === 3, (await page.locator("#ticket-set option").allTextContents()).join(" | "));
+  check("importing tickets adds a deck instead of overwriting", (await page.locator("#ticket-set option").count()) === deckOptions.length + 1, (await page.locator("#ticket-set option").allTextContents()).join(" | "));
   check("imported tickets land on real stops", (await page.locator(".analysis-table tbody tr td:first-child").allTextContents()).every((r) => !r.includes("—")));
   // An imported deck is stamped with the moment it arrived, so it can be told from the decks the
   // map already had.
@@ -500,10 +557,11 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.waitForFunction(() => window.__print !== null, null, { timeout: 5000 });
   const printed = await page.evaluate(() => window.__print);
   const mm = (value) => value / 25.4 * 96;
-  check("ticket printing lays out one card per ticket", printed.cards === 2, String(printed.cards));
+  check("ticket printing lays out one card per ticket", printed.cards === mainAfter, `${printed.cards} cards for ${mainAfter} tickets`);
   // No fixed sheet box any more: the browser paginates, so only the card size is ours to check.
   check("ticket cards are 45 x 62 mm, cut from a run the browser paginates", Math.abs(printed.card.width - mm(45)) < 3 && Math.abs(printed.card.height - mm(62)) < 4, `${(printed.card.width / 96 * 25.4).toFixed(0)} x ${(printed.card.height / 96 * 25.4).toFixed(0)} mm`);
-  check("a card names both ends and its points", /Westport/.test(printed.text) && /\d/.test(printed.text), printed.text);
+  const firstTicket = await page.evaluate(() => { const m = JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")); const t = m.tickets.find((x) => (x.set || "main") === "main"); const name = (id) => m.stops.find((st) => st.id === id).name; return { a: name(t.a), b: name(t.b), points: t.points }; });
+  check("a card names both ends and its points", printed.text.includes(firstTicket.a) && printed.text.includes(firstTicket.b) && printed.text.includes(String(firstTicket.points)), `${printed.text} for ${JSON.stringify(firstTicket)}`);
   await page.emulateMedia({ media: "screen" });
   await page.waitForTimeout(400);
   check("the map print tree returns after printing tickets", (await page.locator(".print-tickets").count()) === 0);
@@ -515,7 +573,8 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await clickStop("Westport");
   await page.waitForTimeout(400);
   const stopLinks = await page.locator(".stop-ticket-link").allTextContents();
-  check("a stop lists its tickets from every deck", stopLinks.length === 3, stopLinks.join(" | "));
+  const westportTickets = await page.evaluate(() => { const m = JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")); return { all: m.tickets.filter((t) => t.a === "example-westport" || t.b === "example-westport").length, decks: new Set(m.tickets.filter((t) => t.a === "example-westport" || t.b === "example-westport").map((t) => t.set || "main")).size }; });
+  check("a stop lists its tickets from every deck", stopLinks.length === westportTickets.all, `${stopLinks.length} listed, ${westportTickets.all} in the map`);
   await page.locator(".stop-ticket-link").first().click();
   await page.waitForTimeout(500);
   check("a ticket link opens that ticket for editing", await page.locator(".ticket-set-bar").isVisible() && (await page.locator(".analysis-row-active").count()) === 1, await page.locator("#ticket-set-name").inputValue());
@@ -552,7 +611,16 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.waitForTimeout(350);
   const previewText = (await page.locator(".pick-preview").count()) ? await page.locator(".pick-preview").textContent() : "";
   check("hovering the far end previews the ticket", /Westport/.test(previewText) && /Quarry/.test(previewText) && /point/.test(previewText), previewText);
-  check("and lights the path it would use", (await page.locator(".map-canvas .route-group.on-preview").count()) === 3, String(await page.locator(".route-group.on-preview").count()));
+  // The lit routes must form one unbroken path from Westport to Quarry, whatever the map looks like.
+  const litPath = await page.evaluate(() => {
+    const routes = JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")).routes;
+    const lit = Array.from(document.querySelectorAll(".map-canvas .route-group")).map((g, i) => g.classList.contains("on-preview") ? routes[i] : null).filter(Boolean);
+    let at = "example-westport";
+    const left = [...lit];
+    while (left.length) { const i = left.findIndex((r) => r.a === at || r.b === at); if (i < 0) break; at = left[i].a === at ? left[i].b : left[i].a; left.splice(i, 1); }
+    return { count: lit.length, reached: at, unused: left.length };
+  });
+  check("and lights the path it would use", litPath.count >= 1 && litPath.reached === "example-quarry" && litPath.unused === 0, JSON.stringify(litPath));
   await page.keyboard.press("Escape");
   await page.waitForTimeout(300);
   check("Escape drops the pick", (await pendingText()) === null && (await page.locator(".pick-band").count()) === 0);
@@ -590,14 +658,19 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.waitForTimeout(300);
   const cells = () => page.$$eval(".coverage-table tbody tr", (trs) => trs.map((tr) => Array.from(tr.children).map((td) => td.textContent.trim())));
   check("the ticket tool fills the right panel", await page.locator(".coverage-table").isVisible());
-  check("with a row per stop and a column per ticket length", (await cells()).length === 9 && (await cells())[0].length === 4, JSON.stringify((await cells())[0]));
+  // A junction is never a ticket's end, so it has no row: it would sit under "not reached" for ever.
+  const ticketStops = await page.evaluate(() => { const m = JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")); const j = new Set(m.stopTypeStyles.filter((t) => t.junction).map((t) => t.id)); return m.stops.filter((st) => !j.has(st.type)).length; });
+  check("with a row per stop a ticket can go to and a column per ticket length", (await cells()).length === ticketStops && (await cells())[0].length === 4, `${(await cells()).length} rows for ${ticketStops} stops; ${JSON.stringify((await cells())[0])}`);
+  const rowOf = async (name) => (await cells()).find((row) => row[0] === name).slice(1).map(Number);
+  const westportBefore = await rowOf("Westport"), centralBefore = await rowOf("Central");
   await pointAt("Westport"); await pointAt("Central");
   await page.waitForTimeout(300);
-  const westportRow = (await cells()).find((row) => row[0] === "Westport");
-  // Bands are fractions of the map's own longest journey, so on the small example map a four-space
-  // ticket already counts as medium.
-  const westportTotal = westportRow.slice(1).reduce((sum, value) => sum + Number(value), 0);
-  check("a ticket is counted at both ends, in its length band", westportTotal === 2 && Number(westportRow[1]) === 0, westportRow.join(" "));
+  // One new ticket: one more at each end, in the same length band at both.
+  const westportAfter = await rowOf("Westport"), centralAfter = await rowOf("Central");
+  const grew = (before, after) => after.map((n, i) => n - before[i]);
+  const wGrew = grew(westportBefore, westportAfter), cGrew = grew(centralBefore, centralAfter);
+  check("a ticket is counted at both ends, in its length band", wGrew.reduce((a, b) => a + b, 0) === 1 && JSON.stringify(wGrew) === JSON.stringify(cGrew), `Westport ${wGrew.join(" ")}, Central ${cGrew.join(" ")}`);
+  const westportTotal = westportAfter.reduce((a, b) => a + b, 0);
   const names = (await cells()).map((row) => row[0]);
   check("the panel starts sorted by name", names.join() === [...names].sort().join(), names.join(" "));
   await page.locator(".coverage-table thead th").nth(1).click();
@@ -610,14 +683,16 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.getByLabel(/only stops with no tickets/i).uncheck();
   await page.waitForTimeout(300);
 
-  await page.locator(".coverage-table tbody tr").filter({ hasText: "Westport" }).locator(".coverage-count").first().click();
+  const firstCount = page.locator(".coverage-table tbody tr").filter({ hasText: "Westport" }).locator(".coverage-count").first();
+  const shownCount = Number(await firstCount.textContent());
+  await firstCount.click();
   await page.waitForTimeout(450);
-  check("a count opens only the tickets behind it", (await page.locator(".stop-tickets-dialog .stop-ticket-row").count()) === 1, String(await page.locator(".stop-tickets-dialog .stop-ticket-row").count()));
+  check("a count opens only the tickets behind it", (await page.locator(".stop-tickets-dialog .stop-ticket-row").count()) === shownCount && shownCount < westportTotal, `${await page.locator(".stop-tickets-dialog .stop-ticket-row").count()} rows for a count of ${shownCount}`);
   await page.keyboard.press("Escape");
   await page.waitForTimeout(350);
   await page.locator(".coverage-table tbody tr").filter({ hasText: "Westport" }).locator(".coverage-stop").click();
   await page.waitForTimeout(450);
-  check("a stop name opens all of them", (await page.locator(".stop-tickets-dialog .stop-ticket-row").count()) === 2, String(await page.locator(".stop-tickets-dialog .stop-ticket-row").count()));
+  check("a stop name opens all of them", (await page.locator(".stop-tickets-dialog .stop-ticket-row").count()) === westportTotal, `${await page.locator(".stop-tickets-dialog .stop-ticket-row").count()} of ${westportTotal}`);
   await page.locator(".stop-tickets-dialog .stop-ticket-row").first().click();
   await page.waitForTimeout(500);
   check("and leads through to editing that ticket", await page.locator(".ticket-set-bar").isVisible() && (await page.locator(".analysis-row-active").count()) === 1);
@@ -629,24 +704,26 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await clickStop("Westport");
   await page.waitForTimeout(400);
   const deckNames = await page.locator(".stop-ticket-deck-name").allTextContents();
-  check("a stop's tickets are listed deck by deck", deckNames.length === 3, deckNames.join(" | "));
+  const westportDecks = await page.evaluate(() => { const m = JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")); return new Set(m.tickets.filter((t) => t.a === "example-westport" || t.b === "example-westport").map((t) => t.set || "main")).size; });
+  check("a stop's tickets are listed deck by deck", deckNames.length === westportDecks, `${deckNames.join(" | ")} for ${westportDecks} decks`);
   check("and every deck group holds only its own", (await page.locator(".stop-ticket-deck").first().locator(".stop-ticket-link").count()) >= 1);
 
   // 19. the game setup settings: wagons per player and tickets dealt at the start
   await page.getByRole("button", { name: "Settings" }).click();
   await page.waitForTimeout(500);
   check("Settings carries the game setup", await page.locator("#settings-wagons").isVisible() && await page.locator("#settings-starting-tickets").isVisible());
-  check("including how many players the map is for", await page.locator("#settings-players-min").isVisible() && (await page.locator("#settings-players-max").inputValue()) === "5", `${await page.locator("#settings-players-min").inputValue()}–${await page.locator("#settings-players-max").inputValue()}`);
-  await page.locator("#settings-players-max").fill("3");
+  // The example map is built for two or three; Settings shows the map's own range, not a default.
+  check("including how many players the map is for", await page.locator("#settings-players-min").isVisible() && (await page.locator("#settings-players-min").inputValue()) === "2" && (await page.locator("#settings-players-max").inputValue()) === "3", `${await page.locator("#settings-players-min").inputValue()}–${await page.locator("#settings-players-max").inputValue()}`);
+  await page.locator("#settings-players-max").fill("4");
   await page.locator("#settings-players-max").blur();
   await page.waitForTimeout(400);
-  const smallTable = await page.evaluate(() => JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")).players);
-  check("a smaller table is stored with the map", smallTable.max === 3 && smallTable.min <= 3, `${smallTable.min}–${smallTable.max}`);
+  const newTable = await page.evaluate(() => JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")).players);
+  check("a different table is stored with the map", newTable.max === 4 && newTable.min <= 4, `${newTable.min}–${newTable.max}`);
   await page.keyboard.press("Escape");
   await page.waitForTimeout(300);
   await page.getByRole("button", { name: "Analyze balance" }).click();
   await page.waitForTimeout(500);
-  check("the deck is judged against that table, not a fixed five", /table of three/.test(await page.locator(".setup-balance").textContent()));
+  check("the deck is judged against that table, not a fixed five", /table of four/.test(await page.locator(".setup-balance").textContent()), (await page.locator(".setup-balance").textContent()).slice(0, 300));
   await page.keyboard.press("Escape");
   await page.waitForTimeout(300);
   await page.getByRole("button", { name: "Settings" }).click();
@@ -654,7 +731,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.locator("#settings-players-max").fill("5");
   await page.locator("#settings-players-max").blur();
   await page.waitForTimeout(400);
-  check("starting at the original game's numbers", (await page.locator("#settings-wagons").inputValue()) === "45" && (await page.locator("#settings-starting-tickets").inputValue()) === "3", `${await page.locator("#settings-wagons").inputValue()}/${await page.locator("#settings-starting-tickets").inputValue()}`);
+  check("showing the map's own setup", (await page.locator("#settings-wagons").inputValue()) === String(await page.evaluate(() => JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")).wagonsPerPlayer)) && (await page.locator("#settings-starting-tickets").inputValue()) === "3", `${await page.locator("#settings-wagons").inputValue()}/${await page.locator("#settings-starting-tickets").inputValue()}`);
   await page.locator("#settings-wagons").fill("40");
   await page.locator("#settings-wagons").blur();
   await page.waitForTimeout(400);
@@ -672,6 +749,15 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.waitForTimeout(300);
 
   // 20. the balance report reads the setup against the map
+  // Give each player more wagons than two players could ever place, so the report has to object.
+  await page.getByRole("button", { name: "Settings" }).click();
+  await page.waitForTimeout(400);
+  const spaces = await page.evaluate(() => JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")).routes.reduce((sum, r) => sum + r.length, 0));
+  await page.locator("#settings-wagons").fill(String(Math.ceil(spaces / 1.5)));
+  await page.locator("#settings-wagons").blur();
+  await page.waitForTimeout(400);
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(300);
   await page.getByRole("button", { name: "Analyze balance" }).click();
   await page.waitForTimeout(600);
   const setupText = await page.locator(".setup-balance").textContent();
@@ -1017,6 +1103,9 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.waitForTimeout(600);
   await page.getByRole("button", { name: "Settings" }).click();
   await page.waitForTimeout(500);
+  check("a new map starts at the original game's numbers: 45 wagons, 3 tickets, 2–5 players",
+    (await page.locator("#settings-wagons").inputValue()) === "45" && (await page.locator("#settings-starting-tickets").inputValue()) === "3" && (await page.locator("#settings-players-min").inputValue()) === "2" && (await page.locator("#settings-players-max").inputValue()) === "5",
+    `${await page.locator("#settings-wagons").inputValue()} / ${await page.locator("#settings-starting-tickets").inputValue()} / ${await page.locator("#settings-players-min").inputValue()}–${await page.locator("#settings-players-max").inputValue()}`);
   check("a new map is told the board format is all it needs to start", await page.locator(".settings-start").isVisible(), await page.locator(".settings-start").textContent());
   check("and the way out invites drawing", /start drawing/i.test(await page.locator(".settings-foot button").textContent()), await page.locator(".settings-foot button").textContent());
   await page.locator(".settings-foot button").click();

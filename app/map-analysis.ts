@@ -258,11 +258,14 @@ export function autoPlaceLabels(data: MapData): { placed: Map<string, number>; u
   return { placed, unresolved };
 }
 
-// A junction's name is never drawn, so it cannot cover a route or need moving clear of one.
-export const labelledStops = (data: MapData): Stop[] => {
+// Junctions only join routes: no ticket ends at one, and its name is never drawn. So they are left
+// out of anything counted per ticket end, and out of the checks on names covering routes.
+const nonJunctionStops = (data: MapData): Stop[] => {
   const junctions = new Set((data.stopTypeStyles ?? []).filter((style) => style.junction).map((style) => style.id));
   return data.stops.filter((stop) => !junctions.has(stop.type));
 };
+export const labelledStops = nonJunctionStops;
+export const ticketEndStops = nonJunctionStops;
 
 export function coveredLabels(data: MapData): Stop[] {
   const samples = routeSamplePoints(data);
@@ -396,7 +399,7 @@ export function stopCoverage(data: MapData, setId?: string): StopCoverage[] {
   const reviews = reviewTickets(data, setId);
   const diameter = mapDiameter(data);
   const bands = bandsOf(data);
-  const rows = new Map<string, StopCoverage>(data.stops.map((stop) => [stop.id, { stop, short: 0, medium: 0, long: 0, total: 0 }]));
+  const rows = new Map<string, StopCoverage>(ticketEndStops(data).map((stop) => [stop.id, { stop, short: 0, medium: 0, long: 0, total: 0 }]));
   for (const review of reviews) {
     const band = ticketBand(review.distance, diameter, bands);
     for (const id of new Set([review.ticket.a, review.ticket.b])) {
@@ -412,7 +415,7 @@ export function stopCoverage(data: MapData, setId?: string): StopCoverage[] {
 export function ticketCoverage(data: MapData, setId?: string): { stop: Stop; count: number }[] {
   const counts = new Map<string, number>();
   for (const ticket of (setId ? ticketsInSet(data, setId) : data.tickets)) for (const id of [ticket.a, ticket.b]) counts.set(id, (counts.get(id) ?? 0) + 1);
-  return data.stops.map((stop) => ({ stop, count: counts.get(stop.id) ?? 0 })).sort((a, b) => b.count - a.count);
+  return ticketEndStops(data).map((stop) => ({ stop, count: counts.get(stop.id) ?? 0 })).sort((a, b) => b.count - a.count);
 }
 
 // The ticket suggester lives in its own module; re-exported here so the ticket analysis has one door.
