@@ -265,7 +265,11 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
       const unitPx = ctm ? Math.hypot(ctm.a, ctm.b) : 0;
       const box = first ? first.getBoundingClientRect() : null;
       void svg;
+      // How far the first sheet reaches down the page, its cut marks included.
+      const marks = first ? Array.from(first.querySelectorAll(".cut-mark line")).map((line) => line.getBoundingClientRect()) : [];
+      const reach = box ? Math.max(box.bottom, ...marks.map((r) => r.bottom)) - Math.min(box.top, ...marks.map((r) => r.top)) : 0;
       window.__printed = {
+        reachMm: reach / 96 * 25.4,
         pages: pages.length,
         style: Array.from(document.querySelectorAll(".print-pages style")).map((el) => el.textContent).join(" "),
         cutMarks: document.querySelectorAll(".print-pages .cut-mark").length,
@@ -378,6 +382,8 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   check("full size on A4 prints the 9 sheets its cell promises", fullA4.pages === 9 && fullA4.promised === 9, `${fullA4.pages} printed, ${fullA4.promised} promised`);
   check("with a wagon space the real 20 mm long", Math.abs(fullA4.wagonMm - 20) < 0.5, `${fullA4.wagonMm.toFixed(2)} mm`);
   check("and marks to trim at on every sheet", fullA4.cutMarks === 9 * 4, `${fullA4.cutMarks} marks`);
+  // Safari fitted a 274 mm sheet with headers and footers on, and spilled one of 275. Keep well under.
+  check("a full-size A4 sheet reaches no more than 270 mm down the page, cut marks included", fullA4.reachMm <= 270, `${fullA4.reachMm.toFixed(1)} mm`);
   // The paper's size is declared by @page. The page box itself must fit inside the paper less the
   // margins, or a browser that picks its own margins spills it onto an extra sheet or shrinks it.
   check("on an upright page box that fits A4 less its margins", fullA4.pageWidthMm <= 210 - 20 + 0.5 && fullA4.pageHeightMm <= 297 - 20 + 0.5 && fullA4.pageHeightMm > 250, `${fullA4.pageWidthMm.toFixed(1)} × ${fullA4.pageHeightMm.toFixed(1)} mm`);

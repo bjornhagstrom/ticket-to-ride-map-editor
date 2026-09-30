@@ -39,6 +39,11 @@ const boardSizes: Record<MapFormat, { id: SizeId; label: string; widthMm: number
 export const PRINT_MARGIN_MM = 10;
 /** The line naming the map and the sheet, above the artwork. */
 export const PRINT_CAPTION_MM = 8;
+/** Cut marks on a full-size sheet start this far past the artwork's corner… */
+export const CUT_MARK_GAP_MM = 0.5;
+/** …and end this far past it. They count against the page: Safari, with its headers and footers on,
+ *  fitted a 274 mm sheet but spilled a 263 mm one whose 6 mm marks made it 275. */
+export const CUT_MARK_REACH_MM = 2.5;
 
 /** A tile is a share of the board: x, y, width and height as fractions from 0 to 1. */
 export type PrintTile = { x: number; y: number; width: number; height: number };
@@ -93,7 +98,10 @@ export function printPlan(format: MapFormat, raw: PrintChoice): PrintPlan {
   let columns: number, rows: number, scale: number, best: Orientation;
   if (choice.split === "full") {
     // As few sheets as possible, each tile the same size, at 100 %.
-    const counted = orientations(choice.paper).map((item) => ({ item, columns: sheetsFor(boardMm.width, item.content.width), rows: sheetsFor(boardMm.height, item.content.height) }));
+    // The cut marks reach past both ends of the sheet's length, and past the far edge of its depth
+    // (the near edge's marks rise into the caption line), so they come out of the room first.
+    const room = (item: Orientation) => ({ width: item.content.width - 2 * CUT_MARK_REACH_MM, height: item.content.height - CUT_MARK_REACH_MM });
+    const counted = orientations(choice.paper).map((item) => ({ item, columns: sheetsFor(boardMm.width, room(item).width), rows: sheetsFor(boardMm.height, room(item).height) }));
     const pick = counted.reduce((a, b) => (b.columns * b.rows < a.columns * a.rows ? b : a));
     ({ columns, rows } = pick); best = pick.item; scale = 1;
   } else {

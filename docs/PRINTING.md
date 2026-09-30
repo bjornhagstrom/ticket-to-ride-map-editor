@@ -139,9 +139,19 @@ The regression suite imitates Safari with Chromium's `page.pdf` and `@page` size
 imitation said the media-query version worked; Safari showed otherwise. A print change is not done
 until it has been looked at in Safari and Chrome.
 
-Full-size sheets have **cut marks** at the tile corners instead of a border: short lines reaching 6 mm
-into the margin, so neither the page box nor its SVG may clip (`overflow: visible`). With it clipped,
-the bottom marks disappeared.
+Full-size sheets have **cut marks** at the tile corners instead of a border: lines from 0.5 to 2.5 mm
+past each corner (`CUT_MARK_GAP_MM`, `CUT_MARK_REACH_MM`), drawn outside the page box, so neither the
+box nor its SVG may clip (`overflow: visible`). With it clipped, the bottom marks disappeared.
+
+The marks count against the page. They used to reach 6 mm, and a full-size A4 sheet with its marks
+came to 275 mm down the page. Safari, with its headers and footers on, fitted a 274 mm sheet but
+spilled that one onto a second page. So `printPlan` takes the marks' reach off the room before it
+counts sheets, and a full-size A4 sheet now reaches 268 mm. No sheet count changed; at 6 mm, A3
+would have gone from 4 sheets to 6.
+
+Safari's headers and footers (title, date, URL, page number) are a setting in its print dialog, which
+Safari remembers; a page cannot switch them off. Chrome drops them when the margin is too small for
+them. So the layout is made to fit with them on.
 
 ## The dialog
 

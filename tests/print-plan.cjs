@@ -88,6 +88,21 @@ for (const [format, paper, size] of [["board-2x3", "a4"], ["board-2x3", "letter"
   check(`${format} on ${paper}${size ? " " + size : ""}: the tiles cover the board exactly once`, Math.abs(area - 1) < 1e-9, String(area));
 }
 
+// ---------------------------------------------------------------- cut marks count against the page
+// Full-size sheets carry cut marks reaching past the artwork. Safari fitted a 274 mm sheet with its
+// headers and footers on, but spilled a 263 mm sheet whose 6 mm marks made it 275. So the marks are
+// part of the budget: artwork and marks together fit the paper less its margins.
+const { CUT_MARK_REACH_MM } = require(path.join(out, "print-plan.js"));
+check("cut marks reach no more than 2.5 mm past the artwork", CUT_MARK_REACH_MM > 0 && CUT_MARK_REACH_MM <= 2.5, String(CUT_MARK_REACH_MM));
+for (const format of ["board-2x3", "board-2x4"]) for (const paperId of ["a4", "a3", "letter", "tabloid"]) for (const size of format === "board-2x3" ? ["standard", "anniversary"] : ["standard"]) {
+  const plan = printPlan(format, { split: "full", paper: paperId, size });
+  const long = plan.pageMm.height - 20, short = plan.pageMm.width - 20;
+  const fits = plan.pages.every((page) => page.contentMm.width + 2 * CUT_MARK_REACH_MM <= long + 1e-6 && 8 + page.contentMm.height + CUT_MARK_REACH_MM <= short + 1e-6);
+  check(`${format} full size on ${paperId}${size === "anniversary" ? " at Anniversary size" : ""}: artwork and cut marks fit the page`, fits);
+}
+check("and no sheet count changes for it", [["board-2x3", "a3", "standard", 4], ["board-2x3", "a4", "standard", 9], ["board-2x3", "letter", "standard", 12], ["board-2x3", "a4", "anniversary", 16], ["board-2x4", "a3", "standard", 6]]
+  .every(([format, paper, size, count]) => printPlan(format, { split: "full", paper, size }).pages.length === count));
+
 // ---------------------------------------------------------------- the comparison table is the plan
 const table = printChoices("board-2x3").table;
 check("the table has a row per paper", table.length === 4, String(table.length));

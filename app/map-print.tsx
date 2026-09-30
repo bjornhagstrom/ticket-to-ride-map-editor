@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { cn } from "@/lib/utils";
 import { mapFormats, ticketsInSet, type MapData, type MapFormat, W } from "./map-data";
 import { MapArtwork } from "./map-artwork";
-import { describePlan, papers, PRINT_CAPTION_MM, PRINT_MARGIN_MM, printChoices, type PrintChoice, printPlan, type PrintPlan, sameChoice, splits } from "./print-plan";
+import { CUT_MARK_GAP_MM, CUT_MARK_REACH_MM, describePlan, papers, PRINT_CAPTION_MM, PRINT_MARGIN_MM, printChoices, type PrintChoice, printPlan, type PrintPlan, sameChoice, splits } from "./print-plan";
 
 // Tickets print as cut-out cards on plain A4, 16 to a sheet. The same print-and-cut workflow as the
 // board itself: no bleed, a thin cut line, and nothing that needs colour to be readable.
@@ -77,8 +77,8 @@ export function PrintPages({ data, plan }: { data: MapData; plan: PrintPlan }) {
               <MapArtwork data={data} scaleWidthMm={format.widthMm} print />
             </svg>
             {full && corners.map(([x, y, dx, dy]) => <g className="cut-mark" key={`${x}-${y}`}>
-              <line x1={x + dx} y1={y} x2={x + dx * 6} y2={y} />
-              <line x1={x} y1={y + dy} x2={x} y2={y + dy * 6} />
+              <line x1={x + dx * CUT_MARK_GAP_MM} y1={y} x2={x + dx * CUT_MARK_REACH_MM} y2={y} />
+              <line x1={x} y1={y + dy * CUT_MARK_GAP_MM} x2={x} y2={y + dy * CUT_MARK_REACH_MM} />
             </g>)}
           </g>
         </svg>
