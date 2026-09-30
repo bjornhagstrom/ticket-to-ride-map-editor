@@ -19,11 +19,12 @@ const HANDLE_OFFSET = 22, HANDLE_HIT = 12;
 const TOOTH_MM = 1.8, NOTCH_MM = 2.4;
 
 // A boat: the wagon space rounded off at both ends, as the ship spaces on Rails & Sails are drawn.
+// A boat's space: a hull pointed at both ends, two arcs meeting at the tips, so it is told from a
+// wagon's rounded rectangle at a glance. (It was a pill shape, which looked almost like a wagon.)
+// The id stays "oval" so maps saved before keep their boats.
 export function ovalSlotPath(w: number, h: number): string {
-  const r = h / 2;
-  const x = -w / 2, y = -r;
-  const straight = Math.max(0, w - h);
-  return `M${x + r},${y} h${straight} a${r},${r} 0 0 1 0,${h} h${-straight} a${r},${r} 0 0 1 0,${-h} Z`;
+  const r = (w * w / 4 + h * h / 4) / h;
+  return `M${-w / 2},0 A${r},${r} 0 0 1 ${w / 2},0 A${r},${r} 0 0 1 ${-w / 2},0 Z`;
 }
 
 export function tunnelSlotPath(w: number, h: number, tooth: number, teeth = 3) {
