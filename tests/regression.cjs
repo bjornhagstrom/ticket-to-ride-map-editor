@@ -1046,6 +1046,33 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   check("turned back into a regular stop, its name is drawn again", (await drawnNames(".map-canvas")).includes("Quarry"));
   await page.keyboard.press("Escape");
 
+  // 33c. a name turns smoothly around its stop: no jump at the top or the bottom
+  await tool("Select & move").click();
+  await clickStop("Central");
+  await page.waitForTimeout(300);
+  const nameAt = async (angle) => {
+    await page.locator(".label-angle", { hasText: "Name position" }).locator("input[type=range]").fill(String(angle));
+    await page.waitForTimeout(120);
+    return page.evaluate(() => {
+      const g = Array.from(document.querySelectorAll(".map-canvas .stop")).find((el) => Array.from(el.querySelectorAll("text")).some((t) => t.textContent === "Central"));
+      const c = g.querySelector("circle").getBoundingClientRect();
+      const t = Array.from(g.querySelectorAll("text")).find((el) => el.textContent === "Central").getBoundingClientRect();
+      const cx = c.x + c.width / 2, cy = c.y + c.height / 2;
+      const nx = Math.max(t.left, Math.min(cx, t.right)), ny = Math.max(t.top, Math.min(cy, t.bottom));
+      return { x: t.x + t.width / 2, y: t.y + t.height / 2, width: t.width, height: t.height, gap: Math.hypot(nx - cx, ny - cy) - c.width / 2 };
+    });
+  };
+  const turns = [];
+  for (let angle = 0; angle <= 360; angle += 15) turns.push({ angle, ...(await nameAt(angle % 360)) });
+  // A smooth turn moves the name a few pixels per 15° step. The old placement snapped its anchor from
+  // end to middle to start near the top and bottom, a jump of half the name's width per step.
+  const jumps = turns.slice(1).map((now, i) => ({ at: `${turns[i].angle}→${now.angle}°`, move: Math.hypot(now.x - turns[i].x, now.y - turns[i].y), limit: now.width / 4 + 3 })).filter((step) => step.move > step.limit);
+  check("a stop's name moves smoothly all the way round, top and bottom included", jumps.length === 0, jumps.map((j) => `${j.at} ${j.move.toFixed(0)}px`).join(", "));
+  const badGaps = turns.filter((turn) => turn.gap < -0.5 || turn.gap > turn.height).map((turn) => `${turn.angle}°: ${turn.gap.toFixed(1)}px`);
+  check("and keeps the same small distance from the stop at every angle", badGaps.length === 0, badGaps.join(", "));
+  await page.locator(".label-angle", { hasText: "Name position" }).locator("input[type=range]").fill("165");
+  await page.keyboard.press("Escape");
+
   // 34. a map saved on a format that is now a print choice opens on its board
   await page.evaluate(() => {
     const map = JSON.parse(localStorage.getItem("orebro-map-editor-public-v2"));

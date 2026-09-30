@@ -133,6 +133,16 @@ export const realWagon = { length: 20, width: 9, gap: 5.5, endMargin: 15 };
 // set to. True-scale mode measures against the map's own target board instead.
 export const REFERENCE_BOARD_MM = 790;
 
+// How far a stop's name box is pushed out from the point at its bearing, as fractions of half its
+// width and half its height. Following a square rather than a circle puts the box's nearest corner
+// exactly on the point at the diagonals, so the name never slides onto the stop; it is still
+// continuous all the way round. Shared by the drawing and the overlap analysis.
+export const labelPush = (angleDegrees: number): { x: number; y: number } => {
+  const rad = angleDegrees * Math.PI / 180;
+  const cos = Math.cos(rad), sin = Math.sin(rad), m = Math.max(Math.abs(cos), Math.abs(sin));
+  return { x: cos / m, y: sin / m };
+};
+
 // Extra room, in millimetres on the reference board, added beyond a stop's own circle before the
 // first wagon of every route into it. Two is the measured sweet spot on the imported Europe map:
 // it keeps the median wagon spacing at the real board's 25.5 mm while leaving about 3 mm of clear

@@ -1,6 +1,6 @@
 // The balance layer: everything derived from the stops and routes themselves. All of it is pure,
 // computed on demand from MapData, and none of it is stored in a map file.
-import { DEFAULT_WAGONS_PER_PLAYER, DEFAULT_STARTING_TICKETS, DEFAULT_TICKET_BANDS, DEFAULT_TICKET_MIX, type TicketBands, type TicketMix, DEFAULT_PLAYERS, defaultLabelAngle, stopSizeMeta, ticketsInSet, type MapData, type Ticket, type Point, realWagon, type Route, routeColors, type Stop, W } from "./map-data";
+import { DEFAULT_WAGONS_PER_PLAYER, DEFAULT_STARTING_TICKETS, DEFAULT_TICKET_BANDS, DEFAULT_TICKET_MIX, type TicketBands, type TicketMix, DEFAULT_PLAYERS, defaultLabelAngle, labelPush, stopSizeMeta, ticketsInSet, type MapData, type Ticket, type Point, realWagon, type Route, routeColors, type Stop, W } from "./map-data";
 import { curvedSamples, isCurved, intersects, parallelPoints, pointsFor, polylineLength, stopById } from "./map-geometry";
 
 export type RouteSpacing = { route: Route; drawnMm: number; neededMm: number; ratio: number; verdict: "short" | "long" | "ok" };
@@ -186,8 +186,11 @@ const labelBox = (stop: Stop, angle: number, radius: number) => {
   const width = Math.max(1, stop.name.length) * LABEL_CHAR_WIDTH;
   const rad = angle * Math.PI / 180, distance = radius + 9;
   const dx = Math.cos(rad) * distance, dy = Math.sin(rad) * distance;
-  const left = dx < -1 ? stop.x + dx - width : dx > 1 ? stop.x + dx : stop.x + dx - width / 2;
-  const top = dy < -3 ? stop.y + dy - LABEL_HEIGHT : dy > 3 ? stop.y + dy : stop.y + dy - LABEL_HEIGHT / 2;
+  // As StopLabel draws it: centred on the point at this bearing, pushed out by cos × half the width
+  // and sin × half the height, so the box slides round the stop without jumping.
+  const push = labelPush(angle);
+  const left = stop.x + dx - width / 2 + push.x * width / 2;
+  const top = stop.y + dy - LABEL_HEIGHT / 2 + push.y * LABEL_HEIGHT / 2;
   return { left: left - LABEL_PAD, top: top - LABEL_PAD, right: left + width + LABEL_PAD, bottom: top + LABEL_HEIGHT + LABEL_PAD };
 };
 

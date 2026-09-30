@@ -4,7 +4,7 @@
 // editing handles. It renders whatever MapData it is handed and reports interactions upwards.
 
 import { cn } from "@/lib/utils";
-import { DEFAULT_END_GAP_MM, defaultLabelAngle, REFERENCE_BOARD_MM, type BackgroundImage, type BackgroundShape, type BackgroundType, mapFormats, type MapData, type NoteBox, type Point, realWagon, routeColors, type Stop, stopSizeMeta, fallbackStopTypeStyle, W } from "./map-data";
+import { DEFAULT_END_GAP_MM, defaultLabelAngle, labelPush, REFERENCE_BOARD_MM, type BackgroundImage, type BackgroundShape, type BackgroundType, mapFormats, type MapData, type NoteBox, type Point, realWagon, routeColors, type Stop, stopSizeMeta, fallbackStopTypeStyle, W } from "./map-data";
 import { automaticLabelPoint, canvasPoint, isCurved, parallelOffset, stopById, curvedPath, curvedSamples, parallelPoints, pathFromPoints, pointAlong, pointsFor, polylineLength } from "./map-geometry";
 
 // Editing handles sit this far to the side of the line, with this grab radius. The gap between
@@ -177,12 +177,15 @@ export function StopSymbolGlyph({ stop, radius, color }: { stop: Stop; radius: n
 
 
 // The name hangs off the stop at a bearing the user can turn, so it can be moved clear of a route
-// without detaching it from the stop it belongs to.
+// without detaching it from the stop it belongs to. It is centred on a point at that bearing and then
+// pushed outwards by `labelPush` × half its own width and height (`transform-box: fill-box` makes the
+// percentages refer to the text's own box). That slides it continuously round the stop. Snapping the
+// text anchor between end, middle and start made it jump half its width near the top and bottom.
+// `labelBox` in map-analysis.ts reproduces the same box.
 export function StopLabel({ stop, radius }: { stop: Stop; radius: number }) {
-  const angle = (stop.labelAngle ?? defaultLabelAngle(stop)) * Math.PI / 180;
-  const distance = radius + 9;
-  const dx = Math.cos(angle) * distance, dy = Math.sin(angle) * distance;
-  const anchor = dx < -1 ? "end" : dx > 1 ? "start" : "middle";
-  const baseline = dy < -3 ? "auto" : dy > 3 ? "hanging" : "middle";
-  return <text x={dx} y={dy} textAnchor={anchor} dominantBaseline={baseline}>{stop.name}</text>;
+  const angle = stop.labelAngle ?? defaultLabelAngle(stop);
+  const rad = angle * Math.PI / 180, distance = radius + 9;
+  const push = labelPush(angle);
+  return <text x={Math.cos(rad) * distance} y={Math.sin(rad) * distance} dy="0.35em" textAnchor="middle"
+    style={{ transformBox: "fill-box", transform: `translate(${(push.x * 50).toFixed(2)}%, ${(push.y * 50).toFixed(2)}%)` }}>{stop.name}</text>;
 }
