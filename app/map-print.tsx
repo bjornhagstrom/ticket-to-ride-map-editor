@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { cn } from "@/lib/utils";
 import { mapFormats, ticketsInSet, type MapData, type MapFormat, W } from "./map-data";
 import { MapArtwork } from "./map-artwork";
-import { CUT_MARK_GAP_MM, CUT_MARK_REACH_MM, describePlan, papers, PRINT_CAPTION_MM, PRINT_MARGIN_MM, printChoices, type PrintChoice, printPlan, type PrintPlan, sameChoice, splits } from "./print-plan";
+import { CUT_MARK_GAP_MM, CUT_MARK_REACH_MM, describePlan, papers, PRINT_CAPTION_MM, printChoices, type PrintChoice, printPlan, type PrintPlan, sameChoice, splits } from "./print-plan";
 
 // Tickets print as cut-out cards on plain A4, 16 to a sheet. The same print-and-cut workflow as the
 // board itself: no bleed, a thin cut line, and nothing that needs colour to be readable.
@@ -57,7 +57,11 @@ export function PrintPages({ data, plan }: { data: MapData; plan: PrintPlan }) {
         it is the turned sheet, which fits inside the paper less the margin. A browser that ignores
         @page margin and uses its own — Safari does — then still has room for it; a box the size of
         the paper would spill onto an empty sheet after every page, or be shrunk to fit. */}
-    <style>{`@media print{@page{size:${plan.pageMm.width}mm ${plan.pageMm.height}mm;margin:${PRINT_MARGIN_MM}mm}}`}</style>
+    {/* EXPERIMENT: the margin declared to the browser is 5 mm, while the plan still keeps 10 mm clear
+        on every side. Safari's first layout spilled about 10 mm onto a second page and every later one
+        fitted; if it honours this margin on the first pass only, 5 mm less on each end makes it fit.
+        See docs/PRINTING.md. */}
+    <style>{`@media print{@page{size:${plan.pageMm.width}mm ${plan.pageMm.height}mm;margin:${PAGE_RULE_MARGIN_MM}mm}}`}</style>
     {plan.pages.map((page) => {
       // Each page is one SVG the size of the page box, in millimetres, holding the landscape sheet —
       // caption, artwork, frame or cut marks — turned a quarter turn with an SVG transform. Turning
@@ -86,6 +90,9 @@ export function PrintPages({ data, plan }: { data: MapData; plan: PrintPlan }) {
     })}
   </div>;
 }
+
+// The margin declared in @page, apart from the 10 mm the plan keeps clear (PRINT_MARGIN_MM).
+const PAGE_RULE_MARGIN_MM = 5;
 
 // Printing is decided per run. Nothing chosen here is written to the map; the last choice is kept
 // in this browser only, for convenience.
