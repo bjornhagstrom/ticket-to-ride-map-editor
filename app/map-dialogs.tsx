@@ -112,18 +112,21 @@ export function AnalysisDialog({ open, onOpenChange, data, stats, colourTable, s
   </Dialog>;
 }
 
-export function SuggestionsDialog({ open, onOpenChange, suggestions, onAdd }: { open: boolean; onOpenChange: (open: boolean) => void; suggestions: RouteSuggestion[]; onAdd: (suggestion: RouteSuggestion) => void }) {
-  return <Dialog open={open} onOpenChange={onOpenChange}>
-    <DialogContent className="analysis-dialog">
-      <DialogHeader><DialogTitle>Suggested routes</DialogTitle><DialogDescription>Geometrically nearby stop pairs with no route yet, that don&apos;t cross existing routes, prioritised for the least-connected stops. Length and colour are starting guesses — adjust them afterwards like any other route.</DialogDescription></DialogHeader>
-      {suggestions.length === 0 ? <p className="helper">No good candidates right now — every nearby stop pair is already connected, would cross an existing route, or there aren&apos;t enough stops yet.</p> : <ul className="suggestion-list">
-        {suggestions.map((suggestion) => <li key={`${suggestion.a}-${suggestion.b}`} className="suggestion-row">
-          <div><strong>{suggestion.aName} ↔ {suggestion.bName}</strong><p className="helper">Suggested length {suggestion.suggestedLength} · {colorLabels[suggestion.suggestedColor]}</p></div>
-          <Button size="sm" onClick={() => onAdd(suggestion)}><Plus />Add</Button>
+// Suggested routes live in the right column, not in a dialog: the map stays in view and undimmed,
+// and pointing at a suggestion draws it on the map where it would go.
+export function SuggestionsPanel({ suggestions, onAdd, onHover, onClose }: { suggestions: RouteSuggestion[]; onAdd: (suggestion: RouteSuggestion) => void; onHover: (suggestion: RouteSuggestion | null) => void; onClose: () => void }) {
+  return <div className="suggestion-panel">
+    <div className="panel-heading"><span>Suggested routes</span><small>{suggestions.length} to consider</small></div>
+    <p className="helper">Nearby stops with no route yet, that would not cross an existing route, least-connected stops first. Point at one to see it on the map. Length and colour are a starting guess to adjust.</p>
+    {suggestions.length === 0 ? <p className="helper">No good candidates right now: every nearby pair is connected already, would cross a route, or there are not enough stops yet.</p>
+      : <ul className="suggestion-list">
+        {suggestions.map((suggestion) => <li key={`${suggestion.a}-${suggestion.b}`} className="suggestion-row" onPointerEnter={() => onHover(suggestion)} onPointerLeave={() => onHover(null)} onFocus={() => onHover(suggestion)} onBlur={() => onHover(null)}>
+          <div><strong>{suggestion.aName} ↔ {suggestion.bName}</strong><p className="helper">Length {suggestion.suggestedLength} · {colorLabels[suggestion.suggestedColor]}</p></div>
+          <Button size="sm" onClick={() => { onHover(null); onAdd(suggestion); }}><Plus />Add</Button>
         </li>)}
       </ul>}
-    </DialogContent>
-  </Dialog>;
+    <Button variant="outline" size="sm" onClick={onClose}>Done</Button>
+  </div>;
 }
 
 

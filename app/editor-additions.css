@@ -129,3 +129,13 @@
 .property-form [data-slot="native-select-wrapper"]{width:100%}
 /* The Properties panel is too narrow for two selects side by side at this text size ("No symbol"
    needed 106px of a 105px column), so its pairs stack: see .property-form .grid-two in globals.css. */
+
+/* Suggested routes in the right column. While the list is open the column shows nothing else, and
+   the suggestion under the pointer is drawn on the map as a dashed line from stop to stop. */
+.properties.showing-suggestions>:not(.suggestion-panel){display:none}
+.suggestion-panel{display:grid;gap:10px;align-content:start}
+.suggestion-panel .suggestion-list{display:grid;gap:6px;margin:0;padding:0;list-style:none}
+.suggestion-panel .suggestion-row{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:8px 10px;border:1px solid #d8cfc0;border-radius:8px;background:#fffdf8}
+.suggestion-panel .suggestion-row:hover,.suggestion-panel .suggestion-row:focus-within{border-color:#721c24;background:#f7e9e6}
+.suggestion-panel .suggestion-row strong{font-size:13px}
+.map-canvas .suggestion-preview{stroke:#721c24;stroke-width:5;stroke-dasharray:10 7;stroke-linecap:round;opacity:.85;pointer-events:none}

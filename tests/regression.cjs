@@ -294,11 +294,11 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.keyboard.press("Escape");
   await page.waitForTimeout(300);
 
-  // 7. suggestions dialog
+  // 7. route suggestions open in the right column (tested in full in 33h, on a map that has some)
   await page.getByRole("button", { name: "Suggest routes" }).click();
   await page.waitForTimeout(500);
-  check("route suggestions render", await page.locator(".suggestion-list, .helper").count() > 0);
-  await page.keyboard.press("Escape");
+  check("route suggestions render", await page.locator(".suggestion-panel").count() === 1);
+  await page.locator(".suggestion-panel").getByRole("button", { name: "Done" }).click();
   await page.waitForTimeout(300);
 
   // 8. measure tool
@@ -1594,6 +1594,53 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   const uniqueSmall = [...new Set(tooSmall)];
   check("no text in the editor's panels and dialogs is smaller than 12px", uniqueSmall.length === 0, `${uniqueSmall.length}: ${uniqueSmall.slice(0, 12).join(" | ")}`);
   if (process.env.SHOW_SMALL) console.log(uniqueSmall.join("\n"));
+
+  // 33h. suggested routes sit in the right column and show on the map where they would go; the
+  // low-connection card lists every stop it means. A blank map with six stops has both.
+  await page.getByRole("button", { name: "Clear map" }).click();
+  await page.waitForTimeout(300);
+  await page.getByRole("button", { name: "Continue" }).click();
+  await page.waitForTimeout(500);
+  if (await page.locator(".settings-foot button").count()) { await page.locator(".settings-foot button").click(); await page.waitForTimeout(300); }
+  await tool("Add stop").click();
+  for (const [fx, fy] of [[0.15, 0.2], [0.35, 0.25], [0.55, 0.2], [0.2, 0.6], [0.45, 0.65], [0.7, 0.55]]) {
+    await page.evaluate(([x, y]) => { const svg = document.querySelector(".map-canvas"); const r = svg.getBoundingClientRect(); svg.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, clientX: r.left + r.width * x, clientY: r.top + r.height * y })); svg.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, clientX: r.left + r.width * x, clientY: r.top + r.height * y })); }, [fx, fy]);
+    await page.waitForTimeout(150);
+  }
+  await tool("Select & move").click();
+  const sixStops = await page.evaluate(() => JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")).stops);
+  check("six stops are placed", sixStops.length === 6, String(sixStops.length));
+  const lowConnectionCard = page.locator(".crossing-card", { hasText: /low-connection/ });
+  check("the card counts six low-connection stops", /6 low-connection stops/.test(await lowConnectionCard.textContent()), await lowConnectionCard.textContent());
+  await lowConnectionCard.hover();
+  await page.waitForTimeout(400);
+  const lowTip = (await page.locator('[data-slot="tooltip-content"]').textContent().catch(() => "")) || "";
+  check("and pointing at it lists every one of them", sixStops.every((st) => lowTip.includes(st.name)), lowTip.slice(0, 160));
+  await page.mouse.move(5, 5);
+  await page.getByRole("button", { name: "Suggest routes" }).click();
+  await page.waitForTimeout(500);
+  const suggestionPanel = page.locator(".suggestion-panel");
+  check("suggested routes open in the right column, not in a dialog", (await suggestionPanel.count()) === 1 && (await page.locator('[role="dialog"]').count()) === 0);
+  check("and the map is not darkened", (await page.locator('[data-slot="dialog-overlay"]').count()) === 0);
+  const suggestionRows = suggestionPanel.locator(".suggestion-row");
+  const suggestionCount = await suggestionRows.count();
+  check("with suggestions for a map of loose stops", suggestionCount > 0, String(suggestionCount));
+  await suggestionRows.first().hover();
+  await page.waitForTimeout(300);
+  const suggestionPreview = await page.evaluate(() => { const line = document.querySelector(".map-canvas .suggestion-preview"); return line ? { x1: +line.getAttribute("x1"), y1: +line.getAttribute("y1"), x2: +line.getAttribute("x2"), y2: +line.getAttribute("y2") } : null; });
+  const previewEnds = suggestionPreview ? sixStops.filter((st) => (Math.abs(st.x - suggestionPreview.x1) < 1 && Math.abs(st.y - suggestionPreview.y1) < 1) || (Math.abs(st.x - suggestionPreview.x2) < 1 && Math.abs(st.y - suggestionPreview.y2) < 1)) : [];
+  check("pointing at a suggestion draws it on the map, from stop to stop", suggestionPreview !== null && previewEnds.length === 2, JSON.stringify(suggestionPreview));
+  await page.mouse.move(5, 5);
+  await page.waitForTimeout(250);
+  check("and the drawing goes when the pointer leaves", (await page.locator(".map-canvas .suggestion-preview").count()) === 0);
+  const routesBefore = await page.evaluate(() => JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")).routes.length);
+  await suggestionRows.first().getByRole("button", { name: "Add" }).click();
+  await page.waitForTimeout(400);
+  check("Add puts the route on the map", (await page.evaluate(() => JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")).routes.length)) === routesBefore + 1);
+  check("and the panel stays open for the next one", (await suggestionPanel.count()) === 1);
+  await suggestionPanel.getByRole("button", { name: "Done" }).click();
+  await page.waitForTimeout(300);
+  check("Done gives the column back to Properties", (await suggestionPanel.count()) === 0 && /Properties/.test(await page.locator(".panel-heading").last().textContent()));
 
   // 34. a map saved on a format that is now a print choice opens on its board
   await page.evaluate(() => {
