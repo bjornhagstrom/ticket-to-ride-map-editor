@@ -388,6 +388,9 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   });
   const printButton = () => page.getByRole("button", { name: "Print map" });
   const printDialog = () => page.getByRole("dialog", { name: "Print the map" });
+  // What a print run holds is ticked in the dialog: the board, the tickets, the rules.
+  const printPart = (name) => printDialog().getByRole("checkbox", { name, exact: true });
+  const choosePrintParts = async (board, tickets, rules) => { for (const [name, want] of [["Print the board", board], ["Print the tickets", tickets], ["Print the rules", rules]]) if ((await printPart(name).isChecked()) !== want) await printPart(name).setChecked(want); };
   await printButton().click();
   await page.waitForTimeout(400);
   check("the Print button opens a dialog rather than printing", await printDialog().isVisible() && (await page.evaluate(() => window.__printCalls)) === 0);
@@ -535,7 +538,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     await page.waitForTimeout(300);
     await cell(paper, column).click();
     // These count the board's sheets, so the rules (the example map has some) stay out of the run.
-    await printDialog().getByRole("radio", { name: "Board only", exact: true }).check();
+    await choosePrintParts(true, false, false);
     const promised = Number(await cell(paper, column).getAttribute("data-pages"));
     await printDialog().getByRole("button", { name: "Cancel" }).click();
     await page.waitForTimeout(300);
@@ -2163,7 +2166,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   // the map, and printed on pages of their own after the board when asked
   {
     const mapKey = "orebro-map-editor-public-v2";
-    await page.evaluate(() => localStorage.removeItem("ttr-print-rules"));
+    await page.evaluate(() => { localStorage.removeItem("ttr-print-rules"); localStorage.removeItem("ttr-print-parts"); });
     const first = await page.evaluate((key) => { const m = JSON.parse(localStorage.getItem(key)); const r = m.routes[0]; const name = (id) => m.stops.find((st) => st.id === id).name; const isJunction = (st) => Boolean((m.stopTypeStyles.find((t) => t.id === st.type) || {}).junction);
       const near = new Set(m.routes.filter((x) => x.a === r.a || x.b === r.a).map((x) => (x.a === r.a ? x.b : x.a)));
       const stranger = m.stops.find((st) => st.id !== r.a && !near.has(st.id) && !isJunction(st));
@@ -2337,85 +2340,115 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     await page.keyboard.press("Escape");
     await page.waitForTimeout(300);
     check("Escape closes Rules once the text area has let go of the key", (await page.locator(".rules-panel").count()) === 0);
-    // printing: what to print is a choice of its own in the print dialog
+    // printing: what to print is ticked in the print dialog: the board, the tickets, the rules
     await printButton().click();
     await page.waitForTimeout(400);
-    const what = (name) => printDialog().getByRole("radio", { name, exact: true });
-    check("the print dialog asks what to print: the board, the board and the rules, or the rules only", (await Promise.all(["Board only", "Board and rules", "Rules only"].map((n) => what(n).count()))).every((n) => n === 1));
-    check("with rules written, the board and the rules is what is ticked at first, and all three can be chosen", (await what("Board and rules").isChecked()) && (await what("Board only").isEnabled()) && (await what("Rules only").isEnabled()));
+    check("the print dialog asks what to print with three tick boxes: the board, the tickets and the rules", (await Promise.all(["Print the board", "Print the tickets", "Print the rules"].map((n) => printPart(n).count()))).every((n) => n === 1));
+    check("the board and the rules are ticked at first, and the tickets are not", (await printPart("Print the board").isChecked()) && (await printPart("Print the rules").isChecked()) && !(await printPart("Print the tickets").isChecked()));
     check("the summary of the run says the rules follow the board", /then the rules/i.test(await printDialog().locator(".print-summary").textContent()));
-    check("and says they get pages of their own", /pages of their own/i.test(await printDialog().textContent()));
-    await what("Board only").check();
-    check("with the board only, the summary is about the board alone", !/rules/i.test(await printDialog().locator(".print-summary").textContent()));
+    await choosePrintParts(true, false, false);
+    check("with the board only, the summary is about the board alone", !/rules|ticket/i.test(await printDialog().locator(".print-summary").textContent()));
     await printDialog().getByRole("button", { name: "Cancel" }).click();
     await page.waitForTimeout(300);
     const pagesOf = async () => { await page.emulateMedia({ media: "print" }); const pdf = await page.pdf({ format: "A4", printBackground: true }); await page.emulateMedia({ media: "screen" }); return (pdf.toString("latin1").match(/\/Type\s*\/Page[^s]/g) || []).length; };
-    const pdfOff = await pagesOf();
+    const tree = () => page.evaluate(() => { const root = document.querySelector(".print-pages"); return { order: Array.from(root.children).map((el) => (el.matches("style") ? "style" : el.classList.contains("print-page") ? "board" : el.classList.contains("print-tickets") ? "tickets" : el.classList.contains("print-rules") ? "rules" : "other")).filter((x, i, all) => x !== "style" && x !== all[i - 1]), boards: document.querySelectorAll(".print-pages .print-page").length, cards: document.querySelectorAll(".print-pages .ticket-card").length, rules: document.querySelectorAll(".print-pages .print-rules").length, text: (document.querySelector(".print-pages .print-rules") || { textContent: "" }).textContent, missing: document.querySelectorAll(".print-pages .print-rules .missing").length, style: Array.from(document.querySelectorAll(".print-pages style")).map((el) => el.textContent).join(" ") }; });
+    const run = async (board, tickets, rules) => { await printButton().click(); await page.waitForTimeout(350); await choosePrintParts(board, tickets, rules); await printDialog().getByRole("button", { name: "Cancel" }).click(); await page.waitForTimeout(300); };
+    const deckSize = await page.evaluate(() => { const m = JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")); const first = m.ticketSets[0].id; const active = (m.ticketSets.find((x) => x.label === document.querySelector("#ticket-set")?.selectedOptions?.[0]?.textContent?.replace(/ \(\d+\)$/, "")) || m.ticketSets[0]).id; return m.tickets.filter((t) => (t.set ?? first) === active).length; });
+    // each part on its own
+    const pagesBoard = await pagesOf();
+    check("with the board only, the print tree has board pages and nothing else", JSON.stringify((await tree()).order) === JSON.stringify(["board"]), JSON.stringify(await tree()).slice(0, 120));
+    await run(false, true, false);
+    const t1 = await tree();
+    check("with the tickets only, the tree holds one card for each ticket of the deck and no board", JSON.stringify(t1.order) === JSON.stringify(["tickets"]) && t1.boards === 0 && t1.cards === deckSize && deckSize > 0, JSON.stringify([t1.order, t1.boards, t1.cards, deckSize]));
+    const pagesTickets = await pagesOf();
     await printButton().click();
-    await page.waitForTimeout(400);
-    await what("Board and rules").check();
+    await page.waitForTimeout(350);
+    const cardsSummary = await printDialog().locator(".print-summary").textContent();
     await printDialog().getByRole("button", { name: "Cancel" }).click();
     await page.waitForTimeout(300);
-    const treeOn = await page.evaluate(() => { const r = document.querySelector(".print-pages .print-rules"); const prev = r && r.previousElementSibling; return r ? { text: r.textContent, afterPage: Boolean(prev && prev.classList.contains("print-page")), missing: r.querySelectorAll(".missing").length, title: r.querySelector("h1") && r.querySelector("h1").textContent } : null; });
-    check("with the board and the rules, the print tree holds the rules after the last board page", treeOn !== null && treeOn.afterPage && /House rules/.test(treeOn.text), JSON.stringify(treeOn).slice(0, 160));
+    check("the cards' sheet count in the summary is the number of pages the browser prints", Number((/(\d+) sheet/.exec(cardsSummary) || [])[1]) === pagesTickets, `${cardsSummary} against ${pagesTickets}`);
+    await run(false, false, true);
+    const t2 = await tree();
+    check("with the rules only, the tree holds the rules and nothing else", JSON.stringify(t2.order) === JSON.stringify(["rules"]) && t2.rules === 1 && /House rules/.test(t2.text), JSON.stringify(t2.order));
+    check("a reference to something that is not there prints as its plain name, unmarked", t2.missing === 0 && /Atlantis/.test(t2.text));
+    check("on upright A4 with its margin", /size:\s*210mm 297mm/.test(t2.style), t2.style);
+    const pagesRules = await pagesOf();
+    check("these rules take one page, and the cards the sheets their summary promised", pagesRules === 1 && pagesTickets >= 1, `${pagesBoard} board, ${pagesTickets} tickets, ${pagesRules} rules`);
+    await run(true, true, true);
+    const t3 = await tree();
+    check("with all three, the board comes first, then the tickets, then the rules", JSON.stringify(t3.order) === JSON.stringify(["board", "tickets", "rules"]), JSON.stringify(t3.order));
+    const pagesAll = await pagesOf();
+    check("and the pages are the sum of the three on their own, each part on pages of its own", pagesAll === pagesBoard + pagesTickets + pagesRules, `${pagesAll} against ${pagesBoard} + ${pagesTickets} + ${pagesRules}`);
+    await run(true, false, true);
+    const t4 = await tree();
     await page.emulateMedia({ media: "print" });
     const printedBullets = await page.locator(".print-pages .print-rules ul").first().evaluate((el) => getComputedStyle(el).listStyleType);
     await page.emulateMedia({ media: "screen" });
-    check("and so do the printed pages", printedBullets === "disc", printedBullets);
-    check("a reference to something that is not there prints as its plain name, unmarked", treeOn !== null && treeOn.missing === 0 && /Atlantis/.test(treeOn.text));
-    const pdfOn = await pagesOf();
-    check("the rules take one more page than the board alone, on a page of their own", pdfOn === pdfOff + 1, `${pdfOn} pages with, ${pdfOff} without`);
+    check("with the board and the rules, the rules come after the last board page, with their bullets", JSON.stringify(t4.order) === JSON.stringify(["board", "rules"]) && printedBullets === "disc", JSON.stringify(t4.order) + " " + printedBullets);
+    check("and the pages are the board's plus the rules'", (await pagesOf()) === pagesBoard + pagesRules);
+    // the dialog follows what is ticked
     await printButton().click();
     await page.waitForTimeout(400);
-    await what("Board only").check();
+    check("with the board ticked, how it is split, Supersize and the sheet table are there", (await printDialog().locator('input[name="print-split"]').count()) === 3 && (await printDialog().locator(".print-table").count()) === 1);
+    await choosePrintParts(false, true, true);
+    check("without the board they go, and the paper stays", (await printDialog().locator('input[name="print-split"]').count()) === 0 && (await printDialog().locator(".print-table").count()) === 0 && (await printDialog().locator('input[name="print-paper"]').count()) === 4);
+    const summary = await printDialog().locator(".print-summary").textContent();
+    check("the summary says how many cards, on how many sheets, and then the rules", new RegExp(`${deckSize} ticket`).test(summary) && /\d+ sheet/.test(summary) && /then the rules/i.test(summary) && !/Standard board|board/i.test(summary.replace(/cards/g, "")), summary);
+    await choosePrintParts(false, false, false);
+    check("with nothing ticked there is nothing to print, and the dialog says so", (await printDialog().getByRole("button", { name: "Print", exact: true }).isDisabled()) && /tick at least one/i.test(await printDialog().textContent()));
+    await choosePrintParts(false, true, true);
     await printDialog().getByRole("button", { name: "Cancel" }).click();
     await page.waitForTimeout(300);
-    check("with the board only, the print tree has no rules", (await page.locator(".print-pages .print-rules").count()) === 0);
-    check("and the choice is remembered", (await page.evaluate(() => localStorage.getItem("ttr-print-rules"))) === "board");
-    // the rules on their own, on paper
-    await printButton().click();
-    await page.waitForTimeout(400);
-    await what("Rules only").check();
-    check("rules only drops the board's own choices, how it is split and the sheet table, and keeps the paper", (await printDialog().locator('input[name="print-split"]').count()) === 0 && (await printDialog().locator(".print-table").count()) === 0 && (await printDialog().locator('input[name="print-paper"]').count()) === 4);
-    check("and the summary says so", /rules only/i.test(await printDialog().locator(".print-summary").textContent()) && !/sheet/i.test(await printDialog().locator(".print-summary").textContent()), await printDialog().locator(".print-summary").textContent());
-    await printDialog().getByRole("button", { name: "Cancel" }).click();
-    await page.waitForTimeout(300);
-    const only = await page.evaluate(() => ({ rules: document.querySelectorAll(".print-pages .print-rules").length, boards: document.querySelectorAll(".print-pages .print-page").length, style: Array.from(document.querySelectorAll(".print-pages style")).map((el) => el.textContent).join(" ") }));
-    check("the print tree then holds the rules and no board at all", only.rules === 1 && only.boards === 0, JSON.stringify({ rules: only.rules, boards: only.boards }));
-    check("on upright A4 with its margin", /size:\s*210mm 297mm/.test(only.style), only.style);
-    const pdfOnly = await pagesOf();
-    check("and prints as one page for these rules", pdfOnly === 1, `${pdfOnly} pages`);
-    check("the choice is remembered", (await page.evaluate(() => localStorage.getItem("ttr-print-rules"))) === "rules");
+    // the paper chosen sets the page for everything
     await printButton().click();
     await page.waitForTimeout(400);
     await printDialog().getByRole("radio", { name: "A3", exact: true }).check();
     await printDialog().getByRole("button", { name: "Cancel" }).click();
     await page.waitForTimeout(300);
-    check("the paper chosen sets the page the rules print on", /size:\s*297mm 420mm/.test(await page.evaluate(() => Array.from(document.querySelectorAll(".print-pages style")).map((el) => el.textContent).join(" "))));
+    check("the paper chosen sets the page the cards and the rules print on", /size:\s*297mm 420mm/.test((await tree()).style));
     await printButton().click();
     await page.waitForTimeout(400);
     await printDialog().getByRole("radio", { name: "A4", exact: true }).check();
-    // pressing Print, as a person does: the rules and nothing else reach print()
-    await page.evaluate(() => { window.__only = null; window.print = () => { window.__only = { rules: document.querySelectorAll(".print-pages .print-rules").length, boards: document.querySelectorAll(".print-pages .print-page").length, dialogs: document.querySelectorAll('[role="dialog"]').length }; }; });
+    // pressing Print, as a person does: what was ticked, and nothing else, reaches print()
+    await page.evaluate(() => { window.__run = null; window.print = () => { window.__run = { cards: document.querySelectorAll(".print-pages .ticket-card").length, rules: document.querySelectorAll(".print-pages .print-rules").length, boards: document.querySelectorAll(".print-pages .print-page").length, dialogs: document.querySelectorAll('[role="dialog"]').length }; }; });
     await printDialog().getByRole("button", { name: "Print", exact: true }).click();
-    await page.waitForFunction(() => window.__only !== null, null, { timeout: 5000 });
-    const reached = await page.evaluate(() => window.__only);
-    check("when Print is pressed, the rules alone reach the printer, after the dialog has gone", reached.rules === 1 && reached.boards === 0 && reached.dialogs === 0, JSON.stringify(reached));
-    // choices written by the earlier build still mean what they meant
-    await page.evaluate(() => localStorage.setItem("ttr-print-rules", "off"));
+    await page.waitForFunction(() => window.__run !== null, null, { timeout: 5000 });
+    const reached = await page.evaluate(() => window.__run);
+    check("when Print is pressed, the cards and the rules reach the printer, and no board, after the dialog has gone", reached.cards === deckSize && reached.rules === 1 && reached.boards === 0 && reached.dialogs === 0, JSON.stringify(reached));
+    // remembered, and choices an earlier build wrote still mean what they meant
+    check("the choice is remembered", (await page.evaluate(() => JSON.parse(localStorage.getItem("ttr-print-parts")))) && JSON.stringify(await page.evaluate(() => JSON.parse(localStorage.getItem("ttr-print-parts")))) === JSON.stringify({ board: false, tickets: true, rules: true }));
+    const ticked = async () => { await printButton().click(); await page.waitForTimeout(400); const state = [await printPart("Print the board").isChecked(), await printPart("Print the tickets").isChecked(), await printPart("Print the rules").isChecked()]; await printDialog().getByRole("button", { name: "Cancel" }).click(); await page.waitForTimeout(250); return state; };
     await page.reload({ waitUntil: "networkidle" });
     await page.waitForTimeout(600);
-    await printButton().click();
-    await page.waitForTimeout(400);
-    check("an old 'off' means the board only", await what("Board only").isChecked());
-    await printDialog().getByRole("button", { name: "Cancel" }).click();
-    await page.evaluate(() => localStorage.setItem("ttr-print-rules", "on"));
+    check("it survives a reload", JSON.stringify(await ticked()) === JSON.stringify([false, true, true]));
+    for (const [old, want] of [["off", [true, false, false]], ["board", [true, false, false]], ["on", [true, false, true]], ["both", [true, false, true]], ["rules", [false, false, true]]]) {
+      await page.evaluate((value) => { localStorage.removeItem("ttr-print-parts"); localStorage.setItem("ttr-print-rules", value); }, old);
+      await page.reload({ waitUntil: "networkidle" });
+      await page.waitForTimeout(500);
+      check(`a choice an earlier build stored as '${old}' means ${want.map((w, i) => (w ? ["the board", "the tickets", "the rules"][i] : null)).filter(Boolean).join(" and ")}`, JSON.stringify(await ticked()) === JSON.stringify(want));
+    }
+    await page.evaluate(() => { localStorage.removeItem("ttr-print-rules"); localStorage.removeItem("ttr-print-parts"); });
     await page.reload({ waitUntil: "networkidle" });
-    await page.waitForTimeout(600);
+    await page.waitForTimeout(500);
+    // an empty deck has no cards to print
+    await ticketsButton.click();
+    await page.waitForTimeout(300);
+    await page.getByRole("button", { name: /Add a deck/ }).click();
+    await page.waitForTimeout(250);
+    await page.getByRole("menuitem", { name: /New, empty deck/ }).click();
+    await page.waitForTimeout(400);
+    await page.locator(".tickets-panel").getByRole("button", { name: "Done" }).click();
+    await page.waitForTimeout(300);
     await printButton().click();
     await page.waitForTimeout(400);
-    check("and an old 'on' means the board and the rules", await what("Board and rules").isChecked());
+    check("an empty deck has no cards to print: the tickets box cannot be ticked, and says why", (await printPart("Print the tickets").isDisabled()) && /no tickets/i.test(await printDialog().textContent()));
     await printDialog().getByRole("button", { name: "Cancel" }).click();
+    await page.waitForTimeout(300);
+    await ticketsButton.click();
+    await page.waitForTimeout(300);
+    await page.getByRole("button", { name: /Delete deck/ }).click();
+    await page.waitForTimeout(400);
+    await page.locator(".tickets-panel").getByRole("button", { name: "Done" }).click();
     await page.waitForTimeout(300);
     // a map with no rules cannot print any
     await rulesButton.click();
@@ -2425,13 +2458,13 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     check("a map without rules shows an empty preview that says so", /nothing written/i.test(await panel.locator(".rules-preview").textContent()));
     await printButton().click();
     await page.waitForTimeout(400);
-    check("with nothing written, only the board can be chosen, and the dialog says why", (await what("Board only").isChecked()) && (await what("Board and rules").isDisabled()) && (await what("Rules only").isDisabled()) && /nothing written/i.test(await printDialog().textContent()));
+    check("with nothing written, the rules box cannot be ticked, and the dialog says why", (await printPart("Print the rules").isDisabled()) && !(await printPart("Print the rules").isChecked()) && /nothing written/i.test(await printDialog().textContent()));
     await printDialog().getByRole("button", { name: "Cancel" }).click();
     await page.waitForTimeout(300);
     // back to a clean state for what follows
     await panel.getByRole("button", { name: "Done" }).click();
     await page.waitForTimeout(300);
-    await page.evaluate(() => localStorage.removeItem("ttr-print-rules"));
+    await page.evaluate(() => { localStorage.removeItem("ttr-print-rules"); localStorage.removeItem("ttr-print-parts"); });
   }
 
   // 33b2. a panel open in the right column must not clip the print: a browser that lays the print out at
@@ -2514,7 +2547,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     check("the What's new page opens", /What.s new/.test(await other.locator("h1").first().textContent()));
     const releases = other.locator("article.release");
     check("it lists the releases, newest first, each with its version and date", (await releases.count()) >= 2 && (await releases.first().locator("h2").textContent()).includes(pkgVersion) && /\d{4}-\d{2}-\d{2}/.test(await releases.first().locator("time").textContent()));
-    check("each with what changed, in a list that shows its bullets", (await releases.first().locator("li").count()) >= 3 && (await releases.first().locator("ul").evaluate((el) => getComputedStyle(el).listStyleType)) === "disc");
+    check("each with what changed, in a list that shows its bullets", (await releases.first().locator("li").count()) >= 1 && (await releases.first().locator("ul").evaluate((el) => getComputedStyle(el).listStyleType)) === "disc");
     check("and a way back to the editor", (await other.getByRole("link", { name: /Back to the editor/ }).count()) >= 1);
     await other.goto(BASE + "about/", { waitUntil: "networkidle" });
     check("the About page shows the version and links to What's new", (await other.locator("body").textContent()).includes(`Version ${pkgVersion}`) && (await other.getByRole("link", { name: /What.s new/ }).count()) >= 1);

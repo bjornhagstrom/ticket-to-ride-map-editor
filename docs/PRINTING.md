@@ -179,12 +179,17 @@ them. So the layout is made to fit with them on.
 
 ## The dialog
 
-- **What to print is the first choice**: the board only, the board and then the rules, or the rules
-  alone (`PrintWhat` in `app/map-print.tsx`, kept in `localStorage` as `ttr-print-rules`: `board`,
-  `both` or `rules`; an older build's `off` and `on` are read as `board` and `both`). The rules are
-  `.print-rules` in the same print tree and flow in the same page box, upright on the chosen paper.
-  Rules only has no board in it, so how it is split, Supersize and the sheet table are hidden and the
-  paper stays. With nothing written only the board can be chosen.
+- **What to print is the first choice**: three tick boxes, the board, the tickets and the rules
+  (`PrintParts` in `app/map-print.tsx`), in any combination. They print in that order in one tree: the
+  board pages, then `.print-tickets` (the cards of the deck being worked on, four to a row), then
+  `.print-rules`. Each part after the first starts on a page of its own. The paper chosen in the dialog
+  sets the page for all of them. The choice is kept in `localStorage` as `ttr-print-parts`; the single
+  word an earlier build kept in `ttr-print-rules` (`board`, `both`, `rules`, `off`, `on`) is still read.
+  Without the board in the run, how it is split, Supersize and the sheet table are hidden and the paper
+  stays. A deck with no tickets has no cards to tick, a map with no rules text has no rules, and with
+  nothing ticked Print is off. The summary says how many sheets the cards take (`cardSheets` in
+  `app/print-plan.ts`), and a test checks that it is the number of pages the browser prints. The
+  "Print deck" button in the Tickets panel prints just the cards, whatever is ticked.
 - **Anniversary size is one checkbox under Supersize.** There is no Standard option; an empty box is
   the standard board. Ticking it also selects full size, and choosing one sheet or per panel clears it.
   Picking a table cell sets or clears it too. It is never disabled: an earlier version greyed out the

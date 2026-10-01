@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 import { MapArtwork, type Tool } from "./map-artwork";
 import { AnalysisPanel, StopTicketsDialog, SuggestionsPanel, SuggestTicketsDialog, TicketsPanel, WelcomeGuide } from "./map-dialogs";
 import { TicketCoveragePanel, type CoverageSort, BackgroundImageProperties, BackgroundProperties, NoteProperties, RouteProperties, StopProperties, StylePicker } from "./map-properties";
-import { PrintDialog, PrintPages, TicketPrintPages, type PrintWhat } from "./map-print";
+import { PrintDialog, PrintPages, type PrintParts } from "./map-print";
 import { ImageStage } from "./map-image";
 import { RulesPanel } from "./rules-panel";
 import { type TicketLengthsView } from "./ticket-lengths";
@@ -43,6 +43,7 @@ const readHintOffset = () => {
 
 const RIGHT_WIDTH_KEY = "ttr-right-column-width";
 const PRINT_RULES_KEY = "ttr-print-rules";
+const PRINT_PARTS_KEY = "ttr-print-parts";
 const RIGHT_WIDTH_DEFAULT = 400, RIGHT_WIDTH_MIN = 320, RIGHT_WIDTH_MAX = 900, RIGHT_WIDTH_WIDE = 720;
 
 export function MapEditor() {
@@ -90,12 +91,18 @@ export function MapEditor() {
   // The rules panel asks for stops to be clicked on the map; the map hands the click to it.
   const rulesPickRef = useRef<{ stop: (stopId: string) => boolean; cancel: () => boolean } | null>(null);
   const [rulesPicking, setRulesPicking] = useState(false);
-  const [printWhat, setPrintWhat] = useState<PrintWhat>("both");
-  // "on" and "off" are what an earlier build wrote for the one tick box it had.
-  useEffect(() => { queueMicrotask(() => { try { const stored = localStorage.getItem(PRINT_RULES_KEY); if (stored === "off" || stored === "board") setPrintWhat("board"); else if (stored === "rules") setPrintWhat("rules"); else if (stored === "on" || stored === "both") setPrintWhat("both"); } catch { /* keep the default */ } }); }, []);
-  const choosePrintWhat = (what: PrintWhat) => { setPrintWhat(what); try { localStorage.setItem(PRINT_RULES_KEY, what); } catch { /* not remembered, still used */ } };
-  // Without any rules written there is only the board to print.
-  const printWhatNow: PrintWhat = data.rules?.trim() ? printWhat : "board";
+  // What a print run holds is ticked in the print dialog and kept in this browser, like the other print
+  // choices. An earlier build kept one word for the board and the rules; it still means what it meant.
+  const [printParts, setPrintParts] = useState<PrintParts>({ board: true, tickets: false, rules: true });
+  useEffect(() => { queueMicrotask(() => { try {
+    const stored = localStorage.getItem(PRINT_PARTS_KEY);
+    if (stored) { const parsed = JSON.parse(stored) as Partial<PrintParts>; setPrintParts({ board: Boolean(parsed.board), tickets: Boolean(parsed.tickets), rules: Boolean(parsed.rules) }); return; }
+    const old = localStorage.getItem(PRINT_RULES_KEY);
+    if (old === "off" || old === "board") setPrintParts({ board: true, tickets: false, rules: false });
+    else if (old === "rules") setPrintParts({ board: false, tickets: false, rules: true });
+    else if (old === "on" || old === "both") setPrintParts({ board: true, tickets: false, rules: true });
+  } catch { /* keep the default */ } }); }, []);
+  const choosePrintParts = (parts: PrintParts) => { setPrintParts(parts); try { localStorage.setItem(PRINT_PARTS_KEY, JSON.stringify(parts)); } catch { /* not remembered, still used */ } };
   // How wide the right column is while Map balance is open; the left edge of the column is its handle.
   const [rightWidth, setRightWidth] = useState(RIGHT_WIDTH_DEFAULT);
   const resizeRight = (width: number) => {
@@ -116,7 +123,8 @@ export function MapEditor() {
   const [hoveredTicket, setHoveredTicket] = useState<string | null>(null);
   const [showTickets, setShowTickets] = useState(false);
   const [ticketSetId, setTicketSetId] = useState(defaultTicketSet.id);
-  const [printScope, setPrintScope] = useState<"map" | "tickets">("map");
+  // "deck" is the Print deck button in the Tickets panel: just the cards, whatever is ticked in the print dialog.
+  const [printScope, setPrintScope] = useState<"map" | "deck">("map");
   const [pickTo, setPickTo] = useState<Point | null>(null);
   const [hoveredStop, setHoveredStop] = useState<string | null>(null);
   const [coverageSort, setCoverageSort] = useState<CoverageSort>({ column: "stop", descending: false });
@@ -201,6 +209,10 @@ export function MapEditor() {
   // freshly imported or loaded map always lands on a deck that exists.
   const activeTicketSet = data.ticketSets.find((set) => set.id === ticketSetId) ?? data.ticketSets[0];
   const ticketsHere = ticketsInSet(data, activeTicketSet.id);
+  // What is ticked, less what there is nothing to print of: a deck with no tickets has no cards, and a map with
+  // no rules text has no rules.
+  const printPartsNow: PrintParts = { board: printParts.board, tickets: printParts.tickets && ticketsHere.length > 0, rules: printParts.rules && Boolean(data.rules?.trim()) };
+  const runParts: PrintParts = printScope === "deck" ? { board: false, tickets: true, rules: false } : printPartsNow;
   const ticketReviews = useMemo(() => reviewTickets(data, activeTicketSet.id), [data, activeTicketSet.id]);
   const ticketRate = useMemo(() => ticketPointsPerSpace(ticketReviews), [ticketReviews]);
   const ticketDiameter = useMemo(() => mapDiameter(data), [data]);
@@ -390,7 +402,7 @@ export function MapEditor() {
     const settled = () => !document.querySelector('[role="dialog"]') && !document.body.hasAttribute("data-scroll-locked") && getComputedStyle(document.body).overflow !== "hidden";
     // The ticket cards print on their own paper: the print tree has swapped to them, and needs two frames
     // for the styles applied after the swap, on top of waiting for the dialog.
-    const frames = printScope === "tickets" ? 2 : 1;
+    const frames = runParts.tickets ? 2 : 1;
     let seen = 0;
     const wait = () => {
       seen += 1;
@@ -637,7 +649,7 @@ export function MapEditor() {
   const exportBackground = () => downloadJson(writeMapFile("background", { format: data.format, background: data.background, backgroundImage: data.backgroundImage }, data), `${data.name} background`);
   const exportNetwork = () => downloadJson(writeMapFile("network", networkPayload(data), data), `${data.name} network`);
   const exportTickets = (scope: "set" | "all") => { const ids = scope === "all" ? data.ticketSets.map((set) => set.id) : [activeTicketSet.id]; downloadJson(writeMapFile("tickets", buildTicketFile(data, ids), data), `${data.name} ${scope === "all" ? "tickets" : activeTicketSet.label}`); };
-  const printTickets = () => { setShowTickets(false); setPrintScope("tickets"); setPrintRequest((count) => count + 1); };
+  const printTickets = () => { setShowTickets(false); setPrintScope("deck"); setPrintRequest((count) => count + 1); };
   const applyBackgroundImport = (background: BackgroundShape[], backgroundImage?: BackgroundImage) => { change((draft) => ({ ...draft, background, backgroundImage })); clearSelection(); setDanger(null); setPendingImport(null); };
   const applyNetworkImport = (stops: Stop[], routes: Route[], lineStyles: LineStyle[], routeTypeStyles: RouteTypeStyle[], stopTypeStyles: StopTypeStyle[], wagonStyles: WagonStyle[], tickets: Ticket[]) => {
     change((draft) => {
@@ -821,9 +833,9 @@ export function MapEditor() {
       onShuffle={() => setSuggestSeed((seed) => seed + 1)} onApply={(mode) => applySuggestion(mode, `ts-${Date.now()}`)} />
     <WelcomeGuide open={showGuide} onOpenChange={(open) => !open && dismissGuide()} onChooseBlank={() => chooseFromGuide("blank")} onChooseExample={() => chooseFromGuide("example")} />
     <SettingsDialog open={showStyles} onOpenChange={setShowStyles} target={styleTarget} onTarget={setStyleTarget} data={data} change={change} onChangeFormat={changeFormat} defaults={{ stopType, setStopType, stopSize, setStopSize: (value) => setStopSize(value as StopSize), routeType, setRouteType, routeColor, setRouteColor, routeCurved, setRouteCurved, routeLineStyle, setRouteLineStyle, linkParallel, setLinkParallel }} />
-    {printScope === "tickets" ? <TicketPrintPages data={data} setId={activeTicketSet.id} /> : <PrintPages data={data} plan={printPlan(data.format, printChoice, printProfile)} what={printWhatNow} />}
+    <PrintPages data={data} plan={printPlan(data.format, printChoice, printProfile)} parts={runParts} setId={activeTicketSet.id} />
     {makingImage && <ImageStage data={data} onDone={saveImage} onFail={() => setMakingImage(false)} />}
-    <PrintDialog open={showPrint} onOpenChange={setShowPrint} format={data.format} profile={printProfile} choice={printChoice} onChoice={choosePrint} what={{ written: Boolean(data.rules?.trim()), value: printWhatNow, onChange: choosePrintWhat }} onPrint={() => { setShowPrint(false); setPrintRequest((count) => count + 1); }} />
+    <PrintDialog open={showPrint} onOpenChange={setShowPrint} format={data.format} profile={printProfile} choice={printChoice} onChoice={choosePrint} parts={{ value: printPartsNow, onChange: choosePrintParts, rulesWritten: Boolean(data.rules?.trim()), ticketCount: ticketsHere.length, deckLabel: activeTicketSet.label }} onPrint={() => { setShowPrint(false); setPrintRequest((count) => count + 1); }} />
   </main></TooltipProvider>;
 }
 

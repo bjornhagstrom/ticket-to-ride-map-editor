@@ -163,3 +163,17 @@ export function describePlan(plan: PrintPlan): string {
   if (plan.choice.split === "full") return `${sheets}, at 100 % — real size. Together they make the ${plan.boardMm.width} × ${plan.boardMm.height} mm board: trim each at its marks and butt it to its neighbours.`;
   return `${sheets}, at ${Math.round(plan.scale * 100)} % of real size: the board prints smaller than the real ${plan.boardMm.width} × ${plan.boardMm.height} mm.`;
 }
+
+/** Cut-out ticket cards: 45 x 62 mm, four to a row, as many rows as the page holds. */
+export const CARD_MM = { width: 45, height: 62 };
+export const CARDS_PER_ROW = 4;
+/** The run's caption above the first row of cards. */
+export const CARD_CAPTION_MM = 10;
+/** How many sheets a deck of cards takes on a page, and how many cards go on a sheet. */
+export function cardSheets(count: number, pageMm: { width: number; height: number }): { sheets: number; perSheet: number } {
+  const room = pageMm.height - 2 * PRINT_MARGIN_MM;
+  const firstRows = Math.max(1, Math.floor((room - CARD_CAPTION_MM) / CARD_MM.height));
+  const laterRows = Math.max(1, Math.floor(room / CARD_MM.height));
+  const first = CARDS_PER_ROW * firstRows, later = CARDS_PER_ROW * laterRows;
+  return { sheets: count <= 0 ? 0 : count <= first ? 1 : 1 + Math.ceil((count - first) / later), perSheet: first };
+}

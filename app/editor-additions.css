@@ -97,7 +97,10 @@
   .ticket-card-points{margin-top:2.5mm!important;width:11mm;height:11mm;border:.4mm solid #24211d;border-radius:50%;font:700 12pt Georgia,serif;line-height:10.2mm;color:#24211d}
   .ticket-card-flag{font:6.5pt "Segoe UI",Arial,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:#24221e}
   /* The rules text, on pages of their own after the board. It flows in the same page box as the board's pages. */
-  .print-rules{break-before:page;page-break-before:always;font:10.5pt/1.5 Georgia,serif;color:#24211d}
+  /* Whatever follows the board starts on a page of its own; the first thing in the run does not leave a blank page before it. */
+  .print-pages>.print-tickets,.print-pages>.print-rules{break-before:page;page-break-before:always}
+  .print-pages>style+.print-tickets,.print-pages>style+.print-rules{break-before:auto;page-break-before:auto}
+  .print-rules{font:10.5pt/1.5 Georgia,serif;color:#24211d}
   .print-rules-name{margin:0 0 6mm;font:7.5pt "Segoe UI",Arial,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:#4f493f}
   .print-rules h1{font:700 18pt/1.2 Georgia,serif;margin:0 0 4mm;break-after:avoid}
   .print-rules h2{font:700 14pt/1.25 Georgia,serif;margin:6mm 0 2mm;break-after:avoid}

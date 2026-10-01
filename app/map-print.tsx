@@ -8,12 +8,12 @@ import { cn } from "@/lib/utils";
 import { mapFormats, ticketsInSet, type MapData, type MapFormat, W } from "./map-data";
 import { MapArtwork } from "./map-artwork";
 import { RulesText } from "./rules-text";
-import { CUT_MARK_GAP_MM, CUT_MARK_REACH_MM, describePlan, papers, PRINT_CAPTION_MM, PRINT_MARGIN_MM, printChoices, type PrintChoice, printPlan, type PrintPlan, type PrintProfile, sameChoice, splits } from "./print-plan";
+import { CUT_MARK_GAP_MM, CUT_MARK_REACH_MM, describePlan, papers, PRINT_CAPTION_MM, PRINT_MARGIN_MM, printChoices, type PrintChoice, printPlan, type PrintPlan, type PrintProfile, sameChoice, splits, cardSheets } from "./print-plan";
 
 // Tickets print as cut-out cards on plain A4, 16 to a sheet. The same print-and-cut workflow as the
 // board itself: no bleed, a thin cut line, and nothing that needs colour to be readable.
 
-export function TicketPrintPages({ data, setId }: { data: MapData; setId: string }) {
+export function TicketCards({ data, setId }: { data: MapData; setId: string }) {
   const set = data.ticketSets.find((item) => item.id === setId) ?? data.ticketSets[0];
   const name = (id: string) => data.stops.find((stop) => stop.id === id)?.name ?? "—";
   const tickets = ticketsInSet(data, set?.id ?? "");
@@ -21,8 +21,7 @@ export function TicketPrintPages({ data, setId }: { data: MapData; setId: string
   // the printable area is exactly the paper would break on a browser that insists on its own
   // margins, and then every sheet spills a few millimetres onto a blank one. Letting the browser
   // paginate, with a card never split across a break, cannot overflow by construction.
-  return <div className="print-pages print-tickets" aria-hidden="true">
-    <style>{"@media print{@page{size:210mm 297mm;margin:10mm}}"}</style>
+  return <section className="print-tickets">
     <div className="ticket-run">
       <div className="print-caption"><strong>{data.name}</strong><span>{set?.label} · {tickets.length} ticket{tickets.length === 1 ? "" : "s"}</span></div>
       {/* Explicit rows of four, each a block that may not be split. Safari ignores break-inside on
@@ -37,15 +36,15 @@ export function TicketPrintPages({ data, setId }: { data: MapData; setId: string
         </div>)}
       </div>)}
     </div>
-  </div>;
+  </section>;
 }
 
 // The board as the chosen print run cuts it. Page size, margins and the size of every tile come
 // from printPlan, in millimetres, so the pages cannot disagree with what the dialog promised.
-// What a print run holds: the board, the board followed by the rules, or the rules alone.
-export type PrintWhat = "board" | "both" | "rules";
+// What a print run holds, in the order it is printed: the board, then the tickets as cards, then the rules.
+export type PrintParts = { board: boolean; tickets: boolean; rules: boolean };
 
-export function PrintPages({ data, plan, what = "board" }: { data: MapData; plan: PrintPlan; what?: PrintWhat }) {
+export function PrintPages({ data, plan, parts, setId }: { data: MapData; plan: PrintPlan; parts: PrintParts; setId: string }) {
   const format = mapFormats[data.format];
   const full = plan.choice.split === "full";
   const percent = `${Math.round(plan.scale * 100)} %`;
@@ -62,7 +61,7 @@ export function PrintPages({ data, plan, what = "board" }: { data: MapData; plan
         @page margin and uses its own — Safari does — then still has room for it; a box the size of
         the paper would spill onto an empty sheet after every page, or be shrunk to fit. */}
     <style>{`@media print{@page{size:${plan.pageMm.width}mm ${plan.pageMm.height}mm;margin:${PRINT_MARGIN_MM}mm}}`}</style>
-    {what !== "rules" && plan.pages.map((page) => {
+    {parts.board && plan.pages.map((page) => {
       // Each page is one SVG the size of the page box, in millimetres, holding the landscape sheet —
       // caption, artwork, frame or cut marks — turned a quarter turn with an SVG transform. Turning
       // HTML with a CSS transform printed the artwork shrunk in Chromium's PDF, and a CSS media query
@@ -90,7 +89,8 @@ export function PrintPages({ data, plan, what = "board" }: { data: MapData; plan
     })}
     {/* The rules, if asked for, on pages of their own after the board: as many as the text needs,
         flowing in the same page box as the board's pages. */}
-    {what !== "board" && data.rules?.trim() && <section className="print-rules">
+    {parts.tickets && <TicketCards data={data} setId={setId} />}
+    {parts.rules && data.rules?.trim() && <section className="print-rules">
       <p className="print-rules-name">{data.name} · rules</p>
       <RulesText source={data.rules} data={data} print />
     </section>}
@@ -99,22 +99,34 @@ export function PrintPages({ data, plan, what = "board" }: { data: MapData; plan
 
 // Printing is decided per run. Nothing chosen here is written to the map; the last choice is kept
 // in this browser only, for convenience.
-export function PrintDialog({ open, onOpenChange, format, profile, choice, onChoice, what, onPrint }: {
+export function PrintDialog({ open, onOpenChange, format, profile, choice, onChoice, parts, onPrint }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   format: MapFormat;
   profile: PrintProfile;
   choice: PrintChoice;
   onChoice: (choice: PrintChoice) => void;
-  what: { written: boolean; value: PrintWhat; onChange: (what: PrintWhat) => void };
+  // What is ticked, what each part has to print, and what is on offer: a deck with no tickets has no
+  // cards, and a map with no rules text has no rules.
+  parts: { value: PrintParts; onChange: (parts: PrintParts) => void; rulesWritten: boolean; ticketCount: number; deckLabel: string };
   onPrint: () => void;
 }) {
   const plan = printPlan(format, choice, profile);
   const { sizes, columns, table } = printChoices(format, profile);
   const current = plan.choice;
   const anniversary = sizes.find((size) => size.id === "anniversary");
-  // Rules only has no board in it: how it is split, its size and its sheet table do not apply.
-  const boardIn = what.value !== "rules";
+  // Without the board in the run, how it is split, its size and its sheet table do not apply.
+  const boardIn = parts.value.board;
+  const anything = parts.value.board || parts.value.tickets || parts.value.rules;
+  const paperLabel = papers.find((paper) => paper.id === current.paper)?.label ?? "the paper";
+  const cards = cardSheets(parts.ticketCount, plan.pageMm);
+  // One sentence for the whole run, in the order it prints.
+  const summary = !anything ? "Nothing is ticked: tick at least one of the board, the tickets and the rules."
+    : [
+      parts.value.board ? describePlan(plan) : null,
+      parts.value.tickets ? `${parts.value.board ? "Then the" : "The"} ${parts.ticketCount} ticket${parts.ticketCount === 1 ? "" : "s"} of ${parts.deckLabel} as cut-out cards, ${cards.sheets} sheet${cards.sheets === 1 ? "" : "s"} of ${paperLabel}.` : null,
+      parts.value.rules ? `${parts.value.board || parts.value.tickets ? "Then the rules" : "The rules text"}, on pages of their own${parts.value.board || parts.value.tickets ? "" : ", upright on " + paperLabel + ", as many as it needs"}.` : null,
+    ].filter(Boolean).join(" ");
   return <Dialog open={open} onOpenChange={onOpenChange}>
     <DialogContent className="print-dialog">
       <DialogHeader>
@@ -123,11 +135,21 @@ export function PrintDialog({ open, onOpenChange, format, profile, choice, onCho
       </DialogHeader>
       <div className="print-choices">
         <fieldset><legend>What to print</legend>
-          {([["board", "Board only", "The map on its sheets, as chosen below."], ["both", "Board and rules", what.written ? "The board, then the rules on pages of their own." : "Nothing written yet. Open Rules in the left column to write them."], ["rules", "Rules only", what.written ? "Just the rules text, on as many pages as it needs." : "Nothing written yet."]] as [PrintWhat, string, string][]).map(([id, label, note]) => <label key={id} className="print-option">
-            <input type="radio" name="print-what" value={id} aria-label={label} aria-describedby={`print-what-${id}`} disabled={id !== "board" && !what.written}
-              checked={what.value === id} onChange={() => what.onChange(id)} />
-            <span><strong>{label}</strong><small id={`print-what-${id}`}>{note}</small></span>
-          </label>)}
+          <label className="print-option">
+            <input type="checkbox" name="print-board" aria-label="Print the board" aria-describedby="print-board-note"
+              checked={parts.value.board} onChange={(event) => parts.onChange({ ...parts.value, board: event.target.checked })} />
+            <span><strong>The board</strong><small id="print-board-note">The map on its sheets, as chosen below.</small></span>
+          </label>
+          <label className="print-option">
+            <input type="checkbox" name="print-tickets" aria-label="Print the tickets" aria-describedby="print-tickets-note" disabled={parts.ticketCount === 0}
+              checked={parts.value.tickets} onChange={(event) => parts.onChange({ ...parts.value, tickets: event.target.checked })} />
+            <span><strong>The tickets</strong><small id="print-tickets-note">{parts.ticketCount === 0 ? "This deck has no tickets yet." : `${parts.deckLabel}, ${parts.ticketCount} ticket${parts.ticketCount === 1 ? "" : "s"}, as cut-out cards.`}</small></span>
+          </label>
+          <label className="print-option">
+            <input type="checkbox" name="print-rules" aria-label="Print the rules" aria-describedby="print-rules-note" disabled={!parts.rulesWritten}
+              checked={parts.value.rules} onChange={(event) => parts.onChange({ ...parts.value, rules: event.target.checked })} />
+            <span><strong>The rules</strong><small id="print-rules-note">{parts.rulesWritten ? "The rules text, on pages of their own." : "Nothing written yet. Open Rules in the left column to write them."}</small></span>
+          </label>
         </fieldset>
         {boardIn && <fieldset><legend>How it is split</legend>
           {splits.map((split) => <label key={split.id} className="print-option">
@@ -154,7 +176,7 @@ export function PrintDialog({ open, onOpenChange, format, profile, choice, onCho
           </label>
         </fieldset>}
       </div>
-      <p className="print-summary">{what.value === "rules" ? `Rules only: the rules text, upright on ${papers.find((paper) => paper.id === current.paper)?.label ?? "the paper"}, on as many pages as it needs.` : describePlan(plan)}{what.value === "both" ? " Then the rules, on pages of their own." : ""}</p>
+      <p className="print-summary">{summary}</p>
       {boardIn && <><h3 id="print-table-heading" className="print-table-heading">Sheets for every choice</h3>
       <p id="print-table-note" className="print-table-note">Each cell shows how many sheets a print run takes, and its scale: how big the printed board is against the real one. 100 % is real size; 50 % is half as wide and half as tall. Pick a cell to use it.</p>
       <div className="print-table-wrap">
@@ -174,7 +196,7 @@ export function PrintDialog({ open, onOpenChange, format, profile, choice, onCho
       {boardIn && <p className="helper print-dialog-foot">Every page prints upright (portrait), the default in every browser, with the map turned a quarter turn on it: leave the print dialog on Portrait. Print at 100 % — “fit to page” would undo the sizes above. The same dialog can save the run as a PDF.</p>}
       <DialogFooter>
         <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-        <Button onClick={onPrint}><Printer />Print</Button>
+        <Button onClick={onPrint} disabled={!anything}><Printer />Print</Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>;
