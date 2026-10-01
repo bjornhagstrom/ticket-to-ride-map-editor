@@ -13,7 +13,7 @@ import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { MapArtwork, type Tool } from "./map-artwork";
-import { AnalysisPanel, StopTicketsDialog, SuggestionsPanel, SuggestTicketsDialog, TicketsDialog, WelcomeGuide } from "./map-dialogs";
+import { AnalysisPanel, StopTicketsDialog, SuggestionsPanel, SuggestTicketsDialog, TicketsPanel, WelcomeGuide } from "./map-dialogs";
 import { TicketCoveragePanel, type CoverageSort, BackgroundImageProperties, BackgroundProperties, NoteProperties, RouteProperties, StopProperties, StylePicker } from "./map-properties";
 import { PrintDialog, PrintPages, TicketPrintPages } from "./map-print";
 import { ImageStage } from "./map-image";
@@ -40,7 +40,7 @@ const readHintOffset = () => {
 };
 
 const RIGHT_WIDTH_KEY = "ttr-right-column-width";
-const RIGHT_WIDTH_DEFAULT = 400, RIGHT_WIDTH_MIN = 320, RIGHT_WIDTH_MAX = 900;
+const RIGHT_WIDTH_DEFAULT = 400, RIGHT_WIDTH_MIN = 320, RIGHT_WIDTH_MAX = 900, RIGHT_WIDTH_WIDE = 720;
 
 export function MapEditor() {
   const [data, setData] = useState<MapData>(emptyMap);
@@ -120,6 +120,9 @@ export function MapEditor() {
   const [balanceRoutes, setBalanceRoutes] = useState<Set<string> | null>(null);
   const [balanceStop, setBalanceStop] = useState<string | null>(null);
   const closeAnalysis = () => { setShowAnalysis(false); setBalanceRoutes(null); setBalanceStop(null); };
+  // The right column holds one panel at a time: Map balance, Suggest routes or Tickets.
+  const openTickets = () => { closeAnalysis(); setShowSuggestions(false); setHoveredSuggestion(null); setShowTickets(true); };
+  const widePanel = showAnalysis || showTickets;
   // The suggested route the pointer is on, drawn on the map while it is there.
   const [hoveredSuggestion, setHoveredSuggestion] = useState<RouteSuggestion | null>(null);
   const [selectedStop, setSelectedStop] = useState<string | null>(null);
@@ -217,7 +220,7 @@ export function MapEditor() {
     setTicketSetId(target);
     setSelectedTicket(null);
     setShowSuggest(false);
-    setShowTickets(true);
+    openTickets();
     toast.success(`${suggestion.tickets.length} tickets suggested into ${mode === "replace" ? activeTicketSet.label : label}.`);
   };
   const openSuggest = () => { setShowTickets(false); setSuggestStyle(null); setSuggestSize(null); setSuggestSeed(1); setSuggestName(""); setShowSuggest(true); };
@@ -278,11 +281,11 @@ export function MapEditor() {
       .filter((ticket) => ticket.a === selectedS.id || ticket.b === selectedS.id)
       .map((ticket) => ({ id: ticket.id, other: stopById(data, ticket.a === selectedS.id ? ticket.b : ticket.a)?.name ?? "—", points: ticket.points })),
   })).filter((deck) => deck.tickets.length || data.ticketSets.length === 1) : [];
-  const litTicket = selectedTicket && !showTickets ? data.tickets.find((ticket) => ticket.id === selectedTicket) : undefined;
+  const litTicket = selectedTicket ? data.tickets.find((ticket) => ticket.id === selectedTicket) : undefined;
   // A deck can be given any name at all, so the button that carries it has to be able to cut it off.
   const ticketButtonLabel = `Tickets · ${ticketsHere.length}${data.ticketSets.length > 1 ? ` in ${activeTicketSet.label}` : ""}`;
   const startTicketFrom = (stopId: string) => { setShowTickets(false); setSelectedTicket(null); enterTool("ticket"); setTicketStart(stopId); };
-  const openTicket = (ticketId: string) => { const ticket = data.tickets.find((item) => item.id === ticketId); if (!ticket) return; setTicketSetId(ticket.set ?? data.ticketSets[0].id); setSelectedTicket(ticketId); setShowTickets(true); };
+  const openTicket = (ticketId: string) => { const ticket = data.tickets.find((item) => item.id === ticketId); if (!ticket) return; setTicketSetId(ticket.set ?? data.ticketSets[0].id); setSelectedTicket(ticketId); openTickets(); };
   const selectedR = data.routes.find((route) => route.id === selectedRoute);
   // Put the shape hint on whichever edge of the board the selected route is furthest from,
   // so it never covers the bend points you are about to drag.
@@ -325,6 +328,7 @@ export function MapEditor() {
     // Then the side panels, which hold Escape the same way; then a pick in progress; then the ticket.
     if (showAnalysis) closeAnalysis();
     else if (showSuggestions) { setShowSuggestions(false); setHoveredSuggestion(null); }
+    else if (showTickets) setShowTickets(false);
     else if (pendingStop) cancelPick(); else setSelectedTicket(null);
   }; });
   // Ticket cards print on their own paper, so the print tree swaps to them, prints, and swaps back.
@@ -625,7 +629,7 @@ export function MapEditor() {
           if (!tickets.length) { toast.error(dropped ? `None of the ${dropped} tickets in the file match a stop in this map.` : "That ticket file is empty."); return; }
           change((draft) => ({ ...draft, ticketSets: [...draft.ticketSets, ...sets], tickets: [...draft.tickets, ...tickets] }));
           setTicketSetId(sets[0].id);
-          setShowTickets(true);
+          openTickets();
           toast.success(`${tickets.length} ticket${tickets.length === 1 ? "" : "s"} imported as ${sets.map((set) => set.label).join(", ")}.${dropped ? ` ${dropped} skipped: no matching stop.` : ""}`);
           return;
         }
@@ -674,8 +678,8 @@ export function MapEditor() {
       <div className="map-title"><Label htmlFor="map-name" className="sr-only">Map name</Label><Input id="map-name" value={data.name} onChange={(event) => change((draft) => ({ ...draft, name: event.target.value }))} /><span className="save-state"><Check />{saved ? "Saved locally" : "Saving…"}</span></div>
       <div className="header-actions"><DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" size="sm"><CircleHelp />Help</Button></DropdownMenuTrigger><DropdownMenuContent align="start"><DropdownMenuItem onClick={() => setShowGuide(true)}><CircleHelp />Getting started</DropdownMenuItem><DropdownMenuItem asChild><a href="./about"><BusFront />About Map prototypes</a></DropdownMenuItem></DropdownMenuContent></DropdownMenu><Button variant="ghost" size="icon" aria-label="Undo" title="Undo (Ctrl/Cmd+Z)" disabled={!past.length} onClick={undo}><Undo2 /></Button><Button variant="ghost" size="icon" aria-label="Redo" title="Redo (Ctrl/Cmd+Shift+Z)" disabled={!future.length} onClick={redo}><Redo2 /></Button><DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" size="sm"><Upload />Import</Button></DropdownMenuTrigger><DropdownMenuContent align="start"><DropdownMenuItem onClick={() => fileRef.current?.click()}><Upload />Map project</DropdownMenuItem><DropdownMenuItem onClick={() => fileRef.current?.click()}><TicketIcon />Tickets only</DropdownMenuItem><DropdownMenuItem onClick={() => imageFileRef.current?.click()}><ImageIcon />Background image</DropdownMenuItem></DropdownMenuContent></DropdownMenu><input ref={fileRef} hidden type="file" accept="application/json" onChange={(event) => { importMap(event.target.files?.[0]); event.target.value = ""; }} /><input ref={imageFileRef} hidden type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => { importBackgroundImage(event.target.files?.[0]); event.target.value = ""; }} /><Button variant="outline" size="sm" onClick={() => setShowPrint(true)}><Printer />Print map</Button><DropdownMenu><DropdownMenuTrigger asChild><Button size="sm"><Download />Export</Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onClick={exportMap}><Download />Full map</DropdownMenuItem><DropdownMenuItem onClick={() => setMakingImage(true)}><ImageIcon />Map as image (PNG)</DropdownMenuItem><DropdownMenuItem onClick={exportBackground}><Layers3 />Background only</DropdownMenuItem><DropdownMenuItem onClick={exportNetwork}><Link2 />Network only</DropdownMenuItem><DropdownMenuItem onClick={() => exportTickets("all")}><TicketIcon />Tickets only</DropdownMenuItem></DropdownMenuContent></DropdownMenu></div>
     </header>
-    <div className={cn("workspace", showAnalysis && "showing-balance")} style={{ "--right-width": `${rightWidth}px`, "--map-ratio": W / format.height } as React.CSSProperties}>
-      {showAnalysis && <div className="column-resizer" role="separator" aria-orientation="vertical" aria-label="Resize the right column" aria-valuenow={rightWidth} aria-valuemin={RIGHT_WIDTH_MIN} aria-valuemax={RIGHT_WIDTH_MAX} tabIndex={0} title="Drag to resize, double-click to reset"
+    <div className={cn("workspace", widePanel && "showing-balance")} style={{ "--right-width": `${rightWidth}px`, "--map-ratio": W / format.height } as React.CSSProperties}>
+      {widePanel && <div className="column-resizer" role="separator" aria-orientation="vertical" aria-label="Resize the right column" aria-valuenow={rightWidth} aria-valuemin={RIGHT_WIDTH_MIN} aria-valuemax={RIGHT_WIDTH_MAX} tabIndex={0} title="Drag to resize, double-click to reset"
         onPointerDown={(event) => { event.preventDefault(); const startX = event.clientX, startWidth = rightWidth; const el = event.currentTarget; el.setPointerCapture(event.pointerId); const move = (e: PointerEvent) => resizeRight(startWidth + startX - e.clientX); const done = () => { el.removeEventListener("pointermove", move); el.removeEventListener("pointerup", done); el.removeEventListener("pointercancel", done); }; el.addEventListener("pointermove", move); el.addEventListener("pointerup", done); el.addEventListener("pointercancel", done); }}
         onDoubleClick={resetRight}
         onKeyDown={(event) => { if (event.key === "ArrowLeft") { event.preventDefault(); resizeRight(rightWidth + 24); } else if (event.key === "ArrowRight") { event.preventDefault(); resizeRight(rightWidth - 24); } }} />}
@@ -721,9 +725,9 @@ export function MapEditor() {
           <p>Drawing and deleting routes moves it; placing stops you never connect drags the average down.</p>
         </TooltipContent></Tooltip>}
         <Button variant="outline" size="sm" className="analyze-button" onClick={() => openStyles({ kind: "map" })}><Settings2 />Settings</Button>
-        {data.stops.length > 0 && <Button variant="outline" size="sm" className="analyze-button" onClick={() => { setShowSuggestions(false); setHoveredSuggestion(null); setShowAnalysis(true); }}><BarChart3 />Analyze balance</Button>}
-        <Button variant="outline" size="sm" className="analyze-button" title={ticketButtonLabel} onClick={() => setShowTickets(true)}><TicketIcon /><span className="button-label">{ticketButtonLabel}</span></Button>
-        {data.stops.length > 1 && <Button variant="outline" size="sm" className="analyze-button" onClick={() => { closeAnalysis(); setShowSuggestions(true); }}><Lightbulb />Suggest routes</Button>}
+        {data.stops.length > 0 && <Button variant="outline" size="sm" className="analyze-button" onClick={() => { setShowSuggestions(false); setHoveredSuggestion(null); setShowTickets(false); setShowAnalysis(true); }}><BarChart3 />Analyze balance</Button>}
+        <Button variant="outline" size="sm" className="analyze-button" title={ticketButtonLabel} onClick={openTickets}><TicketIcon /><span className="button-label">{ticketButtonLabel}</span></Button>
+        {data.stops.length > 1 && <Button variant="outline" size="sm" className="analyze-button" onClick={() => { closeAnalysis(); setShowTickets(false); setShowSuggestions(true); }}><Lightbulb />Suggest routes</Button>}
         <div className="legend"><p className="eyebrow">Stop types</p>{data.stopTypeStyles.map((meta) => <button type="button" key={meta.id} className="legend-item" title={`Edit the ${meta.label} stop type`} onClick={() => openStyles({ kind: "stop", id: meta.id })}><i style={{ background: meta.fill, borderColor: meta.stroke }} />{meta.label}</button>)}</div>
         <Button variant="ghost" className="reset-button" onClick={() => setDanger("reset")}><RotateCcw />Clear map</Button>
       </aside>
@@ -736,8 +740,17 @@ export function MapEditor() {
         </svg>
         {hint && !hint.atTop && <MapHint atTop={false} title={hint.title} open={routeHintOpen} onToggle={toggleRouteHint} offsetX={routeHintX} onOffsetChange={moveRouteHint}>{hint.body}</MapHint>}
       </section>
-      <aside className={cn("properties panel", showSuggestions && "showing-suggestions", showAnalysis && "showing-balance")}>
+      <aside className={cn("properties panel", showSuggestions && "showing-suggestions", widePanel && "showing-balance")}>
         {showAnalysis && <AnalysisPanel lengthView={lengthsView} setup={setup} bottlenecks={deckReport.bottlenecks} atTable={atTable} onAtTable={(count) => { setBottleneckTable(count); setBottleneckRoutes(new Set()); }} onShowBottleneck={(routeIds) => setBottleneckRoutes(new Set(routeIds))} onClose={closeAnalysis} onPreviewRoutes={(routeIds) => setBalanceRoutes(routeIds ? new Set(routeIds) : null)} onPreviewStop={setBalanceStop} data={data} stats={stats} colourTable={colourTable} spacing={spacing} scaleWidthMm={scaleWidthMm} onSelectRoute={(routeId) => { closeAnalysis(); setSelectedRoute(routeId); setSelectedStop(null); setSelectedBackground(null); setSelectedNote(null); setImageSelected(false); setTool("select"); }} onSelectStop={(stopId) => { closeAnalysis(); setSelectedStop(stopId); setSelectedRoute(null); setSelectedBackground(null); setSelectedNote(null); setImageSelected(false); setTool("select"); }}  />}
+        {showTickets && <TicketsPanel lengthView={lengthsView} wide={rightWidth >= RIGHT_WIDTH_WIDE} onToggleWide={() => (rightWidth >= RIGHT_WIDTH_WIDE ? resetRight() : resizeRight(RIGHT_WIDTH_WIDE))} onClose={() => setShowTickets(false)} data={data} reviews={ticketReviews} coverage={ticketCoverage(data, activeTicketSet.id)} rate={ticketRate} selected={selectedTicket} activeSet={activeTicketSet} onSelect={setSelectedTicket}
+          onSelectSet={(setId) => { setTicketSetId(setId); setSelectedTicket(null); }}
+          onAddSet={() => { const id = `ts-${Date.now()}`; change((draft) => { draft.ticketSets.push({ id, label: nextDeckLabel(draft.ticketSets) }); return draft; }); setTicketSetId(id); setSelectedTicket(null); }}
+          onDuplicateSet={() => { const id = `ts-${Date.now()}`; const stamp = Date.now(); change((draft) => { draft.ticketSets.push({ id, label: nextDeckLabel(draft.ticketSets, `${activeTicketSet.label} copy`) }); ticketsInSet(draft, activeTicketSet.id).forEach((ticket, index) => draft.tickets.push({ ...ticket, id: `t-${stamp}-${index}`, set: id })); return draft; }); setTicketSetId(id); setSelectedTicket(null); }}
+          onRenameSet={(label) => change((draft) => { const set = draft.ticketSets.find((item) => item.id === activeTicketSet.id); if (set) set.label = label; return draft; })}
+          onDeleteSet={() => { if (data.ticketSets.length < 2) return; const gone = activeTicketSet.id; change((draft) => { const first = draft.ticketSets[0].id; draft.tickets = draft.tickets.filter((ticket) => (ticket.set ?? first) !== gone); draft.ticketSets = draft.ticketSets.filter((set) => set.id !== gone); return draft; }); setTicketSetId(data.ticketSets.find((set) => set.id !== gone)!.id); setSelectedTicket(null); }}
+          onExport={exportTickets} onImport={() => fileRef.current?.click()} onPrint={printTickets} onStartFrom={startTicketFrom} onSuggest={openSuggest}
+          onUpdate={(ticketId, values) => change((draft) => { const ticket = draft.tickets.find((item) => item.id === ticketId); if (ticket) Object.assign(ticket, { ...values, long: values.long === false ? undefined : values.long ?? ticket.long }); return draft; })}
+          onDelete={(ticketId) => { change((draft) => { draft.tickets = draft.tickets.filter((item) => item.id !== ticketId); return draft; }); setSelectedTicket((current) => current === ticketId ? null : current); }}  />}
         {showSuggestions && <SuggestionsPanel suggestions={suggestions} onAdd={addSuggestedRoute} onHover={setHoveredSuggestion} onClose={() => { setShowSuggestions(false); setHoveredSuggestion(null); }} />}
         <div className="panel-heading"><span>{tool === "ticket" ? "Ticket coverage" : "Properties"}</span><small title={tool === "ticket" ? activeTicketSet.label : undefined}>{tool === "ticket" ? `${activeTicketSet.label} · ${ticketsHere.length} ticket${ticketsHere.length === 1 ? "" : "s"}` : imageSelected ? "Background image selected" : selectedN ? "Note selected" : selectedB ? "Background object selected" : selectedR ? "Route selected" : selectedS ? "Stop selected" : "Select an object on the map"}</small></div>
         {tool === "ticket" && <TicketCoveragePanel rows={coverageRows} deck={activeTicketSet.label} cuts={bandCuts(ticketDiameter, bandsOf(data))} onEditMix={() => openStyles({ kind: "ticket" })} sort={coverageSort} onSort={setCoverageSort} onlyUncovered={onlyUncovered} onOnlyUncovered={setOnlyUncovered} onOpen={(stopId, band) => setStopTicketView({ stopId, band })} />}
@@ -762,15 +775,6 @@ export function MapEditor() {
       onShuffle={() => setSuggestSeed((seed) => seed + 1)} onApply={(mode) => applySuggestion(mode, `ts-${Date.now()}`)} />
     <WelcomeGuide open={showGuide} onOpenChange={(open) => !open && dismissGuide()} onChooseBlank={() => chooseFromGuide("blank")} onChooseExample={() => chooseFromGuide("example")} />
     <SettingsDialog open={showStyles} onOpenChange={setShowStyles} target={styleTarget} onTarget={setStyleTarget} data={data} change={change} onChangeFormat={changeFormat} defaults={{ stopType, setStopType, stopSize, setStopSize: (value) => setStopSize(value as StopSize), routeType, setRouteType, routeColor, setRouteColor, routeCurved, setRouteCurved, routeLineStyle, setRouteLineStyle, linkParallel, setLinkParallel }} />
-    <TicketsDialog lengthView={lengthsView} open={showTickets} onOpenChange={setShowTickets} data={data} reviews={ticketReviews} coverage={ticketCoverage(data, activeTicketSet.id)} rate={ticketRate} selected={selectedTicket} activeSet={activeTicketSet} onSelect={setSelectedTicket}
-      onSelectSet={(setId) => { setTicketSetId(setId); setSelectedTicket(null); }}
-      onAddSet={() => { const id = `ts-${Date.now()}`; change((draft) => { draft.ticketSets.push({ id, label: nextDeckLabel(draft.ticketSets) }); return draft; }); setTicketSetId(id); setSelectedTicket(null); }}
-      onDuplicateSet={() => { const id = `ts-${Date.now()}`; const stamp = Date.now(); change((draft) => { draft.ticketSets.push({ id, label: nextDeckLabel(draft.ticketSets, `${activeTicketSet.label} copy`) }); ticketsInSet(draft, activeTicketSet.id).forEach((ticket, index) => draft.tickets.push({ ...ticket, id: `t-${stamp}-${index}`, set: id })); return draft; }); setTicketSetId(id); setSelectedTicket(null); }}
-      onRenameSet={(label) => change((draft) => { const set = draft.ticketSets.find((item) => item.id === activeTicketSet.id); if (set) set.label = label; return draft; })}
-      onDeleteSet={() => { if (data.ticketSets.length < 2) return; const gone = activeTicketSet.id; change((draft) => { const first = draft.ticketSets[0].id; draft.tickets = draft.tickets.filter((ticket) => (ticket.set ?? first) !== gone); draft.ticketSets = draft.ticketSets.filter((set) => set.id !== gone); return draft; }); setTicketSetId(data.ticketSets.find((set) => set.id !== gone)!.id); setSelectedTicket(null); }}
-      onExport={exportTickets} onImport={() => fileRef.current?.click()} onPrint={printTickets} onStartFrom={startTicketFrom} onSuggest={openSuggest}
-      onUpdate={(ticketId, values) => change((draft) => { const ticket = draft.tickets.find((item) => item.id === ticketId); if (ticket) Object.assign(ticket, { ...values, long: values.long === false ? undefined : values.long ?? ticket.long }); return draft; })}
-      onDelete={(ticketId) => { change((draft) => { draft.tickets = draft.tickets.filter((item) => item.id !== ticketId); return draft; }); setSelectedTicket((current) => current === ticketId ? null : current); }} />
     {printScope === "tickets" ? <TicketPrintPages data={data} setId={activeTicketSet.id} /> : <PrintPages data={data} plan={printPlan(data.format, printChoice, printProfile)} />}
     {makingImage && <ImageStage data={data} onDone={saveImage} onFail={() => setMakingImage(false)} />}
     <PrintDialog open={showPrint} onOpenChange={setShowPrint} format={data.format} profile={printProfile} choice={printChoice} onChoice={choosePrint} onPrint={() => { setShowPrint(false); setPrintRequest((count) => count + 1); }} />

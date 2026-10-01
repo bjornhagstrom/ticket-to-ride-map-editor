@@ -170,8 +170,8 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   check("every stop but the junction is on a ticket", example.stops.filter((st) => !typeOf(st.type).junction).every((st) => mainDeck.some((t) => t.a === st.id || t.b === st.id)));
   await page.getByRole("button", { name: /^Tickets · / }).click();
   await page.waitForTimeout(500);
-  const ticketsDialogText = await page.locator('[role="dialog"]').first().textContent();
-  check("and the tickets dialog does not list the junction as a stop no ticket reaches", !ticketsDialogText.includes(junction.name), ticketsDialogText.slice(0, 200));
+  const ticketsDialogText = await page.locator(".tickets-panel").textContent();
+  check("and the tickets panel does not list the junction as a stop no ticket reaches", !ticketsDialogText.includes(junction.name), ticketsDialogText.slice(0, 200));
   await page.keyboard.press("Escape");
   await page.waitForTimeout(300);
   await page.getByRole("button", { name: "Analyze balance" }).click();
@@ -689,18 +689,57 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await ticketsButton.click();
   await page.waitForTimeout(400);
 
+  // Tickets is a panel in the right column, like Map balance: the map stays in view and undimmed, the
+  // panel scrolls and widens, and it can be opened out to read a long list.
+  {
+    const panel = page.locator("aside.properties .tickets-panel");
+    const view = () => page.evaluate(() => {
+      const box = (el) => { const r = el.getBoundingClientRect(); return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, width: r.width }; };
+      const aside = document.querySelector("aside.properties"), canvas = document.querySelector(".map-canvas"), wrap = document.querySelector(".map-wrap");
+      return { page: document.documentElement.scrollHeight, win: innerHeight, aside: box(aside), canvas: box(canvas), wrap: box(wrap), overflow: getComputedStyle(aside).overflowY, scroll: aside.scrollHeight, client: aside.clientHeight };
+    });
+    check("Tickets opens in the right column, not in a dialog", (await panel.count()) === 1 && (await page.locator('[role="dialog"]').count()) === 0);
+    check("and does not darken the map", (await page.locator('[data-slot="dialog-overlay"]').count()) === 0);
+    const v = await view();
+    check("the page does not grow with the ticket list, and the panel scrolls", v.page <= v.win + 1 && v.overflow === "auto" && v.scroll > v.client, `${v.page}/${v.win}, ${v.overflow}, ${v.scroll}/${v.client}`);
+    check("the whole map is in view beside it", v.canvas.top >= 0 && v.canvas.bottom <= v.win && v.canvas.right <= v.aside.left + 1 && v.canvas.left >= v.wrap.left - 1, JSON.stringify({ canvas: v.canvas, aside: v.aside.left }));
+    check("the column can be dragged wider while Tickets is open", (await page.getByRole("separator", { name: "Resize the right column" }).count()) === 1);
+    const expand = panel.getByRole("button", { name: "Expand", exact: true });
+    await expand.click();
+    await page.waitForTimeout(250);
+    const wide = await view();
+    check("Expand opens the column out to read a long list", wide.aside.width >= 640 && wide.canvas.right <= wide.aside.left + 1 && wide.canvas.bottom <= wide.win, `${v.aside.width} → ${wide.aside.width}`);
+    await panel.getByRole("button", { name: "Collapse", exact: true }).click();
+    await page.waitForTimeout(250);
+    check("and Collapse puts it back", Math.abs((await view()).aside.width - v.aside.width) <= 3);
+    // Picking a row shows that ticket's shortest path on the map, which is in view beside the list.
+    await panel.locator(".analysis-table tbody tr").first().click();
+    await page.waitForTimeout(250);
+    check("picking a ticket lights its path on the map beside the list", (await page.locator(".map-canvas .route-group.on-ticket").count()) >= 1);
+    await panel.locator(".analysis-table tbody tr").first().click();
+    // One panel at a time: Map balance takes the column, and Tickets comes back when asked.
+    await page.getByRole("button", { name: "Analyze balance" }).click();
+    await page.waitForTimeout(400);
+    check("opening Map balance replaces the Tickets panel", (await page.locator(".tickets-panel").count()) === 0 && (await page.locator(".balance-panel").count()) === 1);
+    await page.locator(".balance-panel").getByRole("button", { name: "Done" }).click();
+    await page.waitForTimeout(250);
+    await ticketsButton.click();
+    await page.waitForTimeout(300);
+    check("and Tickets replaces Map balance", (await page.locator(".tickets-panel").count()) === 1 && (await page.locator(".balance-panel:not(.tickets-panel)").count()) === 0);
+  }
+
   {
     const inDeck = await page.evaluate(() => JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")).tickets.filter((t) => (t.set || "main") === "main").length);
     // Tickets longer than a player can build are left out of the bars, and the section says how many.
-    const left = await page.locator('[role="dialog"]').first().locator(".length-excluded").evaluateAll((els) => els.reduce((sum, el) => sum + Number(el.dataset.skipped) + Number(el.dataset.long), 0));
+    const left = await page.locator(".tickets-panel .length-excluded").evaluateAll((els) => els.reduce((sum, el) => sum + Number(el.dataset.skipped) + Number(el.dataset.long), 0));
     const keptInDeck = inDeck - left;
-    const lengths = await lengthsIn(page.locator('[role="dialog"]').first());
-    check("the Tickets dialog shows the deck's lengths in five bands", lengths !== null && lengths.rows.length === 5, JSON.stringify(lengths && lengths.rows.map((r) => r.label)));
+    const lengths = await lengthsIn(page.locator(".tickets-panel"));
+    check("the Tickets panel shows the deck's lengths in five bands", lengths !== null && lengths.rows.length === 5, JSON.stringify(lengths && lengths.rows.map((r) => r.label)));
     check("the bands hold every ticket once, but those the section says it left out", lengths !== null && lengths.rows.reduce((sum, r) => sum + r.count, 0) === keptInDeck, `${lengths && lengths.rows.map((r) => r.count)} of ${inDeck}, ${left} left out`);
     check("and each bar is that band's share of the deck", lengths !== null && lengths.rows.every((r) => Math.abs(r.share - (r.count / keptInDeck) * 100) < 1.5), JSON.stringify(lengths && lengths.rows.map((r) => r.share)));
     check("the official decks are marked on every bar, and no rules of its own yet", lengths !== null && lengths.rows.every((r) => r.official !== null && r.own === null) && Math.abs(lengths.rows.reduce((sum, r) => sum + r.official, 0) - 100) < 2, JSON.stringify(lengths && lengths.rows.map((r) => r.official)));
     check("a sentence says where the deck is furthest from them", lengths !== null && /official/i.test(lengths.verdict) && /%/.test(lengths.verdict), lengths && lengths.verdict);
-    check("and nothing spills out of the dialog", lengths !== null && lengths.spill === 0, String(lengths && lengths.spill));
+    check("and nothing spills out of the column", lengths !== null && lengths.spill === 0, String(lengths && lengths.spill));
   }
 
   const ticketFile = path.join(os.tmpdir(), `ttr-tickets-${Date.now()}.json`);
@@ -1049,11 +1088,11 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   const withTickets = (await page.locator("#ticket-set option").allTextContents()).findIndex((label) => !/\(0\)$/.test(label));
   await page.locator("#ticket-set").selectOption({ index: Math.max(0, withTickets) });
   await page.waitForTimeout(400);
-  const ticketCells = () => page.$$eval(".analysis-dialog .analysis-table tbody tr", (trs) => trs.map((tr) => Array.from(tr.children).map((td) => {
+  const ticketCells = () => page.$$eval(".tickets-panel .analysis-table tbody tr", (trs) => trs.map((tr) => Array.from(tr.children).map((td) => {
     const input = td.querySelector("input[type=number]");
     return input ? input.value : td.textContent.trim();
   })));
-  const ticketHead = (label) => page.locator(".analysis-dialog .analysis-table thead th").filter({ hasText: label }).first();
+  const ticketHead = (label) => page.locator(".tickets-panel .analysis-table thead th").filter({ hasText: label }).first();
   const inOrder = (values, descending) => values.every((v, i) => i === 0 || (descending ? v <= values[i - 1] : v >= values[i - 1]));
   await ticketHead("Spaces").click();
   await page.waitForTimeout(300);
@@ -1063,7 +1102,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await ticketHead("Spaces").click();
   await page.waitForTimeout(300);
   check("clicking it again turns the order around", inOrder((await ticketCells()).map((cells) => Number(cells[1])), true), (await ticketCells()).map((cells) => cells[1]).slice(0, 6).join(","));
-  const editable = page.locator(".analysis-dialog .analysis-table tbody tr").first().locator(".ticket-points");
+  const editable = page.locator(".tickets-panel .analysis-table tbody tr").first().locator(".ticket-points");
   await editable.fill("9");
   await editable.blur();
   await page.waitForTimeout(400);
@@ -1633,8 +1672,8 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.getByRole("button", { name: /^Tickets · / }).click();
   await page.waitForTimeout(400);
   {
-    const lengths = await lengthsIn(page.locator('[role="dialog"]').first());
-    check("with rules of its own chosen, the Tickets dialog marks both references", lengths !== null && lengths.rows.every((r) => r.official !== null && r.own !== null) && /Sparse/.test(lengths.verdict) && /official/i.test(lengths.verdict), lengths && lengths.verdict);
+    const lengths = await lengthsIn(page.locator(".tickets-panel"));
+    check("with rules of its own chosen, the Tickets panel marks both references", lengths !== null && lengths.rows.every((r) => r.official !== null && r.own !== null) && /Sparse/.test(lengths.verdict) && /official/i.test(lengths.verdict), lengths && lengths.verdict);
   }
   await page.getByRole("button", { name: /Add a deck/ }).click();
   await page.waitForTimeout(250);

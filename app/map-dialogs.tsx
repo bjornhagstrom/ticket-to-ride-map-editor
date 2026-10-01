@@ -136,10 +136,11 @@ export function SuggestionsPanel({ suggestions, onAdd, onHover, onClose }: { sug
 
 type TicketSortColumn = "ticket" | "spaces" | "points" | "suggested" | "long";
 
-export function TicketsDialog({ lengthView, open, onOpenChange, data, reviews, coverage, rate, selected, activeSet, onSelect, onUpdate, onDelete, onSelectSet, onAddSet, onDuplicateSet, onRenameSet, onDeleteSet, onExport, onImport, onPrint, onStartFrom, onSuggest }: {
+export function TicketsPanel({ lengthView, wide, onToggleWide, onClose, data, reviews, coverage, rate, selected, activeSet, onSelect, onUpdate, onDelete, onSelectSet, onAddSet, onDuplicateSet, onRenameSet, onDeleteSet, onExport, onImport, onPrint, onStartFrom, onSuggest }: {
   lengthView: TicketLengthsView;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+  wide: boolean;
+  onToggleWide: () => void;
+  onClose: () => void;
   data: MapData;
   reviews: TicketReview[];
   coverage: { stop: Stop; count: number }[];
@@ -183,9 +184,10 @@ export function TicketsDialog({ lengthView, open, onOpenChange, data, reviews, c
   const lengths = reviews.map((review) => review.distance).filter((d): d is number => d !== null).sort((a, b) => a - b);
   const uncovered = coverage.filter((entry) => entry.count === 0);
 
-  return <Dialog open={open} onOpenChange={onOpenChange}>
-    <DialogContent className="analysis-dialog">
-      <DialogHeader><DialogTitle>Destination tickets</DialogTitle><DialogDescription>{reviews.length} ticket{reviews.length === 1 ? "" : "s"} in this deck, worth about {rate.toFixed(1)} point{rate.toFixed(1) === "1.0" ? "" : "s"} per wagon space.</DialogDescription></DialogHeader>
+  // In the right column rather than a dialog, so the map stays in view beside the list.
+  return <div className="balance-panel tickets-panel">
+    <div className="panel-heading"><span>Destination tickets</span><Button size="sm" variant="outline" aria-expanded={wide} onClick={onToggleWide}>{wide ? "Collapse" : "Expand"}</Button></div>
+    <p className="helper">{reviews.length} ticket{reviews.length === 1 ? "" : "s"} in this deck, worth about {rate.toFixed(1)} point{rate.toFixed(1) === "1.0" ? "" : "s"} per wagon space.</p>
 
       <div className="ticket-set-bar">
         <div className="ticket-set-field"><Label htmlFor="ticket-set">Deck</Label><NativeSelect id="ticket-set" value={activeSet.id} onChange={(event) => onSelectSet(event.target.value)}>{data.ticketSets.map((set) => <NativeSelectOption key={set.id} value={set.id}>{set.label} ({ticketsInSet(data, set.id).length})</NativeSelectOption>)}</NativeSelect></div>
@@ -246,8 +248,8 @@ export function TicketsDialog({ lengthView, open, onOpenChange, data, reviews, c
           <div className="uncovered-stops">{uncovered.map((entry) => <button type="button" key={entry.stop.id} className="uncovered-stop" onClick={() => onStartFrom(entry.stop.id)}>{entry.stop.name}</button>)}</div>
         </> : <p className="helper">Every stop is named by at least one ticket.</p>}
       </div>
-    </DialogContent>
-  </Dialog>;
+    <Button variant="outline" size="sm" onClick={onClose}>Done</Button>
+  </div>;
 }
 
 // The tickets behind one number in the coverage panel, as a way through to editing them.
