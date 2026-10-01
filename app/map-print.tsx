@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { cn } from "@/lib/utils";
 import { mapFormats, ticketsInSet, type MapData, type MapFormat, W } from "./map-data";
 import { MapArtwork } from "./map-artwork";
+import { RulesText } from "./rules-text";
 import { CUT_MARK_GAP_MM, CUT_MARK_REACH_MM, describePlan, papers, PRINT_CAPTION_MM, PRINT_MARGIN_MM, printChoices, type PrintChoice, printPlan, type PrintPlan, type PrintProfile, sameChoice, splits } from "./print-plan";
 
 // Tickets print as cut-out cards on plain A4, 16 to a sheet. The same print-and-cut workflow as the
@@ -41,7 +42,7 @@ export function TicketPrintPages({ data, setId }: { data: MapData; setId: string
 
 // The board as the chosen print run cuts it. Page size, margins and the size of every tile come
 // from printPlan, in millimetres, so the pages cannot disagree with what the dialog promised.
-export function PrintPages({ data, plan }: { data: MapData; plan: PrintPlan }) {
+export function PrintPages({ data, plan, rules = false }: { data: MapData; plan: PrintPlan; rules?: boolean }) {
   const format = mapFormats[data.format];
   const full = plan.choice.split === "full";
   const percent = `${Math.round(plan.scale * 100)} %`;
@@ -84,18 +85,25 @@ export function PrintPages({ data, plan }: { data: MapData; plan: PrintPlan }) {
         </svg>
       </section>;
     })}
+    {/* The rules, if asked for, on pages of their own after the board: as many as the text needs,
+        flowing in the same page box as the board's pages. */}
+    {rules && data.rules?.trim() && <section className="print-rules">
+      <p className="print-rules-name">{data.name} · rules</p>
+      <RulesText source={data.rules} data={data} print />
+    </section>}
   </div>;
 }
 
 // Printing is decided per run. Nothing chosen here is written to the map; the last choice is kept
 // in this browser only, for convenience.
-export function PrintDialog({ open, onOpenChange, format, profile, choice, onChoice, onPrint }: {
+export function PrintDialog({ open, onOpenChange, format, profile, choice, onChoice, rules, onPrint }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   format: MapFormat;
   profile: PrintProfile;
   choice: PrintChoice;
   onChoice: (choice: PrintChoice) => void;
+  rules: { written: boolean; on: boolean; onChange: (on: boolean) => void };
   onPrint: () => void;
 }) {
   const plan = printPlan(format, choice, profile);
@@ -133,6 +141,13 @@ export function PrintDialog({ open, onOpenChange, format, profile, choice, onCho
             <span><strong>Anniversary size</strong><small id="print-anniversary-note">{anniversary.widthMm} × {anniversary.heightMm} mm, bigger wagons too. Always printed full size.</small></span>
           </label>
         </fieldset>}
+        <fieldset><legend>Rules</legend>
+          <label className="print-option">
+            <input type="checkbox" name="print-rules" aria-label="Print the rules after the board" aria-describedby="print-rules-note" disabled={!rules.written}
+              checked={rules.written && rules.on} onChange={(event) => rules.onChange(event.target.checked)} />
+            <span><strong>Print the rules</strong><small id="print-rules-note">{rules.written ? "The rules text prints on pages of their own after the board, as many as it needs." : "Nothing written yet. Open Rules in the left column to write them."}</small></span>
+          </label>
+        </fieldset>
       </div>
       <p className="print-summary">{describePlan(plan)}</p>
       <h3 id="print-table-heading" className="print-table-heading">Sheets for every choice</h3>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, BarChart3, Crosshair, Settings2, Ticket as TicketIcon, BusFront, Check, ChevronDown, ChevronUp, GripVertical, CircleDot, CircleHelp, Download, Image as ImageIcon, Layers3, Lightbulb, Link2, MapPinPlus, MousePointer2, Printer, Redo2, RotateCcw, Ruler, StickyNote, Trash2, Undo2, Upload, X } from "lucide-react";
+import { ScrollText, AlertTriangle, BarChart3, Crosshair, Settings2, Ticket as TicketIcon, BusFront, Check, ChevronDown, ChevronUp, GripVertical, CircleDot, CircleHelp, Download, Image as ImageIcon, Layers3, Lightbulb, Link2, MapPinPlus, MousePointer2, Printer, Redo2, RotateCcw, Ruler, StickyNote, Trash2, Undo2, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
@@ -17,6 +17,7 @@ import { AnalysisPanel, StopTicketsDialog, SuggestionsPanel, SuggestTicketsDialo
 import { TicketCoveragePanel, type CoverageSort, BackgroundImageProperties, BackgroundProperties, NoteProperties, RouteProperties, StopProperties, StylePicker } from "./map-properties";
 import { PrintDialog, PrintPages, TicketPrintPages } from "./map-print";
 import { ImageStage } from "./map-image";
+import { RulesPanel } from "./rules-panel";
 import { type TicketLengthsView } from "./ticket-lengths";
 import { DEFAULT_PRINT_CHOICE, isSafari, PRINT_CHOICE_KEY, PRINT_PROFILES, type PrintChoice, type PrintProfile, printPlan } from "./print-plan";
 import { useTicketSuggestion } from "./use-ticket-suggestion";
@@ -40,6 +41,7 @@ const readHintOffset = () => {
 };
 
 const RIGHT_WIDTH_KEY = "ttr-right-column-width";
+const PRINT_RULES_KEY = "ttr-print-rules";
 const RIGHT_WIDTH_DEFAULT = 400, RIGHT_WIDTH_MIN = 320, RIGHT_WIDTH_MAX = 900, RIGHT_WIDTH_WIDE = 720;
 
 export function MapEditor() {
@@ -81,6 +83,12 @@ export function MapEditor() {
   const [showPrint, setShowPrint] = useState(false);
   const [printRequest, setPrintRequest] = useState(0);
   const [makingImage, setMakingImage] = useState(false);
+  // The rules text is a panel in the right column. Whether it prints after the board is a choice made
+  // at the print dialog, kept in this browser like the other print choices.
+  const [showRules, setShowRules] = useState(false);
+  const [printRules, setPrintRules] = useState(true);
+  useEffect(() => { queueMicrotask(() => { try { if (localStorage.getItem(PRINT_RULES_KEY) === "off") setPrintRules(false); } catch { /* keep the default */ } }); }, []);
+  const choosePrintRules = (on: boolean) => { setPrintRules(on); try { localStorage.setItem(PRINT_RULES_KEY, on ? "on" : "off"); } catch { /* not remembered, still used */ } };
   // How wide the right column is while Map balance is open; the left edge of the column is its handle.
   const [rightWidth, setRightWidth] = useState(RIGHT_WIDTH_DEFAULT);
   const resizeRight = (width: number) => {
@@ -127,8 +135,9 @@ export function MapEditor() {
   const togglePin = (key: string, routes: string[] | null, stop: string | null) => setPin((current) => (current?.key === key ? null : { key, routes, stop }));
   const closeAnalysis = () => { setShowAnalysis(false); setBalanceRoutes(null); setBalanceStop(null); setPin(null); setBottleneckRoutes(new Set()); };
   // The right column holds one panel at a time: Map balance, Suggest routes or Tickets.
-  const openTickets = () => { closeAnalysis(); setShowSuggestions(false); setHoveredSuggestion(null); setShowTickets(true); };
-  const widePanel = showAnalysis || showTickets;
+  const openTickets = () => { closeAnalysis(); setShowSuggestions(false); setHoveredSuggestion(null); setShowRules(false); setShowTickets(true); };
+  const openRules = () => { closeAnalysis(); setShowSuggestions(false); setHoveredSuggestion(null); setShowTickets(false); setShowRules(true); };
+  const widePanel = showAnalysis || showTickets || showRules;
   // The suggested route the pointer is on, drawn on the map while it is there.
   const [hoveredSuggestion, setHoveredSuggestion] = useState<RouteSuggestion | null>(null);
   const [selectedStop, setSelectedStop] = useState<string | null>(null);
@@ -161,7 +170,7 @@ export function MapEditor() {
   useEffect(() => { if (!ready) return; localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); const timer = window.setTimeout(() => setSaved(true), 0); return () => window.clearTimeout(timer); }, [data, ready]);
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") { cancelPickRef.current(); return; }
+      if (event.key === "Escape") { const target = event.target as HTMLElement | null; if (target?.tagName === "TEXTAREA") { target.blur(); return; } cancelPickRef.current(); return; }
       if (!(event.metaKey || event.ctrlKey)) return;
       const key = event.key.toLowerCase();
       if (key !== "z" && key !== "y") return;
@@ -338,6 +347,7 @@ export function MapEditor() {
     if (showAnalysis) closeAnalysis();
     else if (showSuggestions) { setShowSuggestions(false); setHoveredSuggestion(null); }
     else if (showTickets) setShowTickets(false);
+    else if (showRules) setShowRules(false);
     else if (pendingStop) cancelPick(); else setSelectedTicket(null);
   }; });
   // Ticket cards print on their own paper, so the print tree swaps to them, prints, and swaps back.
@@ -734,9 +744,10 @@ export function MapEditor() {
           <p>Drawing and deleting routes moves it; placing stops you never connect drags the average down.</p>
         </TooltipContent></Tooltip>}
         <Button variant="outline" size="sm" className="analyze-button" onClick={() => openStyles({ kind: "map" })}><Settings2 />Settings</Button>
-        {data.stops.length > 0 && <Button variant="outline" size="sm" className="analyze-button" onClick={() => { setShowSuggestions(false); setHoveredSuggestion(null); setShowTickets(false); setShowAnalysis(true); }}><BarChart3 />Analyze balance</Button>}
+        {data.stops.length > 0 && <Button variant="outline" size="sm" className="analyze-button" onClick={() => { setShowSuggestions(false); setHoveredSuggestion(null); setShowTickets(false); setShowRules(false); setShowAnalysis(true); }}><BarChart3 />Analyze balance</Button>}
         <Button variant="outline" size="sm" className="analyze-button" title={ticketButtonLabel} onClick={openTickets}><TicketIcon /><span className="button-label">{ticketButtonLabel}</span></Button>
-        {data.stops.length > 1 && <Button variant="outline" size="sm" className="analyze-button" onClick={() => { closeAnalysis(); setShowTickets(false); setShowSuggestions(true); }}><Lightbulb />Suggest routes</Button>}
+        <Button variant="outline" size="sm" className="analyze-button" onClick={openRules}><ScrollText />Rules</Button>
+        {data.stops.length > 1 && <Button variant="outline" size="sm" className="analyze-button" onClick={() => { closeAnalysis(); setShowTickets(false); setShowRules(false); setShowSuggestions(true); }}><Lightbulb />Suggest routes</Button>}
         <div className="legend"><p className="eyebrow">Stop types</p>{data.stopTypeStyles.map((meta) => <button type="button" key={meta.id} className="legend-item" title={`Edit the ${meta.label} stop type`} onClick={() => openStyles({ kind: "stop", id: meta.id })}><i style={{ background: meta.fill, borderColor: meta.stroke }} />{meta.label}</button>)}</div>
         <Button variant="ghost" className="reset-button" onClick={() => setDanger("reset")}><RotateCcw />Clear map</Button>
       </aside>
@@ -760,6 +771,7 @@ export function MapEditor() {
           onExport={exportTickets} onImport={() => fileRef.current?.click()} onPrint={printTickets} onStartFrom={startTicketFrom} onSuggest={openSuggest}
           onUpdate={(ticketId, values) => change((draft) => { const ticket = draft.tickets.find((item) => item.id === ticketId); if (ticket) Object.assign(ticket, { ...values, long: values.long === false ? undefined : values.long ?? ticket.long }); return draft; })}
           onDelete={(ticketId) => { change((draft) => { draft.tickets = draft.tickets.filter((item) => item.id !== ticketId); return draft; }); setSelectedTicket((current) => current === ticketId ? null : current); }}  />}
+        {showRules && <RulesPanel data={data} wide={rightWidth >= RIGHT_WIDTH_WIDE} onToggleWide={() => (rightWidth >= RIGHT_WIDTH_WIDE ? resetRight() : resizeRight(RIGHT_WIDTH_WIDE))} onClose={() => setShowRules(false)} onChange={(text) => change((draft) => ({ ...draft, rules: text.trim() ? text : undefined }))} hover={{ stop: setBalanceStop, routes: (ids) => setBalanceRoutes(ids ? new Set(ids) : null) }} />}
         {showSuggestions && <SuggestionsPanel suggestions={suggestions} onAdd={addSuggestedRoute} onHover={setHoveredSuggestion} onClose={() => { setShowSuggestions(false); setHoveredSuggestion(null); }} />}
         <div className="panel-heading"><span>{tool === "ticket" ? "Ticket coverage" : "Properties"}</span><small title={tool === "ticket" ? activeTicketSet.label : undefined}>{tool === "ticket" ? `${activeTicketSet.label} · ${ticketsHere.length} ticket${ticketsHere.length === 1 ? "" : "s"}` : imageSelected ? "Background image selected" : selectedN ? "Note selected" : selectedB ? "Background object selected" : selectedR ? "Route selected" : selectedS ? "Stop selected" : "Select an object on the map"}</small></div>
         {tool === "ticket" && <TicketCoveragePanel rows={coverageRows} deck={activeTicketSet.label} cuts={bandCuts(ticketDiameter, bandsOf(data))} onEditMix={() => openStyles({ kind: "ticket" })} sort={coverageSort} onSort={setCoverageSort} onlyUncovered={onlyUncovered} onOnlyUncovered={setOnlyUncovered} onOpen={(stopId, band) => setStopTicketView({ stopId, band })} />}
@@ -784,9 +796,9 @@ export function MapEditor() {
       onShuffle={() => setSuggestSeed((seed) => seed + 1)} onApply={(mode) => applySuggestion(mode, `ts-${Date.now()}`)} />
     <WelcomeGuide open={showGuide} onOpenChange={(open) => !open && dismissGuide()} onChooseBlank={() => chooseFromGuide("blank")} onChooseExample={() => chooseFromGuide("example")} />
     <SettingsDialog open={showStyles} onOpenChange={setShowStyles} target={styleTarget} onTarget={setStyleTarget} data={data} change={change} onChangeFormat={changeFormat} defaults={{ stopType, setStopType, stopSize, setStopSize: (value) => setStopSize(value as StopSize), routeType, setRouteType, routeColor, setRouteColor, routeCurved, setRouteCurved, routeLineStyle, setRouteLineStyle, linkParallel, setLinkParallel }} />
-    {printScope === "tickets" ? <TicketPrintPages data={data} setId={activeTicketSet.id} /> : <PrintPages data={data} plan={printPlan(data.format, printChoice, printProfile)} />}
+    {printScope === "tickets" ? <TicketPrintPages data={data} setId={activeTicketSet.id} /> : <PrintPages data={data} plan={printPlan(data.format, printChoice, printProfile)} rules={printRules} />}
     {makingImage && <ImageStage data={data} onDone={saveImage} onFail={() => setMakingImage(false)} />}
-    <PrintDialog open={showPrint} onOpenChange={setShowPrint} format={data.format} profile={printProfile} choice={printChoice} onChoice={choosePrint} onPrint={() => { setShowPrint(false); setPrintRequest((count) => count + 1); }} />
+    <PrintDialog open={showPrint} onOpenChange={setShowPrint} format={data.format} profile={printProfile} choice={printChoice} onChoice={choosePrint} rules={{ written: Boolean(data.rules?.trim()), on: printRules, onChange: choosePrintRules }} onPrint={() => { setShowPrint(false); setPrintRequest((count) => count + 1); }} />
   </main></TooltipProvider>;
 }
 

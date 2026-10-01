@@ -2090,6 +2090,126 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.waitForTimeout(300);
   check("and Escape closes it too", (await balancePanel.count()) === 0);
 
+  // 33b. rules text: written in markdown beside the map, previewed with live references, saved in
+  // the map, and printed on pages of their own after the board when asked
+  {
+    const mapKey = "orebro-map-editor-public-v2";
+    const first = await page.evaluate((key) => { const m = JSON.parse(localStorage.getItem(key)); const r = m.routes[0]; const name = (id) => m.stops.find((st) => st.id === id).name; return { a: name(r.a), b: name(r.b), color: r.color }; }, mapKey);
+    const rulesButton = page.getByRole("button", { name: "Rules", exact: true });
+    await rulesButton.click();
+    await page.waitForTimeout(400);
+    const panel = page.locator("aside.properties .rules-panel");
+    check("Rules opens in the right column, not in a dialog", (await panel.count()) === 1 && (await page.locator('[role="dialog"]').count()) === 0);
+    const inView = await page.evaluate(() => { const c = document.querySelector(".map-canvas").getBoundingClientRect(), a = document.querySelector("aside.properties").getBoundingClientRect(); return c.top >= 0 && c.bottom <= innerHeight && c.right <= a.left + 1 && document.documentElement.scrollHeight <= innerHeight + 1; });
+    check("with the whole map in view beside it", inView);
+    const box = panel.getByRole("textbox", { name: "Rules text" });
+    check("a text area takes the rules", (await box.count()) === 1);
+    check("which says it is markdown and how to name a stop or a route", /markdown/i.test(await panel.textContent()) && /\[\[/.test(await panel.textContent()));
+    check("and a map without rules shows an empty preview that says so", /nothing written/i.test(await panel.locator(".rules-preview").textContent()));
+    const written = `# House rules\n\nClaim **routes** by colouring in their spaces.\n\n- Start at [[${first.a}]]\n- Cross [[${first.a}–${first.b}]]\n- Never visit [[Atlantis]]\n\n| Players | Wagons |\n| --- | --- |\n| 2 | 45 |\n\n<b>raw</b> html stays text`;
+    await box.fill(written);
+    await page.waitForTimeout(400);
+    const preview = panel.locator(".rules-preview");
+    check("the preview shows a heading, bold text, a list and a table", (await preview.locator("h1").textContent()) === "House rules" && (await preview.locator("strong").first().textContent()) === "routes" && (await preview.locator("li").count()) === 3 && (await preview.locator("td").count()) === 2 && (await preview.locator("th").count()) === 2);
+    check("lists show their bullets, as they must to read as lists", (await preview.locator("ul").first().evaluate((el) => getComputedStyle(el).listStyleType)) === "disc");
+    check("and shows typed HTML as text, not as markup", (await preview.locator("b").count()) === 0 && /<b>raw<\/b> html stays text/.test(await preview.textContent()));
+    check("a stop is named with its own symbol", (await preview.locator(".rule-ref.stop").count()) === 1 && (await preview.locator(".rule-ref.stop svg").count()) === 1);
+    check("a route is named with its colour", (await preview.locator(".rule-ref.route").count()) === 1);
+    // The swatch is the route's own colour: the one its line is drawn in on the map.
+    const colours = await page.evaluate(() => {
+      const asRgb = (c) => { const probe = document.createElement("span"); document.body.append(probe); probe.style.color = c; const out = getComputedStyle(probe).color; probe.remove(); return out; };
+      const swatch = document.querySelector(".rules-preview .rule-ref.route .rule-swatch");
+      const line = document.querySelector(".map-canvas .route-group .route-guide");
+      return { swatch: asRgb(getComputedStyle(swatch).backgroundColor), line: asRgb(line.getAttribute("stroke")) };
+    });
+    check("a route's swatch is the colour its line has on the map", colours.swatch === colours.line, JSON.stringify(colours));
+    check("a name that is no stop is marked as missing, in the editor", (await preview.locator(".rule-ref.missing").count()) === 1 && /no stop|not found|no such/i.test((await preview.locator(".rule-ref.missing").getAttribute("title")) || ""));
+    // pointing at a reference shows it on the map
+    await preview.locator(".rule-ref.stop").first().hover();
+    await page.waitForTimeout(250);
+    check("pointing at a stop in the rules rings it on the map", (await page.locator(".map-canvas .stop.previewed").count()) === 1);
+    await preview.locator(".rule-ref.route").first().hover();
+    await page.waitForTimeout(250);
+    check("and at a route marks it", (await page.locator(".map-canvas .route-group.on-preview").count()) >= 1 && (await page.locator(".map-canvas .stop.previewed").count()) === 0);
+    await page.mouse.move(5, 5);
+    await page.waitForTimeout(250);
+    check("and the marks go when the pointer leaves", (await page.locator(".map-canvas .route-group.on-preview").count()) === 0);
+    // kept in the map
+    await page.waitForTimeout(1200);
+    check("the text is kept in the map", (await page.evaluate((key) => JSON.parse(localStorage.getItem(key)).rules, mapKey)) === written);
+    await page.reload({ waitUntil: "networkidle" });
+    await page.waitForTimeout(700);
+    await rulesButton.click();
+    await page.waitForTimeout(400);
+    check("and survives a reload", (await panel.getByRole("textbox", { name: "Rules text" }).inputValue()) === written);
+    // exported with the map
+    const rulesDownload = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Export", exact: true }).click();
+    await page.waitForTimeout(250);
+    await page.getByRole("menuitem", { name: "Full map" }).click();
+    const rulesFile = path.join(os.tmpdir(), `ttr-rules-${Date.now()}.json`);
+    await (await rulesDownload).saveAs(rulesFile);
+    check("a full export carries the rules", JSON.parse(fs.readFileSync(rulesFile, "utf8")).payload.rules === written);
+    fs.rmSync(rulesFile, { force: true });
+    // one panel at a time, and Escape
+    await ticketsButton.click();
+    await page.waitForTimeout(300);
+    check("opening Tickets takes the column from Rules", (await page.locator(".rules-panel").count()) === 0 && (await page.locator(".tickets-panel").count()) === 1);
+    await rulesButton.click();
+    await page.waitForTimeout(300);
+    check("and Rules takes it back, with the text as it was", (await page.locator(".tickets-panel").count()) === 0 && (await panel.getByRole("textbox", { name: "Rules text" }).inputValue()) === written);
+    await page.evaluate(() => document.activeElement && document.activeElement.blur());
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(300);
+    check("Escape closes Rules once the text area has let go of the key", (await page.locator(".rules-panel").count()) === 0);
+    // printing: a choice of its own in the print dialog
+    await printButton().click();
+    await page.waitForTimeout(400);
+    const rulesBox = printDialog().getByRole("checkbox", { name: /Print the rules/ });
+    check("the print dialog offers the rules, ticked", (await rulesBox.count()) === 1 && (await rulesBox.isChecked()) && (await rulesBox.isEnabled()));
+    check("and says they get pages of their own after the board", /pages of their own|after the board/i.test(await printDialog().textContent()));
+    await rulesBox.uncheck();
+    await printDialog().getByRole("button", { name: "Cancel" }).click();
+    await page.waitForTimeout(300);
+    const pdfOff = await (async () => { await page.emulateMedia({ media: "print" }); const pdf = await page.pdf({ format: "A4", printBackground: true }); await page.emulateMedia({ media: "screen" }); return (pdf.toString("latin1").match(/\/Type\s*\/Page[^s]/g) || []).length; })();
+    await printButton().click();
+    await page.waitForTimeout(400);
+    await printDialog().getByRole("checkbox", { name: /Print the rules/ }).check();
+    await printDialog().getByRole("button", { name: "Cancel" }).click();
+    await page.waitForTimeout(300);
+    const treeOn = await page.evaluate(() => { const r = document.querySelector(".print-pages .print-rules"); const prev = r && r.previousElementSibling; return r ? { text: r.textContent, afterPage: Boolean(prev && prev.classList.contains("print-page")), missing: r.querySelectorAll(".missing").length, title: r.querySelector("h1") && r.querySelector("h1").textContent } : null; });
+    check("with the box ticked the print tree holds the rules after the last board page", treeOn !== null && treeOn.afterPage && /House rules/.test(treeOn.text), JSON.stringify(treeOn).slice(0, 160));
+    await page.emulateMedia({ media: "print" });
+    const printedBullets = await page.locator(".print-pages .print-rules ul").first().evaluate((el) => getComputedStyle(el).listStyleType);
+    await page.emulateMedia({ media: "screen" });
+    check("and so do the printed pages", printedBullets === "disc", printedBullets);
+    check("a reference to something that is not there prints as its plain name, unmarked", treeOn !== null && treeOn.missing === 0 && /Atlantis/.test(treeOn.text));
+    const pdfOn = await (async () => { await page.emulateMedia({ media: "print" }); const pdf = await page.pdf({ format: "A4", printBackground: true }); await page.emulateMedia({ media: "screen" }); return (pdf.toString("latin1").match(/\/Type\s*\/Page[^s]/g) || []).length; })();
+    check("the rules take one more page than the board alone, on a page of their own", pdfOn === pdfOff + 1, `${pdfOn} pages with, ${pdfOff} without`);
+    await printButton().click();
+    await page.waitForTimeout(400);
+    await printDialog().getByRole("checkbox", { name: /Print the rules/ }).uncheck();
+    await printDialog().getByRole("button", { name: "Cancel" }).click();
+    await page.waitForTimeout(300);
+    check("unticked, the print tree has no rules", (await page.locator(".print-pages .print-rules").count()) === 0);
+    check("and the choice is remembered", (await page.evaluate(() => localStorage.getItem("ttr-print-rules"))) === "off");
+    // a map with no rules cannot print any
+    await rulesButton.click();
+    await page.waitForTimeout(300);
+    await panel.getByRole("textbox", { name: "Rules text" }).fill("");
+    await page.waitForTimeout(1200);
+    await printButton().click();
+    await page.waitForTimeout(400);
+    const emptyBox = printDialog().getByRole("checkbox", { name: /Print the rules/ });
+    check("with nothing written the choice is there but cannot be ticked, and says why", (await emptyBox.isDisabled()) && /nothing written/i.test(await printDialog().textContent()));
+    await printDialog().getByRole("button", { name: "Cancel" }).click();
+    await page.waitForTimeout(300);
+    // back to a clean state for what follows
+    await panel.getByRole("button", { name: "Done" }).click();
+    await page.waitForTimeout(300);
+    await page.evaluate(() => localStorage.removeItem("ttr-print-rules"));
+  }
+
   // 34. a map saved on a format that is now a print choice opens on its board
   await page.evaluate(() => {
     const map = JSON.parse(localStorage.getItem("orebro-map-editor-public-v2"));

@@ -168,7 +168,7 @@ const MAP_KEYS = new Set([
   "name", "format", "background", "backgroundImage", "stops", "routes", "notes",
   "lineStyles", "routeTypeStyles", "wagonStyles", "stopTypeStyles", "tickets", "ticketSets",
   "wagonsPerPlayer", "startingTickets", "keptTickets", "players", "ticketBands", "ticketMix",
-  "ticketValuation", "lanesUsableByPlayers", "endGapMm", "deckRules", "deckRule", "unknown",
+  "ticketValuation", "lanesUsableByPlayers", "endGapMm", "deckRules", "deckRule", "rules", "unknown",
 ]);
 
 const unknownKeys = (value: Record<string, unknown>): Record<string, unknown> | undefined => {
@@ -281,6 +281,8 @@ const normalizeMapFields = (value: Partial<MapData>): MapData => ({
   stops: Array.isArray(value.stops) ? value.stops : [],
   routes: Array.isArray(value.routes) ? value.routes.map(migrateRoute) : [],
   notes: Array.isArray(value.notes) ? value.notes : [],
+  // The rules text, as written. Nothing, rather than an empty text, when there is none.
+  rules: typeof value.rules === "string" && value.rules.trim() ? value.rules : undefined,
   lineStyles: Array.isArray(value.lineStyles) ? value.lineStyles : [],
   routeTypeStyles: Array.isArray(value.routeTypeStyles) && value.routeTypeStyles.length ? value.routeTypeStyles : defaultRouteTypeStyles.map((style) => ({ ...style })),
   wagonStyles: normalizeWagonStyles(value),

@@ -93,13 +93,10 @@ What would be worth building on top:
   as they stood — so that a year later the file says not just what the map looked like but what the
   editor thought of it.
 
-## Rules text printed with the map
+## Rules text: what is left
 
-Wanted, not built. A place to write the rules of the map being designed, printed with it.
-
-Markdown in a plain text area, rather than a rich-text editor: it reads as text, survives in the map
-file, and ties us to no editor's data format. Stops and routes referred to as `[[Westport]]` and
-`[[Westport–Central]]`, rendered with the same colour and shape they have on the map.
-
-Two things to decide first: whether the rules print as their own pages after the board, and whether
-a reference to a stop that has since been deleted should warn or just show the name.
+The rules box is built: markdown in the right column, `[[Stop]]` and
+`[[Stop–Stop]]` drawn as the map draws them, printed on pages of their own after the board when the
+print dialog says so. Not done: the rules are not in the PNG; a print run of the rules alone; a link
+to another part of the rules; images in the text; and a way to see in the preview where a page
+would break.

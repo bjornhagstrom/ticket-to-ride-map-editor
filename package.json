@@ -10,14 +10,15 @@
     "dev": "next dev",
     "build": "next build",
     "typecheck": "tsc --noEmit",
-    "test": "npm run typecheck && npm run test:suggester && npm run test:calibration && npm run test:file-format && npm run test:print-plan && npm run build",
+    "test": "npm run typecheck && npm run test:suggester && npm run test:calibration && npm run test:file-format && npm run test:print-plan && npm run test:markdown && npm run build",
     "lint": "eslint app components hooks lib --ignore-pattern .next --ignore-pattern out",
     "db:generate": "bash scripts/sites-env.sh -- drizzle-kit generate",
     "test:regression": "node tests/regression.cjs",
     "test:suggester": "node tests/ticket-suggester.cjs",
     "test:calibration": "node tests/ticket-calibration.cjs",
     "test:file-format": "node tests/file-format.cjs",
-    "test:print-plan": "node tests/print-plan.cjs"
+    "test:print-plan": "node tests/print-plan.cjs",
+    "test:markdown": "node tests/markdown.cjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

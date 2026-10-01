@@ -150,6 +150,15 @@ check("where an own set ends its tickets survives a round trip", (endsBack.deckR
 const wild = storage.normalizeMap({ ...JSON.parse(JSON.stringify(sample)), deckRules: [{ ...ends, longEnds: 0.9 }] });
 check("and an end further than the map allows drops the set", !(wild.deckRules || []).length);
 
+// The rules text: a plain string in the map, optional, kept as written.
+const ruled = storage.normalizeMap({ ...JSON.parse(JSON.stringify(sample)), rules: "# Rules\n\nClaim **routes**.\n\n- see [[Westport]]\n" });
+const ruledBack = storage.normalizeMap(storage.readMapFile(JSON.parse(JSON.stringify(storage.writeMapFile("map", storage.mapPayload(ruled), ruled)))).payload);
+check("the rules text survives a round trip exactly", ruledBack.rules === "# Rules\n\nClaim **routes**.\n\n- see [[Westport]]\n", JSON.stringify(ruledBack.rules));
+check("and is not mistaken for a field this build does not know", !(ruledBack.unknown && "rules" in ruledBack.unknown));
+check("a map with no rules has none, rather than an empty text", storage.normalizeMap(JSON.parse(JSON.stringify(sample))).rules === undefined);
+check("and a rules field that is not text is dropped", storage.normalizeMap({ ...JSON.parse(JSON.stringify(sample)), rules: 42 }).rules === undefined);
+check("a network file does not carry the rules, which belong to the whole map", !("rules" in storage.networkPayload(ruled)));
+
 console.log("PASS:"); ok.forEach((line) => console.log("  ✓ " + line));
 if (bad.length) { console.log("FAIL:"); bad.forEach((line) => console.log("  ✗ " + line)); }
 console.log(`\n${ok.length} passed, ${bad.length} failed`);

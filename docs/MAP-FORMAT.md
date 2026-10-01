@@ -243,10 +243,21 @@ The image is embedded directly as a base64 `dataUrl`, so the project file stays 
 
 Notes are only part of full-map exports, not background-only or network-only exports, since they are neither background art nor game network.
 
+## Rules
+
+`rules` is an optional string on the map: the rules of the map being designed, written in a small subset of markdown (headings, paragraphs, lists, quotes, tables, bold, italic, code and a line across) and kept exactly as typed. `[[Westport]]` names a stop and `[[Westport–Central]]` the route or routes between two stops; the name is matched to the stop's `name` ignoring case, and a dash of any kind (`–`, `—`, `→`, `->` or `-`) may separate the two. A name that matches nothing is kept in the text and shown flagged in the editor; in print it is plain text.
+
+```json
+{ "rules": "# Rules\n\nStart at [[Westport]] and claim **routes**.\n" }
+```
+
+A map with no rules has no `rules` field at all, rather than an empty string. Rules are only part of full-map exports. They are not in network, background or ticket files, and not in the PNG. Adding the field did not change the file version: a reader that does not know it keeps it with the other unknown fields.
+
 ## Compatibility rules
 
 - Missing `background` becomes an empty array, supporting older map files.
 - Missing `notes` or `lineStyles` becomes an empty array.
+- Missing `rules`, or one that is not text, means there are no rules.
 - Missing or empty `routeTypeStyles` falls back to the six default types (`city`, `region`, `brt`, `ferry`, `rail`, `trail`).
 - Missing or unknown `format` becomes `board-2x3`.
 - Missing or unrecognized `kind` is treated as a full map (`"map"`).

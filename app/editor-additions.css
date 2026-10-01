@@ -94,6 +94,26 @@
   .ticket-card-arrow{font:9pt "Segoe UI",Arial,sans-serif;color:#81786c}
   .ticket-card-points{margin-top:2.5mm!important;width:11mm;height:11mm;border:.4mm solid #24211d;border-radius:50%;font:700 12pt Georgia,serif;line-height:10.2mm;color:#24211d}
   .ticket-card-flag{font:6.5pt "Segoe UI",Arial,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:#24221e}
+  /* The rules text, on pages of their own after the board. It flows in the same page box as the board's pages. */
+  .print-rules{break-before:page;page-break-before:always;font:10.5pt/1.5 Georgia,serif;color:#24211d}
+  .print-rules-name{margin:0 0 6mm;font:7.5pt "Segoe UI",Arial,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:#4f493f}
+  .print-rules h1{font:700 18pt/1.2 Georgia,serif;margin:0 0 4mm;break-after:avoid}
+  .print-rules h2{font:700 14pt/1.25 Georgia,serif;margin:6mm 0 2mm;break-after:avoid}
+  .print-rules h3{font:700 11.5pt/1.3 Georgia,serif;margin:4mm 0 1.5mm;break-after:avoid}
+  .print-rules p{margin:0 0 3mm;orphans:3;widows:3}
+  .print-rules ul,.print-rules ol{margin:0 0 3mm;padding-left:6mm}
+  .print-rules ul{list-style:disc}
+  .print-rules ol{list-style:decimal}
+  .print-rules ul ul{list-style:circle}
+  .print-rules li{margin:0 0 1mm;break-inside:avoid}
+  .print-rules blockquote{margin:0 0 3mm;padding:1mm 4mm;border-left:.8mm solid #81786c;color:#3b362e}
+  .print-rules hr{border:0;border-top:.3mm solid #81786c;margin:4mm 0}
+  .print-rules table{border-collapse:collapse;margin:0 0 4mm;font-size:10pt}
+  .print-rules th,.print-rules td{border:.25mm solid #81786c;padding:1mm 2.5mm;text-align:left}
+  .print-rules th{background:#eee7da}
+  .print-rules tr{break-inside:avoid}
+  .print-rules code{font:9.5pt ui-monospace,Menlo,monospace;background:#f1ece2;padding:0 1mm;border-radius:.8mm}
+  .print-rules .rule-ref{break-inside:avoid}
 }
 
 /* Deck rules in Settings: the sets to choose from, then the chosen set's values, fixed or editable. */
@@ -215,3 +235,35 @@
 .analysis-table.classic-table td:first-child{white-space:normal}
 .balance-panel tr.pinned td,.balance-panel td.pinned{background:#f4d9d3!important;font-weight:700}
 .balance-panel .bottleneck-row[aria-pressed="true"]{background:#f4d9d3;border-color:#b3261e}
+
+/* Rules text: markdown beside the map, previewed with stops and routes drawn as the map draws them. */
+.rules-panel{container-type:inline-size}
+.rules-body{display:grid;gap:14px}
+@container (min-width:600px){.rules-body{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
+.rules-editor{display:grid;gap:6px;align-content:start;min-width:0}
+.rules-editor textarea{width:100%;min-height:260px;resize:vertical;padding:10px;border:1px solid #cec4b6;border-radius:8px;background:#fffdf8;color:#24221e;font:13px/1.5 ui-monospace,Menlo,Consolas,monospace}
+.rules-editor small{font-size:12px;color:#4f493f}
+.rules-view{display:grid;gap:6px;align-content:start;min-width:0}
+.rules-view-label{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#4f493f}
+.rules-preview{min-height:120px;padding:12px 14px;border:1px solid #d5cbbb;border-radius:8px;background:#fff;color:#24211d;font:14px/1.55 Georgia,serif;overflow-wrap:anywhere}
+.rules-preview>*:first-child{margin-top:0}
+.rules-preview h1{font-size:21px;line-height:1.25;margin:0 0 .5em}
+.rules-preview h2{font-size:17px;line-height:1.3;margin:1em 0 .4em}
+.rules-preview h3{font-size:15px;margin:.9em 0 .3em}
+.rules-preview p{margin:0 0 .7em}
+.rules-preview ul,.rules-preview ol{margin:0 0 .7em;padding-left:1.4em}
+.rules-preview blockquote{margin:0 0 .7em;padding:2px 12px;border-left:3px solid #b8ad9b;color:#3b362e}
+.rules-preview hr{border:0;border-top:1px solid #cfc6b6;margin:1em 0}
+.rules-preview table{border-collapse:collapse;margin:0 0 .8em;font-size:13px}
+.rules-preview th,.rules-preview td{border:1px solid #cfc6b6;padding:3px 9px;text-align:left}
+.rules-preview th{background:#eee7da}
+.rules-preview code{font:12px ui-monospace,Menlo,Consolas,monospace;background:#f1ece2;padding:0 4px;border-radius:3px}
+.rule-ref{display:inline-flex;align-items:center;gap:5px;padding:0 7px;border:1px solid #cfc6b6;border-radius:999px;background:#fffaf0;font-size:.93em;line-height:1.5;vertical-align:baseline}
+.rules-preview .rule-ref:hover{background:#f7e9e6;border-color:#b3261e}
+.rule-symbol{flex:none}
+.rule-swatch{display:inline-block;width:14px;height:8px;border:1px solid #24211d;border-radius:2px}
+.rule-ref.missing{border-style:dashed;border-color:#b3261e;background:#fdf1ee;color:#8a2b21}
+.rules-preview ul{list-style:disc}
+.rules-preview ol{list-style:decimal}
+.rules-preview ul ul{list-style:circle}
+.rules-preview li{margin:0 0 .25em}
