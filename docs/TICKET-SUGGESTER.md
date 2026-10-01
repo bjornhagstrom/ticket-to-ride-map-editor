@@ -76,7 +76,7 @@ Periphery and near-duplicate rates are not consistent between maps. Tickets per 
 The `generic` style therefore uses:
 
 - **Length bins:** the mean of the seven decks, `.18 .33 .22 .16 .11`.
-- **Tickets per stop:** 1.1.
+- **Tickets per stop:** 1.1. The size of a suggested deck is this times the stops and is not raised to what a full table is dealt: on a small map the official density gives fewer tickets than that, so the dialog warns ("Too few to deal a full table") with a button to raise it, and leaves the decision to the person.
 - **Periphery:** relative only. Long-ish endpoints should be at or above the map's mean periphery, and short endpoints at or below it. Only the wrong side is penalised.
 - **Most tickets per stop:** 7.
 - **Near-duplicates:** 3 %.

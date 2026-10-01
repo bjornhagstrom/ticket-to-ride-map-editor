@@ -5,9 +5,6 @@
 Editing, scoring, coverage, decks, ticket-only transfer and card printing are built. What remains:
 
 - Compare two decks against each other directly, rather than by switching between them.
-- The suggester holds the deck size at what a table of five can be dealt, which on a small map is
-  denser than the official 0.83–0.98 tickets per stop. The dialog says so and the count can be
-  overridden, but a better rule would be to warn rather than to force.
 - Tickets to countries or groups of stops, as Switzerland has, are not modelled.
 
 ## Map collaboration

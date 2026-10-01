@@ -467,4 +467,4 @@ export function ticketCoverage(data: MapData, setId?: string): { stop: Stop; cou
 }
 
 // The ticket suggester lives in its own module; re-exported here so the ticket analysis has one door.
-export { suggestTickets, evaluateTicketDeck, suggestedDeckSize, defaultStyle, deckRules, deckRuleFor, TICKET_SUGGESTER, type TicketStyle, type BuiltInStyle, type DeckRule, type TicketSuggestOptions, type TicketDeckReport, type Bottleneck } from "./ticket-suggester";
+export { suggestTickets, evaluateTicketDeck, suggestedDeckSize, dealtToFullTable, defaultStyle, deckRules, deckRuleFor, TICKET_SUGGESTER, type TicketStyle, type BuiltInStyle, type DeckRule, type TicketSuggestOptions, type TicketDeckReport, type Bottleneck } from "./ticket-suggester";

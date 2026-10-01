@@ -23,7 +23,7 @@ const out = fs.mkdtempSync(path.join(os.tmpdir(), "ttr-suggester-"));
 execFileSync("npx", ["tsc", "app/ticket-suggester.ts", "app/map-data.ts",
   "--outDir", out, "--module", "commonjs", "--target", "es2022", "--moduleResolution", "node", "--skipLibCheck"],
   { cwd: root, stdio: "inherit" });
-const { suggestTickets, evaluateTicketDeck, TICKET_SUGGESTER, mulberry32 } = require(path.join(out, "ticket-suggester.js"));
+const { suggestTickets, evaluateTicketDeck, TICKET_SUGGESTER, mulberry32, suggestedDeckSize, dealtToFullTable } = require(path.join(out, "ticket-suggester.js"));
 
 const ok = [];
 const bad = [];
@@ -171,6 +171,15 @@ const started = Date.now();
 suggestTickets(europe, { style: "europe", seed: 7 });
 const elapsed = Date.now() - started;
 check("a Europe-sized map is suggested in well under a second", elapsed < 1000, `${elapsed} ms`);
+
+// The size of a suggested deck follows the rules' density. A deck too small to deal is warned about, not forced up.
+{
+  const tiny = { players: { min: 2, max: 3 }, startingTickets: 3, deckRules: [{ ...TICKET_SUGGESTER.styles.generic, id: "sparse-own", label: "Sparse", basedOn: "generic", ticketsPerStop: 0.5, longPerStop: 0 }] };
+  check("a deck's size is the rules' tickets per stop times the stops, with no floor", suggestedDeckSize(tiny, "sparse-own", 15).regular === 8 && suggestedDeckSize(tiny, "generic", 15).regular === 17, JSON.stringify([suggestedDeckSize(tiny, "sparse-own", 15), suggestedDeckSize(tiny, "generic", 15)]));
+  check("even where that is fewer than a full table is dealt", suggestedDeckSize(tiny, "sparse-own", 15).regular < dealtToFullTable(tiny));
+  check("what a full table is dealt is the largest table times the tickets each", dealtToFullTable(tiny) === 9 && dealtToFullTable({}) === 15, `${dealtToFullTable(tiny)}, ${dealtToFullTable({})}`);
+  check("a deck is never empty, however few stops", suggestedDeckSize(tiny, "sparse-own", 0).regular >= 1);
+}
 
 console.log("PASS:"); ok.forEach((line) => console.log("  ✓ " + line));
 if (bad.length) { console.log("FAIL:"); bad.forEach((line) => console.log("  ✗ " + line)); }

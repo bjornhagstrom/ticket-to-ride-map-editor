@@ -12,7 +12,7 @@ import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { TicketLengths, type TicketLengthsView } from "./ticket-lengths";
-import { colourRouteIds, compareWithClassics, CLASSIC_ROUTE_MAPS, type Bottleneck, deckRuleFor, deckRules, TICKET_SUGGESTER, type TicketDeckReport, type TicketStyle, type SetupBalance, type TicketReview, type ColourLengthTable, type NetworkStats, type RouteSpacing, type RouteSuggestion } from "./map-analysis";
+import { colourRouteIds, compareWithClassics, CLASSIC_ROUTE_MAPS, type Bottleneck, dealtToFullTable, deckRuleFor, deckRules, TICKET_SUGGESTER, type TicketDeckReport, type TicketStyle, type SetupBalance, type TicketReview, type ColourLengthTable, type NetworkStats, type RouteSpacing, type RouteSuggestion } from "./map-analysis";
 
 export function WelcomeGuide({ open, onOpenChange, onChooseBlank, onChooseExample }: { open: boolean; onOpenChange: (open: boolean) => void; onChooseBlank: () => void; onChooseExample: () => void }) {
   const steps: Array<{ icon: React.ReactNode; title: string; text: string }> = [
@@ -339,12 +339,12 @@ export function SuggestTicketsDialog({ open, onOpenChange, data, current, sugges
     const total = r.mix.reduce((sum, count) => sum + count, 0);
     return total ? r.mix.map((count) => Math.round(100 * count / total)).join(" / ") : "—";
   };
-  // On a small map, dealing a full table needs more tickets than one per stop would give.
   // Ours and the map's own, and the one chosen now.
   const rules = deckRules(data);
   const rule = deckRuleFor(data, style);
-  const perStopSize = Math.round((rule.ticketsPerStop + rule.longPerStop) * data.stops.length);
-  const dealtFloor = deckSize > perStopSize ? deckSize : 0;
+  // On a small map the official density is fewer tickets than a full table is dealt. That is the
+  // person's to decide, so a deck that is too small is warned about here and never held up.
+  const needed = dealtToFullTable(data);
 
   return <Dialog open={open} onOpenChange={onOpenChange}>
     {/* A fixed shape, set here rather than in the stylesheet so the utility classes on DialogContent
@@ -381,7 +381,10 @@ export function SuggestTicketsDialog({ open, onOpenChange, data, current, sugges
         })}</div>
       </div>
       <p className="helper">{busy ? "Working out a deck… " : ""} The wagon count is this map&apos;s own setting and changing it here changes it there. A player&apos;s reach is {report?.reach ?? current.reach} wagon spaces, from {rule.lengthCap} × {wagons} wagons.</p>
-      {dealtFloor > 0 && <p className="helper">On a map this size, {rule.ticketsPerStop} tickets per stop would leave too few to deal {data.startingTickets ?? 3} each to a table of {tableWord(data.players?.max ?? 5)}, so the count is held at {dealtFloor}. That is denser than the official decks; lower it if you would rather match them.</p>}
+      {deckSize < needed && <div className="helper helper-warning deck-size-warning" role="status">
+        <span>Too few to deal a full table: {needed} tickets are dealt at the start ({tableWord(data.players?.max ?? 5)} players, {data.startingTickets ?? 3} each), and this deck has {deckSize}. It is allowed. Official decks have {TICKET_SUGGESTER.official.perStop[0]}–{TICKET_SUGGESTER.official.perStop[1]} tickets per stop.</span>
+        <Button size="sm" variant="outline" onClick={() => onDeckSize(needed)}>Use {needed}</Button>
+      </div>}
       <label className="checkbox-row"><input type="checkbox" checked={keepExisting} onChange={(event) => onKeepExisting(event.target.checked)} />Keep the tickets this deck already has</label>
 
       {report?.note && <p className="helper helper-warning">{report.note}</p>}

@@ -1736,7 +1736,26 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await styleCard("Generic").click();
   await page.waitForTimeout(400);
   const genericSize = Number(await page.locator("#suggest-size").inputValue());
-  check("and aims at a deck its own size: far smaller than Generic's", sparseSize > 0 && sparseSize < genericSize && genericSize === 17 && sparseSize === 9, `${sparseSize} against ${genericSize}`);
+  check("and aims at a deck its own size: far smaller than Generic's, and not held up to what a table is dealt", sparseSize > 0 && sparseSize < genericSize && genericSize === 17 && sparseSize === 8, `${sparseSize} against ${genericSize}`);
+  {
+    // A deck too small to deal a full table is warned about and left to the person, never forced up.
+    const warning = page.locator(".deck-size-warning");
+    await styleCard("Sparse").click();
+    await page.waitForTimeout(400);
+    const dealt = await page.evaluate(() => { const m = JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")); return (m.players ? m.players.max : 5) * (m.startingTickets ?? 3); });
+    check("a deck too small to deal a full table says so, with the number it would take", (await warning.count()) === 1 && new RegExp(`\\b${dealt}\\b`).test(await warning.textContent()) && /It is allowed/.test(await warning.textContent()), (await warning.count()) ? await warning.textContent() : "no warning");
+    check("while the deck still is the size the rules ask for", Number(await page.locator("#suggest-size").inputValue()) === 8);
+    check("and nothing is blocked: the deck can still be saved", (await page.getByRole("button", { name: "Save as a new deck" }).isEnabled()) || (await page.getByRole("button", { name: /^Replace / }).isEnabled()));
+    await page.locator("#suggest-size").fill("5");
+    await page.waitForTimeout(500);
+    check("a still smaller size is kept as typed, with the warning", Number(await page.locator("#suggest-size").inputValue()) === 5 && (await warning.count()) === 1);
+    await warning.getByRole("button", { name: `Use ${dealt}` }).click();
+    await page.waitForTimeout(400);
+    check("one click raises it to what a table is dealt, and the warning goes", Number(await page.locator("#suggest-size").inputValue()) === dealt && (await warning.count()) === 0, String(await page.locator("#suggest-size").inputValue()));
+    await styleCard("Generic").click();
+    await page.waitForTimeout(400);
+    check("a deck of Generic's size has no warning", (await warning.count()) === 0);
+  }
   await page.keyboard.press("Escape");
   await page.waitForTimeout(300);
   await page.keyboard.press("Escape");

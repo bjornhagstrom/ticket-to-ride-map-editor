@@ -611,13 +611,18 @@ export function deckRuleFor(data: MapData, id: TicketStyle): DeckRule {
   return all.find((rule) => rule.id === id) ?? all[0];
 }
 
-// How big a deck to aim for: the rules' tickets per stop, but never so few that a full table
-// cannot be dealt from it.
+// How many tickets a full table is dealt at the start: the largest table times the tickets each.
+export function dealtToFullTable(data: Pick<MapData, "players" | "startingTickets">): number {
+  return (data.players?.max ?? DEFAULT_PLAYERS.max) * (data.startingTickets ?? DEFAULT_STARTING_TICKETS);
+}
+
+// How big a deck to aim for: the rules' tickets per stop. Never forced up to what a full table is
+// dealt: a deck that is too small is warned about where it is chosen, and left to the person, since
+// on a small map the official density is fewer tickets than a full table needs.
 export function suggestedDeckSize(data: MapData, style: TicketStyle, stops: number): { regular: number; long: number } {
   const preset = deckRuleFor(data, style);
   const long = Math.round(preset.longPerStop * stops);
-  const dealt = (data.players?.max ?? DEFAULT_PLAYERS.max) * (data.startingTickets ?? DEFAULT_STARTING_TICKETS);
-  const regular = Math.max(Math.round(preset.ticketsPerStop * stops), dealt - long);
+  const regular = Math.max(1, Math.round(preset.ticketsPerStop * stops));
   return { regular, long };
 }
 
