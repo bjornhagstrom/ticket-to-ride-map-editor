@@ -195,3 +195,12 @@
 .balance-panel .colour-cell{cursor:default}
 .balance-panel .colour-cell:hover{background:#f7e9e6;outline:1px solid #b3261e;outline-offset:-1px}
 .balance-panel .analysis-wagons-row td{font-weight:700;border-top:1px solid #cfc6b6}
+
+/* Marked routes: a band under the wagons, with a dark edge, wider than the wagons, and the rest stepped back. */
+.map-canvas .route-halo-edge{stroke:#2b1014;opacity:.9;pointer-events:none}
+.map-canvas .route-halo{stroke:#ffd23f;pointer-events:none}
+.map-canvas .route-group.on-ticket .route-halo{stroke:#4fd18b}
+.map-canvas .route-group.on-ticket .route-halo-edge{stroke:#0e3b24}
+.map-canvas .route-group.bottleneck .route-halo{stroke:#ff6b5a}
+.map-canvas.has-marks .route-group:not(.on-preview):not(.on-ticket):not(.bottleneck){opacity:.35}
+.map-canvas .route-group{transition:opacity .12s}

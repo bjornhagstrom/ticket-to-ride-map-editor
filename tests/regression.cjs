@@ -676,6 +676,26 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     return { rows, verdict: (section.querySelector(".length-verdict") || { textContent: "" }).textContent, spill };
   });
 
+  // Marked routes must be seen at a glance: a band of their own under the wagons, wider than the
+  // wagons, and the rest of the routes dimmed while anything is marked. Measured on screen.
+  const markInfo = (cls) => page.evaluate((cls) => {
+    const groups = Array.from(document.querySelectorAll(`.map-canvas .route-group.${cls}`));
+    const unmarked = Array.from(document.querySelectorAll(".map-canvas .route-group:not(.on-preview):not(.on-ticket):not(.bottleneck)"));
+    const scaleOf = (el) => { const m = el.getScreenCTM(); return m ? Math.hypot(m.a, m.b) : 0; };
+    const halos = groups.map((g) => g.querySelector(".route-halo"));
+    const wagon = (groups[0] || document).querySelector(".wagon-slot rect");
+    const wagonPx = wagon ? +wagon.getAttribute("height") * scaleOf(wagon) : 0;
+    return {
+      marked: groups.length,
+      withHalo: halos.filter(Boolean).length,
+      haloPx: halos[0] ? parseFloat(getComputedStyle(halos[0]).strokeWidth) * scaleOf(halos[0]) : 0,
+      wagonPx,
+      dimmed: unmarked.length > 0 && unmarked.every((g) => parseFloat(getComputedStyle(g).opacity) <= 0.5),
+      undimmed: unmarked.every((g) => parseFloat(getComputedStyle(g).opacity) === 1),
+    };
+  }, cls);
+  const clearlyMarked = (info) => info.marked >= 1 && info.withHalo === info.marked && info.haloPx >= info.wagonPx + 6 && info.dimmed;
+
   // 12. destination tickets: decks, ticket-only export and import, card printing
   // Counted against what the map already holds, so a richer example map does not move the goalposts.
   const ticketsNow = () => page.evaluate(() => { const m = JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")); return { main: m.tickets.filter((t) => (t.set || "main") === "main").length, decks: m.ticketSets.map((d) => `${d.label} (${m.tickets.filter((t) => (t.set || "main") === d.id).length})`) }; });
@@ -712,6 +732,17 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     await panel.getByRole("button", { name: "Collapse", exact: true }).click();
     await page.waitForTimeout(250);
     check("and Collapse puts it back", Math.abs((await view()).aside.width - v.aside.width) <= 3);
+    // Pointing at a row is enough: the ticket's path is marked before anything is clicked. Nothing is
+    // picked first, so the marks that go on leaving are the hover's own.
+    if (await panel.locator(".analysis-row-active").count()) { await panel.locator(".analysis-row-active").first().click(); await page.waitForTimeout(200); }
+    await panel.locator(".analysis-table tbody tr").first().hover();
+    await page.waitForTimeout(250);
+    const hovered = await markInfo("on-ticket");
+    check("pointing at a ticket marks its path, clearly", clearlyMarked(hovered), JSON.stringify(hovered));
+    await page.mouse.move(700, 800);
+    await page.waitForTimeout(250);
+    const left = await markInfo("on-ticket");
+    check("and the mark goes, and the other routes come back, when the pointer leaves", left.marked === 0 && left.undimmed, JSON.stringify(left));
     // Picking a row shows that ticket's shortest path on the map, which is in view beside the list.
     await panel.locator(".analysis-table tbody tr").first().click();
     await page.waitForTimeout(250);
@@ -1907,6 +1938,8 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     }
     await body.nth(cell.row).locator("td").nth(cell.col + 1).hover();
     await page.waitForTimeout(200);
+    const cellMarks = await markInfo("on-preview");
+    check("the marked routes stand out from the rest", clearlyMarked(cellMarks), JSON.stringify(cellMarks));
     check("pointing at a count marks those routes on the map", (await marked()) === cell.count && cell.count === stored.filter((r) => r.length === cell.length && r.color === colourOf(cell.label)).length, `${await marked()} marked, ${cell.count} in ${cell.length} × ${cell.label}`);
     await body.nth(cell.row).locator("td").first().hover();
     await page.waitForTimeout(200);
@@ -1950,6 +1983,8 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     await crowdedRow.hover();
     await page.waitForTimeout(250);
     check("pointing at a crowded route marks it", (await page.locator(".map-canvas .route-group.on-preview").count()) >= 1);
+    const crowdedMarks = await markInfo("on-preview");
+    check("and marks it clearly", clearlyMarked(crowdedMarks), JSON.stringify(crowdedMarks));
   }
   await page.mouse.move(5, 5);
   await page.waitForTimeout(250);

@@ -1,7 +1,7 @@
 "use client";
 
 // The modal surfaces: the first-visit guide, the balance report and the route suggestions.
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ChevronDown, Copy, Download, FileStack, Sparkles, Layers3, MapPinPlus, Pencil, Plus, Printer, Save, Trash2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -143,7 +143,8 @@ export function SuggestionsPanel({ suggestions, onAdd, onHover, onClose }: { sug
 
 type TicketSortColumn = "ticket" | "spaces" | "points" | "suggested" | "long";
 
-export function TicketsPanel({ lengthView, wide, onToggleWide, onClose, data, reviews, coverage, rate, selected, activeSet, onSelect, onUpdate, onDelete, onSelectSet, onAddSet, onDuplicateSet, onRenameSet, onDeleteSet, onExport, onImport, onPrint, onStartFrom, onSuggest }: {
+export function TicketsPanel({ onHoverTicket, lengthView, wide, onToggleWide, onClose, data, reviews, coverage, rate, selected, activeSet, onSelect, onUpdate, onDelete, onSelectSet, onAddSet, onDuplicateSet, onRenameSet, onDeleteSet, onExport, onImport, onPrint, onStartFrom, onSuggest }: {
+  onHoverTicket: (ticketId: string | null) => void;
   lengthView: TicketLengthsView;
   wide: boolean;
   onToggleWide: () => void;
@@ -168,6 +169,8 @@ export function TicketsPanel({ lengthView, wide, onToggleWide, onClose, data, re
   onStartFrom: (stopId: string) => void;
   onSuggest: () => void;
 }) {
+  // Closing the panel with the pointer still on a row must not leave that ticket marked.
+  useEffect(() => () => onHoverTicket(null), [onHoverTicket]);
   const name = (id: string) => data.stops.find((stop) => stop.id === id)?.name ?? "—";
   const problems = reviews.filter((review) => review.verdict !== "ok");
   // The list starts in the order the deck was built, and sorts on any heading from there.
@@ -229,6 +232,7 @@ export function TicketsPanel({ lengthView, wide, onToggleWide, onClose, data, re
         <div className="analysis-table-scroll"><table className="analysis-table">
           <thead><tr>{heading("ticket", "Ticket")}{heading("spaces", "Spaces")}{heading("points", "Points")}{heading("suggested", "Suggested")}{heading("long", "Long")}<th /></tr></thead>
           <tbody>{sorted.map((review) => <tr key={review.ticket.id} className={cn("analysis-row-link", review.verdict !== "ok" && "analysis-warning-row", review.ticket.id === selected && "analysis-row-active")} tabIndex={0} role="button"
+            onPointerEnter={() => onHoverTicket(review.ticket.id)} onPointerLeave={() => onHoverTicket(null)} onFocus={() => onHoverTicket(review.ticket.id)} onBlur={() => onHoverTicket(null)}
             onClick={() => onSelect(review.ticket.id === selected ? null : review.ticket.id)}
             onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onSelect(review.ticket.id === selected ? null : review.ticket.id); } }}>
             <td>{name(review.ticket.a)} → {name(review.ticket.b)}{review.verdict === "unreachable" ? " · not connected" : review.verdict === "duplicate" ? " · duplicate" : ""}</td>
