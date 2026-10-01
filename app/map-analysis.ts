@@ -1,6 +1,7 @@
 // The balance layer: everything derived from the stops and routes themselves. All of it is pure,
 // computed on demand from MapData, and none of it is stored in a map file.
 import { DEFAULT_WAGONS_PER_PLAYER, DEFAULT_STARTING_TICKETS, DEFAULT_TICKET_BANDS, DEFAULT_TICKET_MIX, type TicketBands, type TicketMix, DEFAULT_PLAYERS, defaultLabelAngle, labelPush, stopSizeMeta, ticketsInSet, type MapData, type Ticket, type Point, realWagon, type Route, routeColors, type Stop, W } from "./map-data";
+import type { TicketDeckReport } from "./ticket-suggester";
 import { curvedSamples, isCurved, intersects, parallelPoints, pointsFor, polylineLength, stopById } from "./map-geometry";
 
 export type RouteSpacing = { route: Route; drawnMm: number; neededMm: number; ratio: number; verdict: "short" | "long" | "ok" };
@@ -464,6 +465,40 @@ export function ticketCoverage(data: MapData, setId?: string): { stop: Stop; cou
   const counts = new Map<string, number>();
   for (const ticket of (setId ? ticketsInSet(data, setId) : data.tickets)) for (const id of [ticket.a, ticket.b]) counts.set(id, (counts.get(id) ?? 0) + 1);
   return ticketEndStops(data).map((stop) => ({ stop, count: counts.get(stop.id) ?? 0 })).sort((a, b) => b.count - a.count);
+}
+
+// One deck's figures, for setting two decks side by side. Everything is read from the deck itself:
+// its tickets, the lengths of their shortest paths, and the report on how it lies on the map.
+export type DeckFigures = {
+  tickets: number; long: number; points: number; pointsPerTicket: number | null;
+  shortest: number | null; median: number | null; longest: number | null;
+  mix: [number, number, number] | null;   // short, medium, long, as shares of the tickets counted
+  bins: number[] | null;                  // the five length bands, as shares of the regular tickets counted
+  uncovered: number; crowded: number; duplicates: number; unusedPct: number; offPath: number; offPathOf: number;
+};
+
+export function deckFigures(data: MapData, setId: string, report: TicketDeckReport): DeckFigures {
+  const tickets = ticketsInSet(data, setId);
+  const points = tickets.reduce((sum, ticket) => sum + ticket.points, 0);
+  const lengths = reviewTickets(data, setId).map((review) => review.distance).filter((distance): distance is number => distance !== null).sort((a, b) => a - b);
+  const mixTotal = report.mix.reduce((sum, count) => sum + count, 0);
+  return {
+    tickets: tickets.length,
+    long: tickets.filter((ticket) => ticket.long).length,
+    points,
+    pointsPerTicket: tickets.length ? points / tickets.length : null,
+    shortest: lengths.length ? lengths[0] : null,
+    median: lengths.length ? lengths[Math.floor(lengths.length / 2)] : null,
+    longest: lengths.length ? lengths[lengths.length - 1] : null,
+    mix: mixTotal ? [100 * report.mix[0] / mixTotal, 100 * report.mix[1] / mixTotal, 100 * report.mix[2] / mixTotal] : null,
+    bins: report.regular ? report.bins.map((count) => 100 * count / report.regular) : null,
+    uncovered: ticketCoverage(data, setId).filter((entry) => entry.count === 0).length,
+    crowded: report.bottlenecks.length,
+    duplicates: report.duplicatePairs.length,
+    unusedPct: report.unusedPct,
+    offPath: report.valuation.off.length,
+    offPathOf: report.valuation.total,
+  };
 }
 
 // The ticket suggester lives in its own module; re-exported here so the ticket analysis has one door.

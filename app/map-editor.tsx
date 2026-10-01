@@ -19,10 +19,11 @@ import { PrintDialog, PrintPages, TicketPrintPages, type PrintWhat } from "./map
 import { ImageStage } from "./map-image";
 import { RulesPanel } from "./rules-panel";
 import { type TicketLengthsView } from "./ticket-lengths";
+import { type DeckCompareView } from "./deck-compare";
 import { DEFAULT_PRINT_CHOICE, isSafari, PRINT_CHOICE_KEY, PRINT_PROFILES, type PrintChoice, type PrintProfile, printPlan } from "./print-plan";
 import { useTicketSuggestion } from "./use-ticket-suggestion";
 import { SettingsDialog, type StyleTarget } from "./map-styles";
-import { bandsOf, bandCuts, mapDiameter, defaultStyle, deckRuleFor, TICKET_SUGGESTER, evaluateTicketDeck, suggestedDeckSize, type TicketStyle, autoPlaceLabels, labelledStops, setupBalance, stopCoverage, ticketBand, type TicketBand, reviewTickets, ticketPointsPerSpace, ticketCoverage, type RouteSuggestion, labelCovers, labelAngleOptions, routeSamplePoints, colourLengthTable, crossingPairs, buildAdjacency, networkStats, routeSpacing, shortestPath, suggestRoutes } from "./map-analysis";
+import { bandsOf, bandCuts, mapDiameter, deckFigures, defaultStyle, deckRuleFor, TICKET_SUGGESTER, evaluateTicketDeck, suggestedDeckSize, type TicketStyle, autoPlaceLabels, labelledStops, setupBalance, stopCoverage, ticketBand, type TicketBand, reviewTickets, ticketPointsPerSpace, ticketCoverage, type RouteSuggestion, labelCovers, labelAngleOptions, routeSamplePoints, colourLengthTable, crossingPairs, buildAdjacency, networkStats, routeSpacing, shortestPath, suggestRoutes } from "./map-analysis";
 import { canvasPoint, canvasPointRaw, pointsFor, samePair, stopById } from "./map-geometry";
 import { cloneForHistory, cloneMap, formatTimestamp, GUIDE_SEEN_KEY, HISTORY_LIMIT, MAX_IMAGE_WARN_BYTES, normalizeBackgroundFile, normalizeMap, normalizeNetworkFile, normalizeTicketFile, buildTicketFile, readMapFile, writeMapFile, mapPayload, networkPayload, readBackgroundImage, rescaleMapToFormat, MAP_HINT_KEY, MAP_HINT_X_KEY } from "./map-storage";
 import { colorLabels, defaultTicketSet, DEFAULT_PLAYERS, DEFAULT_WAGONS_PER_PLAYER, IMAGE_KEEP_ON_BOARD, type Ticket, type StopTypeStyle, type WagonStyle, ticketsInSet, type TicketSet, emptyMap, initialMap, type LineStyle, DEFAULT_END_GAP_MM, mapFormats, type BackgroundImage, type BackgroundShape, type BackgroundType, type MapData, type MapFormat, type Point, type Route, type RouteType, type RouteTypeStyle, routeColors, STORAGE_KEY, type Stop, type StopSize, stopSizeMeta, type StopSymbol, stopSymbolMeta, type StopType, W } from "./map-data";
@@ -215,6 +216,22 @@ export function MapEditor() {
   const currentDeckReport = useMemo(() => evaluateTicketDeck(data, { style: suggestChoice, setId: activeTicketSet.id }), [data, suggestChoice, activeTicketSet.id]);
   // The deck's lengths against the official decks, and against the map's own rules when it has chosen some.
   const lengthsView = useMemo((): TicketLengthsView => { const rule = deckRuleFor(data, suggestChoice); return { counts: currentDeckReport.bins, regular: currentDeckReport.regular, reach: currentDeckReport.reach, skipped: currentDeckReport.skipped, long: currentDeckReport.long, official: TICKET_SUGGESTER.styles.generic.bins, own: rule.custom ? { label: rule.label, bins: rule.bins } : null }; }, [data, suggestChoice, currentDeckReport]);
+  // This deck against another, when the map has more than one: only worked out while the Tickets panel is open.
+  const [compareSetId, setCompareSetId] = useState<string | null>(null);
+  const compareOthers = data.ticketSets.filter((set) => set.id !== activeTicketSet.id);
+  const compareOtherId = compareOthers.find((set) => set.id === compareSetId)?.id ?? compareOthers[0]?.id ?? null;
+  const compareView = useMemo((): DeckCompareView | null => {
+    if (!showTickets || !compareOtherId) return null;
+    const other = data.ticketSets.find((set) => set.id === compareOtherId);
+    if (!other) return null;
+    return {
+      others: data.ticketSets.filter((set) => set.id !== activeTicketSet.id).map((set) => ({ id: set.id, label: set.label })),
+      otherId: compareOtherId,
+      onOther: setCompareSetId,
+      a: { label: activeTicketSet.label, figures: deckFigures(data, activeTicketSet.id, deckReport) },
+      b: { label: other.label, figures: deckFigures(data, other.id, evaluateTicketDeck(data, { setId: other.id, atTable })) },
+    };
+  }, [showTickets, data, activeTicketSet, compareOtherId, deckReport, atTable]);
   const suggestDefaultSize = useMemo(() => {
     const connected = new Set(data.routes.flatMap((route) => [route.a, route.b]));
     const size = suggestedDeckSize(data, suggestChoice, connected.size || data.stops.length);
@@ -770,7 +787,7 @@ export function MapEditor() {
       </section>
       <aside className={cn("properties panel", showSuggestions && "showing-suggestions", widePanel && "showing-balance")}>
         {showAnalysis && <AnalysisPanel lengthView={lengthsView} setup={setup} bottlenecks={deckReport.bottlenecks} atTable={atTable} onAtTable={(count) => { setBottleneckTable(count); setBottleneckRoutes(new Set()); }} onShowBottleneck={(routeIds) => setBottleneckRoutes((current) => (routeIds.length === current.size && routeIds.every((id) => current.has(id)) ? new Set() : new Set(routeIds)))} bottleneckShown={bottleneckRoutes} pinKey={pin?.key ?? null} onPin={togglePin} onClose={closeAnalysis} onPreviewRoutes={(routeIds) => setBalanceRoutes(routeIds ? new Set(routeIds) : null)} onPreviewStop={setBalanceStop} data={data} stats={stats} colourTable={colourTable} spacing={spacing} scaleWidthMm={scaleWidthMm} onSelectRoute={(routeId) => { closeAnalysis(); setSelectedRoute(routeId); setSelectedStop(null); setSelectedBackground(null); setSelectedNote(null); setImageSelected(false); setTool("select"); }} onSelectStop={(stopId) => { closeAnalysis(); setSelectedStop(stopId); setSelectedRoute(null); setSelectedBackground(null); setSelectedNote(null); setImageSelected(false); setTool("select"); }}  />}
-        {showTickets && <TicketsPanel onHoverTicket={setHoveredTicket} lengthView={lengthsView} wide={rightWidth >= RIGHT_WIDTH_WIDE} onToggleWide={() => (rightWidth >= RIGHT_WIDTH_WIDE ? resetRight() : resizeRight(RIGHT_WIDTH_WIDE))} onClose={() => setShowTickets(false)} data={data} reviews={ticketReviews} coverage={ticketCoverage(data, activeTicketSet.id)} rate={ticketRate} selected={selectedTicket} activeSet={activeTicketSet} onSelect={setSelectedTicket}
+        {showTickets && <TicketsPanel compare={compareView} onHoverTicket={setHoveredTicket} lengthView={lengthsView} wide={rightWidth >= RIGHT_WIDTH_WIDE} onToggleWide={() => (rightWidth >= RIGHT_WIDTH_WIDE ? resetRight() : resizeRight(RIGHT_WIDTH_WIDE))} onClose={() => setShowTickets(false)} data={data} reviews={ticketReviews} coverage={ticketCoverage(data, activeTicketSet.id)} rate={ticketRate} selected={selectedTicket} activeSet={activeTicketSet} onSelect={setSelectedTicket}
           onSelectSet={(setId) => { setTicketSetId(setId); setSelectedTicket(null); }}
           onAddSet={() => { const id = `ts-${Date.now()}`; change((draft) => { draft.ticketSets.push({ id, label: nextDeckLabel(draft.ticketSets) }); return draft; }); setTicketSetId(id); setSelectedTicket(null); }}
           onDuplicateSet={() => { const id = `ts-${Date.now()}`; const stamp = Date.now(); change((draft) => { draft.ticketSets.push({ id, label: nextDeckLabel(draft.ticketSets, `${activeTicketSet.label} copy`) }); ticketsInSet(draft, activeTicketSet.id).forEach((ticket, index) => draft.tickets.push({ ...ticket, id: `t-${stamp}-${index}`, set: id })); return draft; }); setTicketSetId(id); setSelectedTicket(null); }}

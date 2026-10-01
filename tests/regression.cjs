@@ -805,6 +805,54 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.waitForTimeout(800);
   check("importing tickets adds a deck instead of overwriting", (await page.locator("#ticket-set option").count()) === deckOptions.length + 1, (await page.locator("#ticket-set option").allTextContents()).join(" | "));
   check("imported tickets land on real stops", (await page.locator(".analysis-table tbody tr td:first-child").allTextContents()).every((r) => !r.includes("—")));
+  // Two decks side by side: this deck against another, figure by figure, with the difference
+  {
+    const KEY = "orebro-map-editor-public-v2";
+    const cmp = page.locator(".tickets-panel .deck-compare");
+    const oracle = (setId) => page.evaluate(([key, id]) => { const m = JSON.parse(localStorage.getItem(key)); const first = m.ticketSets[0].id; const ts = m.tickets.filter((t) => (t.set ?? first) === id); return { tickets: ts.length, long: ts.filter((t) => t.long).length, points: ts.reduce((sum, t) => sum + t.points, 0), label: m.ticketSets.find((x) => x.id === id).label }; }, [KEY, setId]);
+    const figure = async (row, col) => { const raw = await cmp.locator(`tr[data-row="${row}"] .cmp-${col}`).getAttribute("data-value"); return raw === "" || raw === null ? null : Number(raw); };
+    const select = cmp.getByRole("combobox", { name: "Compare with" });
+    const allIds = await page.locator("#ticket-set option").evaluateAll((os) => os.map((o) => o.value));
+    const activeId = await page.locator("#ticket-set").inputValue();
+    check("with several decks the panel offers to compare them", (await cmp.count()) === 1 && /Compare decks/.test(await cmp.locator("h3").textContent()) && (await select.count()) === 1);
+    const others = await select.locator("option").evaluateAll((os) => os.map((o) => o.value));
+    check("the other deck is chosen among the decks that are not this one, the first by default", JSON.stringify(others) === JSON.stringify(allIds.filter((id) => id !== activeId)) && (await select.inputValue()) === others[0], JSON.stringify([others, allIds, activeId]));
+    const rowIds = await cmp.locator("tr[data-row]").evaluateAll((trs) => trs.map((tr) => tr.dataset.row));
+    check("it compares tickets, long tickets, points, lengths, mix, length bands, uncovered stops, crowded routes, duplicates, unused routes and points off the path rule", ["tickets", "long", "points", "per-ticket", "shortest", "median", "longest", "mix-short", "mix-medium", "mix-long", "bin-0", "bin-1", "bin-2", "bin-3", "bin-4", "uncovered", "crowded", "duplicates", "unused", "off-path"].every((r) => rowIds.includes(r)), rowIds.join());
+    const a = await oracle(activeId), b = await oracle(others[0]);
+    check("this deck's tickets, long tickets and points are what the map holds", (await figure("tickets", "a")) === a.tickets && (await figure("long", "a")) === a.long && (await figure("points", "a")) === a.points, JSON.stringify(a));
+    check("and so are the other deck's", (await figure("tickets", "b")) === b.tickets && (await figure("long", "b")) === b.long && (await figure("points", "b")) === b.points, JSON.stringify(b));
+    check("the difference is the other deck against this one", (await figure("tickets", "delta")) === b.tickets - a.tickets && (await figure("points", "delta")) === b.points - a.points);
+    check("the columns are headed with the decks' names", (await cmp.locator("th.cmp-a").textContent()).includes(a.label) && (await cmp.locator("th.cmp-b").textContent()).includes(b.label));
+    const lengths = await lengthsIn(page.locator(".tickets-panel"));
+    let binsAgree = lengths !== null;
+    for (let i = 0; i < 5 && binsAgree; i += 1) binsAgree = Math.abs((await figure(`bin-${i}`, "a")) - lengths.rows[i].share) <= 1;
+    check("this deck's length bands agree with the Ticket lengths section above", binsAgree, JSON.stringify(lengths && lengths.rows.map((r) => r.share)));
+    const spread = /Shortest (\d+), median (\d+), longest (\d+)/.exec(await page.locator(".tickets-panel .analysis-section", { has: page.locator("h3", { hasText: "Length spread" }) }).textContent());
+    check("and its shortest, median and longest agree with the Length spread section", spread !== null && (await figure("shortest", "a")) === Number(spread[1]) && (await figure("median", "a")) === Number(spread[2]) && (await figure("longest", "a")) === Number(spread[3]), spread && spread.slice(1).join());
+    // another deck on the other side
+    await select.selectOption(others[1]);
+    await page.waitForTimeout(500);
+    const b2 = await oracle(others[1]);
+    check("choosing another deck puts it in the other column", (await figure("tickets", "b")) === b2.tickets && (await figure("points", "b")) === b2.points && (await cmp.locator("th.cmp-b").textContent()).includes(b2.label), JSON.stringify(b2));
+    // the deck being worked on changes sides with the Deck picker
+    await page.locator("#ticket-set").selectOption(others[0]);
+    await page.waitForTimeout(600);
+    const a3 = await oracle(others[0]);
+    const others3 = await select.locator("option").evaluateAll((os) => os.map((o) => o.value));
+    check("picking another deck to work on moves it to this column, and it leaves the list of others", (await figure("tickets", "a")) === a3.tickets && !others3.includes(others[0]) && others3.includes(activeId), JSON.stringify(others3));
+    // an empty deck: nothing to average, nothing breaks
+    await page.getByRole("button", { name: /Add a deck/ }).click();
+    await page.waitForTimeout(250);
+    await page.getByRole("menuitem", { name: /New, empty deck/ }).click();
+    await page.waitForTimeout(500);
+    check("an empty deck compares as nothing, with dashes where an average would be", (await figure("tickets", "a")) === 0 && (await figure("points", "a")) === 0 && (await figure("per-ticket", "a")) === null && (await figure("shortest", "a")) === null && (await cmp.locator('tr[data-row="per-ticket"] .cmp-a').textContent()).includes("—"));
+    check("and its difference from a full one is still said", (await figure("tickets", "delta")) === (await oracle(await select.inputValue())).tickets);
+    await page.getByRole("button", { name: /Delete deck/ }).click();
+    await page.waitForTimeout(500);
+    await page.locator("#ticket-set").selectOption(activeId);
+    await page.waitForTimeout(400);
+  }
   // An imported deck is stamped with the moment it arrived, so it can be told from the decks the
   // map already had.
   const importedName = await page.locator("#ticket-set-name").inputValue();

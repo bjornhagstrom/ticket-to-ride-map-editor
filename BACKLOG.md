@@ -4,7 +4,6 @@
 
 Editing, scoring, coverage, decks, ticket-only transfer and card printing are built. What remains:
 
-- Compare two decks against each other directly, rather than by switching between them.
 - Tickets to countries or groups of stops, as Switzerland has, are not modelled.
 
 ## Map collaboration

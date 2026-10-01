@@ -12,6 +12,7 @@ import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { TicketLengths, type TicketLengthsView } from "./ticket-lengths";
+import { DeckCompare, type DeckCompareView } from "./deck-compare";
 import { colourRouteIds, compareWithClassics, CLASSIC_ROUTE_MAPS, type Bottleneck, dealtToFullTable, deckRuleFor, deckRules, TICKET_SUGGESTER, type TicketDeckReport, type TicketStyle, type SetupBalance, type TicketReview, type ColourLengthTable, type NetworkStats, type RouteSpacing, type RouteSuggestion } from "./map-analysis";
 
 export function WelcomeGuide({ open, onOpenChange, onChooseBlank, onChooseExample }: { open: boolean; onOpenChange: (open: boolean) => void; onChooseBlank: () => void; onChooseExample: () => void }) {
@@ -162,7 +163,8 @@ export function SuggestionsPanel({ suggestions, onAdd, onHover, onClose }: { sug
 
 type TicketSortColumn = "ticket" | "spaces" | "points" | "suggested" | "long";
 
-export function TicketsPanel({ onHoverTicket, lengthView, wide, onToggleWide, onClose, data, reviews, coverage, rate, selected, activeSet, onSelect, onUpdate, onDelete, onSelectSet, onAddSet, onDuplicateSet, onRenameSet, onDeleteSet, onExport, onImport, onPrint, onStartFrom, onSuggest }: {
+export function TicketsPanel({ compare, onHoverTicket, lengthView, wide, onToggleWide, onClose, data, reviews, coverage, rate, selected, activeSet, onSelect, onUpdate, onDelete, onSelectSet, onAddSet, onDuplicateSet, onRenameSet, onDeleteSet, onExport, onImport, onPrint, onStartFrom, onSuggest }: {
+  compare: DeckCompareView | null;
   onHoverTicket: (ticketId: string | null) => void;
   lengthView: TicketLengthsView;
   wide: boolean;
@@ -265,6 +267,8 @@ export function TicketsPanel({ onHoverTicket, lengthView, wide, onToggleWide, on
       </div>
 
       <TicketLengths view={lengthView} />
+
+      {compare && <DeckCompare view={compare} />}
 
       <div className="analysis-section">
         <h3>Length spread</h3>
