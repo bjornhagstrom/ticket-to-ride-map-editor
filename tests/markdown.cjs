@@ -95,5 +95,44 @@ r = md.resolveRef(`${from.name}–${to.name}`, doubled);
 check("a double route gives both its routes", r.kind === "route" && r.routes.length >= 2);
 check("the names in the map are what the test used", names.length > 3);
 
+inl = md.parseInline("*see [[Rock*Hill]] now* and **bold [[Rock**Hill]] here**");
+check("a star inside a name does not close italics or bold that began before it", inl.length === 3 && inl[0].t === "em" && inl[0].c.some((i) => i.t === "ref" && i.name === "Rock*Hill") && inl[2].t === "strong" && inl[2].c.some((i) => i.t === "ref" && i.name === "Rock**Hill"), JSON.stringify(inl));
+inl = md.parseInline("*see `a*b` now*");
+check("nor does one inside code", inl.length === 1 && inl[0].t === "em" && inl[0].c.some((i) => i.t === "code" && i.v === "a*b"), JSON.stringify(inl));
+
+// ------------------------------------------------------------------ names with dashes in them
+const stop = (id, name) => ({ id, name, type: "city", x: 0, y: 0 });
+const road = (id, a, b) => ({ id, a, b, length: 3, type: "city", color: "neutral" });
+const dashed = {
+  stops: [stop("s1", "Stoke-on-Trent"), stop("s2", "Hanley"), stop("s3", "Aix–Marseille"), stop("s4", "Paris"), stop("s5", "Saint-Étienne"), stop("s6", "A"), stop("s7", "B"), stop("s8", "A-B")],
+  routes: [road("r1", "s1", "s2"), road("r2", "s3", "s4"), road("r3", "s5", "s1"), road("r4", "s6", "s7"), road("r5", "s8", "s4")],
+};
+let d = md.resolveRef("Stoke-on-Trent", dashed);
+check("a stop with hyphens in its name is that stop", d.kind === "stop" && d.stop.id === "s1");
+d = md.resolveRef("Stoke-on-Trent–Hanley", dashed);
+check("and the route from it, written with an en dash, is found", d.kind === "route" && d.routes[0].id === "r1");
+d = md.resolveRef("Stoke-on-Trent-Hanley", dashed);
+check("also when only hyphens separate the two", d.kind === "route" && d.routes[0].id === "r1", JSON.stringify(d).slice(0, 90));
+d = md.resolveRef("Saint-Étienne–Stoke-on-Trent", dashed);
+check("two names that both hold hyphens", d.kind === "route" && d.routes[0].id === "r3");
+d = md.resolveRef("Saint-Étienne-Stoke-on-Trent", dashed);
+check("even with hyphens everywhere", d.kind === "route" && d.routes[0].id === "r3", JSON.stringify(d).slice(0, 90));
+d = md.resolveRef("Aix–Marseille", dashed);
+check("a stop with an en dash in its own name is still that stop", d.kind === "stop" && d.stop.id === "s3");
+d = md.resolveRef("Aix–Marseille–Paris", dashed);
+check("and takes part in a route", d.kind === "route" && d.routes[0].id === "r2", JSON.stringify(d).slice(0, 90));
+d = md.resolveRef("A–B", dashed);
+check("where A, B and A-B are all stops, an en dash means the route between A and B", d.kind === "route" && d.routes[0].id === "r4", JSON.stringify(d).slice(0, 90));
+d = md.resolveRef("A-B", dashed);
+check("and the exact name A-B is the stop of that name", d.kind === "stop" && d.stop.id === "s8");
+d = md.resolveRef("A-B–Paris", dashed);
+check("and A-B to Paris is the route from that stop", d.kind === "route" && d.routes[0].id === "r5", JSON.stringify(d).slice(0, 90));
+d = md.resolveRef("stoke-on-trent – hanley", dashed);
+check("spaces round the dash and any case do not matter", d.kind === "route" && d.routes[0].id === "r1");
+inl = md.parseInline("see [[Stoke-on-Trent–Hanley]] and [[Saint-Étienne]]");
+check("the text parser keeps such a name whole inside [[ ]]", inl.filter((i) => i.t === "ref").map((i) => i.name).join("|") === "Stoke-on-Trent–Hanley|Saint-Étienne", JSON.stringify(inl));
+inl = md.parseInline("a *b* and [[Rock_Hill]] and _c_");
+check("an underscore in a name does not start italics", inl.some((i) => i.t === "ref" && i.name === "Rock_Hill") && inl.filter((i) => i.t === "em").length === 2, JSON.stringify(inl));
+
 console.log(`${ok.length} passed, ${bad.length} failed`);
 if (bad.length) { console.log("FAIL:"); for (const b of bad) console.log("  ✗ " + b); process.exit(1); }

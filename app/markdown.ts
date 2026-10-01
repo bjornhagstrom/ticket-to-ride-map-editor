@@ -31,6 +31,19 @@ export type Block =
 const PUNCTUATION = "\\`*_{}[]()#+-.!|<>~\"'";
 
 // ---------------------------------------------------------------- inline
+// The next `marker` at or after `from` that is not inside a [[reference]] or a code span, so a star or
+// an underscore in a stop's name cannot close a mark that began before the name.
+function findClose(src: string, marker: string, from: number): number {
+  let at = from;
+  while (at < src.length) {
+    if (src.startsWith("[[", at)) { const end = src.indexOf("]]", at + 2); if (end > 0) { at = end + 2; continue; } }
+    if (src[at] === "`") { const end = src.indexOf("`", at + 1); if (end > 0) { at = end + 1; continue; } }
+    if (src.startsWith(marker, at)) return at;
+    at += 1;
+  }
+  return -1;
+}
+
 export function parseInline(src: string): Inline[] {
   const out: Inline[] = [];
   let text = "";
@@ -50,8 +63,8 @@ export function parseInline(src: string): Inline[] {
       if (end > 0 && name && !name.includes("[[") && !name.includes("\n")) { flush(); out.push({ t: "ref", name }); i = end + 2; continue; }
     }
     if (ch === "*" && src[i + 1] === "*") {
-      let end = src.indexOf("**", i + 2);
-      while (end > 0 && /\s/.test(src[end - 1])) end = src.indexOf("**", end + 1);
+      let end = findClose(src, "**", i + 2);
+      while (end > 0 && /\s/.test(src[end - 1])) end = findClose(src, "**", end + 1);
       if (end > i + 2 && !/\s/.test(src[i + 2])) { flush(); out.push({ t: "strong", c: parseInline(src.slice(i + 2, end)) }); i = end + 2; continue; }
       text += "**"; i += 2; continue;
     }
@@ -61,7 +74,7 @@ export function parseInline(src: string): Inline[] {
         let end = i + 1;
         let found = -1;
         while (end < src.length) {
-          const at = src.indexOf(ch, end);
+          const at = findClose(src, ch, end);
           if (at < 0) break;
           const closes = !/\s/.test(src[at - 1]) && src[at + 1] !== ch && src[at - 1] !== ch && (ch === "*" || !wordChar(src[at + 1]));
           if (closes && at > i + 1) { found = at; break; }

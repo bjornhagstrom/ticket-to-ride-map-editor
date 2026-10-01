@@ -155,7 +155,8 @@ const ruled = storage.normalizeMap({ ...JSON.parse(JSON.stringify(sample)), rule
 const ruledBack = storage.normalizeMap(storage.readMapFile(JSON.parse(JSON.stringify(storage.writeMapFile("map", storage.mapPayload(ruled), ruled)))).payload);
 check("the rules text survives a round trip exactly", ruledBack.rules === "# Rules\n\nClaim **routes**.\n\n- see [[Westport]]\n", JSON.stringify(ruledBack.rules));
 check("and is not mistaken for a field this build does not know", !(ruledBack.unknown && "rules" in ruledBack.unknown));
-check("a map with no rules has none, rather than an empty text", storage.normalizeMap(JSON.parse(JSON.stringify(sample))).rules === undefined);
+check("a map with no rules has none, rather than an empty text", storage.normalizeMap({ ...JSON.parse(JSON.stringify(sample)), rules: undefined }).rules === undefined && storage.normalizeMap({ ...JSON.parse(JSON.stringify(sample)), rules: "  \n " }).rules === undefined);
+check("the example map carries rules, and they survive being saved and read back", typeof sample.rules === "string" && sample.rules.length > 100 && storage.normalizeMap(storage.readMapFile(JSON.parse(JSON.stringify(storage.writeMapFile("map", storage.mapPayload(sample), sample)))).payload).rules === sample.rules);
 check("and a rules field that is not text is dropped", storage.normalizeMap({ ...JSON.parse(JSON.stringify(sample)), rules: 42 }).rules === undefined);
 check("a network file does not carry the rules, which belong to the whole map", !("rules" in storage.networkPayload(ruled)));
 

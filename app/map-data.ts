@@ -313,6 +313,33 @@ export const initialMap: MapData = {
   // fits. The regression suite checks both halves of that promise.
   name: "Example map",
   format: "board-2x3",
+  // Rules for the example: the standard ones, except where they say otherwise. The exceptions are made
+  // up, or left as XXX, to show what the rules box does, with a stop and routes named so the preview
+  // draws them. Every name here is on this map; the regression suite checks that.
+  rules: `# Rules of the example map
+
+This map follows the standard *Ticket to Ride* rules, except where it says otherwise below. The exceptions are made up to show what this box can do: replace them with your own.
+
+## Where this map differs
+
+- **Start.** Every player puts a marker on [[Westport]] before the first turn. XXX
+- **Boats.** The boat routes [[Lakeside–Gull Island]] and [[Gull Island–Harbour]] can only be claimed by a player who already holds a route into [[Harbour]]. XXX
+- **Tunnel.** [[Central–Deepcut]] is a tunnel. XXX
+- **Restricted route.** [[Harbour–Eastgate]] is marked R. XXX
+- **Double route.** [[Westport–Millbrook]] has two lanes, but with two or three players only one of them is used, as in the standard rules.
+
+## Still to decide
+
+- XXX
+- XXX
+
+| Players | Wagons each | Tickets dealt |
+| --- | ---: | ---: |
+| 2 | 28 | 3 |
+| 3 | 28 | 3 |
+
+*Tip: point at a name above and the map marks it. Write your own with \`[[Stop]]\` or \`[[Stop–Stop]]\`.*
+`,
   notes: [
     { id: "example-note", x: 40, y: 24, width: 300, height: 134, text: "Print this map for a quick playtest: claim routes by colouring in their spaces, each player with a marker of their own colour. Notes like this one keep what you learn, on screen and in print." },
   ],

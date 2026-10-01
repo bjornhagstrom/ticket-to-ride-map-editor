@@ -534,6 +534,9 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     await printButton().click();
     await page.waitForTimeout(300);
     await cell(paper, column).click();
+    // These count the board's sheets, so the rules (the example map has some) stay out of the run.
+    const rulesTick = printDialog().getByRole("checkbox", { name: /Print the rules/ });
+    if (await rulesTick.isChecked()) await rulesTick.uncheck();
     const promised = Number(await cell(paper, column).getAttribute("data-pages"));
     await printDialog().getByRole("button", { name: "Cancel" }).click();
     await page.waitForTimeout(300);
@@ -2094,6 +2097,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   // the map, and printed on pages of their own after the board when asked
   {
     const mapKey = "orebro-map-editor-public-v2";
+    await page.evaluate(() => localStorage.removeItem("ttr-print-rules"));
     const first = await page.evaluate((key) => { const m = JSON.parse(localStorage.getItem(key)); const r = m.routes[0]; const name = (id) => m.stops.find((st) => st.id === id).name; return { a: name(r.a), b: name(r.b), color: r.color }; }, mapKey);
     const rulesButton = page.getByRole("button", { name: "Rules", exact: true });
     await rulesButton.click();
@@ -2105,7 +2109,18 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     const box = panel.getByRole("textbox", { name: "Rules text" });
     check("a text area takes the rules", (await box.count()) === 1);
     check("which says it is markdown and how to name a stop or a route", /markdown/i.test(await panel.textContent()) && /\[\[/.test(await panel.textContent()));
-    check("and a map without rules shows an empty preview that says so", /nothing written/i.test(await panel.locator(".rules-preview").textContent()));
+    // The example map comes with rules of its own: standard rules except where it says otherwise, with a
+    // stop and a route named so the preview shows them, and XXX where the rule is still to be written.
+    const exampleText = await panel.getByRole("textbox", { name: "Rules text" }).inputValue();
+    const examplePreview = panel.locator(".rules-preview");
+    check("the example map has example rules", /standard/i.test(exampleText) && /Ticket to Ride/.test(exampleText) && (await examplePreview.locator("h1").count()) === 1, exampleText.slice(0, 120));
+    check("they say the map follows the standard rules, except where they say otherwise", /follows the standard[^.]*except/i.test(await examplePreview.textContent()));
+    check("with a stop and a route named, drawn in the preview", (await examplePreview.locator(".rule-ref.stop").count()) >= 1 && (await examplePreview.locator(".rule-ref.route").count()) >= 1);
+    check("and every name in them is on the map", (await examplePreview.locator(".rule-ref.missing").count()) === 0);
+    check("with XXX where a rule is still to be written", (await examplePreview.locator("li").filter({ hasText: "XXX" }).count()) >= 2);
+    // A link to a neutral page that explains markdown
+    const help = panel.getByRole("link", { name: /markdown/i });
+    check("a link to a neutral page explaining markdown", (await help.count()) === 1 && /^https:\/\/commonmark\.org\//.test(await help.getAttribute("href")) && (await help.getAttribute("target")) === "_blank" && /noopener/.test(await help.getAttribute("rel")), String(await help.getAttribute("href")));
     const written = `# House rules\n\nClaim **routes** by colouring in their spaces.\n\n- Start at [[${first.a}]]\n- Cross [[${first.a}–${first.b}]]\n- Never visit [[Atlantis]]\n\n| Players | Wagons |\n| --- | --- |\n| 2 | 45 |\n\n<b>raw</b> html stays text`;
     await box.fill(written);
     await page.waitForTimeout(400);
@@ -2124,6 +2139,63 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     });
     check("a route's swatch is the colour its line has on the map", colours.swatch === colours.line, JSON.stringify(colours));
     check("a name that is no stop is marked as missing, in the editor", (await preview.locator(".rule-ref.missing").count()) === 1 && /no stop|not found|no such/i.test((await preview.locator(".rule-ref.missing").getAttribute("title")) || ""));
+    // The toolbar: buttons that write the markdown for you, and pickers for a stop and a route
+    const toolbar = panel.getByRole("toolbar", { name: "Format the rules" });
+    check("a toolbar with the formatting buttons", (await toolbar.count()) === 1 && (await Promise.all(["Bold", "Italic", "Heading", "Bulleted list", "Numbered list", "Quote", "Table", "Line"].map((n) => toolbar.getByRole("button", { name: n, exact: true }).count()))).every((n) => n === 1));
+    check("and a picker for a stop and one for a route", (await toolbar.getByRole("combobox", { name: "Insert a stop" }).count()) === 1 && (await toolbar.getByRole("combobox", { name: "Insert a route" }).count()) === 1);
+    const setText = async (text, from, to) => { await box.fill(text); await box.evaluate((el, [a, b]) => { el.focus(); el.setSelectionRange(a, b); }, [from ?? text.length, to ?? from ?? text.length]); };
+    const value = () => box.inputValue();
+    await setText("hello world", 6, 11);
+    await toolbar.getByRole("button", { name: "Bold", exact: true }).click();
+    check("Bold wraps the selected words", (await value()) === "hello **world**", await value());
+    check("and keeps them selected, so the next click undoes it", (await box.evaluate((el) => el.value.slice(el.selectionStart, el.selectionEnd))) === "world");
+    await toolbar.getByRole("button", { name: "Bold", exact: true }).click();
+    check("a second click takes the bold off again", (await value()) === "hello world", await value());
+    await setText("a b", 3, 3);
+    await toolbar.getByRole("button", { name: "Italic", exact: true }).click();
+    check("with nothing selected, Italic leaves a word to type over", (await value()) === "a b*text*" && (await box.evaluate((el) => el.value.slice(el.selectionStart, el.selectionEnd))) === "text", await value());
+    await setText("hello world", 0, 5);
+    await box.press("ControlOrMeta+b");
+    check("Ctrl or Cmd+B does the same as the button", (await value()) === "**hello** world", await value());
+    await setText("Title", 2, 2);
+    const heading = toolbar.getByRole("button", { name: "Heading", exact: true });
+    const seen = [];
+    for (let n = 0; n < 4; n += 1) { await heading.click(); seen.push(await value()); }
+    check("Heading goes through #, ## and ### and back to none", JSON.stringify(seen) === JSON.stringify(["# Title", "## Title", "### Title", "Title"]), JSON.stringify(seen));
+    await setText("one\ntwo\nthree", 0, 13);
+    await toolbar.getByRole("button", { name: "Bulleted list", exact: true }).click();
+    check("Bulleted list marks every selected line", (await value()) === "- one\n- two\n- three", JSON.stringify(await value()));
+    await toolbar.getByRole("button", { name: "Bulleted list", exact: true }).click();
+    check("and a second click takes the bullets off", (await value()) === "one\ntwo\nthree", JSON.stringify(await value()));
+    await box.evaluate((el) => { el.setSelectionRange(0, el.value.length); });
+    await toolbar.getByRole("button", { name: "Numbered list", exact: true }).click();
+    check("Numbered list counts the lines", (await value()) === "1. one\n2. two\n3. three", JSON.stringify(await value()));
+    await box.evaluate((el) => { el.setSelectionRange(0, el.value.length); });
+    await toolbar.getByRole("button", { name: "Numbered list", exact: true }).click();
+    await setText("quoted", 0, 6);
+    await toolbar.getByRole("button", { name: "Quote", exact: true }).click();
+    check("Quote puts > before the line", (await value()) === "> quoted", await value());
+    await setText("", 0, 0);
+    await toolbar.getByRole("button", { name: "Table", exact: true }).click();
+    await page.waitForTimeout(200);
+    check("Table writes a table to fill in, and the preview draws it", /\| Column \| Column \|\n\| --- \| --- \|/.test(await value()) && (await preview.locator("th").count()) === 2, JSON.stringify(await value()));
+    await setText("above", 5, 5);
+    await toolbar.getByRole("button", { name: "Line", exact: true }).click();
+    check("Line writes a line across on its own", /above\n\n---\n/.test(await value()), JSON.stringify(await value()));
+    // the pickers write the references
+    await setText("Start at ", 9, 9);
+    await toolbar.getByRole("combobox", { name: "Insert a stop" }).selectOption({ label: first.a });
+    check("the stop picker writes [[Stop]] where the cursor was", (await value()) === `Start at [[${first.a}]]`, await value());
+    await page.waitForTimeout(200);
+    check("which the preview draws as that stop", (await preview.locator(".rule-ref.stop").count()) === 1);
+    await setText("Take ", 5, 5);
+    await toolbar.getByRole("combobox", { name: "Insert a route" }).selectOption({ label: `${first.a}–${first.b}` });
+    check("the route picker writes [[Stop–Stop]]", (await value()).startsWith(`Take [[${first.a}–${first.b}]]`), await value());
+    await page.waitForTimeout(200);
+    check("which the preview draws as that route", (await preview.locator(".rule-ref.route").count()) === 1);
+    check("the pickers go back to their label, ready for the next", (await toolbar.getByRole("combobox", { name: "Insert a stop" }).inputValue()) === "");
+    await box.fill(written);
+    await page.waitForTimeout(300);
     // pointing at a reference shows it on the map
     await preview.locator(".rule-ref.stop").first().hover();
     await page.waitForTimeout(250);
@@ -2167,8 +2239,10 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     await page.waitForTimeout(400);
     const rulesBox = printDialog().getByRole("checkbox", { name: /Print the rules/ });
     check("the print dialog offers the rules, ticked", (await rulesBox.count()) === 1 && (await rulesBox.isChecked()) && (await rulesBox.isEnabled()));
+    check("the summary of the run says the rules follow the board, and stops saying so when unticked", /then the rules/i.test(await printDialog().locator(".print-summary").textContent()));
     check("and says they get pages of their own after the board", /pages of their own|after the board/i.test(await printDialog().textContent()));
     await rulesBox.uncheck();
+    check("unticked, the summary is about the board alone", !/then the rules/i.test(await printDialog().locator(".print-summary").textContent()));
     await printDialog().getByRole("button", { name: "Cancel" }).click();
     await page.waitForTimeout(300);
     const pdfOff = await (async () => { await page.emulateMedia({ media: "print" }); const pdf = await page.pdf({ format: "A4", printBackground: true }); await page.emulateMedia({ media: "screen" }); return (pdf.toString("latin1").match(/\/Type\s*\/Page[^s]/g) || []).length; })();
@@ -2198,6 +2272,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     await page.waitForTimeout(300);
     await panel.getByRole("textbox", { name: "Rules text" }).fill("");
     await page.waitForTimeout(1200);
+    check("a map without rules shows an empty preview that says so", /nothing written/i.test(await panel.locator(".rules-preview").textContent()));
     await printButton().click();
     await page.waitForTimeout(400);
     const emptyBox = printDialog().getByRole("checkbox", { name: /Print the rules/ });

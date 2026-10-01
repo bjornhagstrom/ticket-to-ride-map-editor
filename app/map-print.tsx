@@ -149,7 +149,7 @@ export function PrintDialog({ open, onOpenChange, format, profile, choice, onCho
           </label>
         </fieldset>
       </div>
-      <p className="print-summary">{describePlan(plan)}</p>
+      <p className="print-summary">{describePlan(plan)}{rules.written && rules.on ? " Then the rules, on pages of their own." : ""}</p>
       <h3 id="print-table-heading" className="print-table-heading">Sheets for every choice</h3>
       <p id="print-table-note" className="print-table-note">Each cell shows how many sheets a print run takes, and its scale: how big the printed board is against the real one. 100 % is real size; 50 % is half as wide and half as tall. Pick a cell to use it.</p>
       <div className="print-table-wrap">
