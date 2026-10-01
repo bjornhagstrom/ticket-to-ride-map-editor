@@ -42,7 +42,10 @@ export function TicketPrintPages({ data, setId }: { data: MapData; setId: string
 
 // The board as the chosen print run cuts it. Page size, margins and the size of every tile come
 // from printPlan, in millimetres, so the pages cannot disagree with what the dialog promised.
-export function PrintPages({ data, plan, rules = false }: { data: MapData; plan: PrintPlan; rules?: boolean }) {
+// What a print run holds: the board, the board followed by the rules, or the rules alone.
+export type PrintWhat = "board" | "both" | "rules";
+
+export function PrintPages({ data, plan, what = "board" }: { data: MapData; plan: PrintPlan; what?: PrintWhat }) {
   const format = mapFormats[data.format];
   const full = plan.choice.split === "full";
   const percent = `${Math.round(plan.scale * 100)} %`;
@@ -59,7 +62,7 @@ export function PrintPages({ data, plan, rules = false }: { data: MapData; plan:
         @page margin and uses its own — Safari does — then still has room for it; a box the size of
         the paper would spill onto an empty sheet after every page, or be shrunk to fit. */}
     <style>{`@media print{@page{size:${plan.pageMm.width}mm ${plan.pageMm.height}mm;margin:${PRINT_MARGIN_MM}mm}}`}</style>
-    {plan.pages.map((page) => {
+    {what !== "rules" && plan.pages.map((page) => {
       // Each page is one SVG the size of the page box, in millimetres, holding the landscape sheet —
       // caption, artwork, frame or cut marks — turned a quarter turn with an SVG transform. Turning
       // HTML with a CSS transform printed the artwork shrunk in Chromium's PDF, and a CSS media query
@@ -87,7 +90,7 @@ export function PrintPages({ data, plan, rules = false }: { data: MapData; plan:
     })}
     {/* The rules, if asked for, on pages of their own after the board: as many as the text needs,
         flowing in the same page box as the board's pages. */}
-    {rules && data.rules?.trim() && <section className="print-rules">
+    {what !== "board" && data.rules?.trim() && <section className="print-rules">
       <p className="print-rules-name">{data.name} · rules</p>
       <RulesText source={data.rules} data={data} print />
     </section>}
@@ -96,20 +99,22 @@ export function PrintPages({ data, plan, rules = false }: { data: MapData; plan:
 
 // Printing is decided per run. Nothing chosen here is written to the map; the last choice is kept
 // in this browser only, for convenience.
-export function PrintDialog({ open, onOpenChange, format, profile, choice, onChoice, rules, onPrint }: {
+export function PrintDialog({ open, onOpenChange, format, profile, choice, onChoice, what, onPrint }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   format: MapFormat;
   profile: PrintProfile;
   choice: PrintChoice;
   onChoice: (choice: PrintChoice) => void;
-  rules: { written: boolean; on: boolean; onChange: (on: boolean) => void };
+  what: { written: boolean; value: PrintWhat; onChange: (what: PrintWhat) => void };
   onPrint: () => void;
 }) {
   const plan = printPlan(format, choice, profile);
   const { sizes, columns, table } = printChoices(format, profile);
   const current = plan.choice;
   const anniversary = sizes.find((size) => size.id === "anniversary");
+  // Rules only has no board in it: how it is split, its size and its sheet table do not apply.
+  const boardIn = what.value !== "rules";
   return <Dialog open={open} onOpenChange={onOpenChange}>
     <DialogContent className="print-dialog">
       <DialogHeader>
@@ -117,13 +122,20 @@ export function PrintDialog({ open, onOpenChange, format, profile, choice, onCho
         <DialogDescription>How this print run comes out. None of it changes the map: the board stays a {mapFormats[format].shortLabel}.</DialogDescription>
       </DialogHeader>
       <div className="print-choices">
-        <fieldset><legend>How it is split</legend>
+        <fieldset><legend>What to print</legend>
+          {([["board", "Board only", "The map on its sheets, as chosen below."], ["both", "Board and rules", what.written ? "The board, then the rules on pages of their own." : "Nothing written yet. Open Rules in the left column to write them."], ["rules", "Rules only", what.written ? "Just the rules text, on as many pages as it needs." : "Nothing written yet."]] as [PrintWhat, string, string][]).map(([id, label, note]) => <label key={id} className="print-option">
+            <input type="radio" name="print-what" value={id} aria-label={label} aria-describedby={`print-what-${id}`} disabled={id !== "board" && !what.written}
+              checked={what.value === id} onChange={() => what.onChange(id)} />
+            <span><strong>{label}</strong><small id={`print-what-${id}`}>{note}</small></span>
+          </label>)}
+        </fieldset>
+        {boardIn && <fieldset><legend>How it is split</legend>
           {splits.map((split) => <label key={split.id} className="print-option">
             <input type="radio" name="print-split" value={split.id} aria-label={split.label} aria-describedby={`print-split-${split.id}`}
               checked={current.split === split.id} onChange={() => onChoice({ ...current, split: split.id })} />
             <span><strong>{split.label}</strong><small id={`print-split-${split.id}`}>{split.note}</small></span>
           </label>)}
-        </fieldset>
+        </fieldset>}
         <fieldset><legend>Paper</legend>
           {papers.map((paper) => <label key={paper.id} className="print-option">
             <input type="radio" name="print-paper" value={paper.id} aria-label={paper.label} aria-describedby={`print-paper-${paper.id}`}
@@ -133,7 +145,7 @@ export function PrintDialog({ open, onOpenChange, format, profile, choice, onCho
         </fieldset>
         {/* Anniversary exists only at full size, so ticking it asks for full size too, and a run
             that is not full size is never Anniversary. The table and the tick follow each other. */}
-        {anniversary && <fieldset><legend>Supersize</legend>
+        {boardIn && anniversary && <fieldset><legend>Supersize</legend>
           <label className="print-option">
             <input type="checkbox" name="print-anniversary" aria-label="Anniversary size" aria-describedby="print-anniversary-note"
               checked={current.split === "full" && current.size === "anniversary"}
@@ -141,16 +153,9 @@ export function PrintDialog({ open, onOpenChange, format, profile, choice, onCho
             <span><strong>Anniversary size</strong><small id="print-anniversary-note">{anniversary.widthMm} × {anniversary.heightMm} mm, bigger wagons too. Always printed full size.</small></span>
           </label>
         </fieldset>}
-        <fieldset><legend>Rules</legend>
-          <label className="print-option">
-            <input type="checkbox" name="print-rules" aria-label="Print the rules after the board" aria-describedby="print-rules-note" disabled={!rules.written}
-              checked={rules.written && rules.on} onChange={(event) => rules.onChange(event.target.checked)} />
-            <span><strong>Print the rules</strong><small id="print-rules-note">{rules.written ? "The rules text prints on pages of their own after the board, as many as it needs." : "Nothing written yet. Open Rules in the left column to write them."}</small></span>
-          </label>
-        </fieldset>
       </div>
-      <p className="print-summary">{describePlan(plan)}{rules.written && rules.on ? " Then the rules, on pages of their own." : ""}</p>
-      <h3 id="print-table-heading" className="print-table-heading">Sheets for every choice</h3>
+      <p className="print-summary">{what.value === "rules" ? `Rules only: the rules text, upright on ${papers.find((paper) => paper.id === current.paper)?.label ?? "the paper"}, on as many pages as it needs.` : describePlan(plan)}{what.value === "both" ? " Then the rules, on pages of their own." : ""}</p>
+      {boardIn && <><h3 id="print-table-heading" className="print-table-heading">Sheets for every choice</h3>
       <p id="print-table-note" className="print-table-note">Each cell shows how many sheets a print run takes, and its scale: how big the printed board is against the real one. 100 % is real size; 50 % is half as wide and half as tall. Pick a cell to use it.</p>
       <div className="print-table-wrap">
         <table className="print-table" aria-labelledby="print-table-heading" aria-describedby="print-table-note">
@@ -163,9 +168,10 @@ export function PrintDialog({ open, onOpenChange, format, profile, choice, onCho
               onClick={() => onChoice(cell.choice)}><span>{cell.pages} sheet{cell.pages === 1 ? "" : "s"}</span> <small>{Math.round(cell.scale * 100)} %</small></button></td>)}
           </tr>)}</tbody>
         </table>
-      </div>
-      {profile.id === "safari" && <p className="helper print-dialog-foot print-safari-note">In Safari the sheets are cut shorter than in other browsers. Safari’s first print layout leaves less room on the page than it shows once any setting is changed, and a full-length sheet spilled onto a second page. The counts above are Safari’s.</p>}
-      <p className="helper print-dialog-foot">Every page prints upright (portrait), the default in every browser, with the map turned a quarter turn on it: leave the print dialog on Portrait. Print at 100 % — “fit to page” would undo the sizes above. The same dialog can save the run as a PDF.</p>
+      </div></>}
+      {boardIn && profile.id === "safari" && <p className="helper print-dialog-foot print-safari-note">In Safari the sheets are cut shorter than in other browsers. Safari’s first print layout leaves less room on the page than it shows once any setting is changed, and a full-length sheet spilled onto a second page. The counts above are Safari’s.</p>}
+      {!boardIn && <p className="helper print-dialog-foot">Pages print upright (portrait), the default in every browser. The page is the paper less a margin.</p>}
+      {boardIn && <p className="helper print-dialog-foot">Every page prints upright (portrait), the default in every browser, with the map turned a quarter turn on it: leave the print dialog on Portrait. Print at 100 % — “fit to page” would undo the sizes above. The same dialog can save the run as a PDF.</p>}
       <DialogFooter>
         <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
         <Button onClick={onPrint}><Printer />Print</Button>

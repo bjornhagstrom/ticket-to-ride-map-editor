@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 import { MapArtwork, type Tool } from "./map-artwork";
 import { AnalysisPanel, StopTicketsDialog, SuggestionsPanel, SuggestTicketsDialog, TicketsPanel, WelcomeGuide } from "./map-dialogs";
 import { TicketCoveragePanel, type CoverageSort, BackgroundImageProperties, BackgroundProperties, NoteProperties, RouteProperties, StopProperties, StylePicker } from "./map-properties";
-import { PrintDialog, PrintPages, TicketPrintPages } from "./map-print";
+import { PrintDialog, PrintPages, TicketPrintPages, type PrintWhat } from "./map-print";
 import { ImageStage } from "./map-image";
 import { RulesPanel } from "./rules-panel";
 import { type TicketLengthsView } from "./ticket-lengths";
@@ -89,9 +89,12 @@ export function MapEditor() {
   // The rules panel asks for stops to be clicked on the map; the map hands the click to it.
   const rulesPickRef = useRef<{ stop: (stopId: string) => boolean; cancel: () => boolean } | null>(null);
   const [rulesPicking, setRulesPicking] = useState(false);
-  const [printRules, setPrintRules] = useState(true);
-  useEffect(() => { queueMicrotask(() => { try { if (localStorage.getItem(PRINT_RULES_KEY) === "off") setPrintRules(false); } catch { /* keep the default */ } }); }, []);
-  const choosePrintRules = (on: boolean) => { setPrintRules(on); try { localStorage.setItem(PRINT_RULES_KEY, on ? "on" : "off"); } catch { /* not remembered, still used */ } };
+  const [printWhat, setPrintWhat] = useState<PrintWhat>("both");
+  // "on" and "off" are what an earlier build wrote for the one tick box it had.
+  useEffect(() => { queueMicrotask(() => { try { const stored = localStorage.getItem(PRINT_RULES_KEY); if (stored === "off" || stored === "board") setPrintWhat("board"); else if (stored === "rules") setPrintWhat("rules"); else if (stored === "on" || stored === "both") setPrintWhat("both"); } catch { /* keep the default */ } }); }, []);
+  const choosePrintWhat = (what: PrintWhat) => { setPrintWhat(what); try { localStorage.setItem(PRINT_RULES_KEY, what); } catch { /* not remembered, still used */ } };
+  // Without any rules written there is only the board to print.
+  const printWhatNow: PrintWhat = data.rules?.trim() ? printWhat : "board";
   // How wide the right column is while Map balance is open; the left edge of the column is its handle.
   const [rightWidth, setRightWidth] = useState(RIGHT_WIDTH_DEFAULT);
   const resizeRight = (width: number) => {
@@ -801,9 +804,9 @@ export function MapEditor() {
       onShuffle={() => setSuggestSeed((seed) => seed + 1)} onApply={(mode) => applySuggestion(mode, `ts-${Date.now()}`)} />
     <WelcomeGuide open={showGuide} onOpenChange={(open) => !open && dismissGuide()} onChooseBlank={() => chooseFromGuide("blank")} onChooseExample={() => chooseFromGuide("example")} />
     <SettingsDialog open={showStyles} onOpenChange={setShowStyles} target={styleTarget} onTarget={setStyleTarget} data={data} change={change} onChangeFormat={changeFormat} defaults={{ stopType, setStopType, stopSize, setStopSize: (value) => setStopSize(value as StopSize), routeType, setRouteType, routeColor, setRouteColor, routeCurved, setRouteCurved, routeLineStyle, setRouteLineStyle, linkParallel, setLinkParallel }} />
-    {printScope === "tickets" ? <TicketPrintPages data={data} setId={activeTicketSet.id} /> : <PrintPages data={data} plan={printPlan(data.format, printChoice, printProfile)} rules={printRules} />}
+    {printScope === "tickets" ? <TicketPrintPages data={data} setId={activeTicketSet.id} /> : <PrintPages data={data} plan={printPlan(data.format, printChoice, printProfile)} what={printWhatNow} />}
     {makingImage && <ImageStage data={data} onDone={saveImage} onFail={() => setMakingImage(false)} />}
-    <PrintDialog open={showPrint} onOpenChange={setShowPrint} format={data.format} profile={printProfile} choice={printChoice} onChoice={choosePrint} rules={{ written: Boolean(data.rules?.trim()), on: printRules, onChange: choosePrintRules }} onPrint={() => { setShowPrint(false); setPrintRequest((count) => count + 1); }} />
+    <PrintDialog open={showPrint} onOpenChange={setShowPrint} format={data.format} profile={printProfile} choice={printChoice} onChoice={choosePrint} what={{ written: Boolean(data.rules?.trim()), value: printWhatNow, onChange: choosePrintWhat }} onPrint={() => { setShowPrint(false); setPrintRequest((count) => count + 1); }} />
   </main></TooltipProvider>;
 }
 

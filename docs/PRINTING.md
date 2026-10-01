@@ -179,6 +179,12 @@ them. So the layout is made to fit with them on.
 
 ## The dialog
 
+- **What to print is the first choice**: the board only, the board and then the rules, or the rules
+  alone (`PrintWhat` in `app/map-print.tsx`, kept in `localStorage` as `ttr-print-rules`: `board`,
+  `both` or `rules`; an older build's `off` and `on` are read as `board` and `both`). The rules are
+  `.print-rules` in the same print tree and flow in the same page box, upright on the chosen paper.
+  Rules only has no board in it, so how it is split, Supersize and the sheet table are hidden and the
+  paper stays. With nothing written only the board can be chosen.
 - **Anniversary size is one checkbox under Supersize.** There is no Standard option; an empty box is
   the standard board. Ticking it also selects full size, and choosing one sheet or per panel clears it.
   Picking a table cell sets or clears it too. It is never disabled: an earlier version greyed out the
