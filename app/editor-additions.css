@@ -286,3 +286,4 @@
 .compare-table th:first-child,.compare-table td:first-child{text-align:left}
 .compare-table thead th{background:#eee7da;font-weight:700;color:#24221e}
 .compare-table tbody tr:last-child td{border-bottom:none}
+.version-label{font-size:12px;font-weight:400;color:#4f493f}

@@ -1,0 +1,37 @@
+// The version of the editor, and what changed in each. The notes are for the people who use the
+// editor, so they say what a person can now do, in plain words: no file names, no commit hashes.
+// The newest release comes first, and its version is the one in package.json (a test checks it).
+export type Release = { version: string; date: string; title: string; changes: string[] };
+
+export const RELEASES: Release[] = [
+  {
+    version: "0.2.0",
+    date: "2026-10-01",
+    title: "Rules, comparisons and a calmer workspace",
+    changes: [
+      "Write your map's rules in a new Rules panel: markdown with a toolbar, and stops and routes named by their names or picked by clicking on the map, shown the way the map shows them. The example map comes with example rules.",
+      "Print the rules on pages of their own, after the board or on their own. The print dialog now starts by asking what to print.",
+      "Save the board as a PNG picture from the Export menu.",
+      "Map balance and Tickets open beside the map instead of over it. The column scrolls, can be dragged wider, and the whole map stays in view.",
+      "Marks on the map are much clearer: a band under the route, the other routes fade, and pointing at a ticket shows its path at once. Click to keep a mark, and click again to let it go.",
+      "Ticket lengths are set against the official decks and against your own rules, and colours and lengths against the seven classic maps, with a row of wagons for each colour.",
+      "Compare two ticket decks side by side, figure by figure.",
+      "Suggest a deck warns when the deck is too small to deal a full table, and no longer raises its size by itself.",
+      "Every dialog scrolls in a small window, printing with a panel open no longer cuts the pages short, and Print deck waits for its dialog to close.",
+      "A version number, and this page.",
+    ],
+  },
+  {
+    version: "0.1.0",
+    date: "2026-09-22",
+    title: "The first version",
+    changes: [
+      "Draw a board with a background, stops, routes and notes, with wagons at their real size.",
+      "Destination tickets with suggested points, coverage and balance checks, and a suggested deck for the map you have drawn.",
+      "Print the board in pieces or at full size on A4, A3, Letter and Tabloid, and the tickets as cards.",
+      "Everything is saved in your browser, and can be exported to a file and imported again.",
+    ],
+  },
+];
+
+export const APP_VERSION = RELEASES[0].version;

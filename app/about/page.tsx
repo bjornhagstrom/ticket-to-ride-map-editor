@@ -130,7 +130,7 @@ export default function About() {
     </section>
 
     <footer className="about-foot">
-      <p>Version {APP_VERSION} · file format {FILE_VERSION}</p>
+      <p>Version {APP_VERSION} · file format {FILE_VERSION} · <Link href="/whats-new">What&apos;s new</Link></p>
       <p>
         Ticket to Ride is a game by Alan R. Moon, published by Days of Wonder. This is an unofficial
         tool for designing your own boards, and is not affiliated with them. The reference data is a

@@ -26,6 +26,7 @@ const sample = storage.normalizeMap(require(path.join(out, "map-data.js")).initi
 
 // ---------------------------------------------------------------- the envelope
 const file = storage.writeMapFile("map", storage.mapPayload(sample), sample);
+check("a file says which version of the editor wrote it, and it is the package's", file.app && file.app.version === JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8")).version, JSON.stringify(file.app));
 check("a file says what format it is", file.format === storage.FILE_FORMAT, String(file.format));
 check("and which schema it follows", file.version === storage.FILE_VERSION && typeof file.version === "number", String(file.version));
 check("and what kind of file it is", file.kind === "map");

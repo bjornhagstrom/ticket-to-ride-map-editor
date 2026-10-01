@@ -1412,7 +1412,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.getByRole("button", { name: /Help/ }).click();
   await page.waitForTimeout(300);
   const helpItems = await page.locator('[role="menuitem"]').allTextContents();
-  check("Help offers the guide and About, and nothing clutters the header", helpItems.length === 2 && helpItems.some((t) => /About/.test(t)), helpItems.join(" | "));
+  check("Help offers the guide, About and What's new, and nothing clutters the header", helpItems.length === 3 && helpItems.some((t) => /About/.test(t)) && helpItems.some((t) => /What.s new/.test(t)), helpItems.join(" | "));
   await page.getByRole("menuitem", { name: /About/ }).click();
   await page.waitForTimeout(1200);
   check("About is a page of its own", page.url().includes("/about"), page.url());
@@ -2497,6 +2497,28 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     await page.waitForTimeout(250);
     await page.setViewportSize({ width: 1500, height: 1000 });
     await page.waitForTimeout(300);
+  }
+
+  // 33d. the version, and what is new in it
+  {
+    const pkgVersion = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf8")).version;
+    await page.getByRole("button", { name: "Help" }).click();
+    await page.waitForTimeout(250);
+    const whatsNew = page.getByRole("menuitem", { name: /What.s new/ });
+    check("the Help menu has What's new, as a link", (await whatsNew.count()) === 1 && /whats-new\/?$/.test((await whatsNew.getAttribute("href")) || ""), String(await whatsNew.getAttribute("href")));
+    check("and says which version this is", (await page.locator('[role="menu"]').textContent()).includes(`Version ${pkgVersion}`));
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(250);
+    const other = await (await browser.newContext({ viewport: { width: 1200, height: 900 } })).newPage();
+    await other.goto(BASE + "whats-new/", { waitUntil: "networkidle" });
+    check("the What's new page opens", /What.s new/.test(await other.locator("h1").first().textContent()));
+    const releases = other.locator("article.release");
+    check("it lists the releases, newest first, each with its version and date", (await releases.count()) >= 2 && (await releases.first().locator("h2").textContent()).includes(pkgVersion) && /\d{4}-\d{2}-\d{2}/.test(await releases.first().locator("time").textContent()));
+    check("each with what changed, in a list that shows its bullets", (await releases.first().locator("li").count()) >= 3 && (await releases.first().locator("ul").evaluate((el) => getComputedStyle(el).listStyleType)) === "disc");
+    check("and a way back to the editor", (await other.getByRole("link", { name: /Back to the editor/ }).count()) >= 1);
+    await other.goto(BASE + "about/", { waitUntil: "networkidle" });
+    check("the About page shows the version and links to What's new", (await other.locator("body").textContent()).includes(`Version ${pkgVersion}`) && (await other.getByRole("link", { name: /What.s new/ }).count()) >= 1);
+    await other.context().close();
   }
 
   // 34. a map saved on a format that is now a print choice opens on its board

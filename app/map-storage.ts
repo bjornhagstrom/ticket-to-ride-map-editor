@@ -1,5 +1,6 @@
 // Loading, saving and reshaping map files: local-storage keys, the normalizers that let older
 // files open, board-format rescaling, and image reading.
+import { APP_VERSION } from "./version";
 import { W, BUILT_IN_DECK_RULES, type DeckRuleSet, type PlayerRange, DEFAULT_WAGONS_PER_PLAYER, DEFAULT_STARTING_TICKETS, DEFAULT_KEPT_TICKETS, defaultTicketSet, type Ticket, type TicketSet, defaultStopTypeStyles, fallbackStopTypeStyle, type StopTypeStyle, defaultWagonStyles, type WagonStyle, defaultRouteTypeStyles, type LineStyle, type RouteTypeStyle, type BackgroundImage, type BackgroundShape, type ImageCrop, mapFormats, type MapData, type MapFormat, type NoteBox, type Point, type Route, type Stop, STORAGE_KEY } from "./map-data";
 
 export const GUIDE_SEEN_KEY = `${STORAGE_KEY}-guide-seen`;
@@ -112,7 +113,8 @@ const normalizeStopTypeStyles = (value: Partial<MapData>): StopTypeStyle[] => {
 export const FILE_FORMAT = "ticket-to-ride-map";
 export const FILE_VERSION = 3;
 export const APP_NAME = "Map prototypes";
-export const APP_VERSION = "0.1.0";
+// The version, and the notes on what changed in it, live in version.ts.
+export { APP_VERSION };
 
 export type FileKind = "map" | "background" | "network" | "tickets";
 
