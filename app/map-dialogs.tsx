@@ -12,7 +12,7 @@ import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { TicketLengths, type TicketLengthsView } from "./ticket-lengths";
-import { type Bottleneck, deckRuleFor, deckRules, TICKET_SUGGESTER, type TicketDeckReport, type TicketStyle, type SetupBalance, type TicketReview, type ColourLengthTable, type NetworkStats, type RouteSpacing, type RouteSuggestion } from "./map-analysis";
+import { colourRouteIds, type Bottleneck, deckRuleFor, deckRules, TICKET_SUGGESTER, type TicketDeckReport, type TicketStyle, type SetupBalance, type TicketReview, type ColourLengthTable, type NetworkStats, type RouteSpacing, type RouteSuggestion } from "./map-analysis";
 
 export function WelcomeGuide({ open, onOpenChange, onChooseBlank, onChooseExample }: { open: boolean; onOpenChange: (open: boolean) => void; onChooseBlank: () => void; onChooseExample: () => void }) {
   const steps: Array<{ icon: React.ReactNode; title: string; text: string }> = [
@@ -39,6 +39,8 @@ const tableWord = (count: number) => NUMBER_WORDS[count] ?? String(count);
 
 export function AnalysisPanel({ lengthView, onClose, onPreviewRoutes, onPreviewStop, data, stats, colourTable, spacing, scaleWidthMm, setup, bottlenecks, atTable, onAtTable, onShowBottleneck, onSelectRoute, onSelectStop }: { lengthView: TicketLengthsView; setup: SetupBalance; bottlenecks: Bottleneck[]; atTable: number; onAtTable: (players: number) => void; onShowBottleneck: (routeIds: string[]) => void; onClose: () => void; onPreviewRoutes: (routeIds: string[] | null) => void; onPreviewStop: (stopId: string | null) => void; onSelectRoute: (routeId: string) => void; onSelectStop: (stopId: string) => void; data: MapData; stats: NetworkStats; colourTable: ColourLengthTable; spacing: RouteSpacing[]; scaleWidthMm: number }) {
   const stopName = (id: string) => data.stops.find((stop) => stop.id === id)?.name ?? "";
+  // A number in the colour table marks the routes it counts while it is pointed at.
+  const pointAt = (length: number | null, colour: string | null) => ({ className: "colour-cell", onPointerEnter: () => onPreviewRoutes(colourRouteIds(data, length, colour)), onPointerLeave: () => onPreviewRoutes(null) });
   const players = data.players ?? { min: 2, max: 5 };
   const sortedStops = [...data.stops].sort((a, b) => (stats.hubDegree.get(b.id) ?? 0) - (stats.hubDegree.get(a.id) ?? 0));
   // In the right column rather than a dialog, so the map stays in view: pointing at a row marks
@@ -103,12 +105,17 @@ export function AnalysisPanel({ lengthView, onClose, onPreviewRoutes, onPreviewS
       </div>
       <div className="analysis-section">
         <h3>Colour × length distribution</h3>
-        <p className="helper">Counts card-route colours by length. Pre-built infrastructure routes (no train cards) are excluded.</p>
+        <p className="helper">Counts card-route colours by length, and below them the wagon spaces each colour adds up to. Point at a number to see its routes on the map. Pre-built infrastructure routes (no train cards) are excluded.</p>
         {colourTable.grandTotal === 0 ? <p className="helper">No card routes yet.</p> : <div className="analysis-table-scroll"><table className="analysis-table">
           <thead><tr><th>Length</th>{colourTable.colours.map((colour) => <th key={colour}>{colorLabels[colour]}</th>)}<th>Total</th></tr></thead>
           <tbody>
-            {colourTable.lengths.map((length) => <tr key={length}><td>{length}</td>{colourTable.colours.map((colour) => <td key={colour}>{colourTable.counts.get(length)?.get(colour) ?? 0}</td>)}<td>{colourTable.lengthTotals.get(length) ?? 0}</td></tr>)}
-            <tr className="analysis-total-row"><td>Total</td>{colourTable.colours.map((colour) => <td key={colour}>{colourTable.colourTotals.get(colour) ?? 0}</td>)}<td>{colourTable.grandTotal}</td></tr>
+            {colourTable.lengths.map((length) => <tr key={length}>
+              <td {...pointAt(length, null)}>{length}</td>
+              {colourTable.colours.map((colour) => <td key={colour} {...pointAt(length, colour)}>{colourTable.counts.get(length)?.get(colour) ?? 0}</td>)}
+              <td {...pointAt(length, null)}>{colourTable.lengthTotals.get(length) ?? 0}</td>
+            </tr>)}
+            <tr className="analysis-total-row"><td {...pointAt(null, null)}>Routes</td>{colourTable.colours.map((colour) => <td key={colour} {...pointAt(null, colour)}>{colourTable.colourTotals.get(colour) ?? 0}</td>)}<td {...pointAt(null, null)}>{colourTable.grandTotal}</td></tr>
+            <tr className="analysis-wagons-row"><td {...pointAt(null, null)}>Wagons</td>{colourTable.colours.map((colour) => <td key={colour} {...pointAt(null, colour)}>{colourTable.colourWagons.get(colour) ?? 0}</td>)}<td {...pointAt(null, null)}>{colourTable.grandWagons}</td></tr>
           </tbody>
         </table></div>}
       </div>

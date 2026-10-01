@@ -1869,6 +1869,44 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await handle.dblclick();
   await page.waitForTimeout(150);
   check("a double click puts it back", Math.abs((await frame()).aside.width - widthAtStart) <= 3, `${(await frame()).aside.width} against ${widthAtStart}`);
+  // Colour × length: a row of wagons per colour, and pointing at a number marks its routes on the map.
+  {
+    const table = balancePanel.locator(".analysis-section", { has: page.locator("h3", { hasText: "Colour × length" }) }).locator("table");
+    const stored = await page.evaluate(() => { const m = JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")); const infra = new Set(m.routeTypeStyles.filter((x) => x.infrastructure).map((x) => x.id)); return m.routes.filter((r) => !infra.has(r.type)).map((r) => ({ length: r.length, color: r.color })); });
+    const heads = (await table.locator("thead th").allTextContents()).map((t) => t.trim());
+    const colourOf = (label) => (label === "Grey" ? "neutral" : label.toLowerCase());
+    const colourLabels = heads.slice(1, -1);
+    const wagonsRow = table.locator("tr.analysis-wagons-row");
+    check("the table has a row of wagons for each colour", (await wagonsRow.count()) === 1 && /^Wagons/.test((await wagonsRow.locator("td").first().textContent()).trim()));
+    const wagonCells = (await wagonsRow.locator("td").allTextContents()).slice(1).map((t) => Number(t.trim()));
+    const expectedWagons = colourLabels.map((label) => stored.filter((r) => r.color === colourOf(label)).reduce((sum, r) => sum + r.length, 0));
+    check("each is the colour's routes added up by length", JSON.stringify(wagonCells.slice(0, -1)) === JSON.stringify(expectedWagons), `${wagonCells.slice(0, -1)} against ${expectedWagons}`);
+    check("and the last is every wagon space on the board", wagonCells.at(-1) === stored.reduce((sum, r) => sum + r.length, 0), `${wagonCells.at(-1)} against ${stored.reduce((sum, r) => sum + r.length, 0)}`);
+    const marked = () => page.locator(".map-canvas .route-group.on-preview").count();
+    // A cell with routes in it: its routes, and only those, are marked while it is pointed at.
+    const body = table.locator("tbody tr:not(.analysis-total-row):not(.analysis-wagons-row)");
+    let cell = null;
+    for (let row = 0; row < await body.count() && !cell; row += 1) {
+      const cells = await body.nth(row).locator("td").allTextContents();
+      const col = cells.slice(1, -1).findIndex((t) => Number(t) > 0);
+      if (col >= 0) cell = { row, col, length: Number(cells[0]), label: colourLabels[col], count: Number(cells[col + 1]) };
+    }
+    await body.nth(cell.row).locator("td").nth(cell.col + 1).hover();
+    await page.waitForTimeout(200);
+    check("pointing at a count marks those routes on the map", (await marked()) === cell.count && cell.count === stored.filter((r) => r.length === cell.length && r.color === colourOf(cell.label)).length, `${await marked()} marked, ${cell.count} in ${cell.length} × ${cell.label}`);
+    await body.nth(cell.row).locator("td").first().hover();
+    await page.waitForTimeout(200);
+    check("pointing at a length marks every route of that length", (await marked()) === stored.filter((r) => r.length === cell.length).length, `${await marked()}`);
+    await wagonsRow.locator("td").nth(colourLabels.indexOf(cell.label) + 1).hover();
+    await page.waitForTimeout(200);
+    check("pointing at a colour's total marks every route of that colour", (await marked()) === stored.filter((r) => r.color === colourOf(cell.label)).length, `${await marked()}`);
+    await table.locator("tr.analysis-total-row td").nth(colourLabels.indexOf(cell.label) + 1).hover();
+    await page.waitForTimeout(200);
+    check("and so does the count row above it", (await marked()) === stored.filter((r) => r.color === colourOf(cell.label)).length);
+    await page.mouse.move(5, 5);
+    await page.waitForTimeout(200);
+    check("and the marks go when the pointer leaves", (await marked()) === 0);
+  }
   const hubRow = balancePanel.locator(".analysis-section", { has: page.locator("h3", { hasText: "Hub degree" }) }).locator("tbody tr").first();
   const hubStop = (await hubRow.locator("td").first().textContent()).trim();
   await hubRow.hover();

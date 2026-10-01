@@ -192,3 +192,6 @@
 .ticket-lengths .length-share{color:#4f493f}
 .ticket-lengths .helper{margin:8px 0 0}
 .ticket-lengths .length-legend{margin-top:6px}
+.balance-panel .colour-cell{cursor:default}
+.balance-panel .colour-cell:hover{background:#f7e9e6;outline:1px solid #b3261e;outline-offset:-1px}
+.balance-panel .analysis-wagons-row td{font-weight:700;border-top:1px solid #cfc6b6}

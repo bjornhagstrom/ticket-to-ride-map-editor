@@ -96,7 +96,7 @@ export function shortestPath(adjacency: Map<string, NetworkEdge[]>, fromId: stri
   }
   return { distance: total, routeIds };
 }
-export type ColourLengthTable = { lengths: number[]; colours: string[]; counts: Map<number, Map<string, number>>; colourTotals: Map<string, number>; lengthTotals: Map<number, number>; grandTotal: number };
+export type ColourLengthTable = { colourWagons: Map<string, number>; grandWagons: number; lengths: number[]; colours: string[]; counts: Map<number, Map<string, number>>; colourTotals: Map<string, number>; lengthTotals: Map<number, number>; grandTotal: number };
 export function colourLengthTable(data: MapData): ColourLengthTable {
   const infrastructureTypes = new Set(data.routeTypeStyles.filter((style) => style.infrastructure).map((style) => style.id));
   const cardRoutes = data.routes.filter((route) => !infrastructureTypes.has(route.type));
@@ -113,7 +113,15 @@ export function colourLengthTable(data: MapData): ColourLengthTable {
     colourTotals.set(route.color, (colourTotals.get(route.color) ?? 0) + 1);
     lengthTotals.set(route.length, (lengthTotals.get(route.length) ?? 0) + 1);
   }
-  return { lengths, colours, counts, colourTotals, lengthTotals, grandTotal: cardRoutes.length };
+  const colourWagons = new Map<string, number>(colours.map((c) => [c, 0]));
+  for (const route of cardRoutes) colourWagons.set(route.color, (colourWagons.get(route.color) ?? 0) + route.length);
+  const grandWagons = cardRoutes.reduce((sum, route) => sum + route.length, 0);
+  return { lengths, colours, counts, colourTotals, lengthTotals, grandTotal: cardRoutes.length, colourWagons, grandWagons };
+}
+// The card routes behind a number in the table: of one length, one colour, both, or neither for all of them.
+export function colourRouteIds(data: MapData, length: number | null, colour: string | null): string[] {
+  const infrastructureTypes = new Set(data.routeTypeStyles.filter((style) => style.infrastructure).map((style) => style.id));
+  return data.routes.filter((route) => !infrastructureTypes.has(route.type) && (length === null || route.length === length) && (colour === null || route.color === colour)).map((route) => route.id);
 }
 const pairKey = (a: string, b: string) => [a, b].sort().join("::");
 export function averageLengthPerDistance(data: MapData): number {
