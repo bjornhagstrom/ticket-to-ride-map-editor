@@ -38,6 +38,9 @@ const readHintOffset = () => {
   try { const x = Number(window.localStorage.getItem(MAP_HINT_X_KEY)); return Number.isFinite(x) ? x : 0; } catch { return 0; }
 };
 
+const RIGHT_WIDTH_KEY = "ttr-right-column-width";
+const RIGHT_WIDTH_DEFAULT = 400, RIGHT_WIDTH_MIN = 320, RIGHT_WIDTH_MAX = 900;
+
 export function MapEditor() {
   const [data, setData] = useState<MapData>(emptyMap);
   const [ready, setReady] = useState(false);
@@ -77,6 +80,15 @@ export function MapEditor() {
   const [showPrint, setShowPrint] = useState(false);
   const [printRequest, setPrintRequest] = useState(0);
   const [makingImage, setMakingImage] = useState(false);
+  // How wide the right column is while Map balance is open; the left edge of the column is its handle.
+  const [rightWidth, setRightWidth] = useState(RIGHT_WIDTH_DEFAULT);
+  const resizeRight = (width: number) => {
+    const next = Math.round(Math.min(Math.max(width, RIGHT_WIDTH_MIN), Math.max(RIGHT_WIDTH_MIN, Math.min(RIGHT_WIDTH_MAX, window.innerWidth - 246 - 320))));
+    setRightWidth(next);
+    try { localStorage.setItem(RIGHT_WIDTH_KEY, String(next)); } catch { /* not remembered, still used */ }
+  };
+  const resetRight = () => { setRightWidth(RIGHT_WIDTH_DEFAULT); try { localStorage.removeItem(RIGHT_WIDTH_KEY); } catch { /* nothing to forget */ } };
+  useEffect(() => { queueMicrotask(() => { try { const stored = Number(localStorage.getItem(RIGHT_WIDTH_KEY)); if (stored > 0) setRightWidth(Math.min(Math.max(stored, RIGHT_WIDTH_MIN), RIGHT_WIDTH_MAX)); } catch { /* keep the default */ } }); }, []);
   // Safari gets shorter sheets: its first print layout has less room (docs/PRINTING.md). Found after
   // mounting, so the server-rendered page and the first client render agree.
   const [printProfile, setPrintProfile] = useState<PrintProfile>(PRINT_PROFILES.standard);
@@ -659,7 +671,11 @@ export function MapEditor() {
       <div className="map-title"><Label htmlFor="map-name" className="sr-only">Map name</Label><Input id="map-name" value={data.name} onChange={(event) => change((draft) => ({ ...draft, name: event.target.value }))} /><span className="save-state"><Check />{saved ? "Saved locally" : "Saving…"}</span></div>
       <div className="header-actions"><DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" size="sm"><CircleHelp />Help</Button></DropdownMenuTrigger><DropdownMenuContent align="start"><DropdownMenuItem onClick={() => setShowGuide(true)}><CircleHelp />Getting started</DropdownMenuItem><DropdownMenuItem asChild><a href="./about"><BusFront />About Map prototypes</a></DropdownMenuItem></DropdownMenuContent></DropdownMenu><Button variant="ghost" size="icon" aria-label="Undo" title="Undo (Ctrl/Cmd+Z)" disabled={!past.length} onClick={undo}><Undo2 /></Button><Button variant="ghost" size="icon" aria-label="Redo" title="Redo (Ctrl/Cmd+Shift+Z)" disabled={!future.length} onClick={redo}><Redo2 /></Button><DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" size="sm"><Upload />Import</Button></DropdownMenuTrigger><DropdownMenuContent align="start"><DropdownMenuItem onClick={() => fileRef.current?.click()}><Upload />Map project</DropdownMenuItem><DropdownMenuItem onClick={() => fileRef.current?.click()}><TicketIcon />Tickets only</DropdownMenuItem><DropdownMenuItem onClick={() => imageFileRef.current?.click()}><ImageIcon />Background image</DropdownMenuItem></DropdownMenuContent></DropdownMenu><input ref={fileRef} hidden type="file" accept="application/json" onChange={(event) => { importMap(event.target.files?.[0]); event.target.value = ""; }} /><input ref={imageFileRef} hidden type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => { importBackgroundImage(event.target.files?.[0]); event.target.value = ""; }} /><Button variant="outline" size="sm" onClick={() => setShowPrint(true)}><Printer />Print map</Button><DropdownMenu><DropdownMenuTrigger asChild><Button size="sm"><Download />Export</Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onClick={exportMap}><Download />Full map</DropdownMenuItem><DropdownMenuItem onClick={() => setMakingImage(true)}><ImageIcon />Map as image (PNG)</DropdownMenuItem><DropdownMenuItem onClick={exportBackground}><Layers3 />Background only</DropdownMenuItem><DropdownMenuItem onClick={exportNetwork}><Link2 />Network only</DropdownMenuItem><DropdownMenuItem onClick={() => exportTickets("all")}><TicketIcon />Tickets only</DropdownMenuItem></DropdownMenuContent></DropdownMenu></div>
     </header>
-    <div className={cn("workspace", showAnalysis && "showing-balance")}>
+    <div className={cn("workspace", showAnalysis && "showing-balance")} style={{ "--right-width": `${rightWidth}px`, "--map-ratio": W / format.height } as React.CSSProperties}>
+      {showAnalysis && <div className="column-resizer" role="separator" aria-orientation="vertical" aria-label="Resize the right column" aria-valuenow={rightWidth} aria-valuemin={RIGHT_WIDTH_MIN} aria-valuemax={RIGHT_WIDTH_MAX} tabIndex={0} title="Drag to resize, double-click to reset"
+        onPointerDown={(event) => { event.preventDefault(); const startX = event.clientX, startWidth = rightWidth; const el = event.currentTarget; el.setPointerCapture(event.pointerId); const move = (e: PointerEvent) => resizeRight(startWidth + startX - e.clientX); const done = () => { el.removeEventListener("pointermove", move); el.removeEventListener("pointerup", done); el.removeEventListener("pointercancel", done); }; el.addEventListener("pointermove", move); el.addEventListener("pointerup", done); el.addEventListener("pointercancel", done); }}
+        onDoubleClick={resetRight}
+        onKeyDown={(event) => { if (event.key === "ArrowLeft") { event.preventDefault(); resizeRight(rightWidth + 24); } else if (event.key === "ArrowRight") { event.preventDefault(); resizeRight(rightWidth - 24); } }} />}
       <aside className="tools-panel panel">
         <div className="panel-heading"><span>Tools</span><small>Work directly on the map</small></div>
         <div className="tool-row">{toolDefinitions.map((item) => <ToolButton key={item.id} active={tool === item.id} icon={item.icon} title={item.title} note={item.note} onClick={() => selectTool(item.id)} />)}</div>

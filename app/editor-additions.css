@@ -146,7 +146,21 @@
 .deck-rule-end-row input{flex:1}
 .deck-rule-end-row output{min-width:44px;font-size:13px;font-weight:700;font-variant-numeric:tabular-nums;color:#1f1c18}
 /* Map balance sits in the right column, which widens for its tables while the map stays in view. */
-.workspace.showing-balance{grid-template-columns:246px minmax(520px,1fr) 400px}
+/* Map balance fills the window rather than the page: its lists scroll inside the column, so the whole map stays in view beside them. */
+@media(min-width:1051px){
+  .app-shell:has(.workspace.showing-balance){height:100vh;min-height:0;overflow:hidden}
+  .workspace.showing-balance{position:relative;grid-template-columns:246px minmax(0,1fr) var(--right-width,400px);grid-template-rows:minmax(0,1fr)}
+  .workspace.showing-balance>.tools-panel,.workspace.showing-balance>.properties{overflow-y:auto;min-height:0}
+  .workspace.showing-balance>.tools-panel>*{flex-shrink:0}
+  /* The badges sit above the map in the flow, room for two lines, so they never cover it; the map takes what is left. */
+  .workspace.showing-balance>.map-wrap{min-height:0;overflow:auto;container-type:size;padding-top:10px}
+  .workspace.showing-balance .map-status{position:static;min-height:54px;flex-wrap:wrap;align-content:flex-start;margin-bottom:6px}
+  .workspace.showing-balance .map-canvas{min-width:0;width:min(100cqw,calc((100cqh - 60px) * var(--map-ratio,1.5)))}
+}
+/* The left edge of the right column, a handle for its width. */
+.column-resizer{position:absolute;top:0;bottom:0;right:calc(var(--right-width,400px) - 4px);width:8px;cursor:col-resize;z-index:5;touch-action:none}
+.column-resizer:hover,.column-resizer:focus-visible,.column-resizer:active{background:rgba(114,28,36,.28);outline:none}
+@media(max-width:1050px){.column-resizer{display:none}}
 .properties.showing-balance>:not(.balance-panel){display:none}
 .balance-panel{display:grid;gap:12px;align-content:start;min-width:0}
 .balance-panel>*,.balance-panel .analysis-section{min-width:0}

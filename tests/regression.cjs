@@ -1735,6 +1735,52 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   check("the map is not darkened", (await page.locator('[data-slot="dialog-overlay"]').count()) === 0);
   const columnWidth = await page.evaluate(() => document.querySelector("aside.properties").getBoundingClientRect().width);
   check("and the column widens to hold its tables", columnWidth >= 380, `${Math.round(columnWidth)}px`);
+  // The list scrolls inside its column, so the whole map stays in view beside it. Measured at the
+  // suite's window and again in a small one, where the map has to shrink rather than be scrolled to.
+  const frame = () => page.evaluate(() => {
+    const box = (el) => { const r = el.getBoundingClientRect(); return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, width: r.width }; };
+    const aside = document.querySelector("aside.properties"), canvas = document.querySelector(".map-canvas"), wrap = document.querySelector(".map-wrap");
+    return { page: document.documentElement.scrollHeight, win: innerHeight, winW: innerWidth, aside: box(aside), asideScroll: aside.scrollHeight, asideClient: aside.clientHeight, asideOverflow: getComputedStyle(aside).overflowY, canvas: box(canvas), wrap: box(wrap), wrapScroll: wrap.scrollWidth, wrapClient: wrap.clientWidth };
+  });
+  const wholeMapInView = (f) => f.canvas.top >= 0 && f.canvas.bottom <= f.win && f.canvas.left >= f.wrap.left - 1 && f.canvas.right <= f.aside.left + 1 && f.wrapScroll <= f.wrapClient + 1;
+  const open = await frame();
+  check("the page does not grow with the balance lists", open.page <= open.win + 1, `${open.page}px page in a ${open.win}px window`);
+  check("the right column scrolls instead", open.asideOverflow === "auto" && open.asideScroll > open.asideClient, `${open.asideOverflow}, ${open.asideScroll}px of lists in ${open.asideClient}px`);
+  check("and the whole map is in view beside it", wholeMapInView(open), JSON.stringify({ canvas: open.canvas, aside: open.aside.left, win: open.win }));
+  await page.evaluate(() => { const a = document.querySelector("aside.properties"); a.scrollTop = a.scrollHeight; });
+  await page.waitForTimeout(150);
+  const scrolled = await frame();
+  check("scrolling the list to its end leaves the map where it was", wholeMapInView(scrolled) && Math.abs(scrolled.canvas.top - open.canvas.top) < 1 && (await page.evaluate(() => document.querySelector("aside.properties").scrollTop)) > 0);
+  await page.evaluate(() => { document.querySelector("aside.properties").scrollTop = 0; });
+  await page.setViewportSize({ width: 1280, height: 760 });
+  await page.waitForTimeout(250);
+  const small = await frame();
+  check("in a small window the map shrinks to stay whole beside the list", small.page <= small.win + 1 && wholeMapInView(small), JSON.stringify({ canvas: small.canvas, aside: small.aside.left, wrap: small.wrapScroll + "/" + small.wrapClient }));
+  await page.setViewportSize({ width: 1500, height: 1000 });
+  await page.waitForTimeout(250);
+  // The column's left edge is a handle: dragged, nudged with the arrow keys, and reset by a double click.
+  const handle = page.getByRole("separator", { name: "Resize the right column" });
+  check("the column has a handle on its left edge", (await handle.count()) === 1);
+  const widthAtStart = (await frame()).aside.width;
+  const handleAt = await handle.boundingBox();
+  await page.mouse.move(handleAt.x + handleAt.width / 2, handleAt.y + 200);
+  await page.mouse.down();
+  await page.mouse.move(handleAt.x + handleAt.width / 2 - 120, handleAt.y + 200, { steps: 6 });
+  await page.mouse.up();
+  await page.waitForTimeout(200);
+  const dragged = await frame();
+  check("dragging the handle left widens the column by as much", Math.abs(dragged.aside.width - (widthAtStart + 120)) <= 3, `${widthAtStart} → ${dragged.aside.width}`);
+  check("and the whole map is still in view", wholeMapInView(dragged), JSON.stringify({ canvas: dragged.canvas, aside: dragged.aside.left }));
+  await handle.focus();
+  await page.keyboard.press("ArrowRight");
+  await page.waitForTimeout(150);
+  const nudged = (await frame()).aside.width;
+  check("the arrow keys nudge it", nudged < dragged.aside.width - 5, `${dragged.aside.width} → ${nudged}`);
+  const stored = await page.evaluate(() => localStorage.getItem("ttr-right-column-width"));
+  check("the width is remembered", Number(stored) > 0, String(stored));
+  await handle.dblclick();
+  await page.waitForTimeout(150);
+  check("a double click puts it back", Math.abs((await frame()).aside.width - widthAtStart) <= 3, `${(await frame()).aside.width} against ${widthAtStart}`);
   const hubRow = balancePanel.locator(".analysis-section", { has: page.locator("h3", { hasText: "Hub degree" }) }).locator("tbody tr").first();
   const hubStop = (await hubRow.locator("td").first().textContent()).trim();
   await hubRow.hover();
