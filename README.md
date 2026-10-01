@@ -125,8 +125,8 @@ the example map through route editing, real-size wagons, the balance, ticket and
 the ticket tools to the print dialog, including real PDFs printed with the browser's own margins. If it
 breaks off part way, it still lists the checks it made before stopping.
 
-`npm test` runs the typecheck, the suggester, calibration, file-format and print-plan checks, and the
-build. The suggester and calibration checks measure the ticket suggester against official maps, which
+`npm test` runs the typecheck, lint, the suggester, calibration, file-format, print-plan, markdown and
+release-notes checks, and the build. The suggester and calibration checks measure the ticket suggester against official maps, which
 are private and live in their own repository beside this one, `../ttr-reference-data` (or wherever
 `TTR_REFERENCE_DATA` points). Without it those two say so and are skipped; everything else, and the
 editor itself, needs none of that data. The suggester's targets are already written into the code, so
@@ -142,7 +142,9 @@ The dev server sends CSS pretty-printed and with properties reordered, so check 
 It is a single script rather than a Playwright test project, and it expects the editor at
 `http://localhost:3000/ttr/`. It has caught real bugs — a handle's hit area swallowing the click
 that marks a locomotive, editing handles measured from the wrong line on double routes — so it
-earns its place, but it is not wired into CI and there are no unit tests.
+earns its place, but it is not wired into CI. The checks that do not need a browser are separate scripts
+beside it in `tests/` (file format, print plan, markdown, release notes, and the suggester and its
+calibration), and `npm test` runs them.
 
 If a change does not take effect locally, check for an orphaned dev server before suspecting the
 build. `npm run dev` falls back to port 3001 when 3000 is already taken, printing only a warning, so
@@ -157,6 +159,4 @@ machine out of memory — so after changing the root, stop the server, delete `.
 
 ## Source of truth
 
-The canonical local checkout is the copy under `Developer/ticket-to-ride-map-editor`. Generated folders such as `.next/`, `out/` and `node_modules/` must not be committed.
-
-Git is initialized locally. No remote repository is configured yet.
+The source lives in the GitHub repository `bjornhagstrom/ticket-to-ride-map-editor`. Generated folders such as `.next/`, `out/` and `node_modules/` must not be committed.
