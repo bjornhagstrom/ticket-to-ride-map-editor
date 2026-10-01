@@ -2098,7 +2098,10 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   {
     const mapKey = "orebro-map-editor-public-v2";
     await page.evaluate(() => localStorage.removeItem("ttr-print-rules"));
-    const first = await page.evaluate((key) => { const m = JSON.parse(localStorage.getItem(key)); const r = m.routes[0]; const name = (id) => m.stops.find((st) => st.id === id).name; return { a: name(r.a), b: name(r.b), color: r.color }; }, mapKey);
+    const first = await page.evaluate((key) => { const m = JSON.parse(localStorage.getItem(key)); const r = m.routes[0]; const name = (id) => m.stops.find((st) => st.id === id).name; const isJunction = (st) => Boolean((m.stopTypeStyles.find((t) => t.id === st.type) || {}).junction);
+      const near = new Set(m.routes.filter((x) => x.a === r.a || x.b === r.a).map((x) => (x.a === r.a ? x.b : x.a)));
+      const stranger = m.stops.find((st) => st.id !== r.a && !near.has(st.id) && !isJunction(st));
+      return { a: name(r.a), b: name(r.b), color: r.color, neighbours: [...near].map(name).sort((p, q) => p.localeCompare(q)), stranger: stranger.name, stops: m.stops.length }; }, mapKey);
     const rulesButton = page.getByRole("button", { name: "Rules", exact: true });
     await rulesButton.click();
     await page.waitForTimeout(400);
@@ -2108,6 +2111,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     check("with the whole map in view beside it", inView);
     const box = panel.getByRole("textbox", { name: "Rules text" });
     check("a text area takes the rules", (await box.count()) === 1);
+    check("it says a stop or a route can be picked by clicking on the map", /clicking the stops on the map/i.test(await panel.textContent()));
     check("which says it is markdown and how to name a stop or a route", /markdown/i.test(await panel.textContent()) && /\[\[/.test(await panel.textContent()));
     // The example map comes with rules of its own: standard rules except where it says otherwise, with a
     // stop and a route named so the preview shows them, and XXX where the rule is still to be written.
@@ -2142,7 +2146,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     // The toolbar: buttons that write the markdown for you, and pickers for a stop and a route
     const toolbar = panel.getByRole("toolbar", { name: "Format the rules" });
     check("a toolbar with the formatting buttons", (await toolbar.count()) === 1 && (await Promise.all(["Bold", "Italic", "Heading", "Bulleted list", "Numbered list", "Quote", "Table", "Line"].map((n) => toolbar.getByRole("button", { name: n, exact: true }).count()))).every((n) => n === 1));
-    check("and a picker for a stop and one for a route", (await toolbar.getByRole("combobox", { name: "Insert a stop" }).count()) === 1 && (await toolbar.getByRole("combobox", { name: "Insert a route" }).count()) === 1);
+    check("a picker for a stop, two for a route (from, then to), and a button for each to pick on the map", (await toolbar.getByRole("combobox", { name: "Insert a stop" }).count()) === 1 && (await toolbar.getByRole("combobox", { name: "Route from" }).count()) === 1 && (await toolbar.getByRole("combobox", { name: "Route to" }).count()) === 1 && (await toolbar.getByRole("button", { name: "Pick a stop on the map" }).count()) === 1 && (await toolbar.getByRole("button", { name: "Pick a route on the map" }).count()) === 1);
     const setText = async (text, from, to) => { await box.fill(text); await box.evaluate((el, [a, b]) => { el.focus(); el.setSelectionRange(a, b); }, [from ?? text.length, to ?? from ?? text.length]); };
     const value = () => box.inputValue();
     await setText("hello world", 6, 11);
@@ -2189,11 +2193,44 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     await page.waitForTimeout(200);
     check("which the preview draws as that stop", (await preview.locator(".rule-ref.stop").count()) === 1);
     await setText("Take ", 5, 5);
-    await toolbar.getByRole("combobox", { name: "Insert a route" }).selectOption({ label: `${first.a}–${first.b}` });
-    check("the route picker writes [[Stop–Stop]]", (await value()).startsWith(`Take [[${first.a}–${first.b}]]`), await value());
+    const routeTo = toolbar.getByRole("combobox", { name: "Route to" });
+    check("the second picker waits for the first", await routeTo.isDisabled());
+    await toolbar.getByRole("combobox", { name: "Route from" }).selectOption({ label: first.a });
+    const toOptions = (await routeTo.locator("option").allTextContents()).slice(1);
+    check("and then offers only the stops that route leads to, not all of them", JSON.stringify(toOptions) === JSON.stringify(first.neighbours) && toOptions.length < first.stops - 1, `${toOptions.length} of ${first.stops}`);
+    await routeTo.selectOption({ label: first.b });
+    check("the two pickers write [[Stop–Stop]]", (await value()).startsWith(`Take [[${first.a}–${first.b}]]`), await value());
     await page.waitForTimeout(200);
     check("which the preview draws as that route", (await preview.locator(".rule-ref.route").count()) === 1);
-    check("the pickers go back to their label, ready for the next", (await toolbar.getByRole("combobox", { name: "Insert a stop" }).inputValue()) === "");
+    check("the pickers go back to their label, ready for the next", (await toolbar.getByRole("combobox", { name: "Insert a stop" }).inputValue()) === "" && (await toolbar.getByRole("combobox", { name: "Route from" }).inputValue()) === "" && (await routeTo.isDisabled()));
+    // Picking on the map, for a stop and for a route: the map is clicked instead of a list read
+    const mapStop = (name) => page.locator(".map-canvas g.stop", { hasText: name }).locator("circle").nth(1);
+    const note = panel.getByRole("status");
+    await setText("Go to ", 6, 6);
+    await toolbar.getByRole("button", { name: "Pick a stop on the map" }).click();
+    check("Pick a stop says to click one on the map", /click a stop on the map/i.test(await note.textContent()));
+    await mapStop(first.a).click();
+    await page.waitForTimeout(200);
+    check("a click on a stop writes it where the cursor was, and the picking ends", (await value()) === `Go to [[${first.a}]]` && (await note.count()) === 0, await value());
+    check("without selecting the stop for editing", (await page.locator(".map-canvas .stop.active").count()) === 0);
+    await setText("Use ", 4, 4);
+    await toolbar.getByRole("button", { name: "Pick a route on the map" }).click();
+    check("Pick a route asks for the first stop", /first stop/i.test(await note.textContent()));
+    await mapStop(first.a).click();
+    await page.waitForTimeout(200);
+    check("and rings it, then asks for the second", /second stop/i.test(await note.textContent()) && (await page.locator(".map-canvas .stop.previewed").count()) === 1);
+    await mapStop(first.stranger).click();
+    await page.waitForTimeout(200);
+    check("a second stop with no route to the first is refused, and says so, and the picking goes on", /no route/i.test(await note.textContent()) && (await value()) === "Use ");
+    await mapStop(first.b).click();
+    await page.waitForTimeout(200);
+    check("a second stop with a route writes [[Stop–Stop]], and the picking ends", (await value()) === `Use [[${first.a}–${first.b}]]` && (await note.count()) === 0 && (await page.locator(".map-canvas .stop.previewed").count()) === 0, await value());
+    await setText("Keep ", 5, 5);
+    await toolbar.getByRole("button", { name: "Pick a stop on the map" }).click();
+    await page.evaluate(() => document.activeElement && document.activeElement.blur());
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(250);
+    check("Escape ends the picking and writes nothing, and the panel stays", (await note.count()) === 0 && (await value()) === "Keep " && (await page.locator(".rules-panel").count()) === 1);
     await box.fill(written);
     await page.waitForTimeout(300);
     // pointing at a reference shows it on the map

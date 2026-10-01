@@ -274,3 +274,5 @@
 .rules-toolbar svg{width:16px;height:16px}
 .rules-toolbar select{height:30px;max-width:130px;padding:0 6px;border:1px solid #cec4b6;border-radius:6px;background:#fffdf8;font:inherit;font-size:12px;color:#24221e}
 .rules-helper a,.rules-panel .helper a{color:#721c24;text-decoration:underline}
+.map-canvas.picking-rules,.map-canvas.picking-rules .stop{cursor:crosshair}
+.rules-pick-note{padding:6px 9px;border:1px solid #b3261e;border-radius:6px;background:#fdf1ee;color:#5e1a14!important}

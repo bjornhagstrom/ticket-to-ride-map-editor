@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Bold, Heading, Italic, List, ListOrdered, Minus, Quote, Table } from "lucide-react";
+import { Bold, Heading, Italic, List, ListOrdered, MapPin, Minus, Quote, Route as RouteIcon, Table } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import type { MapData } from "./map-data";
@@ -73,7 +73,9 @@ function insertBlock(el: HTMLTextAreaElement, block: string, selectFrom: number,
   edit(el, at, to, `${lead}${block}\n`, at + lead.length + selectFrom, at + lead.length + selectTo);
 }
 
-export function RulesPanel({ data, wide, onToggleWide, onClose, onChange, hover }: {
+export function RulesPanel({ pickRef, onPicking, data, wide, onToggleWide, onClose, onChange, hover }: {
+  pickRef: React.MutableRefObject<{ stop: (stopId: string) => boolean; cancel: () => boolean } | null>;
+  onPicking: (picking: boolean) => void;
   data: MapData;
   wide: boolean;
   onToggleWide: () => void;
@@ -103,11 +105,38 @@ export function RulesPanel({ data, wide, onToggleWide, onClose, onChange, hover 
     return [...pairs].sort((a, b) => a.localeCompare(b));
   }, [data.stops, data.routes]);
   const act = (run: (el: HTMLTextAreaElement) => void) => { if (area.current) run(area.current); };
+  // Writing a reference at the cursor, wherever the focus has gone since.
+  const write = (name: string) => act((el) => { const { selectionStart: a, selectionEnd: b } = el; edit(el, a, b, `[[${name}]]`, a + name.length + 4, a + name.length + 4); });
+  // A route is two stops: picked from two lists (the second only offers the stops the first leads to) or by
+  // clicking two stops on the map. A stop is one list or one click.
+  const [routeFrom, setRouteFrom] = useState("");
+  const [pick, setPick] = useState<null | { kind: "stop" } | { kind: "route"; from?: string; message?: string }>(null);
+  const pickNow = useRef(pick);
+  pickNow.current = pick;
+  const nameOf = (id: string) => data.stops.find((stop) => stop.id === id)?.name ?? "";
+  const leadsTo = (id: string) => [...new Set(data.routes.filter((route) => route.a === id || route.b === id).map((route) => (route.a === id ? route.b : route.a)))]
+    .map((other) => data.stops.find((stop) => stop.id === other)).filter((stop): stop is NonNullable<typeof stop> => Boolean(stop)).sort((a, b) => a.name.localeCompare(b.name));
+  const stopPicked = (id: string): boolean => {
+    const now = pickNow.current;
+    if (!now) return false;
+    if (now.kind === "stop") { write(nameOf(id)); setPick(null); return true; }
+    if (!now.from) { setPick({ kind: "route", from: id }); hover.stop(id); return true; }
+    if (id === now.from) return true;
+    if (!leadsTo(now.from).some((stop) => stop.id === id)) { setPick({ kind: "route", from: now.from, message: `No route between ${nameOf(now.from)} and ${nameOf(id)}. Click another stop for the second end, or press Esc.` }); return true; }
+    write(`${nameOf(now.from)}–${nameOf(id)}`);
+    hover.stop(null);
+    setPick(null);
+    return true;
+  };
+  const stopPicking = (): boolean => { if (!pickNow.current) return false; hover.stop(null); setPick(null); return true; };
+  useEffect(() => { pickRef.current = { stop: stopPicked, cancel: stopPicking }; });
+  useEffect(() => { onPicking(pick !== null); }, [pick]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => { pickRef.current = null; onPicking(false); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const tool = (label: string, shortcut: string | null, icon: React.ReactNode, run: (el: HTMLTextAreaElement) => void) =>
     <Button key={label} type="button" size="icon" variant="ghost" aria-label={label} title={shortcut ? `${label} (${shortcut})` : label} onMouseDown={(event) => event.preventDefault()} onClick={() => act(run)}>{icon}</Button>;
   return <div className="balance-panel rules-panel">
     <div className="panel-heading"><span>Rules</span><Button size="sm" variant="outline" aria-expanded={wide} onClick={onToggleWide}>{wide ? "Collapse" : "Expand"}</Button></div>
-    <p className="helper">The rules of this map, written in markdown and kept in the map file. New to markdown? <a href={MARKDOWN_HELP} target="_blank" rel="noopener noreferrer">A short guide to markdown</a> (opens another site). Name a stop as <code>[[Westport]]</code> and a route as <code>[[Westport–Central]]</code>, or pick them from the lists below: the preview draws them as the map does, and pointing at one marks it on the map. They print on pages of their own after the board when the print dialog says so.</p>
+    <p className="helper">The rules of this map, written in markdown and kept in the map file. New to markdown? <a href={MARKDOWN_HELP} target="_blank" rel="noopener noreferrer">A short guide to markdown</a> (opens another site). Name a stop as <code>[[Westport]]</code> and a route as <code>[[Westport–Central]]</code>, or pick them: from the lists, or by clicking the stops on the map (a route is its two stops). The preview draws them as the map does, and pointing at one marks it on the map. They print on pages of their own after the board when the print dialog says so.</p>
     <div className="rules-body">
       <div className="rules-editor">
         <Label htmlFor="rules-text">Rules text</Label>
@@ -120,15 +149,22 @@ export function RulesPanel({ data, wide, onToggleWide, onClose, onChange, hover 
           {tool("Quote", null, <Quote />, (el) => prefixLines(el, /^\s*>\s?/, (row) => `> ${row}`))}
           {tool("Table", null, <Table />, (el) => insertBlock(el, "| Column | Column |\n| --- | --- |\n| | |", 2, 8))}
           {tool("Line", null, <Minus />, (el) => insertBlock(el, "---", 3, 3))}
-          <select aria-label="Insert a stop" value="" onChange={(event) => { const name = event.target.value; if (name) act((el) => { const { selectionStart: a, selectionEnd: b } = el; edit(el, a, b, `[[${name}]]`, a + name.length + 4, a + name.length + 4); }); }}>
+          <select aria-label="Insert a stop" value="" onChange={(event) => { if (event.target.value) write(event.target.value); }}>
             <option value="">Stop…</option>
             {stops.map((stop) => <option key={stop.id} value={stop.name}>{stop.name}</option>)}
           </select>
-          <select aria-label="Insert a route" value="" onChange={(event) => { const name = event.target.value; if (name) act((el) => { const { selectionStart: a, selectionEnd: b } = el; edit(el, a, b, `[[${name}]]`, a + name.length + 4, a + name.length + 4); }); }}>
-            <option value="">Route…</option>
-            {routes.map((name) => <option key={name} value={name}>{name}</option>)}
+          <Button type="button" size="icon" variant={pick?.kind === "stop" ? "secondary" : "ghost"} aria-label="Pick a stop on the map" aria-pressed={pick?.kind === "stop"} title="Pick a stop by clicking it on the map" onMouseDown={(event) => event.preventDefault()} onClick={() => { hover.stop(null); setPick(pick?.kind === "stop" ? null : { kind: "stop" }); }}><MapPin /></Button>
+          <select aria-label="Route from" value={routeFrom} onChange={(event) => setRouteFrom(event.target.value)}>
+            <option value="">Route from…</option>
+            {stops.map((stop) => <option key={stop.id} value={stop.id}>{stop.name}</option>)}
           </select>
+          <select aria-label="Route to" value="" disabled={!routeFrom} onChange={(event) => { const to = event.target.value; if (to && routeFrom) { write(`${nameOf(routeFrom)}–${nameOf(to)}`); setRouteFrom(""); } }}>
+            <option value="">{routeFrom ? "to…" : "then to…"}</option>
+            {routeFrom && leadsTo(routeFrom).map((stop) => <option key={stop.id} value={stop.id}>{stop.name}</option>)}
+          </select>
+          <Button type="button" size="icon" variant={pick?.kind === "route" ? "secondary" : "ghost"} aria-label="Pick a route on the map" aria-pressed={pick?.kind === "route"} title="Pick a route by clicking its two stops on the map" onMouseDown={(event) => event.preventDefault()} onClick={() => { hover.stop(null); setPick(pick?.kind === "route" ? null : { kind: "route" }); }}><RouteIcon /></Button>
         </div>
+        {pick && <p className="helper rules-pick-note" role="status">{pick.kind === "stop" ? "Click a stop on the map to write its name here. Esc cancels." : pick.message ?? (pick.from ? `${nameOf(pick.from)} · now click the second stop. Esc cancels.` : "Click the first stop of the route on the map. Esc cancels.")} <button type="button" className="mix-link" onClick={() => stopPicking()}>Cancel</button></p>}
         <textarea ref={area} id="rules-text" aria-label="Rules text" value={draft} placeholder={STARTER} spellCheck onChange={(event) => setDraft(event.target.value)} onBlur={() => commit(draft)}
           onKeyDown={(event) => { if ((event.metaKey || event.ctrlKey) && !event.shiftKey && !event.altKey && (event.key === "b" || event.key === "i")) { event.preventDefault(); event.stopPropagation(); wrap(event.currentTarget, event.key === "b" ? "**" : "*"); } }} />
         <small>Headings with #, lists with - or 1., **bold**, *italic*, tables with |, a line across with ---, quotes with &gt;.</small>
