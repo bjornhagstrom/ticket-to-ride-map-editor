@@ -87,7 +87,7 @@ export function RulesPanel({ pickRef, onPicking, data, wide, onToggleWide, onClo
   const kept = useRef(data.rules ?? "");
   const latest = useRef(draft);
   const area = useRef<HTMLTextAreaElement>(null);
-  latest.current = draft;
+  useEffect(() => { latest.current = draft; });
   const commit = (text: string) => { if (text !== kept.current) { kept.current = text; onChange(text); } };
   // Typing is one change in the map's history once it pauses, not one per key.
   useEffect(() => { const timer = window.setTimeout(() => commit(draft), 600); return () => window.clearTimeout(timer); }, [draft]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -97,13 +97,6 @@ export function RulesPanel({ pickRef, onPicking, data, wide, onToggleWide, onClo
   useEffect(() => () => { hover.stop(null); hover.routes(null); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const written = useMemo(() => draft.trim().length > 0, [draft]);
   const stops = useMemo(() => [...data.stops].sort((a, b) => a.name.localeCompare(b.name)), [data.stops]);
-  // One entry for each pair of stops with a route between them: a double route is still one name.
-  const routes = useMemo(() => {
-    const name = (id: string) => data.stops.find((stop) => stop.id === id)?.name;
-    const pairs = new Set<string>();
-    for (const route of data.routes) { const a = name(route.a), b = name(route.b); if (a && b) pairs.add(`${a}–${b}`); }
-    return [...pairs].sort((a, b) => a.localeCompare(b));
-  }, [data.stops, data.routes]);
   const act = (run: (el: HTMLTextAreaElement) => void) => { if (area.current) run(area.current); };
   // Writing a reference at the cursor, wherever the focus has gone since.
   const write = (name: string) => act((el) => { const { selectionStart: a, selectionEnd: b } = el; edit(el, a, b, `[[${name}]]`, a + name.length + 4, a + name.length + 4); });
@@ -112,7 +105,7 @@ export function RulesPanel({ pickRef, onPicking, data, wide, onToggleWide, onClo
   const [routeFrom, setRouteFrom] = useState("");
   const [pick, setPick] = useState<null | { kind: "stop" } | { kind: "route"; from?: string; message?: string }>(null);
   const pickNow = useRef(pick);
-  pickNow.current = pick;
+  useEffect(() => { pickNow.current = pick; });
   const nameOf = (id: string) => data.stops.find((stop) => stop.id === id)?.name ?? "";
   const leadsTo = (id: string) => [...new Set(data.routes.filter((route) => route.a === id || route.b === id).map((route) => (route.a === id ? route.b : route.a)))]
     .map((other) => data.stops.find((stop) => stop.id === other)).filter((stop): stop is NonNullable<typeof stop> => Boolean(stop)).sort((a, b) => a.name.localeCompare(b.name));

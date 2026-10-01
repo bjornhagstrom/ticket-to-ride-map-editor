@@ -37,8 +37,6 @@ yarn-error.log*
 next-env.d.ts
 *.tsbuildinfo
 /dist/
-/outputs/
-/work/
 
 
 # Private reference data lives in its own repository beside this one (../ttr-reference-data)
