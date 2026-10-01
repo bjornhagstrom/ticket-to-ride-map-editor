@@ -2285,6 +2285,71 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     await page.evaluate(() => localStorage.removeItem("ttr-print-rules"));
   }
 
+  // 33b2. a panel open in the right column must not clip the print: a browser that lays the print out at
+  // the window's width (Safari) would otherwise cut everything after the first screen, rules and all
+  {
+    for (const [label, open, panelSel] of [["Rules", () => page.getByRole("button", { name: "Rules", exact: true }).click(), ".rules-panel"], ["Map balance", () => page.getByRole("button", { name: "Analyze balance" }).click(), ".balance-panel"], ["Tickets", () => ticketsButton.click(), ".tickets-panel"]]) {
+      await open();
+      await page.waitForTimeout(500);
+      await page.emulateMedia({ media: "print" });
+      const clip = await page.evaluate(() => { const a = document.querySelector(".app-shell"); const cs = getComputedStyle(a); return { overflow: cs.overflow, height: Math.round(a.getBoundingClientRect().height), content: a.scrollHeight, rules: document.querySelectorAll(".print-pages .print-rules").length }; });
+      await page.emulateMedia({ media: "screen" });
+      check(`with ${label} open, the printed pages are not clipped to one screen`, clip.overflow !== "hidden" && clip.height >= clip.content - 1, JSON.stringify(clip));
+      await page.locator(`${panelSel} button`).filter({ hasText: /^Done$/ }).first().click();
+      await page.waitForTimeout(300);
+    }
+  }
+
+  // 33c. every dialog stays inside a low window and scrolls within, with its last button reachable
+  {
+    await page.setViewportSize({ width: 1280, height: 420 });
+    await page.waitForTimeout(300);
+    const measure = () => page.evaluate(() => {
+      const d = document.querySelector('[role="dialog"], [role="alertdialog"]');
+      if (!d) return null;
+      const r = d.getBoundingClientRect();
+      const before = { top: r.top, bottom: r.bottom };
+      const overflowY = getComputedStyle(d).overflowY;
+      const scrolls = d.scrollHeight > d.clientHeight + 1;
+      d.scrollTop = d.scrollHeight;
+      const buttons = Array.from(d.querySelectorAll("button")).filter((b) => b.getClientRects().length && !b.closest("[data-slot=dialog-close]"));
+      const last = buttons.at(-1);
+      const lr = last ? last.getBoundingClientRect() : null;
+      return { ...before, win: innerHeight, overflowY, scrolls, lastVisible: !last || (lr.top >= 0 && lr.bottom <= innerHeight + 1), height: r.height };
+    });
+    const dialogs = [
+      ["Print", async () => { await printButton().click(); }],
+      ["Settings", async () => { await page.getByRole("button", { name: "Settings" }).click(); }],
+      ["Getting started", async () => { await page.getByRole("button", { name: "Help" }).click(); await page.getByRole("menuitem", { name: "Getting started" }).click(); }],
+      ["Clear map", async () => { await page.getByRole("button", { name: "Clear map" }).click(); }],
+    ];
+    for (const [label, open] of dialogs) {
+      await open();
+      await page.waitForTimeout(500);
+      const m = await measure();
+      check(`the ${label} dialog fits a 420 px window`, m !== null && m.top >= 0 && m.bottom <= m.win + 1, JSON.stringify(m));
+      check(`and scrolls within when it is taller than the window, with its last button in reach`, m !== null && m.overflowY !== "visible" && m.lastVisible && (!m.scrolls || m.overflowY === "auto" || m.overflowY === "scroll"), JSON.stringify(m));
+      await page.keyboard.press("Escape");
+      await page.waitForTimeout(350);
+    }
+    // Suggest a deck has a table of its own to scroll, inside a dialog that must still fit
+    await ticketsButton.click();
+    await page.waitForTimeout(400);
+    await page.getByRole("button", { name: /Add a deck/ }).click();
+    await page.waitForTimeout(250);
+    await page.getByRole("menuitem", { name: /Suggest a deck/ }).click();
+    await page.waitForSelector(".suggest-table tbody tr", { timeout: 20000 });
+    await page.waitForTimeout(300);
+    const sm = await measure();
+    check("the Suggest a deck dialog fits a 420 px window, with its last button in reach", sm !== null && sm.top >= 0 && sm.bottom <= sm.win + 1 && sm.lastVisible && sm.overflowY !== "visible", JSON.stringify(sm));
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(350);
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(250);
+    await page.setViewportSize({ width: 1500, height: 1000 });
+    await page.waitForTimeout(300);
+  }
+
   // 34. a map saved on a format that is now a print choice opens on its board
   await page.evaluate(() => {
     const map = JSON.parse(localStorage.getItem("orebro-map-editor-public-v2"));

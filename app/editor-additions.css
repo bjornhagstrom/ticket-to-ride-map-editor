@@ -60,7 +60,9 @@
   .topbar,.workspace,[role="alertdialog"]{display:none!important}
   body>*:not(.app-shell){display:none!important}
   .app-shell>*:not(.print-pages){display:none!important}
-  .app-shell{display:block!important;min-height:0!important}
+  /* However the page was laid out on screen (a panel open in the right column pins the shell to the window), a print is as tall as its pages. */
+  .app-shell{display:block!important;min-height:0!important;height:auto!important;overflow:visible!important}
+  html,body{height:auto!important;overflow:visible!important}
   .print-pages{display:block!important}
   .print-page{page-break-after:always;break-after:page;overflow:hidden;background:white;display:flex;flex-direction:column}
   .print-page:last-child{page-break-after:auto;break-after:auto}
@@ -167,7 +169,7 @@
 .deck-rule-end-row output{min-width:44px;font-size:13px;font-weight:700;font-variant-numeric:tabular-nums;color:#1f1c18}
 /* Map balance sits in the right column, which widens for its tables while the map stays in view. */
 /* Map balance fills the window rather than the page: its lists scroll inside the column, so the whole map stays in view beside them. */
-@media(min-width:1051px){
+@media screen and (min-width:1051px){
   .app-shell:has(.workspace.showing-balance){height:100vh;min-height:0;overflow:hidden}
   .workspace.showing-balance{position:relative;grid-template-columns:246px minmax(0,1fr) var(--right-width,400px);grid-template-rows:minmax(0,1fr)}
   .workspace.showing-balance>.tools-panel,.workspace.showing-balance>.properties{overflow-y:auto;min-height:0}
