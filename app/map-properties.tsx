@@ -111,7 +111,7 @@ export function NoteProperties({ note, change, onDelete }: { note: NoteBox; chan
   const update = (values: Partial<NoteBox>) => change((draft) => { const item = draft.notes.find((entry) => entry.id === note.id); if (item) Object.assign(item, values); return draft; });
   return <div className="property-form">
     <div><Label htmlFor="note-text">Evaluation note</Label><Textarea id="note-text" rows={5} value={note.text} onChange={(event) => update({ text: event.target.value })} /></div>
-    <p className="helper">Shown on screen and in print, for reviewers evaluating the map. Drag the corner handle on the map to resize it.</p>
+    <p className="helper">Shown on screen, in print and in the PNG, for reviewers evaluating the map. Drag the corner handle on the map to resize it.</p>
     <Button variant="outline" onClick={() => update({ collapsed: !note.collapsed || undefined })}>{note.collapsed ? "Expand note" : "Collapse note"}</Button>
     <Button variant="outline" onClick={() => update({ locked: !note.locked })}>{note.locked ? <Unlock /> : <Lock />}{note.locked ? "Unlock note" : "Lock note"}</Button>
     <Button variant="destructive" onClick={onDelete}><Trash2 />Delete note</Button>

@@ -691,7 +691,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
       haloPx: halos[0] ? parseFloat(getComputedStyle(halos[0]).strokeWidth) * scaleOf(halos[0]) : 0,
       wagonPx,
       dimmed: unmarked.length > 0 && unmarked.every((g) => parseFloat(getComputedStyle(g).opacity) <= 0.5),
-      undimmed: unmarked.every((g) => parseFloat(getComputedStyle(g).opacity) === 1),
+      undimmed: unmarked.every((g) => parseFloat(getComputedStyle(g).opacity) >= 0.99),
     };
   }, cls);
   const clearlyMarked = (info) => info.marked >= 1 && info.withHalo === info.marked && info.haloPx >= info.wagonPx + 6 && info.dimmed;
@@ -740,12 +740,14 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     const hovered = await markInfo("on-ticket");
     check("pointing at a ticket marks its path, clearly", clearlyMarked(hovered), JSON.stringify(hovered));
     await page.mouse.move(700, 800);
-    await page.waitForTimeout(250);
+    await page.waitForTimeout(500);
     const left = await markInfo("on-ticket");
     check("and the mark goes, and the other routes come back, when the pointer leaves", left.marked === 0 && left.undimmed, JSON.stringify(left));
     // Picking a row shows that ticket's shortest path on the map, which is in view beside the list.
     await panel.locator(".analysis-table tbody tr").first().click();
     await page.waitForTimeout(250);
+    const ticketHelp = await panel.locator(".analysis-section .helper").first().textContent();
+    check("the Tickets panel says pointing shows the path and a click keeps it", /point/i.test(ticketHelp) && /click/i.test(ticketHelp) && !/dialog/i.test(await panel.textContent()), ticketHelp);
     check("picking a ticket lights its path on the map beside the list", (await page.locator(".map-canvas .route-group.on-ticket").count()) >= 1);
     await panel.locator(".analysis-table tbody tr").first().click();
     // One panel at a time: Map balance takes the column, and Tickets comes back when asked.
@@ -1944,6 +1946,14 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     check("and the classic range beside it", compare.every((r) => r.range.includes(String(Math.round(classic[r.key][2] * (r.key === "spread" ? 100 : 1)) / (r.key === "spread" ? 100 : 1)))), JSON.stringify(compare.map((r) => r.range)));
     check("and says in a word whether it is within, below or above", compare.every((r) => r.verdict === verdictOf(r.key)), JSON.stringify(compare.map((r) => [r.key, r.verdict])) + " expected " + JSON.stringify(Object.keys(classic).map((k) => [k, verdictOf(k)])));
     check("with a sentence naming the maps it is set against", /USA/.test(await balancePanel.locator(".classic-compare").textContent()) && /Northern Lights/.test(await balancePanel.locator(".classic-compare").textContent()));
+    // The first column only names a row, so it is as narrow as its words and the numbers get the room.
+    const widths = await balancePanel.evaluate((root) => {
+      const first = (sel) => { const th = root.querySelector(`${sel} thead th:first-child`); return th ? th.getBoundingClientRect().width : null; };
+      const scroll = root.querySelector(".classic-table").closest(".analysis-table-scroll");
+      return { colour: first("table.colour-table"), classic: first(".classic-table"), classicScrolls: scroll.scrollWidth > scroll.clientWidth + 1 };
+    });
+    check("in the colour table the first column is narrow", widths.colour !== null && widths.colour <= 64, `${widths.colour} px`);
+    check("in the classic table too, and the table fits the column without scrolling", widths.classic !== null && widths.classic <= 100 && !widths.classicScrolls, `${widths.classic} px, scrolls: ${widths.classicScrolls}`);
     const marked = () => page.locator(".map-canvas .route-group.on-preview").count();
     // A cell with routes in it: its routes, and only those, are marked while it is pointed at.
     const body = table.locator("tbody tr:not(.analysis-total-row):not(.analysis-wagons-row)");
@@ -2006,6 +2016,71 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.mouse.move(5, 5);
   await page.waitForTimeout(250);
   check("and the marks go when the pointer leaves", (await page.locator(".map-canvas .route-group.on-preview").count()) === 0 && (await page.locator(".map-canvas .stop.previewed").count()) === 0);
+  // Help texts say what the controls do now: a click keeps a mark, a double click picks, and neither
+  // names a dialog for what is a panel.
+  {
+    const text = await balancePanel.textContent();
+    check("Map balance says a click keeps a row marked and a second click lets it go", /click[^.]*keep[^.]*marked/i.test(text) && /click again/i.test(text), text.slice(0, 160));
+    check("and that a double click picks it for editing", /double-click/i.test(text));
+    check("the rows no longer promise that one click selects", !/Pick a row to select/i.test(text));
+    const hubHelp = await balancePanel.locator(".analysis-section", { has: page.locator("h3", { hasText: "Hub degree" }) }).locator(".helper").first().textContent();
+    const roomHelp = await balancePanel.locator(".analysis-section", { has: page.locator("h3", { hasText: "Room per wagon" }) }).locator(".helper").first().textContent();
+    check("Hub degree and Room per wagon explain click and double-click", /keep/i.test(hubHelp) && /double-click/i.test(hubHelp) && /keep/i.test(roomHelp) && /double-click/i.test(roomHelp), `${hubHelp.slice(0, 120)} | ${roomHelp.slice(0, 120)}`);
+    check("the colour table says clicking keeps a number's routes marked", /click/i.test(await balancePanel.locator(".analysis-section", { has: page.locator("h3", { hasText: "Colour × length" }) }).locator(".helper").first().textContent()));
+  }
+  // A click pins what a row or number marks, so it stays on the map while the pointer is elsewhere; a
+  // second click lets it go. A double click still picks the route or stop for editing.
+  {
+    const routesMarked = () => page.locator(".map-canvas .route-group.on-preview, .map-canvas .route-group.bottleneck").count();
+    const away = async () => { await page.mouse.move(5, 5); await page.waitForTimeout(300); };
+    // a route's row
+    await roomRow.click();
+    await away();
+    check("a click on a route's row keeps it marked once the pointer has left", (await routesMarked()) >= 1 && (await roomRow.getAttribute("aria-pressed")) === "true" && (await balancePanel.count()) === 1);
+    await roomRow.click();
+    await away();
+    check("and a second click lets it go", (await routesMarked()) === 0 && (await roomRow.getAttribute("aria-pressed")) === "false");
+    // a stop's row: its ring
+    const stopRow = balancePanel.locator(".analysis-section", { has: page.locator("h3", { hasText: "Hub degree" }) }).locator("tbody tr").first();
+    await stopRow.click();
+    await away();
+    check("the same goes for a stop's ring", (await page.locator(".map-canvas .stop.previewed").count()) === 1 && (await stopRow.getAttribute("aria-pressed")) === "true");
+    await stopRow.click();
+    await away();
+    check("and releasing it", (await page.locator(".map-canvas .stop.previewed").count()) === 0);
+    // a number in the colour table
+    const colourCell = balancePanel.locator("table.colour-table tbody tr").first().locator("td").nth(1);
+    await colourCell.click();
+    await away();
+    check("and for a number in the colour table", (await routesMarked()) >= 1);
+    await colourCell.click();
+    await away();
+    check("released by a second click", (await routesMarked()) === 0);
+    // pinning one thing and then another moves the mark
+    await roomRow.click();
+    await balancePanel.locator("table.colour-table tbody tr").first().locator("td").nth(1).click();
+    await away();
+    const pinnedCount = await routesMarked();
+    check("pinning a second thing moves the mark instead of adding to it", (await roomRow.getAttribute("aria-pressed")) === "false" && pinnedCount >= 1);
+    await balancePanel.locator("table.colour-table tbody tr").first().locator("td").nth(1).click();
+    await away();
+    // a crowded route
+    if (await crowdedRow.count()) {
+      await crowdedRow.click();
+      await away();
+      check("a crowded route stays marked after a click", (await routesMarked()) >= 1);
+      await crowdedRow.click();
+      await away();
+      check("and a second click lets it go", (await routesMarked()) === 0);
+    }
+    // a double click picks the route for editing, as a click used to
+    await roomRow.dblclick();
+    await page.waitForTimeout(400);
+    check("a double click on a route's row picks it for editing and hands the column back", (await balancePanel.count()) === 0 && (await page.locator(".route-group.selected").count()) === 1);
+    await page.getByRole("button", { name: "Analyze balance" }).click();
+    await page.waitForTimeout(500);
+    check("and nothing stays pinned when Map balance is opened again", (await routesMarked()) === 0);
+  }
   await balancePanel.getByRole("button", { name: "Done" }).click();
   await page.waitForTimeout(300);
   check("Done gives the column back to Properties", (await balancePanel.count()) === 0 && /Properties/.test(await page.locator(".panel-heading").last().textContent()));

@@ -26,7 +26,7 @@ Live site: <https://hagstrom.nu/ttr/>
 - Choose the board's shape in Settings: the standard 2×3 board or an extended 2×4. That is all the map itself knows about paper.
 - Detect crossings between buildable routes.
 - Check that each route is drawn about as long as its wagon count needs, and see which routes are too short or unnecessarily roomy.
-- Analyse how balanced the network is: hub degree and neighbour count per stop, a colour-by-length distribution table, and a flag for under-connected stops.
+- Analyse how balanced the network is: hub degree and neighbour count per stop, a colour-by-length distribution table with the wagons each colour adds up to, set against the seven classic maps, the deck's ticket lengths against the official decks and the map's own rules, and a flag for under-connected stops. It opens in the right column beside the map: point at a row or number to see it on the map, click to keep it marked, drag the column wider.
 - Measure the shortest travel distance between any two stops (by route length, not straight-line distance).
 - Build a destination ticket deck by clicking two stops, with points suggested from the shortest path and from what the map's other tickets are worth. The ticket list flags unreachable pairs, duplicates and points far from what the distance implies, shows the spread of ticket lengths, and names the stops no ticket sends anyone to.
 - Two-click tools say what they are waiting on: the first stop is ringed and tagged, a rubber band follows the pointer, and hovering the far end previews the ticket or the distance the second click would produce, with the path it would use lit on the map. Escape drops a half-finished pick, and clicking the current tool again lets it go.
@@ -41,7 +41,7 @@ Live site: <https://hagstrom.nu/ttr/>
 - Get automatic route suggestions between nearby, unconnected, poorly-connected stops, with a starting length and colour guess drawn from the balance analysis, that you can add with one click and then adjust.
 - Undo and redo up to 200 changes during the current session, with Cmd/Ctrl+Z and Cmd/Ctrl+Shift+Z.
 - Save automatically in the current browser.
-- Import and export complete maps as JSON, or just the background or the route network on their own.
+- Import and export complete maps as JSON, or just the background or the route network on their own, and save the board as a PNG picture.
 - Print from a dialog that decides each run without touching the map: the whole board on one sheet, one sheet per fold panel, or full size across as many sheets as it takes, with trim marks; on A4, A3, US Letter or Tabloid; and for a 2×3, an Anniversary size tick under Supersize that prints the larger Anniversary board at full size. A table compares the sheet count and scale of every combination and picks one when clicked. The last choice is remembered in the browser.
 - Show a neutral example map to first-time visitors.
 
@@ -91,7 +91,7 @@ The deployable website is generated in `out/`. Its contents are intended to be s
 | `app/map-storage.ts` | Local storage, file normalizers and format rescaling |
 | `app/map-artwork.tsx` | SVG rendering of the map |
 | `app/map-properties.tsx` | Properties panel editors |
-| `app/map-dialogs.tsx` | Welcome guide, balance report and suggestions |
+| `app/map-dialogs.tsx` | Welcome guide, balance report, tickets panel and suggestions |
 | `app/map-print.tsx` | Print pages and the print dialog |
 | `app/print-plan.ts` | How a board is cut into sheets for a print choice |
 | `app/globals.css` | Main editor layout and visual styling |
@@ -119,8 +119,8 @@ npm run test:regression
 ```
 
 It drives the editor with Playwright and makes about two hundred checks, from the welcome guide and
-the example map through route editing, real-size wagons, the balance and suggestion dialogs and the
-ticket tools to the print dialog, including real PDFs printed with the browser's own margins. If it
+the example map through route editing, real-size wagons, the balance, ticket and suggestion panels and
+the ticket tools to the print dialog, including real PDFs printed with the browser's own margins. If it
 breaks off part way, it still lists the checks it made before stopping.
 
 `npm test` runs the typecheck, the suggester, calibration, file-format and print-plan checks, and the

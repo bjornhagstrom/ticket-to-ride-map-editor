@@ -19,7 +19,7 @@ export function WelcomeGuide({ open, onOpenChange, onChooseBlank, onChooseExampl
     { icon: <FileStack />, title: "Choose a board format", text: "Pick the standard 2×3 board or the extended 2×4. Paper, and whether to print on one sheet, a sheet per panel or at full size, is chosen each time you print. Change the board whenever you like — everything keeps its relative position." },
     { icon: <Layers3 />, title: "Draw a background", text: "Sketch areas, boundaries and labels behind the network to show land, water and regions." },
     { icon: <MapPinPlus />, title: "Add stops and connect routes", text: "Place stations and draw the routes that link them, with a length, type and colour." },
-    { icon: <Save />, title: "Save locally, export a backup", text: "The map saves automatically in this browser. Export a JSON backup regularly, since browser storage is not portable." },
+    { icon: <Save />, title: "Save locally, export a backup", text: "The map saves automatically in this browser. Export a JSON backup regularly, since browser storage is not portable. The Export menu can also save the board as a PNG picture." },
     { icon: <Printer />, title: "Print it out and play on paper", text: "This editor does not play the game for you. Print the finished map, gather around it, and use coloured pens to mark the routes each player builds instead of placing plastic trains. Keep each player's real wagons in front of them and put one back in the box for every space they fill in — then the pile in front of them is how many they have left, exactly as in a real game. Print at full size and you can lay the wagons on the paper instead." },
   ];
   return <Dialog open={open} onOpenChange={onOpenChange}>
@@ -37,18 +37,18 @@ export function WelcomeGuide({ open, onOpenChange, onChooseBlank, onChooseExampl
 const NUMBER_WORDS: Record<number, string> = {2: "two", 3: "three", 4: "four", 5: "five", 6: "six", 7: "seven", 8: "eight"};
 const tableWord = (count: number) => NUMBER_WORDS[count] ?? String(count);
 
-export function AnalysisPanel({ lengthView, onClose, onPreviewRoutes, onPreviewStop, data, stats, colourTable, spacing, scaleWidthMm, setup, bottlenecks, atTable, onAtTable, onShowBottleneck, onSelectRoute, onSelectStop }: { lengthView: TicketLengthsView; setup: SetupBalance; bottlenecks: Bottleneck[]; atTable: number; onAtTable: (players: number) => void; onShowBottleneck: (routeIds: string[]) => void; onClose: () => void; onPreviewRoutes: (routeIds: string[] | null) => void; onPreviewStop: (stopId: string | null) => void; onSelectRoute: (routeId: string) => void; onSelectStop: (stopId: string) => void; data: MapData; stats: NetworkStats; colourTable: ColourLengthTable; spacing: RouteSpacing[]; scaleWidthMm: number }) {
+export function AnalysisPanel({ lengthView, pinKey, onPin, bottleneckShown, onClose, onPreviewRoutes, onPreviewStop, data, stats, colourTable, spacing, scaleWidthMm, setup, bottlenecks, atTable, onAtTable, onShowBottleneck, onSelectRoute, onSelectStop }: { lengthView: TicketLengthsView; pinKey: string | null; onPin: (key: string, routes: string[] | null, stop: string | null) => void; bottleneckShown: Set<string>; setup: SetupBalance; bottlenecks: Bottleneck[]; atTable: number; onAtTable: (players: number) => void; onShowBottleneck: (routeIds: string[]) => void; onClose: () => void; onPreviewRoutes: (routeIds: string[] | null) => void; onPreviewStop: (stopId: string | null) => void; onSelectRoute: (routeId: string) => void; onSelectStop: (stopId: string) => void; data: MapData; stats: NetworkStats; colourTable: ColourLengthTable; spacing: RouteSpacing[]; scaleWidthMm: number }) {
   const stopName = (id: string) => data.stops.find((stop) => stop.id === id)?.name ?? "";
   // A number in the colour table marks the routes it counts while it is pointed at.
   const classicRows = compareWithClassics(data);
-  const pointAt = (length: number | null, colour: string | null) => ({ className: "colour-cell", onPointerEnter: () => onPreviewRoutes(colourRouteIds(data, length, colour)), onPointerLeave: () => onPreviewRoutes(null) });
+  const pointAt = (length: number | null, colour: string | null) => ({ className: cn("colour-cell", pinKey === `cell:${length ?? "*"}:${colour ?? "*"}` && "pinned"), "aria-pressed": pinKey === `cell:${length ?? "*"}:${colour ?? "*"}`, onClick: () => onPin(`cell:${length ?? "*"}:${colour ?? "*"}`, colourRouteIds(data, length, colour), null), onPointerEnter: () => onPreviewRoutes(colourRouteIds(data, length, colour)), onPointerLeave: () => onPreviewRoutes(null) });
   const players = data.players ?? { min: 2, max: 5 };
   const sortedStops = [...data.stops].sort((a, b) => (stats.hubDegree.get(b.id) ?? 0) - (stats.hubDegree.get(a.id) ?? 0));
   // In the right column rather than a dialog, so the map stays in view: pointing at a row marks
   // the stop or routes it is about, and picking one selects it as before.
   return <div className="balance-panel">
     <div className="panel-heading"><span>Map balance</span><small>Point at a row to see it on the map</small></div>
-      <p className="helper">A quick read on how evenly connected and coloured the network is.</p>
+      <p className="helper">A quick read on how evenly connected and coloured the network is, and how the tickets lie on it. Point at a row to see it on the map. Click one to keep it marked, and click again to let it go; double-click a stop or a route to pick it for editing.</p>
       <div className="analysis-section bottlenecks">
         <h3>Where the tickets crowd</h3>
         <div className="bottleneck-players">
@@ -61,11 +61,11 @@ export function AnalysisPanel({ lengthView, onClose, onPreviewRoutes, onPreviewS
         {bottlenecks.length === 0
           ? <p className="helper">No route is wanted by more tickets than it can carry.</p>
           : <>
-            <div className="bottleneck-list">{bottlenecks.slice(0, 8).map((edge) => <button type="button" key={`${edge.a}|${edge.b}`} className="bottleneck-row" onPointerEnter={() => onPreviewRoutes(edge.routeIds)} onPointerLeave={() => onPreviewRoutes(null)} onClick={() => onShowBottleneck(edge.routeIds)}>
+            <div className="bottleneck-list">{bottlenecks.slice(0, 8).map((edge) => <button type="button" key={`${edge.a}|${edge.b}`} className="bottleneck-row" onPointerEnter={() => onPreviewRoutes(edge.routeIds)} onPointerLeave={() => onPreviewRoutes(null)} aria-pressed={edge.routeIds.length === bottleneckShown.size && edge.routeIds.every((id) => bottleneckShown.has(id))} onClick={() => onShowBottleneck(edge.routeIds)}>
               <strong>{stopName(edge.a)} → {stopName(edge.b)}</strong>
               <span>{edge.length} spaces · {edge.lanesUsable} of {edge.lanes} lane{edge.lanes === 1 ? "" : "s"} usable · {edge.tickets} ticket{edge.tickets === 1 ? "" : "s"} want it</span>
             </button>)}</div>
-            <p className="helper">Many tickets need these routes. Consider making one a double route, adding a way round, or moving a ticket. The fix is nearly always a change to the map rather than to the deck.</p>
+            <p className="helper">Many tickets need these routes. Consider making one a double route, adding a way round, or moving a ticket. The fix is nearly always a change to the map rather than to the deck. Click a row to keep its route marked, and click again to let go.</p>
           </>}
       </div>
       <TicketLengths view={lengthView} />
@@ -84,18 +84,18 @@ export function AnalysisPanel({ lengthView, onClose, onPreviewRoutes, onPreviewS
       </div>
       <div className="analysis-section">
         <h3>Hub degree per stop</h3>
-        <p className="helper">Pick a row to select that stop on the map. Neighbours + weighted links (parallel routes between the same pair count extra). Higher means more central; sorted from most to least connected.</p>
+        <p className="helper">Click a row to keep that stop ringed on the map, and click again to let go; double-click to pick the stop for editing. Neighbours + weighted links (parallel routes between the same pair count extra). Higher means more central; sorted from most to least connected.</p>
         {sortedStops.length === 0 ? <p className="helper">No stops yet.</p> : <div className="analysis-table-scroll"><table className="analysis-table">
           <thead><tr><th>Stop</th><th>Neighbours</th><th>Links</th><th>Hub degree</th></tr></thead>
-          <tbody>{sortedStops.map((stop) => <tr key={stop.id} className={cn("analysis-row-link", (stats.neighbours.get(stop.id) ?? 0) < 2 && "analysis-warning-row")} tabIndex={0} role="button" onPointerEnter={() => onPreviewStop(stop.id)} onPointerLeave={() => onPreviewStop(null)} onClick={() => onSelectStop(stop.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onSelectStop(stop.id); } }}><td>{stop.name}</td><td>{stats.neighbours.get(stop.id) ?? 0}</td><td>{stats.links.get(stop.id) ?? 0}</td><td>{stats.hubDegree.get(stop.id) ?? 0}</td></tr>)}</tbody>
+          <tbody>{sortedStops.map((stop) => <tr key={stop.id} className={cn("analysis-row-link", (stats.neighbours.get(stop.id) ?? 0) < 2 && "analysis-warning-row", pinKey === `stop:${stop.id}` && "pinned")} aria-pressed={pinKey === `stop:${stop.id}`} tabIndex={0} role="button" onPointerEnter={() => onPreviewStop(stop.id)} onPointerLeave={() => onPreviewStop(null)} onClick={() => onPin(`stop:${stop.id}`, null, stop.id)} onDoubleClick={() => onSelectStop(stop.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onPin(`stop:${stop.id}`, null, stop.id); } }}><td>{stop.name}</td><td>{stats.neighbours.get(stop.id) ?? 0}</td><td>{stats.links.get(stop.id) ?? 0}</td><td>{stats.hubDegree.get(stop.id) ?? 0}</td></tr>)}</tbody>
         </table></div>}
       </div>
       <div className="analysis-section">
         <h3>Room per wagon</h3>
-        <p className="helper">Pick a row to select that route on the map. How long each route is drawn against what a real board would use for the same wagon count: {realWagon.length + realWagon.gap} mm per space plus {realWagon.endMargin} mm of end margin, on a {scaleWidthMm.toLocaleString("en-GB")} mm board. Those figures are fitted from the published Ticket to Ride Europe map, which scores 97–106% against them throughout. Well under means the wagons are cramped; well over means the line looks roomier on screen than the finished board plays.</p>
+        <p className="helper">Click a row to keep that route marked on the map, and click again to let go; double-click to pick the route for editing. How long each route is drawn against what a real board would use for the same wagon count: {realWagon.length + realWagon.gap} mm per space plus {realWagon.endMargin} mm of end margin, on a {scaleWidthMm.toLocaleString("en-GB")} mm board. Those figures are fitted from the published Ticket to Ride Europe map, which scores 97–106% against them throughout. Well under means the wagons are cramped; well over means the line looks roomier on screen than the finished board plays.</p>
         {spacing.length === 0 ? <p className="helper">No card routes yet.</p> : <div className="analysis-table-scroll"><table className="analysis-table">
           <thead><tr><th>Route</th><th>Wagons</th><th>Drawn</th><th>Needs</th><th>Room</th></tr></thead>
-          <tbody>{[...spacing].sort((a, b) => a.ratio - b.ratio).map((item) => <tr key={item.route.id} className={cn("analysis-row-link", item.verdict !== "ok" && "analysis-warning-row")} tabIndex={0} role="button" onPointerEnter={() => onPreviewRoutes([item.route.id])} onPointerLeave={() => onPreviewRoutes(null)} onClick={() => onSelectRoute(item.route.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onSelectRoute(item.route.id); } }}>
+          <tbody>{[...spacing].sort((a, b) => a.ratio - b.ratio).map((item) => <tr key={item.route.id} className={cn("analysis-row-link", item.verdict !== "ok" && "analysis-warning-row", pinKey === `route:${item.route.id}` && "pinned")} aria-pressed={pinKey === `route:${item.route.id}`} tabIndex={0} role="button" onPointerEnter={() => onPreviewRoutes([item.route.id])} onPointerLeave={() => onPreviewRoutes(null)} onClick={() => onPin(`route:${item.route.id}`, [item.route.id], null)} onDoubleClick={() => onSelectRoute(item.route.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onPin(`route:${item.route.id}`, [item.route.id], null); } }}>
             <td>{stopName(item.route.a)} → {stopName(item.route.b)}</td>
             <td>{item.route.length}</td>
             <td>{Math.round(item.drawnMm)} mm</td>
@@ -106,8 +106,8 @@ export function AnalysisPanel({ lengthView, onClose, onPreviewRoutes, onPreviewS
       </div>
       <div className="analysis-section">
         <h3>Colour × length distribution</h3>
-        <p className="helper">Counts card-route colours by length, and below them the wagon spaces each colour adds up to. Point at a number to see its routes on the map. Pre-built infrastructure routes (no train cards) are excluded.</p>
-        {colourTable.grandTotal === 0 ? <p className="helper">No card routes yet.</p> : <div className="analysis-table-scroll"><table className="analysis-table">
+        <p className="helper">Counts card-route colours by length, and below them the wagon spaces each colour adds up to. Point at a number to see its routes on the map; click to keep them marked, and click again to let go. Pre-built infrastructure routes (no train cards) are excluded.</p>
+        {colourTable.grandTotal === 0 ? <p className="helper">No card routes yet.</p> : <div className="analysis-table-scroll"><table className="analysis-table colour-table">
           <thead><tr><th>Length</th>{colourTable.colours.map((colour) => <th key={colour}>{colorLabels[colour]}</th>)}<th>Total</th></tr></thead>
           <tbody>
             {colourTable.lengths.map((length) => <tr key={length}>
@@ -247,7 +247,7 @@ export function TicketsPanel({ onHoverTicket, lengthView, wide, onToggleWide, on
       {problems.length > 0 && <p className="helper helper-warning">{problems.length} need{problems.length === 1 ? "s" : ""} a look: {problems.map((review) => `${name(review.ticket.a)}–${name(review.ticket.b)}`).slice(0, 4).join(", ")}{problems.length > 4 ? ` and ${problems.length - 4} more` : ""}.</p>}
 
       <div className="analysis-section">
-        <p className="helper">Pick a row to show that ticket&apos;s shortest path on the map. Suggested points come from this map&apos;s own tickets, not from a fixed table.</p>
+        <p className="helper">Point at a row to see that ticket&apos;s shortest path on the map; click to keep it marked, and click again to let go. Suggested points come from this map&apos;s own tickets, not from a fixed table.</p>
         <div className="analysis-table-scroll"><table className="analysis-table">
           <thead><tr>{heading("ticket", "Ticket")}{heading("spaces", "Spaces")}{heading("points", "Points")}{heading("suggested", "Suggested")}{heading("long", "Long")}<th /></tr></thead>
           <tbody>{sorted.map((review) => <tr key={review.ticket.id} className={cn("analysis-row-link", review.verdict !== "ok" && "analysis-warning-row", review.ticket.id === selected && "analysis-row-active")} tabIndex={0} role="button"

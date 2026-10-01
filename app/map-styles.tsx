@@ -158,7 +158,7 @@ export function SettingsDialog({ open, onOpenChange, target, onTarget, data, cha
               </div>
               {total !== 100
                 ? <p className="helper helper-warning">These add up to {total} %, not 100. The suggester will read them as proportions all the same, but the numbers are easier to judge when they add up.</p>
-                : <p className="helper">The share of the deck that should sit in each band. The suggester aims at this; the balance report and the ticket panel measure against it.</p>}
+                : <p className="helper">The share of the deck that should sit in each band. The suggester aims at this, and the suggestion dialog shows the current deck and the proposed one against it.</p>}
 
               <div className="mix-presets">
                 <p className="eyebrow">Follow an official map</p>

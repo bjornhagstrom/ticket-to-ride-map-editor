@@ -210,3 +210,8 @@
 .classic-verdict{font-weight:700;white-space:nowrap}
 .classic-table td,.classic-table th{padding-left:6px;padding-right:6px}
 .classic-range small{display:block;color:#4f493f;font-size:12px}
+.analysis-table.colour-table th,.analysis-table.colour-table td{padding-left:6px;padding-right:6px}
+.analysis-table.colour-table th:first-child,.analysis-table.colour-table td:first-child,.analysis-table.classic-table th:first-child,.analysis-table.classic-table td:first-child{min-width:0;width:1%}
+.analysis-table.classic-table td:first-child{white-space:normal}
+.balance-panel tr.pinned td,.balance-panel td.pinned{background:#f4d9d3!important;font-weight:700}
+.balance-panel .bottleneck-row[aria-pressed="true"]{background:#f4d9d3;border-color:#b3261e}
