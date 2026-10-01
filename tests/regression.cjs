@@ -1029,6 +1029,20 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.getByRole("button", { name: /^Tickets · / }).click();
   await page.waitForTimeout(400);
   const decksBefore = await page.locator("#ticket-set option").count();
+  // Backing out of Suggest a deck leaves the deck panel where it was, not an empty column.
+  {
+    const deckBefore = await page.locator("#ticket-set").inputValue();
+    await page.getByRole("button", { name: /Add a deck/ }).click();
+    await page.waitForTimeout(250);
+    await page.getByRole("menuitem", { name: /Suggest a deck/ }).click();
+    await page.waitForSelector('[role="dialog"]', { timeout: 20000 });
+    await page.waitForTimeout(300);
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(500);
+    check("backing out of Suggest a deck closes the dialog", (await page.locator('[role="dialog"]').count()) === 0);
+    check("and leaves the Tickets panel open on the same deck", (await page.locator(".tickets-panel").count()) === 1 && (await page.locator("#ticket-set").inputValue()) === deckBefore && (await page.locator("#ticket-set option").count()) === decksBefore, `${deckBefore}`);
+    check("with its list, not an empty column", (await page.locator(".tickets-panel .analysis-table tbody tr").count()) > 0);
+  }
   const suggestStarted = Date.now();
   await page.getByRole("button", { name: /Add a deck/ }).click();
   await page.waitForTimeout(250);

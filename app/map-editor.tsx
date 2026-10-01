@@ -223,7 +223,8 @@ export function MapEditor() {
     openTickets();
     toast.success(`${suggestion.tickets.length} tickets suggested into ${mode === "replace" ? activeTicketSet.label : label}.`);
   };
-  const openSuggest = () => { setShowTickets(false); setSuggestStyle(null); setSuggestSize(null); setSuggestSeed(1); setSuggestName(""); setShowSuggest(true); };
+  // The Tickets panel stays under the dialog, so backing out leaves it as it was.
+  const openSuggest = () => { setSuggestStyle(null); setSuggestSize(null); setSuggestSeed(1); setSuggestName(""); setShowSuggest(true); };
   // The tickets behind one number in the coverage panel.
   const viewedStopTickets = useMemo(() => {
     if (!stopTicketView) return [];
