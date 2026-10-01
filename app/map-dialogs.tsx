@@ -11,6 +11,7 @@ import { DEFAULT_TICKET_MIX, colorLabels, type MapData, realWagon, type Stop, ty
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { TicketLengths, type TicketLengthsView } from "./ticket-lengths";
 import { type Bottleneck, deckRuleFor, deckRules, TICKET_SUGGESTER, type TicketDeckReport, type TicketStyle, type SetupBalance, type TicketReview, type ColourLengthTable, type NetworkStats, type RouteSpacing, type RouteSuggestion } from "./map-analysis";
 
 export function WelcomeGuide({ open, onOpenChange, onChooseBlank, onChooseExample }: { open: boolean; onOpenChange: (open: boolean) => void; onChooseBlank: () => void; onChooseExample: () => void }) {
@@ -36,7 +37,7 @@ export function WelcomeGuide({ open, onOpenChange, onChooseBlank, onChooseExampl
 const NUMBER_WORDS: Record<number, string> = {2: "two", 3: "three", 4: "four", 5: "five", 6: "six", 7: "seven", 8: "eight"};
 const tableWord = (count: number) => NUMBER_WORDS[count] ?? String(count);
 
-export function AnalysisPanel({ onClose, onPreviewRoutes, onPreviewStop, data, stats, colourTable, spacing, scaleWidthMm, setup, bottlenecks, atTable, onAtTable, onShowBottleneck, onSelectRoute, onSelectStop }: { setup: SetupBalance; bottlenecks: Bottleneck[]; atTable: number; onAtTable: (players: number) => void; onShowBottleneck: (routeIds: string[]) => void; onClose: () => void; onPreviewRoutes: (routeIds: string[] | null) => void; onPreviewStop: (stopId: string | null) => void; onSelectRoute: (routeId: string) => void; onSelectStop: (stopId: string) => void; data: MapData; stats: NetworkStats; colourTable: ColourLengthTable; spacing: RouteSpacing[]; scaleWidthMm: number }) {
+export function AnalysisPanel({ lengthView, onClose, onPreviewRoutes, onPreviewStop, data, stats, colourTable, spacing, scaleWidthMm, setup, bottlenecks, atTable, onAtTable, onShowBottleneck, onSelectRoute, onSelectStop }: { lengthView: TicketLengthsView; setup: SetupBalance; bottlenecks: Bottleneck[]; atTable: number; onAtTable: (players: number) => void; onShowBottleneck: (routeIds: string[]) => void; onClose: () => void; onPreviewRoutes: (routeIds: string[] | null) => void; onPreviewStop: (stopId: string | null) => void; onSelectRoute: (routeId: string) => void; onSelectStop: (stopId: string) => void; data: MapData; stats: NetworkStats; colourTable: ColourLengthTable; spacing: RouteSpacing[]; scaleWidthMm: number }) {
   const stopName = (id: string) => data.stops.find((stop) => stop.id === id)?.name ?? "";
   const players = data.players ?? { min: 2, max: 5 };
   const sortedStops = [...data.stops].sort((a, b) => (stats.hubDegree.get(b.id) ?? 0) - (stats.hubDegree.get(a.id) ?? 0));
@@ -64,6 +65,7 @@ export function AnalysisPanel({ onClose, onPreviewRoutes, onPreviewStop, data, s
             <p className="helper">Many tickets need these routes. Consider making one a double route, adding a way round, or moving a ticket. The fix is nearly always a change to the map rather than to the deck.</p>
           </>}
       </div>
+      <TicketLengths view={lengthView} />
       <div className="analysis-section setup-balance">
         <h3>Game setup against the map</h3>
         <p className="helper">
@@ -134,7 +136,8 @@ export function SuggestionsPanel({ suggestions, onAdd, onHover, onClose }: { sug
 
 type TicketSortColumn = "ticket" | "spaces" | "points" | "suggested" | "long";
 
-export function TicketsDialog({ open, onOpenChange, data, reviews, coverage, rate, selected, activeSet, onSelect, onUpdate, onDelete, onSelectSet, onAddSet, onDuplicateSet, onRenameSet, onDeleteSet, onExport, onImport, onPrint, onStartFrom, onSuggest }: {
+export function TicketsDialog({ lengthView, open, onOpenChange, data, reviews, coverage, rate, selected, activeSet, onSelect, onUpdate, onDelete, onSelectSet, onAddSet, onDuplicateSet, onRenameSet, onDeleteSet, onExport, onImport, onPrint, onStartFrom, onSuggest }: {
+  lengthView: TicketLengthsView;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   data: MapData;
@@ -228,6 +231,8 @@ export function TicketsDialog({ open, onOpenChange, data, reviews, coverage, rat
           </tr>)}</tbody>
         </table></div>
       </div>
+
+      <TicketLengths view={lengthView} />
 
       <div className="analysis-section">
         <h3>Length spread</h3>

@@ -12,7 +12,7 @@ import { deckRuleFor, deckRules, defaultStyle, type DeckRule, TICKET_SUGGESTER }
 import type { DeckRuleSet, MapData } from "./map-data";
 
 // Short enough to sit on one line above a field; how far a ticket reaches, as a share of reach.
-const BIN_LABELS = ["< 30 %", "30–45 %", "45–60 %", "60–75 %", "75 %+"];
+export const BIN_LABELS = ["< 30 %", "30–45 %", "45–60 %", "60–75 %", "75 %+"];
 const pct = (share: number) => Math.round(share * 1000) / 10;
 const clamp = (value: number, low: number, high: number) => Math.min(high, Math.max(low, value));
 const official = TICKET_SUGGESTER.official;

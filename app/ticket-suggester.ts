@@ -140,6 +140,8 @@ export type TicketDeckReport = {
   regular: number;
   long: number;
   bins: number[];
+  // Tickets left out of the judging: longer than a player can build, or to a stop nothing reaches.
+  skipped: number;
   longPeriphery: number | null;
   shortPeriphery: number | null;
   mapPeriphery: number;
@@ -622,7 +624,7 @@ export function suggestedDeckSize(data: MapData, style: TicketStyle, stops: numb
 function emptyReport(note: string, styleName: TicketStyle = "generic"): TicketDeckReport {
   return {
     style: styleName, bottlenecks: [], bottleneckCounts: { smallest: 0, largest: 0 }, loadRatio: null, reachablePairs: [], valuation: { exact: 0, total: 0, off: [] },
-    mix: [0, 0, 0], diameter: 0, reach: 0, regular: 0, long: 0, bins: [0, 0, 0, 0, 0],
+    mix: [0, 0, 0], diameter: 0, reach: 0, regular: 0, long: 0, skipped: 0, bins: [0, 0, 0, 0, 0],
     longPeriphery: null, shortPeriphery: null, mapPeriphery: 0,
     zeroStops: 0, maxPerStop: 0, duplicatePairs: [], dupPct: 0,
     unusedRoutes: [], unusedPct: 0, hard: [], ambiguous: [], perStop: 0, score: 0, note,
@@ -706,6 +708,7 @@ function buildReport(model: SuggesterModel, deck: DeckState, styleName: TicketSt
     regular: deck.regularCount,
     long: longCount,
     bins: [...deck.binCounts],
+    skipped: 0,
     longPeriphery: deck.peripheryLongCount ? deck.peripheryLongSum / deck.peripheryLongCount : null,
     shortPeriphery: deck.peripheryShortCount ? deck.peripheryShortSum / deck.peripheryShortCount : null,
     mapPeriphery: model.mapPeriphery,
@@ -887,6 +890,7 @@ export function evaluateTicketDeck(data: MapData, options: Partial<TicketSuggest
     deck.add(candidate, !isLong);
   }
   const report = buildReport(model, deck, resolved.style, style, Math.max(deck.regularCount, 1), long, ids, mix, audit, data, resolved.atTable);
+  report.skipped = skipped;
   if (skipped) report.note = `${report.note ? `${report.note} ` : ""}${skipped} ticket${skipped === 1 ? "" : "s"} could not be measured and ${skipped === 1 ? "was" : "were"} left out.`;
   return report;
 }

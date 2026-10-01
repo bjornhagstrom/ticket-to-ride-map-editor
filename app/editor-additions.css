@@ -171,3 +171,24 @@
 /* A ring of its own, clear of the stop, with a pale band under it so it shows over any route colour. */
 .map-canvas .balance-ring-halo{fill:none;stroke:#fff;stroke-width:12;opacity:.9;pointer-events:none}
 .map-canvas .balance-ring{fill:none;stroke:#b3261e;stroke-width:6;pointer-events:none}
+
+/* Ticket lengths: the deck's share in each band as a bar, the official decks as a line across it, the map's own rules as a diamond. */
+.ticket-lengths .length-legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:#4f493f}
+.ticket-lengths .length-legend span{display:inline-flex;align-items:center;gap:6px}
+.ticket-lengths .length-key{display:inline-block}
+.ticket-lengths .length-key.deck{width:14px;height:10px;background:#8b3a3a;border-radius:2px}
+.ticket-lengths .length-key.official,.ticket-lengths .length-ref[data-ref="official"]{width:3px;height:22px;background:#2b2722;border-radius:1px}
+.ticket-lengths .length-key.own,.ticket-lengths .length-ref[data-ref="own"]{width:11px;height:11px;background:#1c6b8a;border:2px solid #fff;box-shadow:0 0 0 1px #1c6b8a;transform:translate(-50%,-50%) rotate(45deg)}
+.ticket-lengths .length-key.official{height:14px}
+.ticket-lengths .length-key.own{width:9px;height:9px;border:0;box-shadow:none;transform:rotate(45deg)}
+.ticket-lengths .length-rows{display:grid;gap:7px;margin-top:6px}
+.ticket-lengths .length-row{display:grid;grid-template-columns:62px minmax(0,1fr) 62px;gap:8px;align-items:center;font-size:12px}
+.ticket-lengths .length-label{color:#3b362e}
+.ticket-lengths .length-track{position:relative;height:14px;background:#ebe4d6;border-radius:3px}
+.ticket-lengths .length-fill{height:100%;background:#8b3a3a;border-radius:3px 0 0 3px}
+.ticket-lengths .length-ref{position:absolute;top:50%}
+.ticket-lengths .length-ref[data-ref="official"]{transform:translate(-50%,-50%)}
+.ticket-lengths .length-numbers{text-align:right;white-space:nowrap}
+.ticket-lengths .length-share{color:#4f493f}
+.ticket-lengths .helper{margin:8px 0 0}
+.ticket-lengths .length-legend{margin-top:6px}

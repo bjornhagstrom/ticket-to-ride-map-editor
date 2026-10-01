@@ -659,6 +659,23 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     fs.rmSync(pngFile, { force: true });
   }
 
+  // Ticket lengths against a reference: the deck's share in each of the five length bands, with the
+  // official decks' share marked on each bar and, when the map has chosen rules of its own, theirs too.
+  const lengthsIn = async (scope) => scope.evaluate((root) => {
+    const section = Array.from(root.querySelectorAll(".analysis-section")).find((el) => el.querySelector("h3") && /^Ticket lengths$/.test(el.querySelector("h3").textContent.trim()));
+    if (!section) return null;
+    const rows = Array.from(section.querySelectorAll(".length-row")).map((row) => ({
+      label: row.querySelector(".length-label").textContent.trim(),
+      share: parseFloat(row.querySelector(".length-fill").style.width),
+      count: Number(row.querySelector(".length-count").textContent.replace(/[^0-9]/g, "")),
+      official: row.querySelector('.length-ref[data-ref="official"]') ? parseFloat(row.querySelector('.length-ref[data-ref="official"]').style.left) : null,
+      own: row.querySelector('.length-ref[data-ref="own"]') ? parseFloat(row.querySelector('.length-ref[data-ref="own"]').style.left) : null,
+    }));
+    const parent = root.getBoundingClientRect();
+    const spill = Array.from(section.querySelectorAll("*")).filter((el) => el.getClientRects().length && el.getBoundingClientRect().right > parent.right + 1).length;
+    return { rows, verdict: (section.querySelector(".length-verdict") || { textContent: "" }).textContent, spill };
+  });
+
   // 12. destination tickets: decks, ticket-only export and import, card printing
   // Counted against what the map already holds, so a richer example map does not move the goalposts.
   const ticketsNow = () => page.evaluate(() => { const m = JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")); return { main: m.tickets.filter((t) => (t.set || "main") === "main").length, decks: m.ticketSets.map((d) => `${d.label} (${m.tickets.filter((t) => (t.set || "main") === d.id).length})`) }; });
@@ -671,6 +688,20 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   check("tickets are added to the current deck", (await ticketsButton.textContent()).includes(`Tickets · ${mainAfter}`), await ticketsButton.textContent());
   await ticketsButton.click();
   await page.waitForTimeout(400);
+
+  {
+    const inDeck = await page.evaluate(() => JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")).tickets.filter((t) => (t.set || "main") === "main").length);
+    // Tickets longer than a player can build are left out of the bars, and the section says how many.
+    const left = await page.locator('[role="dialog"]').first().locator(".length-excluded").evaluateAll((els) => els.reduce((sum, el) => sum + Number(el.dataset.skipped) + Number(el.dataset.long), 0));
+    const keptInDeck = inDeck - left;
+    const lengths = await lengthsIn(page.locator('[role="dialog"]').first());
+    check("the Tickets dialog shows the deck's lengths in five bands", lengths !== null && lengths.rows.length === 5, JSON.stringify(lengths && lengths.rows.map((r) => r.label)));
+    check("the bands hold every ticket once, but those the section says it left out", lengths !== null && lengths.rows.reduce((sum, r) => sum + r.count, 0) === keptInDeck, `${lengths && lengths.rows.map((r) => r.count)} of ${inDeck}, ${left} left out`);
+    check("and each bar is that band's share of the deck", lengths !== null && lengths.rows.every((r) => Math.abs(r.share - (r.count / keptInDeck) * 100) < 1.5), JSON.stringify(lengths && lengths.rows.map((r) => r.share)));
+    check("the official decks are marked on every bar, and no rules of its own yet", lengths !== null && lengths.rows.every((r) => r.official !== null && r.own === null) && Math.abs(lengths.rows.reduce((sum, r) => sum + r.official, 0) - 100) < 2, JSON.stringify(lengths && lengths.rows.map((r) => r.official)));
+    check("a sentence says where the deck is furthest from them", lengths !== null && /official/i.test(lengths.verdict) && /%/.test(lengths.verdict), lengths && lengths.verdict);
+    check("and nothing spills out of the dialog", lengths !== null && lengths.spill === 0, String(lengths && lengths.spill));
+  }
 
   const ticketFile = path.join(os.tmpdir(), `ttr-tickets-${Date.now()}.json`);
   const download = page.waitForEvent("download");
@@ -1583,10 +1614,28 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.reload({ waitUntil: "networkidle" });
   await page.waitForTimeout(700);
   check("your own set survives a reload", (await storedRules()).rules[0]?.label === "Sparse" && (await storedRules()).chosen === (await storedRules()).rules[0]?.id);
+  // Map balance with the map's own rules chosen: the lengths against both references.
+  await page.getByRole("button", { name: "Analyze balance" }).click();
+  await page.waitForTimeout(700);
+  {
+    const lengths = await lengthsIn(page.locator(".balance-panel"));
+    const chosenOwn = await page.evaluate(() => { const m = JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")); const rule = (m.deckRules || []).find((r) => r.id === m.deckRule); return rule ? { label: rule.label, bins: rule.bins } : null; });
+    check("Map balance shows the ticket lengths too", lengths !== null && lengths.rows.length === 5);
+    check("with the official decks and the map's own rules both marked", lengths !== null && lengths.rows.every((r) => r.official !== null && r.own !== null), JSON.stringify(lengths && lengths.rows.map((r) => [r.official, r.own])));
+    check("the own marks are the chosen rules' shares", chosenOwn !== null && lengths !== null && lengths.rows.every((r, i) => Math.abs(r.own - chosenOwn.bins[i] * 100) < 1), JSON.stringify([chosenOwn, lengths && lengths.rows.map((r) => r.own)]));
+    check("and the sentence names both references", lengths !== null && /official/i.test(lengths.verdict) && chosenOwn !== null && lengths.verdict.includes(chosenOwn.label), lengths && lengths.verdict);
+    check("nothing spills out of the column", lengths !== null && lengths.spill === 0);
+  }
+  await page.locator(".balance-panel").getByRole("button", { name: "Done" }).click();
+  await page.waitForTimeout(300);
   // The suggester follows the map's rules: half a ticket per stop, floored at what a table of three
   // is dealt, instead of Generic's 1.1.
   await page.getByRole("button", { name: /^Tickets · / }).click();
   await page.waitForTimeout(400);
+  {
+    const lengths = await lengthsIn(page.locator('[role="dialog"]').first());
+    check("with rules of its own chosen, the Tickets dialog marks both references", lengths !== null && lengths.rows.every((r) => r.official !== null && r.own !== null) && /Sparse/.test(lengths.verdict) && /official/i.test(lengths.verdict), lengths && lengths.verdict);
+  }
   await page.getByRole("button", { name: /Add a deck/ }).click();
   await page.waitForTimeout(250);
   await page.getByRole("menuitem", { name: /Suggest a deck/ }).click();
