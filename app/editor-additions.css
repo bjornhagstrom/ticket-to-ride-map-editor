@@ -204,3 +204,9 @@
 .map-canvas .route-group.bottleneck .route-halo{stroke:#ff6b5a}
 .map-canvas.has-marks .route-group:not(.on-preview):not(.on-ticket):not(.bottleneck){opacity:.35}
 .map-canvas .route-group{transition:opacity .12s}
+.classic-compare{margin-top:14px;display:grid;gap:6px}
+.classic-compare h4{margin:0;font-size:14px}
+.classic-table td,.classic-table th{font-size:12px}
+.classic-verdict{font-weight:700;white-space:nowrap}
+.classic-table td,.classic-table th{padding-left:6px;padding-right:6px}
+.classic-range small{display:block;color:#4f493f;font-size:12px}

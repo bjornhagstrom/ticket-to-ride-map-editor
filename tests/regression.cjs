@@ -1916,7 +1916,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   check("a double click puts it back", Math.abs((await frame()).aside.width - widthAtStart) <= 3, `${(await frame()).aside.width} against ${widthAtStart}`);
   // Colour × length: a row of wagons per colour, and pointing at a number marks its routes on the map.
   {
-    const table = balancePanel.locator(".analysis-section", { has: page.locator("h3", { hasText: "Colour × length" }) }).locator("table");
+    const table = balancePanel.locator(".analysis-section", { has: page.locator("h3", { hasText: "Colour × length" }) }).locator("table.analysis-table:not(.classic-table)");
     const stored = await page.evaluate(() => { const m = JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")); const infra = new Set(m.routeTypeStyles.filter((x) => x.infrastructure).map((x) => x.id)); return m.routes.filter((r) => !infra.has(r.type)).map((r) => ({ length: r.length, color: r.color })); });
     const heads = (await table.locator("thead th").allTextContents()).map((t) => t.trim());
     const colourOf = (label) => (label === "Grey" ? "neutral" : label.toLowerCase());
@@ -1927,6 +1927,23 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     const expectedWagons = colourLabels.map((label) => stored.filter((r) => r.color === colourOf(label)).reduce((sum, r) => sum + r.length, 0));
     check("each is the colour's routes added up by length", JSON.stringify(wagonCells.slice(0, -1)) === JSON.stringify(expectedWagons), `${wagonCells.slice(0, -1)} against ${expectedWagons}`);
     check("and the last is every wagon space on the board", wagonCells.at(-1) === stored.reduce((sum, r) => sum + r.length, 0), `${wagonCells.at(-1)} against ${stored.reduce((sum, r) => sum + r.length, 0)}`);
+    // Against the seven classic maps (USA, Nordic, India, Switzerland, Old West, Polska, Northern Lights):
+    // the share of routes at each length, the share of grey ones, and how evenly the eight colours are
+    // spread over the wagons. Ranges are the classic maps' lowest, median and highest.
+    const classic = { 1: [9, 29, 35.2], 2: [23.9, 35, 50], 3: [15.7, 21, 25.5], 4: [5.9, 14, 16], 5: [0, 2, 10], 6: [0, 3, 9], grey: [11.8, 24, 44], spread: [1, 1.05, 1.12] };
+    const eight = ["red", "blue", "green", "yellow", "black", "white", "orange", "purple"];
+    const n = stored.length;
+    const mine = { grey: 100 * stored.filter((r) => r.color === "neutral").length / n };
+    for (const k of [1, 2, 3, 4, 5, 6]) mine[k] = 100 * stored.filter((r) => (k === 6 ? r.length >= 6 : r.length === k)).length / n;
+    const perColour = eight.map((c) => stored.filter((r) => r.color === c).reduce((sum, r) => sum + r.length, 0));
+    mine.spread = Math.max(...perColour) / (perColour.reduce((a, b) => a + b, 0) / 8);
+    const verdictOf = (key) => (mine[key] < classic[key][0] ? "below" : mine[key] > classic[key][2] ? "above" : "within");
+    const compare = await balancePanel.locator(".classic-compare").evaluate((root) => Array.from(root.querySelectorAll(".classic-row")).map((row) => ({ key: row.dataset.kind, this: parseFloat(row.querySelector(".classic-this").textContent), range: row.querySelector(".classic-range").textContent, verdict: row.querySelector(".classic-verdict").textContent.trim() })));
+    check("the colour table is set against the classic maps in eight rows", compare.length === 8 && compare.map((r) => r.key).join() === "1,2,3,4,5,6,grey,spread", compare.map((r) => r.key).join());
+    check("each shows this map's own figure", compare.every((r) => Math.abs(r.this - (r.key === "spread" ? mine.spread : mine[r.key])) < (r.key === "spread" ? 0.011 : 0.51)), JSON.stringify(compare.map((r) => r.this)) + " against " + JSON.stringify(mine));
+    check("and the classic range beside it", compare.every((r) => r.range.includes(String(Math.round(classic[r.key][2] * (r.key === "spread" ? 100 : 1)) / (r.key === "spread" ? 100 : 1)))), JSON.stringify(compare.map((r) => r.range)));
+    check("and says in a word whether it is within, below or above", compare.every((r) => r.verdict === verdictOf(r.key)), JSON.stringify(compare.map((r) => [r.key, r.verdict])) + " expected " + JSON.stringify(Object.keys(classic).map((k) => [k, verdictOf(k)])));
+    check("with a sentence naming the maps it is set against", /USA/.test(await balancePanel.locator(".classic-compare").textContent()) && /Northern Lights/.test(await balancePanel.locator(".classic-compare").textContent()));
     const marked = () => page.locator(".map-canvas .route-group.on-preview").count();
     // A cell with routes in it: its routes, and only those, are marked while it is pointed at.
     const body = table.locator("tbody tr:not(.analysis-total-row):not(.analysis-wagons-row)");

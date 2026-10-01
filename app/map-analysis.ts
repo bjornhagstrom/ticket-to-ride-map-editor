@@ -118,6 +118,39 @@ export function colourLengthTable(data: MapData): ColourLengthTable {
   const grandWagons = cardRoutes.reduce((sum, route) => sum + route.length, 0);
   return { lengths, colours, counts, colourTotals, lengthTotals, grandTotal: cardRoutes.length, colourWagons, grandWagons };
 }
+// How the seven classic official maps (USA, Nordic Countries, India, Switzerland, Old West, Polska and
+// Northern Lights, the same seven the deck targets are fitted to) spread their routes. Aggregated from
+// ../ttr-reference-data/ttr-reference-maps.json: the lowest, median and highest of the seven. Share of
+// routes by length (the last bucket is 6 and longer), the share of grey routes, and how evenly the eight
+// colours share the wagons, as the largest colour's wagons against the average colour's.
+export const CLASSIC_ROUTE_MAPS = ["USA", "Nordic Countries", "India", "Switzerland", "Old West", "Polska", "Northern Lights"];
+export const CLASSIC_ROUTES = {
+  lengthShare: { 1: [9, 28.7, 35.2], 2: [23.9, 34.6, 50], 3: [15.7, 20.5, 25.5], 4: [5.9, 13.6, 16], 5: [0, 2.3, 10], 6: [0, 2.5, 9] } as Record<number, [number, number, number]>,
+  greyShare: [11.8, 23.7, 44] as [number, number, number],
+  colourSpread: [1, 1.05, 1.12] as [number, number, number],
+};
+const SPREAD_COLOURS = ["red", "blue", "green", "yellow", "black", "white", "orange", "purple"];
+export type ClassicRow = { kind: string; label: string; value: number; range: [number, number, number]; verdict: "below" | "within" | "above"; unit: "%" | "×" };
+export function compareWithClassics(data: MapData): ClassicRow[] | null {
+  const infrastructureTypes = new Set(data.routeTypeStyles.filter((style) => style.infrastructure).map((style) => style.id));
+  const routes = data.routes.filter((route) => !infrastructureTypes.has(route.type));
+  if (!routes.length) return null;
+  const verdict = (value: number, range: [number, number, number]): ClassicRow["verdict"] => (value < range[0] ? "below" : value > range[2] ? "above" : "within");
+  const rows: ClassicRow[] = [];
+  for (const length of [1, 2, 3, 4, 5, 6]) {
+    const value = 100 * routes.filter((route) => (length === 6 ? route.length >= 6 : route.length === length)).length / routes.length;
+    const range = CLASSIC_ROUTES.lengthShare[length];
+    rows.push({ kind: String(length), label: length === 6 ? "Length 6+" : `Length ${length}`, value, range, verdict: verdict(value, range), unit: "%" });
+  }
+  const grey = 100 * routes.filter((route) => route.color === "neutral").length / routes.length;
+  rows.push({ kind: "grey", label: "Grey routes", value: grey, range: CLASSIC_ROUTES.greyShare, verdict: verdict(grey, CLASSIC_ROUTES.greyShare), unit: "%" });
+  const wagons = SPREAD_COLOURS.map((colour) => routes.filter((route) => route.color === colour).reduce((sum, route) => sum + route.length, 0));
+  const mean = wagons.reduce((sum, value) => sum + value, 0) / wagons.length;
+  const spread = mean > 0 ? Math.max(...wagons) / mean : 0;
+  rows.push({ kind: "spread", label: "Colour balance", value: spread, range: CLASSIC_ROUTES.colourSpread, verdict: mean > 0 ? verdict(spread, CLASSIC_ROUTES.colourSpread) : "above", unit: "×" });
+  return rows;
+}
+
 // The card routes behind a number in the table: of one length, one colour, both, or neither for all of them.
 export function colourRouteIds(data: MapData, length: number | null, colour: string | null): string[] {
   const infrastructureTypes = new Set(data.routeTypeStyles.filter((style) => style.infrastructure).map((style) => style.id));

@@ -12,7 +12,7 @@ import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { TicketLengths, type TicketLengthsView } from "./ticket-lengths";
-import { colourRouteIds, type Bottleneck, deckRuleFor, deckRules, TICKET_SUGGESTER, type TicketDeckReport, type TicketStyle, type SetupBalance, type TicketReview, type ColourLengthTable, type NetworkStats, type RouteSpacing, type RouteSuggestion } from "./map-analysis";
+import { colourRouteIds, compareWithClassics, CLASSIC_ROUTE_MAPS, type Bottleneck, deckRuleFor, deckRules, TICKET_SUGGESTER, type TicketDeckReport, type TicketStyle, type SetupBalance, type TicketReview, type ColourLengthTable, type NetworkStats, type RouteSpacing, type RouteSuggestion } from "./map-analysis";
 
 export function WelcomeGuide({ open, onOpenChange, onChooseBlank, onChooseExample }: { open: boolean; onOpenChange: (open: boolean) => void; onChooseBlank: () => void; onChooseExample: () => void }) {
   const steps: Array<{ icon: React.ReactNode; title: string; text: string }> = [
@@ -40,6 +40,7 @@ const tableWord = (count: number) => NUMBER_WORDS[count] ?? String(count);
 export function AnalysisPanel({ lengthView, onClose, onPreviewRoutes, onPreviewStop, data, stats, colourTable, spacing, scaleWidthMm, setup, bottlenecks, atTable, onAtTable, onShowBottleneck, onSelectRoute, onSelectStop }: { lengthView: TicketLengthsView; setup: SetupBalance; bottlenecks: Bottleneck[]; atTable: number; onAtTable: (players: number) => void; onShowBottleneck: (routeIds: string[]) => void; onClose: () => void; onPreviewRoutes: (routeIds: string[] | null) => void; onPreviewStop: (stopId: string | null) => void; onSelectRoute: (routeId: string) => void; onSelectStop: (stopId: string) => void; data: MapData; stats: NetworkStats; colourTable: ColourLengthTable; spacing: RouteSpacing[]; scaleWidthMm: number }) {
   const stopName = (id: string) => data.stops.find((stop) => stop.id === id)?.name ?? "";
   // A number in the colour table marks the routes it counts while it is pointed at.
+  const classicRows = compareWithClassics(data);
   const pointAt = (length: number | null, colour: string | null) => ({ className: "colour-cell", onPointerEnter: () => onPreviewRoutes(colourRouteIds(data, length, colour)), onPointerLeave: () => onPreviewRoutes(null) });
   const players = data.players ?? { min: 2, max: 5 };
   const sortedStops = [...data.stops].sort((a, b) => (stats.hubDegree.get(b.id) ?? 0) - (stats.hubDegree.get(a.id) ?? 0));
@@ -118,6 +119,24 @@ export function AnalysisPanel({ lengthView, onClose, onPreviewRoutes, onPreviewS
             <tr className="analysis-wagons-row"><td {...pointAt(null, null)}>Wagons</td>{colourTable.colours.map((colour) => <td key={colour} {...pointAt(null, colour)}>{colourTable.colourWagons.get(colour) ?? 0}</td>)}<td {...pointAt(null, null)}>{colourTable.grandWagons}</td></tr>
           </tbody>
         </table></div>}
+        {classicRows && <div className="classic-compare">
+          <h4>Against the seven classic maps</h4>
+          <p className="helper">{CLASSIC_ROUTE_MAPS.join(", ")}: the lowest and highest of their seven, and the median. Official maps differ a lot in route lengths and in grey routes, but share their wagons very evenly between the colours. Colour balance is the largest colour’s wagons against the average colour’s: 1.00 is perfectly even.</p>
+          <div className="analysis-table-scroll"><table className="analysis-table classic-table">
+            <thead><tr><th>Measure</th><th>This map</th><th>Classic maps</th><th /></tr></thead>
+            <tbody>{classicRows.map((row) => {
+              const digits = row.unit === "×" ? 2 : 0;
+              const text = (value: number) => value.toFixed(digits);
+              return <tr key={row.kind} data-kind={row.kind} className={cn("classic-row", row.verdict !== "within" && "analysis-warning-row")}>
+                <td>{row.label}</td>
+                <td><b className="classic-this">{text(row.value)}{row.unit === "%" ? " %" : " ×"}</b></td>
+                <td className="classic-range">{text(row.range[0])}–{text(row.range[2])}{row.unit === "%" ? " %" : " ×"}<small>median {text(row.range[1])}</small></td>
+                <td className="classic-verdict">{row.verdict}</td>
+              </tr>;
+            })}</tbody>
+          </table></div>
+          <p className="helper classic-summary">{classicRows.filter((row) => row.verdict !== "within").length === 0 ? "Every measure is within what the classic maps do." : `Outside the classic range: ${classicRows.filter((row) => row.verdict !== "within").map((row) => `${row.label.toLowerCase()} (${row.verdict})`).join("; ")}.`}</p>
+        </div>}
       </div>
     <Button variant="outline" size="sm" onClick={onClose}>Done</Button>
   </div>;
