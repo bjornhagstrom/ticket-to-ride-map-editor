@@ -2,6 +2,7 @@
   "name": "ticket-to-ride-map-editor",
   "version": "0.2.0",
   "private": true,
+  "license": "MIT",
   "engines": {
     "node": ">=22.13.0"
   },
@@ -9,7 +10,7 @@
     "dev": "next dev",
     "build": "next build",
     "typecheck": "tsc --noEmit",
-    "test": "npm run typecheck && npm run lint && npm run test:suggester && npm run test:calibration && npm run test:file-format && npm run test:print-plan && npm run test:markdown && npm run test:releases && npm run build",
+    "test": "npm run typecheck && npm run lint && npm run test:suggester && npm run test:calibration && npm run test:file-format && npm run test:print-plan && npm run test:markdown && npm run test:releases && npm run test:license && npm run build",
     "lint": "eslint app components lib --ignore-pattern .next --ignore-pattern out",
     "test:regression": "node tests/regression.cjs",
     "test:suggester": "node tests/ticket-suggester.cjs",
@@ -17,7 +18,8 @@
     "test:file-format": "node tests/file-format.cjs",
     "test:print-plan": "node tests/print-plan.cjs",
     "test:markdown": "node tests/markdown.cjs",
-    "test:releases": "node tests/releases.cjs"
+    "test:releases": "node tests/releases.cjs",
+    "test:license": "node tests/license.cjs"
   },
   "dependencies": {
     "class-variance-authority": "0.7.1",

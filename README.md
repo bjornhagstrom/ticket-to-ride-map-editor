@@ -160,3 +160,7 @@ machine out of memory — so after changing the root, stop the server, delete `.
 ## Source of truth
 
 The source lives in the GitHub repository `bjornhagstrom/ticket-to-ride-map-editor`. Generated folders such as `.next/`, `out/` and `node_modules/` must not be committed.
+
+## Licence
+
+The code and the documentation in this repository are released under the MIT licence: see [LICENSE](LICENSE). It covers this editor, not the Ticket to Ride game, its name or its maps, which belong to their owners; the editor is an unofficial tool and is not affiliated with the game's publisher. `vendor/` holds a stylesheet from shadcn, which keeps its own MIT licence beside it.
