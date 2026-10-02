@@ -704,7 +704,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     const done = await pending;
     const file = path.join(os.tmpdir(), `ttr-${Date.now()}-${done.suggestedFilename()}`);
     await done.saveAs(file);
-    return { name: done.suggestedFilename(), ...readCsv(file) };
+    return { name: done.suggestedFilename(), file, ...readCsv(file) };
   };
   {
     const stored = await page.evaluate(() => JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")));
@@ -732,6 +732,28 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     const distances = await downloadFrom(openCsvMenu, "Distances between stops");
     const ends = stored.stops.filter((s) => !(stored.stopTypeStyles || []).some((t) => t.junction && t.id === s.type));
     check("the distances: a square table, a row and a column per stop a ticket can name", distances.name.endsWith(".csv") && distances.rows.length === ends.length && distances.header.length === ends.length + 1 && distances.rows.every((r) => r.length === ends.length + 1), `${distances.rows.length} rows for ${ends.length} stops`);
+    // And back: the three files chosen at once from Import, over a map that has a network, so the
+    // editor asks first. Stops and routes are replaced by the same ones; the tickets come as new decks.
+    await page.getByRole("button", { name: "Import", exact: true }).click();
+    await page.waitForTimeout(250);
+    const chooser = page.waitForEvent("filechooser");
+    await page.getByRole("menuitem", { name: "Spreadsheet (CSV)" }).click();
+    await (await chooser).setFiles([stops.file, routes.file, tickets.file]);
+    await page.waitForTimeout(600);
+    const ask = await page.getByRole("alertdialog").textContent().catch(() => "");
+    check("importing a spreadsheet over a map asks before it replaces the stops and routes", /Replace stops and routes/i.test(ask) && /new deck/i.test(ask), ask);
+    await page.getByRole("button", { name: "Continue" }).click();
+    await page.waitForTimeout(600);
+    const after = await page.evaluate(() => JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")));
+    const sameStops = stored.stops.every((s) => after.stops.some((t) => t.name === s.name && Math.abs(t.x - s.x) <= .5 && Math.abs(t.y - s.y) <= .5));
+    check("the map comes back from its own spreadsheets: every stop in its place, every route", after.stops.length === stored.stops.length && sameStops && after.routes.length === stored.routes.length, `${after.stops.length} stops, ${after.routes.length} routes`);
+    check("the tickets arrive as new decks beside the old ones", after.ticketSets.length === stored.ticketSets.length * 2 && after.tickets.length === stored.tickets.length * 2, `${after.ticketSets.length} decks, ${after.tickets.length} tickets`);
+    const toastText = (await page.locator("[data-sonner-toast]").allTextContents()).join(" | ");
+    check("and the editor says what it read", /stops/.test(toastText) && /routes/.test(toastText) && /tickets/.test(toastText), toastText);
+    // Leave the map as the rest of the suite expects it.
+    await page.evaluate((map) => localStorage.setItem("orebro-map-editor-public-v2", JSON.stringify(map)), stored);
+    await page.reload({ waitUntil: "networkidle" });
+    await page.waitForTimeout(700);
   }
 
   // Ticket lengths against a reference: the deck's share in each of the five length bands, with the

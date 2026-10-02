@@ -15,6 +15,7 @@ export const RELEASES: Release[] = [
       "Print the whole board on one page as big as the board, at real size, for a large-format printer or to save as a PDF. The page is the board's own size, and the dialog says how big.",
       "The welcome guide is shorter and now covers destination tickets and the rules, and says nothing about how a print is laid out.",
       "Export the tickets, the routes, the stops or the distances between every two stops as a spreadsheet (CSV), from Export or from the Tickets panel.",
+      "Import stops, routes and tickets from spreadsheets (CSV). Stops keep their positions; stops without one are laid out from the routes, ready to be dragged into place.",
     ],
   },
   {

@@ -55,11 +55,33 @@ deck can be moved to another copy of a map where the ids differ but the cities a
 
 Export → Spreadsheet (CSV) writes the tickets, the routes, the stops, or the shortest distance between
 every two stops, and the Tickets panel writes one deck. They are for reading a map in a spreadsheet or
-in another tool, and the editor never reads them back. They have no envelope: one header row, then a
-row per thing, named by stop names rather than ids. RFC 4180 quoting, comma-separated, CRLF line
-ends, UTF-8 with a BOM so a spreadsheet reads å, ä and ö. Text that a spreadsheet would run as a
-formula (starting with `=`, `+`, `-` or `@`) gets a leading apostrophe. `tests/csv-export.cjs` holds
-the columns.
+in another tool. They have no envelope: one header row, then a row per thing, named by stop names
+rather than ids. RFC 4180 quoting, comma-separated, CRLF line ends, UTF-8 with a BOM so a spreadsheet
+reads å, ä and ö. Text that a spreadsheet would run as a formula (starting with `=`, `+`, `-` or `@`)
+gets a leading apostrophe. `tests/csv-export.cjs` holds the columns.
+
+Import → Spreadsheet (CSV) reads stops, routes and tickets back, one file or several at once. It is
+not a way to move a whole map: the background, styles and settings are only in the JSON files.
+
+- **Which file is which** is told from the header, in any case: `from`/`a`, `to`/`b` and `points` make a
+  ticket file, the same with `length` a route file, and `name` without ends a stop file. Our own
+  exports and the reference data's exports both read; so does a list typed by hand. Comma, semicolon
+  (as Swedish Excel saves) and tab all work. A distance table is recognised and turned away.
+- **Names tie the files together**, or a stop file's `id` column when it has one.
+- **Positions** (`x`, `y`, in board units) are kept when every one fits the board, and fitted to it,
+  shape kept, when they do not. `lat` and `lon` instead are drawn north up. Stops without a position
+  are worked out from the routes: between neighbours that have one, or, when none has, by a spring
+  layout that knows nothing of north. The import lists them so they can be dragged into place.
+- **Routes**: colour by name (an unknown one becomes grey), type by name (`kind` = `ship` becomes a
+  boat), `Wagon style` by name or `tunnel` = true, `Locomotives` or `ferryLocomotives` as a count.
+  A double route is two rows.
+- **Stops**: type by name; `kind` = `waypoint` becomes a junction.
+- Stops and routes **replace** the network, after asking when the map has one. Tickets always arrive as
+  **new decks**, named after their `Deck` column. Tickets alone are matched to the open map by name.
+- Anything left out — a route to a stop the stop file lacks, a length that is not a whole number, a
+  stop named twice — is said in the message after the import. `tests/csv-import.cjs` holds the rules,
+  and checks them on Europe, USA, Switzerland and Northern Lights when the private reference data is
+  beside this repository.
 
 ## Rules a reader follows
 

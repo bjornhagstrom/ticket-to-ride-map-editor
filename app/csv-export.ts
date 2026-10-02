@@ -1,6 +1,7 @@
 // Spreadsheet exports: the tickets, the routes, the stops and the distances between stops as CSV.
-// They are for reading a map in a spreadsheet or in someone else's tool, and are never read back;
-// the JSON files stay the way to move a map. Names, not ids, so a row reads on its own.
+// They are for reading a map in a spreadsheet or in someone else's tool. Stops, routes and tickets
+// read back through csv-import.ts; the JSON files stay the way to move a whole map, background and
+// styles included. Names, not ids, so a row reads on its own.
 import { bandsOf, buildAdjacency, mapDiameter, shortestPath, ticketBand, ticketEndStops } from "./map-analysis";
 import { colorLabels, type MapData } from "./map-data";
 

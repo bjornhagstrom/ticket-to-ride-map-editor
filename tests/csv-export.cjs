@@ -3,8 +3,8 @@
 //   npm run test:csv
 //
 // A CSV file is for reading the map in a spreadsheet, or in someone else's tool: the tickets, the
-// routes, the stops, and the shortest distance between every two stops. It is never read back by the
-// editor, so the JSON files stay the only way to move a map. The rules: one header row, then one
+// routes, the stops, and the shortest distance between every two stops. Stops, routes and tickets
+// read back (tests/csv-import.cjs); the JSON files stay the way to move a whole map. The rules: one header row, then one
 // row per thing; RFC 4180 quoting; a BOM so a spreadsheet reads å, ä and ö right; names, not ids.
 const { execFileSync } = require("child_process");
 const fs = require("fs");
