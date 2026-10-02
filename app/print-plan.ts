@@ -177,16 +177,23 @@ export function describePlan(plan: PrintPlan): string {
   return `${sheets}, at ${Math.round(plan.scale * 100)} % of real size: the board prints smaller than the real ${plan.boardMm.width} × ${plan.boardMm.height} mm.`;
 }
 
-/** Cut-out ticket cards: 45 x 62 mm, four to a row, as many rows as the page holds. */
-export const CARD_MM = { width: 45, height: 62 };
-export const CARDS_PER_ROW = 4;
+/** Cut-out ticket cards, 62 x 45 mm, lying the way the board lies: a landscape board gives landscape
+ *  cards, a portrait one upright cards. As many to a row, and as many rows, as the page holds. */
+export function cardSize(format: MapFormat): { width: number; height: number } {
+  const board = mapFormats[format];
+  return board.width >= board.height ? { width: 62, height: 45 } : { width: 45, height: 62 };
+}
+export function cardsPerRow(pageMm: { width: number; height: number }, card: { width: number; height: number }): number {
+  return Math.max(1, Math.floor((pageMm.width - 2 * PRINT_MARGIN_MM) / card.width));
+}
 /** The run's caption above the first row of cards. */
 export const CARD_CAPTION_MM = 10;
 /** How many sheets a deck of cards takes on a page, and how many cards go on a sheet. */
-export function cardSheets(count: number, pageMm: { width: number; height: number }): { sheets: number; perSheet: number } {
+export function cardSheets(count: number, pageMm: { width: number; height: number }, card: { width: number; height: number }): { sheets: number; perSheet: number } {
   const room = pageMm.height - 2 * PRINT_MARGIN_MM;
-  const firstRows = Math.max(1, Math.floor((room - CARD_CAPTION_MM) / CARD_MM.height));
-  const laterRows = Math.max(1, Math.floor(room / CARD_MM.height));
-  const first = CARDS_PER_ROW * firstRows, later = CARDS_PER_ROW * laterRows;
+  const perRow = cardsPerRow(pageMm, card);
+  const firstRows = Math.max(1, Math.floor((room - CARD_CAPTION_MM) / card.height));
+  const laterRows = Math.max(1, Math.floor(room / card.height));
+  const first = perRow * firstRows, later = perRow * laterRows;
   return { sheets: count <= 0 ? 0 : count <= first ? 1 : 1 + Math.ceil((count - first) / later), perSheet: first };
 }

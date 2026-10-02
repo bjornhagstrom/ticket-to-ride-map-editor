@@ -85,17 +85,34 @@
   .print-page .stop,.print-page .route-group{filter:none!important}
   .print-page .stop text{font-size:12px}
   .print-page .wagon-slot-outline{stroke-width:4px}
-  /* Ticket cards: a 4x4 grid of 45x67 mm cards on portrait A4, sized so the sheet needs no bleed. */
-  .ticket-run{width:100%}
-  .ticket-run svg{display:none}
+  /* Ticket cards: 62 x 45 mm, lying as the board lies (cardSize, inline), as many to a row as the paper
+     holds, with no bleed. Two layouts: names above a small map with the points in the corner, or
+     the names stacked over the points when the small map is left out. */
+  .ticket-run{width:100%;position:relative}
+  .ticket-map-defs{position:absolute;width:0;height:0;overflow:hidden}
   .ticket-row{display:flex;gap:0;justify-content:center;break-inside:avoid;page-break-inside:avoid}
   .print-tickets .print-caption{break-after:avoid}
-  .ticket-card{break-inside:avoid;page-break-inside:avoid;width:45mm;height:62mm;border:.25mm dashed #81786c;padding:4mm 3mm;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:1mm;overflow:hidden;background:white}
+  .ticket-card{break-inside:avoid;page-break-inside:avoid;border:.25mm dashed #81786c;padding:3mm;overflow:hidden;background:white;color:#24211d}
   .ticket-card p{margin:0}
-  .ticket-card-from,.ticket-card-to{font:700 10.5pt Georgia,serif;color:#24211d;line-height:1.15}
-  .ticket-card-arrow{font:9pt "Segoe UI",Arial,sans-serif;color:#81786c}
-  .ticket-card-points{margin-top:2.5mm!important;width:11mm;height:11mm;border:.4mm solid #24211d;border-radius:50%;font:700 12pt Georgia,serif;line-height:10.2mm;color:#24211d}
-  .ticket-card-flag{font:6.5pt "Segoe UI",Arial,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:#24221e}
+  .ticket-card.plain{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:.8mm}
+  .ticket-card.plain .ticket-card-from,.ticket-card.plain .ticket-card-to{font:700 10pt Georgia,serif;line-height:1.15;overflow-wrap:anywhere}
+  .ticket-card-arrow{font:8pt "Segoe UI",Arial,sans-serif;color:#81786c}
+  .ticket-card-points{width:10mm;height:10mm;border:.4mm solid #24211d;border-radius:50%;font:700 11pt Georgia,serif;line-height:9.2mm;text-align:center;color:#24211d}
+  .ticket-card.plain .ticket-card-points{margin-top:1.5mm!important}
+  .ticket-card-flag{font:6pt "Segoe UI",Arial,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:#24221e;text-align:center}
+  .ticket-card.with-map{display:grid;grid-template-columns:minmax(0,1fr) 10mm;grid-template-rows:auto minmax(0,1fr);gap:1.2mm 1.5mm}
+  .ticket-card-names{grid-column:1/-1;font:700 8.5pt Georgia,serif;line-height:1.15;overflow-wrap:anywhere}
+  .ticket-card-dash{font-weight:400;color:#81786c}
+  /* Height fills the row; width follows the board's proportions; max-height (inline) keeps it clear of the points. */
+  .ticket-map{grid-column:1;grid-row:2;display:block;height:100%;width:auto;min-height:0;justify-self:start;align-self:center;overflow:hidden}
+  .ticket-card-corner{grid-column:2;grid-row:2;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:.8mm}
+  /* The small map: everything light, so the two black rings are what the eye finds, in colour or not. */
+  .ticket-map-area{fill:#eee8dc;stroke:none}
+  .ticket-map-line{fill:none;stroke:#dcd5c8;stroke-width:8;stroke-linecap:round;stroke-linejoin:round}
+  .ticket-map-route{fill:none;stroke:#c2baad;stroke-width:9;stroke-linecap:round}
+  .ticket-map-stop{fill:#aaa296}
+  .ticket-map-frame{fill:none;stroke:#cfc8bb;stroke-width:5}
+  .ticket-map-end{fill:none;stroke:#000;stroke-width:12}
   /* The rules text, on pages of their own after the board. It flows in the same page box as the board's pages. */
   /* Whatever follows the board starts on a page of its own; the first thing in the run does not leave a blank page before it. */
   .print-pages>.print-tickets,.print-pages>.print-rules{break-before:page;page-break-before:always}

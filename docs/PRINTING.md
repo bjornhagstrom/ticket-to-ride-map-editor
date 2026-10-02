@@ -181,7 +181,7 @@ them. So the layout is made to fit with them on.
 
 - **What to print is the first choice**: three tick boxes, the board, the tickets and the rules
   (`PrintParts` in `app/map-print.tsx`), in any combination. They print in that order in one tree: the
-  board pages, then `.print-tickets` (the cards of the deck being worked on, four to a row), then
+  board pages, then `.print-tickets` (the cards of the deck being worked on, as many to a row as the paper holds), then
   `.print-rules`. Each part after the first starts on a page of its own. The paper chosen in the dialog
   sets the page for all of them. The choice is kept in `localStorage` as `ttr-print-parts`; the single
   word an earlier build kept in `ttr-print-rules` (`board`, `both`, `rules`, `off`, `on`) is still read.
@@ -190,6 +190,16 @@ them. So the layout is made to fit with them on.
   nothing ticked Print is off. The summary says how many sheets the cards take (`cardSheets` in
   `app/print-plan.ts`), and a test checks that it is the number of pages the browser prints. The
   "Print deck" button in the Tickets panel prints just the cards, whatever is ticked.
+- **Ticket cards** are 62 × 45 mm and lie the way the board lies (`cardSize` in `app/print-plan.ts`):
+  both boards are landscape, so the cards are too; a portrait board would get upright cards. Three to
+  a row on A4 and Letter. A fourth tick box, "A small map on each ticket", on from the start and kept
+  in `ttr-print-parts` as `minimap`, puts the whole board on every card in light grey with the
+  ticket's two stops ringed in black, as the real cards do. It applies to "Print deck" too, so it is
+  offered even when the tickets are not ticked. The network is drawn once per deck as an SVG
+  `<symbol>` that every card `<use>`s, so a deck of a hundred cards is no heavier to print than the
+  board. Areas and lines of the background are drawn faintly; their labels, notes and a background
+  image are not. Junctions get no dot. The map keeps the board's proportions and never runs into the
+  points; the names sit above it and wrap rather than being cut.
 - **One page, real size** is a fourth way to split. The page is the board's own size (the board, the
   caption above it and the 10 mm margin all round: 810 × 553 mm for the standard board, 1073 × 554 mm
   for the extended one), upright and not turned, at 100 %. It is for a plotter or a large-format printer,

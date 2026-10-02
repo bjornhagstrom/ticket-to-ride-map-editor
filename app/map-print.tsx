@@ -5,35 +5,77 @@ import { Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { useId } from "react";
 import { mapFormats, ticketsInSet, type MapData, type MapFormat, W } from "./map-data";
+import { curvedPath, isCurved, pathFromPoints, pointsFor } from "./map-geometry";
 import { MapArtwork } from "./map-artwork";
 import { RulesText } from "./rules-text";
-import { CUT_MARK_GAP_MM, CUT_MARK_REACH_MM, describePlan, papers, PRINT_CAPTION_MM, PRINT_MARGIN_MM, printChoices, type PrintChoice, printPlan, type PrintPlan, type PrintProfile, sameChoice, splits, cardSheets } from "./print-plan";
+import { CUT_MARK_GAP_MM, CUT_MARK_REACH_MM, describePlan, papers, PRINT_CAPTION_MM, PRINT_MARGIN_MM, printChoices, type PrintChoice, printPlan, type PrintPlan, type PrintProfile, sameChoice, splits, cardSheets, cardSize, cardsPerRow } from "./print-plan";
 
-// Tickets print as cut-out cards on plain A4, 16 to a sheet. The same print-and-cut workflow as the
-// board itself: no bleed, a thin cut line, and nothing that needs colour to be readable.
+// Tickets print as cut-out cards on plain paper. The same print-and-cut workflow as the board
+// itself: no bleed, a thin cut line, and nothing that needs colour to be readable. A card lies the way
+// the board lies (cardSize), and may carry a small map of the whole board with its two stops marked,
+// as the real tickets do.
 
-export function TicketCards({ data, setId }: { data: MapData; setId: string }) {
+// The whole network, drawn once for the deck as a symbol every card's small map reuses: the
+// background's areas and lines faintly, the routes and stops in light grey. Junctions get no dot.
+function TicketMapSymbol({ data, id }: { data: MapData; id: string }) {
+  const height = mapFormats[data.format].height;
+  const junctions = new Set(data.stopTypeStyles.filter((style) => style.junction).map((style) => style.id));
+  const pairs = new Set<string>();
+  const routes = data.routes.filter((route) => { const key = [route.a, route.b].sort().join("~"); if (pairs.has(key)) return false; pairs.add(key); return true; });
+  return <svg className="ticket-map-defs" width="0" height="0" aria-hidden="true">
+    <symbol id={id} viewBox={`0 0 ${W} ${height}`}>
+      {data.background.filter((shape) => shape.type === "area").map((shape) => <polygon key={shape.id} className="ticket-map-area" points={shape.points.map((point) => `${point.x},${point.y}`).join(" ")} />)}
+      {data.background.filter((shape) => shape.type === "line").map((shape) => <polyline key={shape.id} className="ticket-map-line" points={shape.points.map((point) => `${point.x},${point.y}`).join(" ")} />)}
+      {routes.map((route) => { const points = pointsFor(data, route); return points.length ? <path key={route.id} className="ticket-map-route" d={isCurved(route) && points.length > 2 ? curvedPath(points) : pathFromPoints(points)} /> : null; })}
+      {data.stops.filter((stop) => !junctions.has(stop.type)).map((stop) => <circle key={stop.id} className="ticket-map-stop" cx={stop.x} cy={stop.y} r={9} />)}
+    </symbol>
+  </svg>;
+}
+
+export function TicketCards({ data, setId, perRow, minimap }: { data: MapData; setId: string; perRow: number; minimap: boolean }) {
   const set = data.ticketSets.find((item) => item.id === setId) ?? data.ticketSets[0];
-  const name = (id: string) => data.stops.find((stop) => stop.id === id)?.name ?? "—";
+  const stop = (id: string) => data.stops.find((item) => item.id === id);
+  const name = (id: string) => stop(id)?.name ?? "—";
   const tickets = ticketsInSet(data, set?.id ?? "");
+  const card = cardSize(data.format);
+  const height = mapFormats[data.format].height;
+  const symbolId = `ticket-map-${useId().replace(/:/g, "")}`;
   // One continuous run of cards rather than sheets of a fixed height. Any arithmetic that assumes
   // the printable area is exactly the paper would break on a browser that insists on its own
   // margins, and then every sheet spills a few millimetres onto a blank one. Letting the browser
   // paginate, with a card never split across a break, cannot overflow by construction.
   return <section className="print-tickets">
     <div className="ticket-run">
+      {minimap && <TicketMapSymbol data={data} id={symbolId} />}
       <div className="print-caption"><strong>{data.name}</strong><span>{set?.label} · {tickets.length} ticket{tickets.length === 1 ? "" : "s"}</span></div>
-      {/* Explicit rows of four, each a block that may not be split. Safari ignores break-inside on
-          grid cells, which cut cards in half across the page break. */}
-      {Array.from({ length: Math.ceil(tickets.length / 4) }, (_, row) => tickets.slice(row * 4, row * 4 + 4)).map((row, index) => <div className="ticket-row" key={index}>
-        {row.map((ticket) => <div className="ticket-card" key={ticket.id}>
-          <p className="ticket-card-from">{name(ticket.a)}</p>
-          <p className="ticket-card-arrow">↕</p>
-          <p className="ticket-card-to">{name(ticket.b)}</p>
-          <p className="ticket-card-points">{ticket.points}</p>
-          {ticket.long && <p className="ticket-card-flag">Long route</p>}
-        </div>)}
+      {/* Explicit rows, each a block that may not be split. Safari ignores break-inside on grid
+          cells, which cut cards in half across the page break. */}
+      {Array.from({ length: Math.ceil(tickets.length / perRow) }, (_, row) => tickets.slice(row * perRow, row * perRow + perRow)).map((row, index) => <div className="ticket-row" key={index}>
+        {row.map((ticket) => {
+          const ends = [stop(ticket.a), stop(ticket.b)].filter((item): item is NonNullable<typeof item> => Boolean(item));
+          return <div className={cn("ticket-card", minimap ? "with-map" : "plain")} key={ticket.id} style={{ width: `${card.width}mm`, height: `${card.height}mm` }}>
+            {minimap ? <>
+              <p className="ticket-card-names"><span className="ticket-card-from">{name(ticket.a)}</span><span className="ticket-card-dash"> – </span><span className="ticket-card-to">{name(ticket.b)}</span></p>
+              <svg className="ticket-map" viewBox={`0 0 ${W} ${height}`} style={{ aspectRatio: `${W} / ${height}`, maxHeight: `${((card.width - 6 - 10 - 1.5) * height / W).toFixed(2)}mm` }}>
+                <use href={`#${symbolId}`} width={W} height={height} />
+                <rect className="ticket-map-frame" x={0} y={0} width={W} height={height} />
+                {ends.map((end) => <circle key={end.id} className="ticket-map-end" cx={end.x} cy={end.y} r={30} />)}
+              </svg>
+              <div className="ticket-card-corner">
+                {ticket.long && <p className="ticket-card-flag">Long</p>}
+                <p className="ticket-card-points">{ticket.points}</p>
+              </div>
+            </> : <>
+              <p className="ticket-card-from">{name(ticket.a)}</p>
+              <p className="ticket-card-arrow">↕</p>
+              <p className="ticket-card-to">{name(ticket.b)}</p>
+              <p className="ticket-card-points">{ticket.points}</p>
+              {ticket.long && <p className="ticket-card-flag">Long route</p>}
+            </>}
+          </div>;
+        })}
       </div>)}
     </div>
   </section>;
@@ -42,7 +84,7 @@ export function TicketCards({ data, setId }: { data: MapData; setId: string }) {
 // The board as the chosen print run cuts it. Page size, margins and the size of every tile come
 // from printPlan, in millimetres, so the pages cannot disagree with what the dialog promised.
 // What a print run holds, in the order it is printed: the board, then the tickets as cards, then the rules.
-export type PrintParts = { board: boolean; tickets: boolean; rules: boolean };
+export type PrintParts = { board: boolean; tickets: boolean; rules: boolean; minimap: boolean };
 
 export function PrintPages({ data, plan, parts, setId }: { data: MapData; plan: PrintPlan; parts: PrintParts; setId: string }) {
   const format = mapFormats[data.format];
@@ -90,7 +132,7 @@ export function PrintPages({ data, plan, parts, setId }: { data: MapData; plan: 
     })}
     {/* The rules, if asked for, on pages of their own after the board: as many as the text needs,
         flowing in the same page box as the board's pages. */}
-    {parts.tickets && <TicketCards data={data} setId={setId} />}
+    {parts.tickets && <TicketCards data={data} setId={setId} perRow={cardsPerRow(plan.pageMm, cardSize(data.format))} minimap={parts.minimap} />}
     {parts.rules && data.rules?.trim() && <section className="print-rules">
       <p className="print-rules-name">{data.name} · rules</p>
       <RulesText source={data.rules} data={data} print />
@@ -122,7 +164,7 @@ export function PrintDialog({ open, onOpenChange, format, profile, choice, onCho
   const onePage = current.split === "page";
   const anything = parts.value.board || parts.value.tickets || parts.value.rules;
   const paperLabel = papers.find((paper) => paper.id === current.paper)?.label ?? "the paper";
-  const cards = cardSheets(parts.ticketCount, plan.pageMm);
+  const cards = cardSheets(parts.ticketCount, plan.pageMm, cardSize(format));
   // One sentence for the whole run, in the order it prints.
   const summary = !anything ? "Nothing is ticked: tick at least one of the board, the tickets and the rules."
     : [
@@ -147,6 +189,12 @@ export function PrintDialog({ open, onOpenChange, format, profile, choice, onCho
             <input type="checkbox" name="print-tickets" aria-label="Print the tickets" aria-describedby="print-tickets-note" disabled={parts.ticketCount === 0 || onePage}
               checked={parts.value.tickets} onChange={(event) => parts.onChange({ ...parts.value, tickets: event.target.checked })} />
             <span><strong>The tickets</strong><small id="print-tickets-note">{parts.ticketCount === 0 ? "This deck has no tickets yet." : `${parts.deckLabel}, ${parts.ticketCount} ticket${parts.ticketCount === 1 ? "" : "s"}, as cut-out cards.`}</small></span>
+          </label>
+          {/* Applies to "Print deck" in the Tickets panel too, so it is offered even when the tickets are not ticked here. */}
+          <label className="print-option print-suboption">
+            <input type="checkbox" name="print-minimap" aria-label="A small map on each ticket" aria-describedby="print-minimap-note"
+              checked={parts.value.minimap} onChange={(event) => parts.onChange({ ...parts.value, minimap: event.target.checked })} />
+            <span><strong>A small map on each ticket</strong><small id="print-minimap-note">The whole board in light grey, with the ticket&apos;s two stops marked, as on the real cards.</small></span>
           </label>
           <label className="print-option">
             <input type="checkbox" name="print-rules" aria-label="Print the rules" aria-describedby="print-rules-note" disabled={!parts.rulesWritten || onePage}

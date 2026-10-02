@@ -96,14 +96,14 @@ export function MapEditor() {
   const [rulesPicking, setRulesPicking] = useState(false);
   // What a print run holds is ticked in the print dialog and kept in this browser, like the other print
   // choices. An earlier build kept one word for the board and the rules; it still means what it meant.
-  const [printParts, setPrintParts] = useState<PrintParts>({ board: true, tickets: false, rules: true });
+  const [printParts, setPrintParts] = useState<PrintParts>({ board: true, tickets: false, rules: true, minimap: true });
   useEffect(() => { queueMicrotask(() => { try {
     const stored = localStorage.getItem(PRINT_PARTS_KEY);
-    if (stored) { const parsed = JSON.parse(stored) as Partial<PrintParts>; setPrintParts({ board: Boolean(parsed.board), tickets: Boolean(parsed.tickets), rules: Boolean(parsed.rules) }); return; }
+    if (stored) { const parsed = JSON.parse(stored) as Partial<PrintParts>; setPrintParts({ board: Boolean(parsed.board), tickets: Boolean(parsed.tickets), rules: Boolean(parsed.rules), minimap: parsed.minimap !== false }); return; }
     const old = localStorage.getItem(PRINT_RULES_KEY);
-    if (old === "off" || old === "board") setPrintParts({ board: true, tickets: false, rules: false });
-    else if (old === "rules") setPrintParts({ board: false, tickets: false, rules: true });
-    else if (old === "on" || old === "both") setPrintParts({ board: true, tickets: false, rules: true });
+    if (old === "off" || old === "board") setPrintParts({ board: true, tickets: false, rules: false, minimap: true });
+    else if (old === "rules") setPrintParts({ board: false, tickets: false, rules: true, minimap: true });
+    else if (old === "on" || old === "both") setPrintParts({ board: true, tickets: false, rules: true, minimap: true });
   } catch { /* keep the default */ } }); }, []);
   const choosePrintParts = (parts: PrintParts) => { setPrintParts(parts); try { localStorage.setItem(PRINT_PARTS_KEY, JSON.stringify(parts)); } catch { /* not remembered, still used */ } };
   // How wide the right column is while Map balance is open; the left edge of the column is its handle.
@@ -217,8 +217,8 @@ export function MapEditor() {
   // no rules text has no rules.
   // On one page the size of the board nothing else fits: the tickets and the rules are printed apart.
   const onePageRun = printChoice.split === "page";
-  const printPartsNow: PrintParts = { board: printParts.board, tickets: printParts.tickets && ticketsHere.length > 0 && !onePageRun, rules: printParts.rules && Boolean(data.rules?.trim()) && !onePageRun };
-  const runParts: PrintParts = printScope === "deck" ? { board: false, tickets: true, rules: false } : printPartsNow;
+  const printPartsNow: PrintParts = { minimap: printParts.minimap, board: printParts.board, tickets: printParts.tickets && ticketsHere.length > 0 && !onePageRun, rules: printParts.rules && Boolean(data.rules?.trim()) && !onePageRun };
+  const runParts: PrintParts = printScope === "deck" ? { board: false, tickets: true, rules: false, minimap: printParts.minimap } : printPartsNow;
   const ticketReviews = useMemo(() => reviewTickets(data, activeTicketSet.id), [data, activeTicketSet.id]);
   const ticketRate = useMemo(() => ticketPointsPerSpace(ticketReviews), [ticketReviews]);
   const ticketDiameter = useMemo(() => mapDiameter(data), [data]);
