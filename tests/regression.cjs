@@ -1783,11 +1783,13 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   const styleCard = (name) => page.locator(".style-card").filter({ has: page.locator("strong", { hasText: new RegExp(`^${name}$`) }) });
   check("the suggester offers your own set beside ours", (await styleCard("Sparse").count()) === 1 && (await page.locator(".style-card").count()) === 4);
   check("and starts on it, because the map chose it", (await styleCard("Sparse").getAttribute("aria-pressed")) === "true");
+  // A deck is sized by the stops a ticket can end at: not a junction, and not a stop no route reaches.
+  const endStops = await page.evaluate(() => { const m = JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")); const junction = new Set(m.stopTypeStyles.filter((t) => t.junction).map((t) => t.id)); const touched = new Set(m.routes.flatMap((r) => [r.a, r.b])); return m.stops.filter((s) => touched.has(s.id) && !junction.has(s.type)).length; });
   const sparseSize = Number(await page.locator("#suggest-size").inputValue());
   await styleCard("Generic").click();
   await page.waitForTimeout(400);
   const genericSize = Number(await page.locator("#suggest-size").inputValue());
-  check("and aims at a deck its own size: far smaller than Generic's, and not held up to what a table is dealt", sparseSize > 0 && sparseSize < genericSize && genericSize === 17 && sparseSize === 8, `${sparseSize} against ${genericSize}`);
+  check("and aims at a deck its own size: far smaller than Generic's, and not held up to what a table is dealt", sparseSize > 0 && sparseSize < genericSize && genericSize === Math.round(1.1 * endStops) && sparseSize === Math.round(0.5 * endStops), `${sparseSize} against ${genericSize}, from ${endStops} stops a ticket can end at`);
   {
     // A deck too small to deal a full table is warned about and left to the person, never forced up.
     const warning = page.locator(".deck-size-warning");
@@ -1795,7 +1797,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     await page.waitForTimeout(400);
     const dealt = await page.evaluate(() => { const m = JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")); return (m.players ? m.players.max : 5) * (m.startingTickets ?? 3); });
     check("a deck too small to deal a full table says so, with the number it would take", (await warning.count()) === 1 && new RegExp(`\\b${dealt}\\b`).test(await warning.textContent()) && /It is allowed/.test(await warning.textContent()), (await warning.count()) ? await warning.textContent() : "no warning");
-    check("while the deck still is the size the rules ask for", Number(await page.locator("#suggest-size").inputValue()) === 8);
+    check("while the deck still is the size the rules ask for", Number(await page.locator("#suggest-size").inputValue()) === Math.round(0.5 * endStops));
     check("and nothing is blocked: the deck can still be saved", (await page.getByRole("button", { name: "Save as a new deck" }).isEnabled()) || (await page.getByRole("button", { name: /^Replace / }).isEnabled()));
     await page.locator("#suggest-size").fill("5");
     await page.waitForTimeout(500);

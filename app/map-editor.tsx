@@ -23,7 +23,7 @@ import { type DeckCompareView } from "./deck-compare";
 import { DEFAULT_PRINT_CHOICE, isSafari, PRINT_CHOICE_KEY, PRINT_PROFILES, type PrintChoice, type PrintProfile, printPlan } from "./print-plan";
 import { useTicketSuggestion } from "./use-ticket-suggestion";
 import { SettingsDialog, type StyleTarget } from "./map-styles";
-import { bandsOf, bandCuts, mapDiameter, deckFigures, defaultStyle, deckRuleFor, TICKET_SUGGESTER, evaluateTicketDeck, suggestedDeckSize, type TicketStyle, autoPlaceLabels, labelledStops, setupBalance, stopCoverage, ticketBand, type TicketBand, reviewTickets, ticketPointsPerSpace, ticketCoverage, type RouteSuggestion, labelCovers, labelAngleOptions, routeSamplePoints, colourLengthTable, crossingPairs, buildAdjacency, networkStats, routeSpacing, shortestPath, suggestRoutes } from "./map-analysis";
+import { bandsOf, bandCuts, mapDiameter, deckFigures, defaultStyle, deckRuleFor, TICKET_SUGGESTER, evaluateTicketDeck, suggestedDeckSize, ticketEndStopCount, type TicketStyle, autoPlaceLabels, labelledStops, setupBalance, stopCoverage, ticketBand, type TicketBand, reviewTickets, ticketPointsPerSpace, ticketCoverage, type RouteSuggestion, labelCovers, labelAngleOptions, routeSamplePoints, colourLengthTable, crossingPairs, buildAdjacency, networkStats, routeSpacing, shortestPath, suggestRoutes } from "./map-analysis";
 import { canvasPoint, canvasPointRaw, pointsFor, samePair, stopById } from "./map-geometry";
 import { APP_VERSION, cloneForHistory, cloneMap, formatTimestamp, GUIDE_SEEN_KEY, HISTORY_LIMIT, MAX_IMAGE_WARN_BYTES, normalizeBackgroundFile, normalizeMap, normalizeNetworkFile, normalizeTicketFile, buildTicketFile, readMapFile, writeMapFile, mapPayload, networkPayload, readBackgroundImage, rescaleMapToFormat, MAP_HINT_KEY, MAP_HINT_X_KEY } from "./map-storage";
 import { colorLabels, defaultTicketSet, DEFAULT_PLAYERS, DEFAULT_WAGONS_PER_PLAYER, IMAGE_KEEP_ON_BOARD, type Ticket, type StopTypeStyle, type WagonStyle, ticketsInSet, type TicketSet, emptyMap, initialMap, type LineStyle, DEFAULT_END_GAP_MM, mapFormats, type BackgroundImage, type BackgroundShape, type BackgroundType, type MapData, type MapFormat, type Point, type Route, type RouteType, type RouteTypeStyle, routeColors, STORAGE_KEY, type Stop, type StopSize, stopSizeMeta, type StopSymbol, stopSymbolMeta, type StopType, W } from "./map-data";
@@ -245,8 +245,8 @@ export function MapEditor() {
     };
   }, [showTickets, data, activeTicketSet, compareOtherId, deckReport, atTable]);
   const suggestDefaultSize = useMemo(() => {
-    const connected = new Set(data.routes.flatMap((route) => [route.a, route.b]));
-    const size = suggestedDeckSize(data, suggestChoice, connected.size || data.stops.length);
+    // By the stops a ticket can end at, as the suggester does: a junction is not one.
+    const size = suggestedDeckSize(data, suggestChoice, ticketEndStopCount(data) || data.stops.length);
     return size.regular + size.long;
   }, [data, suggestChoice]);
   const { suggestion, busy: suggestBusy } = useTicketSuggestion(showSuggest, data, {

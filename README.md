@@ -129,7 +129,10 @@ breaks off part way, it still lists the checks it made before stopping.
 release-notes checks, and the build. The suggester and calibration checks measure the ticket suggester against official maps, which
 are private and live in their own repository beside this one, `../ttr-reference-data` (or wherever
 `TTR_REFERENCE_DATA` points). Without it those two say so and are skipped; everything else, and the
-editor itself, needs none of that data. The suggester's targets are already written into the code, so
+editor itself, needs none of that data. `npm run test:synthetic` runs the suggester on small invented
+maps (`tests/fixtures/synthetic-maps.cjs`) and always runs: it shows that the suggester behaves (valid,
+repeatable decks worth their shortest path, within reach, following the rules it is given), not that it
+is calibrated against the real games. The suggester's targets are already written into the code, so
 the data is only needed to change or re-check its calibration. Printing is described in `docs/PRINTING.md`.
 
 Edits to `app/globals.css` do not reach a running dev server: it keeps serving the old rules until

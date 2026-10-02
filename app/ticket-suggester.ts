@@ -196,6 +196,26 @@ function buildEdges(data: MapData): Edge[] {
   return [...byPair.values()];
 }
 
+// The stops a deck is made from. The graph is the largest connected part of the stops that have a
+// route, because a ticket across a break can never be completed; of those, the stops a ticket may end
+// at are all but the junctions, which a journey only passes through.
+function networkStops(data: MapData, edges: ReturnType<typeof buildEdges>): { graph: string[]; ends: string[]; parts: number; touched: number } {
+  const junctionTypes = new Set((data.stopTypeStyles ?? []).filter((style) => style.junction).map((style) => style.id));
+  const isJunction = new Map(data.stops.map((stop) => [stop.id, junctionTypes.has(stop.type)]));
+  const touched = new Set<string>();
+  for (const edge of edges) { touched.add(edge.a); touched.add(edge.b); }
+  const known = new Set(data.stops.map((stop) => stop.id));
+  const reached = data.stops.filter((stop) => touched.has(stop.id)).map((stop) => stop.id);
+  const components = connectedComponents(reached, edges.filter((edge) => known.has(edge.a) && known.has(edge.b)));
+  const graph = components.length > 1 ? components.reduce((best, part) => (part.length > best.length ? part : best), components[0]) : reached;
+  return { graph, ends: graph.filter((id) => !isJunction.get(id)), parts: components.length, touched: reached.length };
+}
+
+/** How many stops a ticket can end at: the number a deck's size is worked out from. */
+export function ticketEndStopCount(data: MapData): number {
+  return networkStops(data, buildEdges(data)).ends.length;
+}
+
 class SuggesterModel {
   nodes: string[];
   index = new Map<string, number>();
@@ -220,26 +240,16 @@ class SuggesterModel {
 
   constructor(data: MapData, wagonsPerPlayer: number, lengthCap: number) {
     this.bands = data.ticketBands ?? DEFAULT_TICKET_BANDS;
-    const junctionTypes = new Set((data.stopTypeStyles ?? []).filter((style) => style.junction).map((style) => style.id));
-    const isJunction = new Map(data.stops.map((stop) => [stop.id, junctionTypes.has(stop.type)]));
     const edges = buildEdges(data);
-    const touched = new Set<string>();
-    for (const edge of edges) { touched.add(edge.a); touched.add(edge.b); }
-    const known = new Set(data.stops.map((stop) => stop.id));
-    let nodes = data.stops.filter((stop) => touched.has(stop.id)).map((stop) => stop.id);
-
+    const network = networkStops(data, edges);
     // Work in the largest connected part: a ticket across a break can never be completed.
-    const components = connectedComponents(nodes, edges.filter((edge) => known.has(edge.a) && known.has(edge.b)));
-    if (components.length > 1) {
-      const largest = components.reduce((best, part) => (part.length > best.length ? part : best), components[0]);
-      this.note = `The network falls into ${components.length} separate parts. Only the largest, with ${largest.length} of ${nodes.length} stops, is used.`;
-      nodes = largest;
-    }
+    if (network.parts > 1) this.note = `The network falls into ${network.parts} separate parts. Only the largest, with ${network.graph.length} of ${network.touched} stops, is used.`;
+    const nodes = network.graph;
     const inside = new Set(nodes);
     this.graphNodes = nodes;
     // Junctions join routes and nothing else: journeys pass through them, but no ticket ends at one
     // and they are not counted when coverage or periphery is worked out.
-    this.nodes = nodes.filter((id) => !isJunction.get(id));
+    this.nodes = network.ends;
     nodes.forEach((id, i) => this.index.set(id, i));
     this.edges = edges.filter((edge) => inside.has(edge.a) && inside.has(edge.b));
 

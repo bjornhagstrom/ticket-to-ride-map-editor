@@ -18,7 +18,7 @@ const root = path.join(__dirname, "..");
 // run, and they say so and step aside: the editor itself needs none of this data.
 const referencePath = process.env.TTR_REFERENCE_DATA || path.join(root, "..", "ttr-reference-data", "ttr-reference-maps.json");
 if (!fs.existsSync(referencePath)) {
-  console.log(`Reference data not found at ${referencePath}.\nThe 99 calibration checks need the private ttr-reference-data repository beside this one, or TTR_REFERENCE_DATA pointing at its ttr-reference-maps.json. Skipped.`);
+  console.log(`Reference data not found at ${referencePath}.\nThese checks calibrate the suggester against the official maps, so they need the private ttr-reference-data repository beside this one, or TTR_REFERENCE_DATA pointing at its ttr-reference-maps.json. Skipped. "npm run test:synthetic" checks that the suggester behaves, on invented maps, and needs no data.`);
   process.exit(0);
 }
 const out = fs.mkdtempSync(path.join(os.tmpdir(), "ttr-calibration-"));

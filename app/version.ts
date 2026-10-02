@@ -11,6 +11,7 @@ export const RELEASES: Release[] = [
     changes: [
       "The print dialog has a tick box for the board, one for the tickets and one for the rules. Tick any of them and they print in one run: the board, then the tickets as cut-out cards, then the rules.",
       "The dialog says how many sheets the cards take on the paper you chose, and offers only what there is to print: no cards from a deck without tickets, and no rules from a map without rules.",
+      "Suggest a deck no longer counts a junction as a stop when it works out how many tickets to propose; a map with junctions now gets a slightly smaller suggested deck.",
     ],
   },
   {
