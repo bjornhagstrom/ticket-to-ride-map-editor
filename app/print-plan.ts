@@ -4,7 +4,7 @@ import { mapFormats, type MapFormat } from "./map-data";
 // a choice made per print run and never stored in the map. tests/print-plan.cjs pins the figures.
 
 export type PaperId = "a4" | "a3" | "letter" | "tabloid";
-export type SplitId = "sheet" | "panel" | "full";
+export type SplitId = "sheet" | "panel" | "full" | "page";
 export type SizeId = "standard" | "anniversary";
 export type PrintChoice = { split: SplitId; paper: PaperId; size?: SizeId };
 /** A board proofed panel by panel on A4, which is what the Print button did before it asked. */
@@ -24,6 +24,7 @@ export const splits: { id: SplitId; label: string; note: string }[] = [
   { id: "sheet", label: "One sheet", note: "The whole board shrunk onto one sheet" },
   { id: "panel", label: "One sheet per panel of the game board", note: "Each fold panel on its own sheet, never enlarged" },
   { id: "full", label: "Full size", note: "Real size, spread over as many sheets as it takes" },
+  { id: "page", label: "One page, real size", note: "The whole board on one page as big as the board: for a large-format printer, or to save as a PDF" },
 ];
 
 /** The real boards a full-size print can add up to. Anniversary exists only for the 2×3 shape. */
@@ -65,6 +66,9 @@ export type PrintPlan = {
   /** Always portrait: the page every browser prints by default. The sheet on it is landscape and
    *  turned a quarter turn (PrintPages). */
   orientation: "portrait";
+  /** Whether the sheet is turned a quarter turn on the page. Only the one page the size of the board is
+   *  not: its page is as wide as the board, because the paper is the board's own. */
+  turned: boolean;
   /** The page as the printer should be asked for it: the paper, upright. */
   pageMm: { width: number; height: number };
   /** Printed size against real size, never above 1. */
@@ -107,6 +111,14 @@ export function printPlan(format: MapFormat, raw: PrintChoice, profile: PrintPro
   const size = (boardSizes[format] ?? boardSizes["board-2x3"]).find((item) => item.id === choice.size)!;
   const boardMm = choice.split === "full" ? { width: size.widthMm, height: size.heightMm } : { width: board.widthMm, height: board.heightMm };
 
+  // The whole board on a page of its own size, upright and at 100 %: for a plotter or a large-format
+  // printer, or to save as a PDF. The page is the board, its caption and the margin all round, whatever
+  // the paper chosen was.
+  if (choice.split === "page") {
+    const pageMm = { width: boardMm.width + 2 * PRINT_MARGIN_MM, height: boardMm.height + PRINT_CAPTION_MM + 2 * PRINT_MARGIN_MM };
+    return { choice, orientation: "portrait", turned: false, pageMm, scale: 1, boardMm, columns: 1, rows: 1, pages: [{ index: 0, column: 0, row: 0, tile: { x: 0, y: 0, width: 1, height: 1 }, contentMm: { ...boardMm } }] };
+  }
+
   let columns: number, rows: number, scale: number, best: Orientation;
   if (choice.split === "full") {
     // As few sheets as possible, each tile the same size, at 100 %.
@@ -131,7 +143,7 @@ export function printPlan(format: MapFormat, raw: PrintChoice, profile: PrintPro
     const tile = { x: column / columns, y: row / rows, width: 1 / columns, height: 1 / rows };
     return { index, column, row, tile, contentMm: { width: tile.width * boardMm.width * scale, height: tile.height * boardMm.height * scale } };
   });
-  return { choice, orientation: "portrait", pageMm: best.pageMm, scale, boardMm, columns, rows, pages };
+  return { choice, orientation: "portrait", turned: true, pageMm: best.pageMm, scale, boardMm, columns, rows, pages };
 }
 
 export type PrintTableCell = { choice: Required<PrintChoice>; label: string; pages: number; scale: number };
@@ -159,6 +171,7 @@ export const sameChoice = (a: PrintChoice, b: PrintChoice) => a.split === b.spli
 export function describePlan(plan: PrintPlan): string {
   const paper = papers.find((item) => item.id === plan.choice.paper)!;
   const count = plan.pages.length;
+  if (plan.choice.split === "page") return `One page, ${plan.pageMm.width} × ${plan.pageMm.height} mm, upright, with the board at 100 % — real size, ${plan.boardMm.width} × ${plan.boardMm.height} mm.`;
   const sheets = `${count} sheet${count === 1 ? "" : "s"} of ${paper.label}, upright with the map turned`;
   if (plan.choice.split === "full") return `${sheets}, at 100 % — real size. Together they make the ${plan.boardMm.width} × ${plan.boardMm.height} mm board: trim each at its marks and butt it to its neighbours.`;
   return `${sheets}, at ${Math.round(plan.scale * 100)} % of real size: the board prints smaller than the real ${plan.boardMm.width} × ${plan.boardMm.height} mm.`;

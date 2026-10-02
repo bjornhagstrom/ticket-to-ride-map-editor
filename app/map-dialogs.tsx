@@ -2,7 +2,7 @@
 
 // The modal surfaces: the first-visit guide, the balance report and the route suggestions.
 import { useEffect, useState } from "react";
-import { ChevronDown, Copy, Download, FileStack, Sparkles, Layers3, MapPinPlus, Pencil, Plus, Printer, Save, Trash2, Upload } from "lucide-react";
+import { ChevronDown, Copy, Download, FileStack, Sparkles, Layers3, Pencil, Plus, Printer, Save, ScrollText, Ticket as TicketIcon, Trash2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -16,12 +16,14 @@ import { DeckCompare, type DeckCompareView } from "./deck-compare";
 import { colourRouteIds, compareWithClassics, CLASSIC_ROUTE_MAPS, type Bottleneck, dealtToFullTable, deckRuleFor, deckRules, TICKET_SUGGESTER, type TicketDeckReport, type TicketStyle, type SetupBalance, type TicketReview, type ColourLengthTable, type NetworkStats, type RouteSpacing, type RouteSuggestion } from "./map-analysis";
 
 export function WelcomeGuide({ open, onOpenChange, onChooseBlank, onChooseExample }: { open: boolean; onOpenChange: (open: boolean) => void; onChooseBlank: () => void; onChooseExample: () => void }) {
+  // What matters, in a line or two each. How a print is laid out is for the print dialog to say.
   const steps: Array<{ icon: React.ReactNode; title: string; text: string }> = [
-    { icon: <FileStack />, title: "Choose a board format", text: "Pick the standard 2×3 board or the extended 2×4. Paper, and whether to print on one sheet, a sheet per panel or at full size, is chosen each time you print. Change the board whenever you like — everything keeps its relative position." },
-    { icon: <Layers3 />, title: "Draw a background", text: "Sketch areas, boundaries and labels behind the network to show land, water and regions." },
-    { icon: <MapPinPlus />, title: "Add stops and connect routes", text: "Place stations and draw the routes that link them, with a length, type and colour." },
-    { icon: <Save />, title: "Save locally, export a backup", text: "The map saves automatically in this browser. Export a JSON backup regularly, since browser storage is not portable. The Export menu can also save the board as a PNG picture." },
-    { icon: <Printer />, title: "Print it out and play on paper", text: "This editor does not play the game for you. Print the finished map, gather around it, and use coloured pens to mark the routes each player builds instead of placing plastic trains. Keep each player's real wagons in front of them and put one back in the box for every space they fill in — then the pile in front of them is how many they have left, exactly as in a real game. Print at full size and you can lay the wagons on the paper instead." },
+    { icon: <FileStack />, title: "Choose a board", text: "The standard 2×3 or the extended 2×4. You can change it whenever you like; everything keeps its place." },
+    { icon: <Layers3 />, title: "Draw the map", text: "Sketch the background (land, water, regions), place stops, and connect them with routes, each with a length, a type and a colour." },
+    { icon: <TicketIcon />, title: "Add destination tickets", text: "Link two stops to make a ticket, or let the editor suggest a whole deck. Map balance shows how well the map and the tickets work together." },
+    { icon: <ScrollText />, title: "Write the rules", text: "Keep the rules of your map in the Rules panel, in plain text with links to its stops and routes." },
+    { icon: <Printer />, title: "Print it and play on paper", text: "Print the board, the tickets as cut-out cards and the rules, or save them as a PDF. Then play with coloured pens instead of plastic trains." },
+    { icon: <Save />, title: "Saved in your browser", text: "Your map saves automatically here. Export a file now and then as a backup, since browser storage does not travel." },
   ];
   return <Dialog open={open} onOpenChange={onOpenChange}>
     <DialogContent className="welcome-guide">

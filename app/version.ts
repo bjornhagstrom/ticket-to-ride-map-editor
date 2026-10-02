@@ -8,6 +8,15 @@ export type Release = { version: string; date: string; title: string; changes: s
 
 export const RELEASES: Release[] = [
   {
+    version: "0.4.0",
+    date: "2026-10-02",
+    title: "The whole board on one page",
+    changes: [
+      "Print the whole board on one page as big as the board, at real size, for a large-format printer or to save as a PDF. The page is the board's own size, and the dialog says how big.",
+      "The welcome guide is shorter and now covers destination tickets and the rules, and says nothing about how a print is laid out.",
+    ],
+  },
+  {
     version: "0.3.0",
     date: "2026-10-02",
     title: "One print run for the board, the tickets and the rules",

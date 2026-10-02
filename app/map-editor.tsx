@@ -212,7 +212,9 @@ export function MapEditor() {
   const ticketsHere = ticketsInSet(data, activeTicketSet.id);
   // What is ticked, less what there is nothing to print of: a deck with no tickets has no cards, and a map with
   // no rules text has no rules.
-  const printPartsNow: PrintParts = { board: printParts.board, tickets: printParts.tickets && ticketsHere.length > 0, rules: printParts.rules && Boolean(data.rules?.trim()) };
+  // On one page the size of the board nothing else fits: the tickets and the rules are printed apart.
+  const onePageRun = printChoice.split === "page";
+  const printPartsNow: PrintParts = { board: printParts.board, tickets: printParts.tickets && ticketsHere.length > 0 && !onePageRun, rules: printParts.rules && Boolean(data.rules?.trim()) && !onePageRun };
   const runParts: PrintParts = printScope === "deck" ? { board: false, tickets: true, rules: false } : printPartsNow;
   const ticketReviews = useMemo(() => reviewTickets(data, activeTicketSet.id), [data, activeTicketSet.id]);
   const ticketRate = useMemo(() => ticketPointsPerSpace(ticketReviews), [ticketReviews]);

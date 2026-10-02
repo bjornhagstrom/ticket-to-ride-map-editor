@@ -190,6 +190,13 @@ them. So the layout is made to fit with them on.
   nothing ticked Print is off. The summary says how many sheets the cards take (`cardSheets` in
   `app/print-plan.ts`), and a test checks that it is the number of pages the browser prints. The
   "Print deck" button in the Tickets panel prints just the cards, whatever is ticked.
+- **One page, real size** is a fourth way to split. The page is the board's own size (the board, the
+  caption above it and the 10 mm margin all round: 810 × 553 mm for the standard board, 1073 × 554 mm
+  for the extended one), upright and not turned, at 100 %. It is for a plotter or a large-format printer,
+  or to save as a PDF. The paper chosen does not matter, so the paper, Supersize and the sheet table are
+  hidden; nothing else fits on such a page, so the tickets and the rules print apart. Safari ignores the
+  size of a page, so there the dialog says to add a custom paper size in Safari's own dialog. A test saves
+  the page as a PDF and reads the size from the PDF itself.
 - **Anniversary size is one checkbox under Supersize.** There is no Standard option; an empty box is
   the standard board. Ticking it also selects full size, and choosing one sheet or per panel clears it.
   Picking a table cell sets or clears it too. It is never disabled: an earlier version greyed out the

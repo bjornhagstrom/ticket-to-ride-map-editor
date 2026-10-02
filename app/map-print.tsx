@@ -68,9 +68,10 @@ export function PrintPages({ data, plan, parts, setId }: { data: MapData; plan: 
       // for portrait paper was not honoured in Safari: see docs/PRINTING.md.
       const width = page.contentMm.width, artHeight = page.contentMm.height, height = PRINT_CAPTION_MM + artHeight;
       const corners: [number, number, number, number][] = [[0, PRINT_CAPTION_MM, -1, -1], [width, PRINT_CAPTION_MM, 1, -1], [0, height, -1, 1], [width, height, 1, 1]];
-      return <section className="print-page" key={page.index} style={{ width: `${height}mm`, height: `${width}mm` }}>
-        <svg className="print-sheet" width="100%" height="100%" viewBox={`0 0 ${height} ${width}`} overflow="visible">
-          <g transform={`translate(${height} 0) rotate(90)`}>
+      // The one page the size of the board is not turned: its page is as wide as the board.
+      return <section className="print-page" key={page.index} style={plan.turned ? { width: `${height}mm`, height: `${width}mm` } : { width: `${width}mm`, height: `${height}mm` }}>
+        <svg className="print-sheet" width="100%" height="100%" viewBox={plan.turned ? `0 0 ${height} ${width}` : `0 0 ${width} ${height}`} overflow="visible">
+          <g transform={plan.turned ? `translate(${height} 0) rotate(90)` : undefined}>
             <text className="print-sheet-name" x={2.5} y={PRINT_CAPTION_MM - 2.2}>{data.name}</text>
             <text className="print-sheet-note" x={width - 2.5} y={PRINT_CAPTION_MM - 2.2} textAnchor="end">{caption(page)}</text>
             <rect className={cn("print-sheet-art", full && "trimmed")} x={0} y={PRINT_CAPTION_MM} width={width} height={artHeight} />
@@ -117,6 +118,8 @@ export function PrintDialog({ open, onOpenChange, format, profile, choice, onCho
   const anniversary = sizes.find((size) => size.id === "anniversary");
   // Without the board in the run, how it is split, its size and its sheet table do not apply.
   const boardIn = parts.value.board;
+  // The whole board on one page the size of the board: the paper is the board's own, and nothing else fits on it.
+  const onePage = current.split === "page";
   const anything = parts.value.board || parts.value.tickets || parts.value.rules;
   const paperLabel = papers.find((paper) => paper.id === current.paper)?.label ?? "the paper";
   const cards = cardSheets(parts.ticketCount, plan.pageMm);
@@ -141,15 +144,16 @@ export function PrintDialog({ open, onOpenChange, format, profile, choice, onCho
             <span><strong>The board</strong><small id="print-board-note">The map on its sheets, as chosen below.</small></span>
           </label>
           <label className="print-option">
-            <input type="checkbox" name="print-tickets" aria-label="Print the tickets" aria-describedby="print-tickets-note" disabled={parts.ticketCount === 0}
+            <input type="checkbox" name="print-tickets" aria-label="Print the tickets" aria-describedby="print-tickets-note" disabled={parts.ticketCount === 0 || onePage}
               checked={parts.value.tickets} onChange={(event) => parts.onChange({ ...parts.value, tickets: event.target.checked })} />
             <span><strong>The tickets</strong><small id="print-tickets-note">{parts.ticketCount === 0 ? "This deck has no tickets yet." : `${parts.deckLabel}, ${parts.ticketCount} ticket${parts.ticketCount === 1 ? "" : "s"}, as cut-out cards.`}</small></span>
           </label>
           <label className="print-option">
-            <input type="checkbox" name="print-rules" aria-label="Print the rules" aria-describedby="print-rules-note" disabled={!parts.rulesWritten}
+            <input type="checkbox" name="print-rules" aria-label="Print the rules" aria-describedby="print-rules-note" disabled={!parts.rulesWritten || onePage}
               checked={parts.value.rules} onChange={(event) => parts.onChange({ ...parts.value, rules: event.target.checked })} />
             <span><strong>The rules</strong><small id="print-rules-note">{parts.rulesWritten ? "The rules text, on pages of their own." : "Nothing written yet. Open Rules in the left column to write them."}</small></span>
           </label>
+          {onePage && <p className="helper">The page is the board&apos;s size, so the tickets and the rules are printed separately.</p>}
         </fieldset>
         {boardIn && <fieldset><legend>How it is split</legend>
           {splits.map((split) => <label key={split.id} className="print-option">
@@ -158,16 +162,16 @@ export function PrintDialog({ open, onOpenChange, format, profile, choice, onCho
             <span><strong>{split.label}</strong><small id={`print-split-${split.id}`}>{split.note}</small></span>
           </label>)}
         </fieldset>}
-        <fieldset><legend>Paper</legend>
+        {!onePage && <fieldset><legend>Paper</legend>
           {papers.map((paper) => <label key={paper.id} className="print-option">
             <input type="radio" name="print-paper" value={paper.id} aria-label={paper.label} aria-describedby={`print-paper-${paper.id}`}
               checked={current.paper === paper.id} onChange={() => onChoice({ ...current, paper: paper.id })} />
             <span><strong>{paper.label}</strong><small id={`print-paper-${paper.id}`}>{paper.note}</small></span>
           </label>)}
-        </fieldset>
+        </fieldset>}
         {/* Anniversary exists only at full size, so ticking it asks for full size too, and a run
             that is not full size is never Anniversary. The table and the tick follow each other. */}
-        {boardIn && anniversary && <fieldset><legend>Supersize</legend>
+        {boardIn && !onePage && anniversary && <fieldset><legend>Supersize</legend>
           <label className="print-option">
             <input type="checkbox" name="print-anniversary" aria-label="Anniversary size" aria-describedby="print-anniversary-note"
               checked={current.split === "full" && current.size === "anniversary"}
@@ -177,7 +181,7 @@ export function PrintDialog({ open, onOpenChange, format, profile, choice, onCho
         </fieldset>}
       </div>
       <p className="print-summary">{summary}</p>
-      {boardIn && <><h3 id="print-table-heading" className="print-table-heading">Sheets for every choice</h3>
+      {boardIn && !onePage && <><h3 id="print-table-heading" className="print-table-heading">Sheets for every choice</h3>
       <p id="print-table-note" className="print-table-note">Each cell shows how many sheets a print run takes, and its scale: how big the printed board is against the real one. 100 % is real size; 50 % is half as wide and half as tall. Pick a cell to use it.</p>
       <div className="print-table-wrap">
         <table className="print-table" aria-labelledby="print-table-heading" aria-describedby="print-table-note">
@@ -191,9 +195,12 @@ export function PrintDialog({ open, onOpenChange, format, profile, choice, onCho
           </tr>)}</tbody>
         </table>
       </div></>}
-      {boardIn && profile.id === "safari" && <p className="helper print-dialog-foot print-safari-note">In Safari the sheets are cut shorter than in other browsers. Safari’s first print layout leaves less room on the page than it shows once any setting is changed, and a full-length sheet spilled onto a second page. The counts above are Safari’s.</p>}
+      {boardIn && !onePage && profile.id === "safari" && <p className="helper print-dialog-foot print-safari-note">In Safari the sheets are cut shorter than in other browsers. Safari’s first print layout leaves less room on the page than it shows once any setting is changed, and a full-length sheet spilled onto a second page. The counts above are Safari’s.</p>}
       {!boardIn && <p className="helper print-dialog-foot">Pages print upright (portrait), the default in every browser. The page is the paper less a margin.</p>}
-      {boardIn && <p className="helper print-dialog-foot">Every page prints upright (portrait), the default in every browser, with the map turned a quarter turn on it: leave the print dialog on Portrait. Print at 100 % — “fit to page” would undo the sizes above. The same dialog can save the run as a PDF.</p>}
+      {onePage && <p className="helper print-dialog-foot print-page-note">{profile.id === "safari"
+        ? `Safari ignores the size of a page. In its print dialog, add a custom paper size of ${plan.pageMm.width} × ${plan.pageMm.height} mm (Paper Size, Manage Custom Sizes), then choose PDF, or use Chrome, Edge or Firefox.`
+        : `The page is ${plan.pageMm.width} × ${plan.pageMm.height} mm. In the print dialog, choose Save as PDF, or a large-format printer.`}</p>}
+      {boardIn && !onePage && <p className="helper print-dialog-foot">Every page prints upright (portrait), the default in every browser, with the map turned a quarter turn on it: leave the print dialog on Portrait. Print at 100 % — “fit to page” would undo the sizes above. The same dialog can save the run as a PDF.</p>}
       <DialogFooter>
         <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
         <Button onClick={onPrint} disabled={!anything}><Printer />Print</Button>

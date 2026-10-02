@@ -17,7 +17,7 @@ const out = fs.mkdtempSync(path.join(os.tmpdir(), "ttr-print-plan-"));
 execFileSync("npx", ["tsc", "app/print-plan.ts", "app/map-data.ts",
   "--outDir", out, "--module", "commonjs", "--target", "es2022", "--moduleResolution", "node", "--skipLibCheck", "--lib", "es2022,dom"],
   { cwd: root, stdio: "inherit" });
-const { printPlan, printChoices, papers, splits } = require(path.join(out, "print-plan.js"));
+const { printPlan, printChoices, printChoiceFor, describePlan, papers, splits } = require(path.join(out, "print-plan.js"));
 const { mapFormats } = require(path.join(out, "map-data.js"));
 
 const ok = [];
@@ -31,7 +31,7 @@ check("the standard board is 790 × 525 mm in 3 × 2 panels", mapFormats["board-
 check("the extended board is 1053 × 526 mm in 4 × 2 panels", mapFormats["board-2x4"].widthMm === 1053 && mapFormats["board-2x4"].heightMm === 526 && mapFormats["board-2x4"].columns === 4 && mapFormats["board-2x4"].rows === 2);
 
 // ---------------------------------------------------------------- the choices a print run offers
-check("three ways to split", JSON.stringify(splits.map((s) => s.id)) === JSON.stringify(["sheet", "panel", "full"]), splits.map((s) => s.id).join(", "));
+check("four ways to split: one sheet, per panel, full size, and one page the size of the board", JSON.stringify(splits.map((s) => s.id)) === JSON.stringify(["sheet", "panel", "full", "page"]), splits.map((s) => s.id).join(", "));
 check("four papers", JSON.stringify(papers.map((p) => p.id)) === JSON.stringify(["a4", "a3", "letter", "tabloid"]), papers.map((p) => p.id).join(", "));
 const tabloid = papers.find((p) => p.id === "tabloid");
 check("Tabloid is 11 × 17 in", tabloid.widthMm === 279.4 && tabloid.heightMm === 431.8, `${tabloid.widthMm} × ${tabloid.heightMm}`);
@@ -132,6 +132,22 @@ check("the table has a row per paper", table.length === 4, String(table.length))
 check("and a column per way to print, Anniversary included on 2×3", table.every((row) => row.cells.length === 4));
 check("the extended board's table has no Anniversary column", printChoices("board-2x4").table.every((row) => row.cells.length === 3));
 check("every cell says what printPlan says", printChoices("board-2x3").table.every((row) => row.cells.every((cell) => cell.pages === printPlan("board-2x3", cell.choice).pages.length && cell.scale === printPlan("board-2x3", cell.choice).scale)));
+
+// ---------------------------------------------------------------- the whole board on one page
+{
+  const page = printPlan("board-2x3", { split: "page", paper: "a4" });
+  check("one page: a single page at real size", page.pages.length === 1 && page.scale === 1 && page.columns === 1 && page.rows === 1, JSON.stringify([page.pages.length, page.scale]));
+  check("the board on it is the real 790 × 525 mm", page.boardMm.width === 790 && page.boardMm.height === 525 && page.pages[0].contentMm.width === 790 && page.pages[0].contentMm.height === 525, JSON.stringify(page.boardMm));
+  check("the page is the board with the caption above it and the margin round it: 810 × 553 mm", page.pageMm.width === 810 && page.pageMm.height === 553, JSON.stringify(page.pageMm));
+  check("it is not turned: the page is as wide as the board, because the paper is the board's own", page.turned === false);
+  check("the paper chosen makes no difference to it", JSON.stringify(printPlan("board-2x3", { split: "page", paper: "tabloid" }).pageMm) === JSON.stringify(page.pageMm));
+  const wide = printPlan("board-2x4", { split: "page", paper: "a4" });
+  check("the extended board is 1053 × 526 mm, on a page of 1073 × 554 mm", wide.boardMm.width === 1053 && wide.pageMm.width === 1073 && wide.pageMm.height === 554, JSON.stringify([wide.boardMm, wide.pageMm]));
+  check("Anniversary size is not offered on one page", printChoiceFor("board-2x3", { split: "page", paper: "a4", size: "anniversary" }).size === "standard");
+  check("the other ways of splitting are turned, as before", ["sheet", "panel", "full"].every((split) => printPlan("board-2x3", { split, paper: "a4" }).turned === true));
+  check("the summary says one page, the real size and the page's size", /one page/i.test(describePlan(page)) && /100 %/.test(describePlan(page)) && /810 × 553 mm/.test(describePlan(page)), describePlan(page));
+  check("the table of sheets is unchanged: still one column per way a paper can be used", printChoices("board-2x3").columns.length === 4);
+}
 
 console.log(ok.map((line) => `  ✓ ${line}`).join("\n"));
 if (bad.length) console.log(bad.map((line) => `  ✗ ${line}`).join("\n"));

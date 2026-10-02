@@ -48,9 +48,10 @@ const made = { ring: maps.ring(), grid: maps.grid(), sparse: maps.sparse() };
 const reachFor = (data) => Math.min(Math.floor(0.47 * data.wagonsPerPlayer), Math.max(...data.stops.map((s) => Math.max(...[...distances(data, s.id).values()]))));
 
 for (const [name, data] of Object.entries(made)) {
-  const started = Date.now();
+  const started = process.cpuUsage(); // computing time, not the clock: other programs on a busy machine do not count
   const r = suggestTickets(data, { seed: 1 });
-  const elapsed = Date.now() - started;
+  const spent = process.cpuUsage(started);
+  const elapsed = Math.round((spent.user + spent.system) / 1000);
   const junctions = new Set(data.stops.filter((s) => data.stopTypeStyles.find((t) => t.id === s.type)?.junction).map((s) => s.id));
   const connected = new Set(data.routes.flatMap((x) => [x.a, x.b]));
   const reach = reachFor(data);
@@ -65,7 +66,7 @@ for (const [name, data] of Object.entries(made)) {
   check(`${name}: a ticket is worth its shortest path in wagon spaces, or more where the way is hard`, worth.every(([points, d]) => points >= d && points <= d + 2) && worth.filter(([points, d]) => points === d).length >= worth.length * 0.8, JSON.stringify(worth.slice(0, 5)));
   check(`${name}: its report adds up: tickets, length bands`, r.report.regular + r.report.long === r.tickets.length && r.report.bins.reduce((a, b) => a + b, 0) === r.report.regular, JSON.stringify([r.report.regular, r.report.long, r.report.bins]));
   check(`${name}: every stop with a route is named by some ticket`, r.report.zeroStops === 0, `${r.report.zeroStops} not named`);
-  check(`${name}: it takes well under two seconds`, elapsed < 2000, `${elapsed} ms`);
+  check(`${name}: it takes well under two seconds of computing`, elapsed < 2000, `${elapsed} ms of CPU time`);
 
   const again = suggestTickets(data, { seed: 1 });
   check(`${name}: the same seed gives the same deck`, shape(again.tickets) === shape(r.tickets));

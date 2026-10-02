@@ -28,6 +28,19 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
 
   // 1. welcome guide
   check("welcome guide appears", await page.getByRole("button", { name: "Load the example map" }).isVisible());
+  {
+    // The guide says what matters, and only that: a few short steps, tickets and rules among them,
+    // and nothing about how a print is laid out.
+    const steps = await page.locator(".welcome-guide .guide-steps li").evaluateAll((lis) => lis.map((li) => ({ title: li.querySelector("strong").textContent.trim(), text: li.querySelector("p").textContent.trim() })));
+    const all = steps.map((s) => `${s.title}. ${s.text}`).join(" ");
+    check("the guide has a handful of steps", steps.length >= 5 && steps.length <= 7, String(steps.length));
+    check("one of them is about destination tickets, and says the editor can suggest a deck", steps.some((s) => /ticket/i.test(s.title) && /suggest/i.test(s.text)), steps.map((s) => s.title).join(" | "));
+    check("one is about the rules, one about printing, one about keeping the map safe", steps.some((s) => /rules/i.test(s.title)) && steps.some((s) => /print/i.test(s.title)) && steps.some((s) => /saved|save|backup/i.test(`${s.title} ${s.text}`)));
+    check("the printing step names what can be printed: the board, the tickets as cards, the rules", (() => { const p = steps.find((s) => /print/i.test(s.title)); return Boolean(p) && /board/i.test(p.text) && /ticket/i.test(p.text) && /rules/i.test(p.text); })());
+    const board = steps.find((s) => /board/i.test(s.title));
+    check("choosing the board says nothing about paper or how a print is cut up", Boolean(board) && !/\b(A4|A3|letter|tabloid|paper|sheet|panel|full size|print)/i.test(board.text), board && board.text);
+    check("every step is short, and the whole guide is", steps.every((s) => s.text.length <= 190) && all.length <= 1000, `${Math.max(...steps.map((s) => s.text.length))} characters at most in a step, ${all.length} in all`);
+  }
   await page.getByRole("button", { name: "Load the example map" }).click();
   await page.waitForTimeout(600);
 
@@ -47,6 +60,10 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     check("in Safari the table promises 12 sheets of A4 at full size", safariCell === "12", String(safariCell));
     const safariNote = await safariPage.locator('[role="dialog"]').first().textContent();
     check("and the dialog says why", /Safari/.test(safariNote) && /first/i.test(safariNote), safariNote.slice(-400));
+    // Safari ignores the size of a page, so on one page the size of the board it is told what to do instead.
+    await safariPage.getByRole("radio", { name: "One page, real size", exact: true }).check();
+    const safariPageNote = await safariPage.locator(".print-page-note").textContent();
+    check("on one page the size of the board, Safari is told to add a custom paper size of 810 × 553 mm", /custom paper size of 810 × 553 mm/.test(safariPageNote) && /Safari/.test(safariPageNote), safariPageNote);
     await safariPage.context().close();
   }
   await page.getByRole("button", { name: "Print map" }).click();
@@ -394,7 +411,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await printButton().click();
   await page.waitForTimeout(400);
   check("the Print button opens a dialog rather than printing", await printDialog().isVisible() && (await page.evaluate(() => window.__printCalls)) === 0);
-  check("it offers three ways to split the board", (await printDialog().locator('input[name="print-split"]').count()) === 3);
+  check("it offers four ways to split the board: one sheet, per panel, full size, and one page the size of the board", (await printDialog().locator('input[name="print-split"]').count()) === 4);
   check("and four papers", (await printDialog().locator('input[name="print-paper"]').count()) === 4);
   // Anniversary is one checkbox under Supersize, not a choice between two board sizes.
   const supersize = () => printDialog().getByRole("checkbox", { name: "Anniversary size", exact: true });
@@ -2391,7 +2408,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     // the dialog follows what is ticked
     await printButton().click();
     await page.waitForTimeout(400);
-    check("with the board ticked, how it is split, Supersize and the sheet table are there", (await printDialog().locator('input[name="print-split"]').count()) === 3 && (await printDialog().locator(".print-table").count()) === 1);
+    check("with the board ticked, how it is split, Supersize and the sheet table are there", (await printDialog().locator('input[name="print-split"]').count()) === 4 && (await printDialog().locator(".print-table").count()) === 1);
     await choosePrintParts(false, true, true);
     check("without the board they go, and the paper stays", (await printDialog().locator('input[name="print-split"]').count()) === 0 && (await printDialog().locator(".print-table").count()) === 0 && (await printDialog().locator('input[name="print-paper"]').count()) === 4);
     const summary = await printDialog().locator(".print-summary").textContent();
@@ -2411,7 +2428,35 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     await printButton().click();
     await page.waitForTimeout(400);
     await printDialog().getByRole("radio", { name: "A4", exact: true }).check();
-    // pressing Print, as a person does: what was ticked, and nothing else, reaches print()
+    // the whole board on one page the size of the board: for a large-format printer, or to save as a PDF
+    await choosePrintParts(true, false, false);
+    const onePage = printDialog().getByRole("radio", { name: "One page, real size", exact: true });
+    check("the board can go on one page as big as the board", (await onePage.count()) === 1);
+    await onePage.check();
+    const pageSummary = await printDialog().locator(".print-summary").textContent();
+    check("the dialog says what that is: one page, real size, and how big the page is", /one page/i.test(pageSummary) && /100 %/.test(pageSummary) && /810 × 553 mm/.test(pageSummary), pageSummary);
+    check("and that it is for a large-format printer or a PDF", /large-format|PDF/i.test(await printDialog().textContent()));
+    check("the paper no longer matters, so it is not asked for", (await printDialog().locator('input[name="print-paper"]').count()) === 0);
+    check("the tickets and the rules cannot join it, and the dialog says they print apart", (await printPart("Print the tickets").isDisabled()) && (await printPart("Print the rules").isDisabled()) && /print(ed)? (them )?separately|apart/i.test(await printDialog().textContent()));
+    await printDialog().getByRole("button", { name: "Cancel" }).click();
+    await page.waitForTimeout(300);
+    const wholeBoard = await page.evaluate(() => ({ pages: document.querySelectorAll(".print-pages .print-page").length, cards: document.querySelectorAll(".print-pages .ticket-card").length, rules: document.querySelectorAll(".print-pages .print-rules").length, style: Array.from(document.querySelectorAll(".print-pages style")).map((el) => el.textContent).join(" ") }));
+    check("the print tree is one page of the board, with no cards and no rules", wholeBoard.pages === 1 && wholeBoard.cards === 0 && wholeBoard.rules === 0, JSON.stringify({ pages: wholeBoard.pages, cards: wholeBoard.cards, rules: wholeBoard.rules }));
+    check("on a page declared as 810 × 553 mm", /size:\s*810mm 553mm/.test(wholeBoard.style), wholeBoard.style);
+    await page.emulateMedia({ media: "print" });
+    const sheetBox = await page.evaluate(() => { const r = document.querySelector(".print-pages .print-page").getBoundingClientRect(); return { w: r.width / 96 * 25.4, h: r.height / 96 * 25.4 }; });
+    const pdfWhole = await page.pdf({ preferCSSPageSize: true, printBackground: true });
+    await page.emulateMedia({ media: "screen" });
+    const pdfText = pdfWhole.toString("latin1");
+    const mediaBox = /\/MediaBox\s*\[\s*0\s+0\s+([\d.]+)\s+([\d.]+)\s*\]/.exec(pdfText);
+    const pts = (mm) => mm / 25.4 * 72;
+    check("the board is laid out upright and at its real size on the page: 790 × 533 mm with its caption", Math.abs(sheetBox.w - 790) < 2 && Math.abs(sheetBox.h - 533) < 2, `${sheetBox.w.toFixed(1)} × ${sheetBox.h.toFixed(1)} mm`);
+    check("saved as a PDF it is a single page", (pdfText.match(/\/Type\s*\/Page[^s]/g) || []).length === 1);
+    check("and that page is 810 × 553 mm, the size of the board and its margin (read from the PDF itself)", Boolean(mediaBox) && Math.abs(Number(mediaBox[1]) - pts(810)) < 3 && Math.abs(Number(mediaBox[2]) - pts(553)) < 3, mediaBox ? `${mediaBox[1]} × ${mediaBox[2]} pt, wanted ${pts(810).toFixed(0)} × ${pts(553).toFixed(0)}` : "no MediaBox found");
+    await printButton().click();
+    await page.waitForTimeout(400);
+    await printDialog().getByRole("radio", { name: "One sheet per panel of the game board", exact: true }).check();
+    await choosePrintParts(false, true, true);
     await page.evaluate(() => { window.__run = null; window.print = () => { window.__run = { cards: document.querySelectorAll(".print-pages .ticket-card").length, rules: document.querySelectorAll(".print-pages .print-rules").length, boards: document.querySelectorAll(".print-pages .print-page").length, dialogs: document.querySelectorAll('[role="dialog"]').length }; }; });
     await printDialog().getByRole("button", { name: "Print", exact: true }).click();
     await page.waitForFunction(() => window.__run !== null, null, { timeout: 5000 });
