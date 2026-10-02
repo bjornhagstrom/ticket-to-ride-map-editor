@@ -120,6 +120,7 @@ not a way to move a whole map: the background, styles and settings are only in t
 | 1 | The original files: `kind` beside the data, no version, no envelope. Still readable. |
 | 2 | The envelope. Payload under its own key, schema version, written-at, app, board frame. Network files carry the styles they refer to. Unknown fields are preserved. |
 | 3 | Wagon styles and line styles folded into route types: a type describes the whole route. A version 2 map gets one route type per combination it used, so it keeps its look. |
+| 4 | A board can stand: `orientation: "portrait"` in the map, and in network and background files, with the `board` frame standing (731 × 1100 for a 2×3). Only a standing map is written as version 4; a lying map is still written as version 3 and has no `orientation`, so every version 3 reader opens it unchanged, while one that cannot stand a board refuses a standing map rather than lays it down wrong. A version 3 file reads as lying. Content brought from a file on a board that lies or stands the other way is turned a quarter turn to fit (`tests/board.cjs`). |
 
 ### Board formats that became print choices
 

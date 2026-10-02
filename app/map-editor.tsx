@@ -26,10 +26,11 @@ import { SettingsDialog, type StyleTarget } from "./map-styles";
 import { bandsOf, bandCuts, mapDiameter, deckFigures, defaultStyle, deckRuleFor, TICKET_SUGGESTER, evaluateTicketDeck, suggestedDeckSize, ticketEndStopCount, type TicketStyle, autoPlaceLabels, labelledStops, setupBalance, stopCoverage, ticketBand, type TicketBand, reviewTickets, ticketPointsPerSpace, ticketCoverage, type RouteSuggestion, labelCovers, labelAngleOptions, routeSamplePoints, colourLengthTable, crossingPairs, buildAdjacency, networkStats, routeSpacing, shortestPath, suggestRoutes } from "./map-analysis";
 import { canvasPoint, canvasPointRaw, pointsFor, samePair, stopById } from "./map-geometry";
 import { REPO_URL } from "./version";
+import { boardOf, rotateMap, type Orientation } from "./board";
 import { distancesCsv, routesCsv, stopsCsv, ticketsCsv } from "./csv-export";
 import { readCsvImport, type CsvImport } from "./csv-import";
 import { APP_VERSION, cloneForHistory, cloneMap, formatTimestamp, GUIDE_SEEN_KEY, HISTORY_LIMIT, MAX_IMAGE_WARN_BYTES, normalizeBackgroundFile, normalizeMap, normalizeNetworkFile, normalizeTicketFile, buildTicketFile, readMapFile, writeMapFile, mapPayload, networkPayload, readBackgroundImage, rescaleMapToFormat, MAP_HINT_KEY, MAP_HINT_X_KEY } from "./map-storage";
-import { colorLabels, defaultTicketSet, DEFAULT_PLAYERS, DEFAULT_WAGONS_PER_PLAYER, IMAGE_KEEP_ON_BOARD, type Ticket, type StopTypeStyle, type WagonStyle, ticketsInSet, type TicketSet, emptyMap, initialMap, type LineStyle, DEFAULT_END_GAP_MM, mapFormats, type BackgroundImage, type BackgroundShape, type BackgroundType, type MapData, type MapFormat, type Point, type Route, type RouteType, type RouteTypeStyle, routeColors, STORAGE_KEY, type Stop, type StopSize, stopSizeMeta, type StopSymbol, stopSymbolMeta, type StopType, W } from "./map-data";
+import { colorLabels, defaultTicketSet, DEFAULT_PLAYERS, DEFAULT_WAGONS_PER_PLAYER, IMAGE_KEEP_ON_BOARD, type Ticket, type StopTypeStyle, type WagonStyle, ticketsInSet, type TicketSet, emptyMap, initialMap, type LineStyle, DEFAULT_END_GAP_MM, mapFormats, type BackgroundImage, type BackgroundShape, type BackgroundType, type MapData, type MapFormat, type Point, type Route, type RouteType, type RouteTypeStyle, routeColors, STORAGE_KEY, type Stop, type StopSize, stopSizeMeta, type StopSymbol, stopSymbolMeta, type StopType } from "./map-data";
 
 type MeasureResult = { from: string; to: string; distance: number; routeIds: string[] } | { from: string; to: string; unreachable: true };
 type Danger = "reset" | "delete" | "load-blank" | "load-example" | "import-background" | "import-network" | "import-image" | "import-csv" | null;
@@ -183,7 +184,9 @@ export function MapEditor() {
   const fileRef = useRef<HTMLInputElement>(null);
   const imageFileRef = useRef<HTMLInputElement>(null);
   const csvFileRef = useRef<HTMLInputElement>(null);
-  const format = mapFormats[data.format];
+  // The board as it lies or stands; wagons are always measured against the lying board's width, the
+  // same number of millimetres per map unit either way.
+  const format = boardOf(data);
 
   useEffect(() => { queueMicrotask(() => { try { const stored = localStorage.getItem(STORAGE_KEY); if (stored) { setData(normalizeMap(JSON.parse(stored))); localStorage.setItem(GUIDE_SEEN_KEY, "1"); } else if (!localStorage.getItem(GUIDE_SEEN_KEY)) setShowGuide(true); } catch { /* ignore invalid local state */ } setReady(true); }); }, []);
   useEffect(() => { if (!ready) return; localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); const timer = window.setTimeout(() => setSaved(true), 0); return () => window.clearTimeout(timer); }, [data, ready]);
@@ -205,7 +208,7 @@ export function MapEditor() {
 
   // Wagons are measured against the board the map is for. Printing smaller or larger scales them
   // with everything else.
-  const scaleWidthMm = format.widthMm;
+  const scaleWidthMm = mapFormats[data.format].widthMm;
   const crossings = useMemo(() => crossingPairs(data), [data]);
   // Routes drawn too short to hold their own wagons at real component size.
   const spacing = useMemo(() => routeSpacing(data, scaleWidthMm), [data, scaleWidthMm]);
@@ -480,7 +483,7 @@ export function MapEditor() {
   const onCanvasDown = (event: React.PointerEvent<SVGSVGElement>) => {
     const target = event.target as SVGElement;
     if (target !== event.currentTarget && !target.classList.contains("map-bg")) return;
-    const point = canvasPoint(event.currentTarget, event.clientX, event.clientY, format.height);
+    const point = canvasPoint(event.currentTarget, event.clientX, event.clientY, format.height, format.width);
     if (tool === "stop") {
       change((draft) => { draft.stops.push({ id: `s-${Date.now()}`, name: "New stop", type: stopType, size: stopSize, symbol: stopSymbol, letter: stopSymbol === "letter" ? stopLetter || "A" : undefined, ...point }); return draft; });
       return;
@@ -503,7 +506,7 @@ export function MapEditor() {
     clearSelection();
   };
   const onCanvasMove = (event: React.PointerEvent<SVGSVGElement>) => {
-    const point = canvasPoint(event.currentTarget, event.clientX, event.clientY, format.height);
+    const point = canvasPoint(event.currentTarget, event.clientX, event.clientY, format.height, format.width);
     if (pendingStop) setPickTo(point);
     // Hold the pointer once a drag is under way, so it keeps reporting after it leaves the board.
     if (dragging() && !event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.setPointerCapture(event.pointerId);
@@ -525,13 +528,13 @@ export function MapEditor() {
       // A background image is placed against the board's edges, and may hang over them, so it moves
       // and scales by the raw pointer. Only a corner of it has to stay on the board, so it cannot be
       // dragged out of reach.
-      const free = canvasPointRaw(event.currentTarget, event.clientX, event.clientY, format.height);
+      const free = canvasPointRaw(event.currentTarget, event.clientX, event.clientY, format.height, format.width);
       setData((current) => {
         const img = current.backgroundImage;
         if (!img) return current;
         if (drag.mode === "move") return { ...current, backgroundImage: {
           ...img,
-          x: Math.max(IMAGE_KEEP_ON_BOARD - img.width, Math.min(W - IMAGE_KEEP_ON_BOARD, free.x - drag.offsetX)),
+          x: Math.max(IMAGE_KEEP_ON_BOARD - img.width, Math.min(format.width - IMAGE_KEEP_ON_BOARD, free.x - drag.offsetX)),
           y: Math.max(IMAGE_KEEP_ON_BOARD - img.height, Math.min(format.height - IMAGE_KEEP_ON_BOARD, free.y - drag.offsetY)),
         } };
         if (drag.mode === "scale") return { ...current, backgroundImage: { ...img, width: Math.max(20, free.x - img.x), height: Math.max(20, free.y - img.y) } };
@@ -654,7 +657,7 @@ export function MapEditor() {
   const downloadCsv = (text: string, filenameBase: string) => download(new Blob([text], { type: "text/csv;charset=utf-8" }), filenameBase, "csv");
   const saveImage = (blob: Blob) => { setMakingImage(false); const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = `${data.name}.png`; document.body.append(link); link.click(); link.remove(); URL.revokeObjectURL(url); };
   const exportMap = () => downloadJson(writeMapFile("map", mapPayload(data), data), data.name);
-  const exportBackground = () => downloadJson(writeMapFile("background", { format: data.format, background: data.background, backgroundImage: data.backgroundImage }, data), `${data.name} background`);
+  const exportBackground = () => downloadJson(writeMapFile("background", { format: data.format, ...(data.orientation === "portrait" ? { orientation: "portrait" } : {}), background: data.background, backgroundImage: data.backgroundImage }, data), `${data.name} background`);
   const exportNetwork = () => downloadJson(writeMapFile("network", networkPayload(data), data), `${data.name} network`);
   const exportTickets = (scope: "set" | "all") => { const ids = scope === "all" ? data.ticketSets.map((set) => set.id) : [activeTicketSet.id]; downloadJson(writeMapFile("tickets", buildTicketFile(data, ids), data), `${data.name} ${scope === "all" ? "tickets" : activeTicketSet.label}`); };
   const exportTicketsCsv = (scope: "set" | "all") => downloadCsv(ticketsCsv(data, scope === "all" ? data.ticketSets.map((set) => set.id) : [activeTicketSet.id]), `${data.name} ${scope === "all" ? "tickets" : activeTicketSet.label}`);
@@ -702,7 +705,7 @@ export function MapEditor() {
         const parsed = readMapFile(JSON.parse(String(reader.result)));
         const raw = parsed.payload as Record<string, never>;
         if (parsed.kind === "background") {
-          const { background, backgroundImage } = normalizeBackgroundFile(raw, format.height);
+          const { background, backgroundImage } = normalizeBackgroundFile(raw, format);
           if (data.background.length || data.backgroundImage) { setPendingImport({ kind: "background", background, backgroundImage }); setDanger("import-background"); }
           else applyBackgroundImport(background, backgroundImage);
           return;
@@ -717,7 +720,7 @@ export function MapEditor() {
           return;
         }
         if (parsed.kind === "network") {
-          const { stops, routes, lineStyles, routeTypeStyles, stopTypeStyles, wagonStyles, tickets } = normalizeNetworkFile(raw, format.height);
+          const { stops, routes, lineStyles, routeTypeStyles, stopTypeStyles, wagonStyles, tickets } = normalizeNetworkFile(raw, format);
           if (data.stops.length || data.routes.length) { setPendingImport({ kind: "network", stops, routes, lineStyles, routeTypeStyles, stopTypeStyles, wagonStyles, tickets }); setDanger("import-network"); }
           else applyNetworkImport(stops, routes, lineStyles, routeTypeStyles, stopTypeStyles, wagonStyles, tickets);
           return;
@@ -738,13 +741,20 @@ export function MapEditor() {
     if (file.size > MAX_IMAGE_WARN_BYTES) toast.warning(`This image is about ${(file.size / (1024 * 1024)).toFixed(1)} MB. The saved map file will be large.`);
     try {
       const { dataUrl, naturalWidth, naturalHeight } = await readBackgroundImage(file);
-      const scale = Math.min((W * 0.9) / naturalWidth, (format.height * 0.9) / naturalHeight, 1);
+      const scale = Math.min((format.width * 0.9) / naturalWidth, (format.height * 0.9) / naturalHeight, 1);
       const width = naturalWidth * scale;
       const height = naturalHeight * scale;
-      const image: BackgroundImage = { dataUrl, naturalWidth, naturalHeight, x: (W - width) / 2, y: (format.height - height) / 2, width, height, rotation: 0, opacity: 1, crop: { top: 0, right: 0, bottom: 0, left: 0 } };
+      const image: BackgroundImage = { dataUrl, naturalWidth, naturalHeight, x: (format.width - width) / 2, y: (format.height - height) / 2, width, height, rotation: 0, opacity: 1, crop: { top: 0, right: 0, bottom: 0, left: 0 } };
       if (data.backgroundImage) { setPendingImport({ kind: "image", image }); setDanger("import-image"); }
       else applyImageImport(image);
     } catch { window.alert("The image could not be read."); }
+  };
+  // Standing a board up or laying it down turns everything on it a quarter turn, as one undoable step.
+  const changeOrientation = (next: Orientation) => {
+    if (next === format.orientation) return;
+    change((draft) => rotateMap(draft, next));
+    setDraftPoints([]);
+    clearSelection();
   };
   const changeFormat = (nextFormat: MapFormat) => {
     if (nextFormat === data.format) return;
@@ -761,7 +771,7 @@ export function MapEditor() {
       <div className="map-title"><Label htmlFor="map-name" className="sr-only">Map name</Label><Input id="map-name" value={data.name} onChange={(event) => change((draft) => ({ ...draft, name: event.target.value }))} /><span className="save-state"><Check />{saved ? "Saved locally" : "Saving…"}</span></div>
       <div className="header-actions"><DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" size="sm"><CircleHelp />Help</Button></DropdownMenuTrigger><DropdownMenuContent align="start"><DropdownMenuItem onClick={() => setShowGuide(true)}><CircleHelp />Getting started</DropdownMenuItem><DropdownMenuItem asChild><a href="./about"><BusFront />About Map prototypes</a></DropdownMenuItem><DropdownMenuItem asChild><a href="./whats-new"><Sparkles />What&apos;s new</a></DropdownMenuItem><DropdownMenuItem asChild><a href={REPO_URL} target="_blank" rel="noopener noreferrer"><Code />Source code on GitHub</a></DropdownMenuItem><DropdownMenuLabel className="version-label">Version {APP_VERSION}</DropdownMenuLabel></DropdownMenuContent></DropdownMenu><Button variant="ghost" size="icon" aria-label="Undo" title="Undo (Ctrl/Cmd+Z)" disabled={!past.length} onClick={undo}><Undo2 /></Button><Button variant="ghost" size="icon" aria-label="Redo" title="Redo (Ctrl/Cmd+Shift+Z)" disabled={!future.length} onClick={redo}><Redo2 /></Button><DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" size="sm"><Upload />Import</Button></DropdownMenuTrigger><DropdownMenuContent align="start"><DropdownMenuItem onClick={() => fileRef.current?.click()}><Upload />Map project</DropdownMenuItem><DropdownMenuItem onClick={() => fileRef.current?.click()}><TicketIcon />Tickets only</DropdownMenuItem><DropdownMenuItem onClick={() => imageFileRef.current?.click()}><ImageIcon />Background image</DropdownMenuItem><DropdownMenuItem onClick={() => csvFileRef.current?.click()}><FileSpreadsheet />Spreadsheet (CSV)</DropdownMenuItem></DropdownMenuContent></DropdownMenu><input ref={csvFileRef} hidden type="file" multiple accept=".csv,.tsv,.txt,text/csv,text/plain" onChange={(event) => { void importCsv(event.target.files); event.target.value = ""; }} /><input ref={fileRef} hidden type="file" accept="application/json" onChange={(event) => { importMap(event.target.files?.[0]); event.target.value = ""; }} /><input ref={imageFileRef} hidden type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => { importBackgroundImage(event.target.files?.[0]); event.target.value = ""; }} /><Button variant="outline" size="sm" onClick={() => setShowPrint(true)}><Printer />Print map</Button><DropdownMenu><DropdownMenuTrigger asChild><Button size="sm"><Download />Export</Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onClick={exportMap}><Download />Full map</DropdownMenuItem><DropdownMenuItem onClick={() => setMakingImage(true)}><ImageIcon />Map as image (PNG)</DropdownMenuItem><DropdownMenuItem onClick={exportBackground}><Layers3 />Background only</DropdownMenuItem><DropdownMenuItem onClick={exportNetwork}><Link2 />Network only</DropdownMenuItem><DropdownMenuItem onClick={() => exportTickets("all")}><TicketIcon />Tickets only</DropdownMenuItem><DropdownMenuSub><DropdownMenuSubTrigger><FileSpreadsheet />Spreadsheet (CSV)</DropdownMenuSubTrigger><DropdownMenuSubContent><DropdownMenuItem onClick={() => exportTicketsCsv("all")}><TicketIcon />Tickets</DropdownMenuItem><DropdownMenuItem onClick={() => downloadCsv(routesCsv(data), `${data.name} routes`)}><RouteIcon />Routes</DropdownMenuItem><DropdownMenuItem onClick={() => downloadCsv(stopsCsv(data), `${data.name} stops`)}><MapPin />Stops</DropdownMenuItem><DropdownMenuItem onClick={() => downloadCsv(distancesCsv(data), `${data.name} distances`)}><Grid3x3 />Distances between stops</DropdownMenuItem></DropdownMenuSubContent></DropdownMenuSub></DropdownMenuContent></DropdownMenu></div>
     </header>
-    <div className={cn("workspace", widePanel && "showing-balance")} style={{ "--right-width": `${rightWidth}px`, "--map-ratio": W / format.height } as React.CSSProperties}>
+    <div className={cn("workspace", widePanel && "showing-balance")} style={{ "--right-width": `${rightWidth}px`, "--map-ratio": format.width / format.height } as React.CSSProperties}>
       {widePanel && <div className="column-resizer" role="separator" aria-orientation="vertical" aria-label="Resize the right column" aria-valuenow={rightWidth} aria-valuemin={RIGHT_WIDTH_MIN} aria-valuemax={RIGHT_WIDTH_MAX} tabIndex={0} title="Drag to resize, double-click to reset"
         onPointerDown={(event) => { event.preventDefault(); const startX = event.clientX, startWidth = rightWidth; const el = event.currentTarget; el.setPointerCapture(event.pointerId); const move = (e: PointerEvent) => resizeRight(startWidth + startX - e.clientX); const done = () => { el.removeEventListener("pointermove", move); el.removeEventListener("pointerup", done); el.removeEventListener("pointercancel", done); }; el.addEventListener("pointermove", move); el.addEventListener("pointerup", done); el.addEventListener("pointercancel", done); }}
         onDoubleClick={resetRight}
@@ -817,9 +827,9 @@ export function MapEditor() {
       </aside>
       <section className="map-wrap">
         {litTicket && <div className="highlight-chip"><TicketIcon /><span>{stopById(data, litTicket.a)?.name} → {stopById(data, litTicket.b)?.name}</span><Button variant="ghost" size="icon" aria-label="Stop showing this ticket" onClick={() => setSelectedTicket(null)}><X /></Button></div>}
-        <div className="map-status"><Badge variant="secondary">{format.shortLabel}</Badge><Badge variant="secondary">{format.widthMm.toLocaleString("en-GB")} × {format.heightMm.toLocaleString("en-GB")} mm</Badge><Badge variant="secondary">{data.stops.length} stops</Badge><Badge variant="secondary">{data.routes.length} routes</Badge><Badge variant="secondary">{data.background.length} background objects</Badge>{data.notes.length > 0 && <Badge variant="secondary">{data.notes.length} note{data.notes.length === 1 ? "" : "s"}</Badge>}<span>Everything is stored in the exported map file</span></div>
+        <div className="map-status"><Badge variant="secondary">{format.label}</Badge><Badge variant="secondary">{format.widthMm.toLocaleString("en-GB")} × {format.heightMm.toLocaleString("en-GB")} mm</Badge><Badge variant="secondary">{data.stops.length} stops</Badge><Badge variant="secondary">{data.routes.length} routes</Badge><Badge variant="secondary">{data.background.length} background objects</Badge>{data.notes.length > 0 && <Badge variant="secondary">{data.notes.length} note{data.notes.length === 1 ? "" : "s"}</Badge>}<span>Everything is stored in the exported map file</span></div>
         {hint && hint.atTop && <MapHint atTop title={hint.title} open={routeHintOpen} onToggle={toggleRouteHint} offsetX={routeHintX} onOffsetChange={moveRouteHint}>{hint.body}</MapHint>}
-        <svg className={cn("map-canvas", `tool-${tool}`, hasMarks && "has-marks", rulesPicking && "picking-rules")} style={{ aspectRatio: `${W} / ${format.height}` }} viewBox={`0 0 ${W} ${format.height}`} onPointerDown={onCanvasDown} onPointerMove={onCanvasMove} onPointerUp={stopDragging} onPointerCancel={stopDragging}>
+        <svg className={cn("map-canvas", format.orientation === "portrait" && "standing", `tool-${tool}`, hasMarks && "has-marks", rulesPicking && "picking-rules")} style={{ aspectRatio: `${format.width} / ${format.height}` }} viewBox={`0 0 ${format.width} ${format.height}`} onPointerDown={onCanvasDown} onPointerMove={onCanvasMove} onPointerUp={stopDragging} onPointerCancel={stopDragging}>
           <MapArtwork data={data} tool={tool} highlightRoutes={highlightRoutes} scaleWidthMm={scaleWidthMm} selectedRoute={selectedRoute} selectedStop={selectedStop} selectedBackground={selectedBackground} imageSelected={imageSelected} selectedNote={selectedNote} bottleneckRoutes={showAnalysis ? bottleneckRoutes : undefined} pendingStop={pendingStop} pickTo={pickTo} previewRoutes={balanceRoutes ?? pinnedRoutes ?? preview?.routes} previewStop={balanceStop ?? pin?.stop ?? null} previewLabel={preview?.label ?? null} onStopHover={setHoveredStop} draft={{ type: backgroundType, points: draftPoints, fill: backgroundFill, stroke: backgroundStroke }} onRoute={(id) => { setSelectedRoute(id); setSelectedStop(null); setSelectedBackground(null); setSelectedNote(null); setTool("select"); }} onRouteSlot={toggleLocomotiveSlot} onRouteBendInsert={insertRouteBend} onRouteBendRemove={removeRouteBend} onStop={(id, shiftHeld) => { if (rulesPickRef.current?.stop(id)) return; chooseStop(id); if (tool === "select" && (shiftHeld || !stopById(data, id)?.locked)) { beginDrag(); dragStopRef.current = id; } }} onWaypoint={(routeId, index, grabOffset) => { beginDrag(); dragWaypointRef.current = { routeId, index, grabOffset }; }} onBackground={(id) => { setSelectedBackground(id); setSelectedRoute(null); setSelectedStop(null); setSelectedNote(null); setTool("select"); }} onBackgroundPoint={(shapeId, index) => { beginDrag(); dragBackgroundPointRef.current = { shapeId, index }; }} onBackgroundLabel={(shapeId) => { beginDrag(); dragBackgroundLabelRef.current = shapeId; }} onImageSelect={chooseImage} onImageMove={(point) => { chooseImage(); const img = data.backgroundImage; if (img) { beginDrag(); dragImageRef.current = { mode: "move", offsetX: point.x - img.x, offsetY: point.y - img.y }; } }} onImageScale={() => { beginDrag(); dragImageRef.current = { mode: "scale" }; }} onImageRotate={() => { beginDrag(); dragImageRef.current = { mode: "rotate" }; }} suggestionPreview={hoveredSuggestion ? (() => { const a = stopById(data, hoveredSuggestion.a), b = stopById(data, hoveredSuggestion.b); return a && b ? { a, b } : undefined; })() : undefined} onStopLabel={(id, shiftHeld) => { if (rulesPickRef.current?.stop(id)) return; chooseStop(id); if (shiftHeld || !stopById(data, id)?.labelLocked) { beginDrag(); dragStopLabelRef.current = id; } }} onNoteSelect={chooseNote} onNoteMove={(id, point) => { chooseNote(id); const note = data.notes.find((item) => item.id === id); if (note) { beginDrag(); dragNoteRef.current = { id, mode: "move", offsetX: point.x - note.x, offsetY: point.y - note.y }; } }} onNoteResize={(id) => { beginDrag(); dragNoteRef.current = { id, mode: "resize" }; }} onNoteToggle={(id) => change((draft) => { const note = draft.notes.find((item) => item.id === id); if (note) note.collapsed = !note.collapsed || undefined; return draft; })} />
         </svg>
         {hint && !hint.atTop && <MapHint atTop={false} title={hint.title} open={routeHintOpen} onToggle={toggleRouteHint} offsetX={routeHintX} onOffsetChange={moveRouteHint}>{hint.body}</MapHint>}
@@ -841,7 +851,7 @@ export function MapEditor() {
         {tool === "ticket" && <TicketCoveragePanel rows={coverageRows} deck={activeTicketSet.label} cuts={bandCuts(ticketDiameter, bandsOf(data))} onEditMix={() => openStyles({ kind: "ticket" })} sort={coverageSort} onSort={setCoverageSort} onlyUncovered={onlyUncovered} onOnlyUncovered={setOnlyUncovered} onOpen={(stopId, band) => setStopTicketView({ stopId, band })} />}
         {tool !== "ticket" && !imageSelected && !selectedN && !selectedB && !selectedR && !selectedS && <div className="empty-state"><CircleDot /><p>Edit names, types, colours, geometry and route length here.</p></div>}
         {selectedN && <NoteProperties note={selectedN} change={change} onDelete={() => setDanger("delete")} />}
-        {imageSelected && data.backgroundImage && <BackgroundImageProperties image={data.backgroundImage} formatHeight={format.height} change={change} onDelete={() => setDanger("delete")} />}
+        {imageSelected && data.backgroundImage && <BackgroundImageProperties image={data.backgroundImage} formatHeight={format.height} formatWidth={format.width} change={change} onDelete={() => setDanger("delete")} />}
         {selectedB && <BackgroundProperties shape={selectedB} change={change} onDelete={() => setDanger("delete")} />}
         {selectedS && <StopProperties stop={selectedS} change={change} onDelete={() => setDanger("delete")} labelState={selectedLabelState} stopTypeStyles={data.stopTypeStyles} onEditStyles={openStyles} mapEndGapMm={data.endGapMm ?? DEFAULT_END_GAP_MM} allLocked={data.stops.length > 0 && data.stops.every((item) => item.locked)} onLockAll={lockAllStops} allNamesLocked={data.stops.length > 0 && data.stops.every((item) => item.labelLocked)} onLockAllNames={lockAllNames} tickets={stopTickets} onOpenTicket={openTicket} />}
         {selectedR && <RouteProperties route={selectedR} stops={data.stops} routes={data.routes} routeTypeStyles={data.routeTypeStyles} change={change} onDelete={() => setDanger("delete")} onAddParallel={addParallelRoute} onEditStyles={openStyles} onStraighten={straightenRoute} onSetCurved={applyRouteCurve} linkParallel={linkParallel} onLinkParallel={setLinkParallel} />}
@@ -859,10 +869,10 @@ export function MapEditor() {
       busy={suggestBusy} deckName={suggestName} onDeckName={setSuggestName} currentDeck={activeTicketSet.label}
       onShuffle={() => setSuggestSeed((seed) => seed + 1)} onApply={(mode) => applySuggestion(mode, `ts-${Date.now()}`)} />
     <WelcomeGuide open={showGuide} onOpenChange={(open) => !open && dismissGuide()} onChooseBlank={() => chooseFromGuide("blank")} onChooseExample={() => chooseFromGuide("example")} />
-    <SettingsDialog open={showStyles} onOpenChange={setShowStyles} target={styleTarget} onTarget={setStyleTarget} data={data} change={change} onChangeFormat={changeFormat} defaults={{ stopType, setStopType, stopSize, setStopSize: (value) => setStopSize(value as StopSize), routeType, setRouteType, routeColor, setRouteColor, routeCurved, setRouteCurved, routeLineStyle, setRouteLineStyle, linkParallel, setLinkParallel }} />
-    <PrintPages data={data} plan={printPlan(data.format, printChoice, printProfile)} parts={runParts} setId={activeTicketSet.id} />
+    <SettingsDialog open={showStyles} onOpenChange={setShowStyles} target={styleTarget} onTarget={setStyleTarget} data={data} change={change} onChangeFormat={changeFormat} onChangeOrientation={changeOrientation} defaults={{ stopType, setStopType, stopSize, setStopSize: (value) => setStopSize(value as StopSize), routeType, setRouteType, routeColor, setRouteColor, routeCurved, setRouteCurved, routeLineStyle, setRouteLineStyle, linkParallel, setLinkParallel }} />
+    <PrintPages data={data} plan={printPlan(data.format, printChoice, printProfile, format.orientation)} parts={runParts} setId={activeTicketSet.id} />
     {makingImage && <ImageStage data={data} onDone={saveImage} onFail={() => setMakingImage(false)} />}
-    <PrintDialog open={showPrint} onOpenChange={setShowPrint} format={data.format} profile={printProfile} choice={printChoice} onChoice={choosePrint} parts={{ value: printPartsNow, onChange: choosePrintParts, rulesWritten: Boolean(data.rules?.trim()), ticketCount: ticketsHere.length, deckLabel: activeTicketSet.label }} onPrint={() => { setShowPrint(false); setPrintRequest((count) => count + 1); }} />
+    <PrintDialog open={showPrint} onOpenChange={setShowPrint} format={data.format} orientation={format.orientation} profile={printProfile} choice={printChoice} onChoice={choosePrint} parts={{ value: printPartsNow, onChange: choosePrintParts, rulesWritten: Boolean(data.rules?.trim()), ticketCount: ticketsHere.length, deckLabel: activeTicketSet.label }} onPrint={() => { setShowPrint(false); setPrintRequest((count) => count + 1); }} />
   </main></TooltipProvider>;
 }
 

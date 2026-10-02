@@ -14,7 +14,7 @@ export type Stop = Point & { id: string; name: string; type: StopType; size?: St
 
 // Where a stop's name sits, as a compass bearing around the stop in degrees (0 = right, 90 = below).
 // Undefined keeps the original behaviour: up and to the right, flipping left near the right edge.
-export const defaultLabelAngle = (stop: Point) => (stop.x > 900 ? 215 : 325);
+export const defaultLabelAngle = (stop: Point, boardWidth = W) => (stop.x > boardWidth - 200 ? 215 : 325);
 export type Route = { id: string; a: string; b: string; length: number; type: RouteType; color: string; points?: Point[]; locomotiveSlots?: number[]; lineStyle?: string; curved?: boolean; wagonStyle?: string };
 export type LineStyle = { id: string; label: string; strokeWidth: number; dash: string };
 
@@ -120,7 +120,7 @@ export type DeckRuleSet = DeckRuleValues & { id: string; label: string; basedOn:
 /** Our sets, by the id a map chooses them with. Their values are in TICKET_SUGGESTER.styles. */
 export const BUILT_IN_DECK_RULES = ["generic", "classic", "europe"] as const;
 
-export type MapData = { name: string; format: MapFormat; rules?: string; endGapMm?: number; background: BackgroundShape[]; stops: Stop[]; routes: Route[]; backgroundImage?: BackgroundImage; notes: NoteBox[]; lineStyles: LineStyle[]; routeTypeStyles: RouteTypeStyle[]; wagonStyles: WagonStyle[]; stopTypeStyles: StopTypeStyle[]; tickets: Ticket[]; ticketSets: TicketSet[]; wagonsPerPlayer?: number; startingTickets?: number; keptTickets?: number; players?: PlayerRange; lanesUsableByPlayers?: LaneRule; ticketBands?: TicketBands; ticketMix?: TicketMix; ticketValuation?: { longBonus?: boolean; ferryPremium?: number }; deckRules?: DeckRuleSet[]; deckRule?: string;
+export type MapData = { name: string; format: MapFormat; orientation?: "landscape" | "portrait"; rules?: string; endGapMm?: number; background: BackgroundShape[]; stops: Stop[]; routes: Route[]; backgroundImage?: BackgroundImage; notes: NoteBox[]; lineStyles: LineStyle[]; routeTypeStyles: RouteTypeStyle[]; wagonStyles: WagonStyle[]; stopTypeStyles: StopTypeStyle[]; tickets: Ticket[]; ticketSets: TicketSet[]; wagonsPerPlayer?: number; startingTickets?: number; keptTickets?: number; players?: PlayerRange; lanesUsableByPlayers?: LaneRule; ticketBands?: TicketBands; ticketMix?: TicketMix; ticketValuation?: { longBonus?: boolean; ferryPremium?: number }; deckRules?: DeckRuleSet[]; deckRule?: string;
   // Fields from a file this build does not know about. Kept so that opening and re-exporting a map
   // written by a newer version never quietly throws its work away.
   unknown?: Record<string, unknown> };

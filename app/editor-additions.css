@@ -2,6 +2,9 @@
 /* Every drag on the map is a drag, never a text selection: without this, sweeping the pointer
    across the map painted every stop name it passed blue. */
 .map-canvas{-webkit-user-select:none;user-select:none}
+/* A standing board as wide as the column would be far taller than the window: it is sized by the
+   window's height instead (less the top bar and the badges), and centred in the column. */
+.map-canvas.standing{min-width:420px;width:min(100%,calc((100vh - 150px) * var(--map-ratio,.66)));margin:0 auto}
 /* A stop's name can be taken and turned round its stop. */
 .map-canvas .stop-label-handle{cursor:grab;pointer-events:auto}
 /* A name is otherwise click-through (globals.css), so a stop is still easy to hit under its own name. */.map-canvas .stop-label-handle:active{cursor:grabbing}

@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { mapFormats, type MapData, W } from "./map-data";
+import { mapFormats, type MapData } from "./map-data";
+import { boardOf } from "./board";
 import { MapArtwork } from "./map-artwork";
 
 // The board as a picture. It is drawn the way the print draws it (no selection, handles or guides),
@@ -96,21 +97,21 @@ export function rasteriseBoard(source: SVGSVGElement, width: number, height: num
 // Mounted only while a picture is being made. It reports the PNG, or the failure, and is then removed.
 export function ImageStage({ data, onDone, onFail }: { data: MapData; onDone: (blob: Blob) => void; onFail: () => void }) {
   const svg = useRef<SVGSVGElement>(null);
-  const format = mapFormats[data.format];
+  const format = boardOf(data);
   useEffect(() => {
     let cancelled = false;
     // Two frames, so styles and fonts are applied before they are read.
     const frame = requestAnimationFrame(() => requestAnimationFrame(() => {
       if (cancelled || !svg.current) return;
-      rasteriseBoard(svg.current, W, format.height).then((blob) => { if (!cancelled) onDone(blob); }, () => { if (!cancelled) onFail(); });
+      rasteriseBoard(svg.current, format.width, format.height).then((blob) => { if (!cancelled) onDone(blob); }, () => { if (!cancelled) onFail(); });
     }));
     return () => { cancelled = true; cancelAnimationFrame(frame); };
     // One picture per mount: the callbacks are new on every render and must not restart it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  return <div className="image-stage" aria-hidden="true" style={{ position: "fixed", left: -20000, top: 0, width: W, height: format.height, pointerEvents: "none" }}>
-    <svg ref={svg} width={W} height={format.height} viewBox={`0 0 ${W} ${format.height}`}>
-      <MapArtwork data={data} scaleWidthMm={format.widthMm} print />
+  return <div className="image-stage" aria-hidden="true" style={{ position: "fixed", left: -20000, top: 0, width: format.width, height: format.height, pointerEvents: "none" }}>
+    <svg ref={svg} width={format.width} height={format.height} viewBox={`0 0 ${format.width} ${format.height}`}>
+      <MapArtwork data={data} scaleWidthMm={mapFormats[data.format].widthMm} print />
     </svg>
   </div>;
 }

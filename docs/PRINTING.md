@@ -190,8 +190,11 @@ them. So the layout is made to fit with them on.
   nothing ticked Print is off. The summary says how many sheets the cards take (`cardSheets` in
   `app/print-plan.ts`), and a test checks that it is the number of pages the browser prints. The
   "Print deck" button in the Tickets panel prints just the cards, whatever is ticked.
+- **A standing board** (Settings → Orientation) prints standing on the upright page, without the
+  quarter turn: its sheet is the page's short side across and its long side, less the caption, down.
+  Its panels are 2 across and 3 (or 4) down. The figures are in `tests/print-plan.cjs`.
 - **Ticket cards** are 62 × 45 mm and lie the way the board lies (`cardSize` in `app/print-plan.ts`):
-  both boards are landscape, so the cards are too; a portrait board would get upright cards. Three to
+  landscape on a lying board, 45 × 62 mm upright on a standing one. Three to
   a row on A4 and Letter. A fourth tick box, "A small map on each ticket", on from the start and kept
   in `ttr-print-parts` as `minimap`, puts the whole board on every card in light grey with the
   ticket's two stops ringed in black, as the real cards do. It applies to "Print deck" too, so it is

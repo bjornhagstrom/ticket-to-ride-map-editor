@@ -3,8 +3,9 @@
 // names (or a stop file's ids) tie the files together, and positions are kept when they fit the
 // board, fitted to it when they do not, and worked out from the routes when there are none.
 // Anything that cannot be used is left out and said so in `warnings`.
-import { colorLabels, mapFormats, routeColors, type MapData, type Route, type Stop, type Ticket, type TicketSet } from "./map-data";
+import { colorLabels, routeColors, type MapData, type Route, type Stop, type Ticket, type TicketSet } from "./map-data";
 import { normalizeTicketFile, type TicketFile } from "./map-storage";
+import { boardOf } from "./board";
 
 export type CsvFileKind = "stops" | "routes" | "tickets" | "distances" | "unknown";
 export type CsvImport = {
@@ -160,7 +161,7 @@ export function readCsvImport(files: { name: string; text: string }[], data: Map
   if (routeTypes.length) warnings.push(`Route types this map does not have became railways: ${listed(routeTypes)}.`);
 
   // ---- positions
-  const board = mapFormats[data.format] ?? mapFormats["board-2x3"];
+  const board = boardOf(data);
   const { placed, scaled } = position(stops, routes, read, board);
   if (placed.length) warnings.push(`${plural(placed.length, "stop", "stops")} had no position and ${placed.length === 1 ? "was" : "were"} laid out from the routes: drag ${placed.length === 1 ? "it" : "them"} into place (${listed(placed)}).`);
 

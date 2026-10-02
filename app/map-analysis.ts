@@ -2,6 +2,7 @@
 // computed on demand from MapData, and none of it is stored in a map file.
 import { DEFAULT_WAGONS_PER_PLAYER, DEFAULT_STARTING_TICKETS, DEFAULT_TICKET_BANDS, DEFAULT_TICKET_MIX, type TicketBands, type TicketMix, DEFAULT_PLAYERS, defaultLabelAngle, labelPush, stopSizeMeta, ticketsInSet, type MapData, type Ticket, type Point, realWagon, type Route, routeColors, type Stop, W } from "./map-data";
 import type { TicketDeckReport } from "./ticket-suggester";
+import { boardOf } from "./board";
 import { curvedSamples, isCurved, intersects, parallelPoints, pointsFor, polylineLength, stopById } from "./map-geometry";
 
 export type RouteSpacing = { route: Route; drawnMm: number; neededMm: number; ratio: number; verdict: "short" | "long" | "ok" };
@@ -253,11 +254,11 @@ export function routeSamplePoints(data: MapData): Point[] {
 const overlapCount = (box: ReturnType<typeof labelBox>, samples: Point[]) =>
   samples.reduce((count, point) => count + (point.x >= box.left && point.x <= box.right && point.y >= box.top && point.y <= box.bottom ? 1 : 0), 0);
 
-export const labelAngleOf = (stop: Stop) => stop.labelAngle ?? defaultLabelAngle(stop);
+export const labelAngleOf = (stop: Stop, boardWidth = W) => stop.labelAngle ?? defaultLabelAngle(stop, boardWidth);
 
 export function labelCovers(data: MapData, stop: Stop, samples: Point[]): boolean {
   const radius = stopSizeMeta[stop.size ?? "medium"].radius;
-  return overlapCount(labelBox(stop, labelAngleOf(stop), radius), samples) > 0;
+  return overlapCount(labelBox(stop, labelAngleOf(stop, boardOf(data).width), radius), samples) > 0;
 }
 
 // Every bearing, with how much of a route each one would sit on. The caller picks the first clear
@@ -287,12 +288,12 @@ export function autoPlaceLabels(data: MapData): { placed: Map<string, number>; u
   // A locked name stays put, and others are placed around it. It is reported only if it covers a route.
   const locked: string[] = [];
   for (const { stop } of scored) if (stop.labelLocked) {
-    taken.push(labelBox(stop, labelAngleOf(stop), radiusOf(stop)));
+    taken.push(labelBox(stop, labelAngleOf(stop, boardOf(data).width), radiusOf(stop)));
     if (labelCovers(data, stop, samples)) locked.push(stop.id);
   }
   for (const { stop, options } of scored) {
     if (stop.labelLocked) continue;
-    const current = labelAngleOf(stop);
+    const current = labelAngleOf(stop, boardOf(data).width);
     const free = options.filter((option) => option.overlap === 0)
       .sort((a, b) => bearingGap(a.angle, current) - bearingGap(b.angle, current));
     const choice = free.find((option) => !taken.some((box) => boxesOverlap(box, labelBox(stop, option.angle, radiusOf(stop)))));

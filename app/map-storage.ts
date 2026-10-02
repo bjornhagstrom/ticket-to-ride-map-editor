@@ -1,6 +1,7 @@
 // Loading, saving and reshaping map files: local-storage keys, the normalizers that let older
 // files open, board-format rescaling, and image reading.
 import { APP_VERSION } from "./version";
+import { boardOf, rotateMap, turnBetween, turnContents, type Board } from "./board";
 import { W, BUILT_IN_DECK_RULES, type DeckRuleSet, type PlayerRange, DEFAULT_WAGONS_PER_PLAYER, DEFAULT_STARTING_TICKETS, DEFAULT_KEPT_TICKETS, defaultTicketSet, type Ticket, type TicketSet, defaultStopTypeStyles, fallbackStopTypeStyle, type StopTypeStyle, defaultWagonStyles, type WagonStyle, defaultRouteTypeStyles, type LineStyle, type RouteTypeStyle, type BackgroundImage, type BackgroundShape, type ImageCrop, mapFormats, type MapData, type MapFormat, type NoteBox, type Point, type Route, type Stop, STORAGE_KEY } from "./map-data";
 
 export const GUIDE_SEEN_KEY = `${STORAGE_KEY}-guide-seen`;
@@ -111,7 +112,11 @@ const normalizeStopTypeStyles = (value: Partial<MapData>): StopTypeStyle[] => {
 //  - a file from a newer build is refused with a message, never quietly stripped,
 //  - anything a reader does not understand is carried along and written back out untouched.
 export const FILE_FORMAT = "ticket-to-ride-map";
-export const FILE_VERSION = 3;
+// The newest version this build reads and writes. A lying map is still written as version 3, which
+// every version 3 reader opens unchanged; only a standing map needs 4, so that a reader that cannot
+// stand a board refuses it instead of laying it down wrong.
+export const FILE_VERSION = 4;
+const LYING_FILE_VERSION = 3;
 export const APP_NAME = "Map prototypes";
 // The version, and the notes on what changed in it, live in version.ts.
 export { APP_VERSION };
@@ -128,15 +133,15 @@ export type MapFileEnvelope<T = unknown> = {
   payload: T;
 };
 
-export function writeMapFile<T>(kind: FileKind, payload: T, data: Pick<MapData, "format">): MapFileEnvelope<T> {
-  const board = mapFormats[data.format] ?? mapFormats["board-2x3"];
+export function writeMapFile<T>(kind: FileKind, payload: T, data: Pick<MapData, "format" | "orientation">): MapFileEnvelope<T> {
+  const board = boardOf(data);
   return {
     format: FILE_FORMAT,
-    version: FILE_VERSION,
+    version: board.orientation === "portrait" ? FILE_VERSION : LYING_FILE_VERSION,
     kind,
     written: new Date().toISOString(),
     app: { name: APP_NAME, version: APP_VERSION },
-    board: { width: W, height: board.height },
+    board: { width: board.width, height: board.height },
     payload,
   };
 }
@@ -167,7 +172,7 @@ const isFileKind = (value: unknown): value is FileKind => value === "map" || val
 // Everything a map file holds. Anything outside this list is a field some other version knows about
 // and this one does not, so it is kept aside rather than thrown away.
 const MAP_KEYS = new Set([
-  "name", "format", "background", "backgroundImage", "stops", "routes", "notes",
+  "name", "format", "orientation", "background", "backgroundImage", "stops", "routes", "notes",
   "lineStyles", "routeTypeStyles", "wagonStyles", "stopTypeStyles", "tickets", "ticketSets",
   "wagonsPerPlayer", "startingTickets", "keptTickets", "players", "ticketBands", "ticketMix",
   "ticketValuation", "lanesUsableByPlayers", "endGapMm", "deckRules", "deckRule", "rules", "unknown",
@@ -194,6 +199,7 @@ export function networkPayload(data: MapData): Record<string, unknown> {
   const routeTypes = new Set(data.routes.map((route) => route.type));
   return {
     format: data.format,
+    ...(data.orientation === "portrait" ? { orientation: "portrait" } : {}),
     stops: data.stops,
     routes: data.routes,
     tickets: data.tickets,
@@ -279,6 +285,8 @@ export const normalizeMap = (raw: Partial<MapData>): MapData => normalizeMapFiel
 const normalizeMapFields = (value: Partial<MapData>): MapData => ({
   name: typeof value.name === "string" ? value.name : "Imported map",
   format: isMapFormat(value.format) ? value.format : "board-2x3",
+  // Lying is the default and is not written, so a lying map is the same file it always was.
+  ...(value.orientation === "portrait" ? { orientation: "portrait" as const } : {}),
   background: Array.isArray(value.background) ? value.background : [],
   stops: Array.isArray(value.stops) ? value.stops : [],
   routes: Array.isArray(value.routes) ? value.routes.map(migrateRoute) : [],
@@ -320,13 +328,30 @@ const scaleRoutesToHeight = (routes: Route[], fromHeight: number, toHeight: numb
 const scaleImageToHeight = (image: BackgroundImage, fromHeight: number, toHeight: number): BackgroundImage => ({ ...image, y: image.y * toHeight / fromHeight, height: image.height * toHeight / fromHeight });
 const scaleNotesToHeight = (notes: NoteBox[], fromHeight: number, toHeight: number): NoteBox[] => notes.map((note) => ({ ...note, y: note.y * toHeight / fromHeight, height: note.height * toHeight / fromHeight }));
 const sourceHeight = (value: { format?: unknown }): number => isMapFormat(value.format) ? mapFormats[value.format].height : typeof value.format === "string" && legacyFormats[value.format] ? legacyFormats[value.format].height : mapFormats["board-2x3"].height;
-export const normalizeBackgroundFile = (value: { format?: unknown; background?: unknown; backgroundImage?: unknown }, toHeight: number): { background: BackgroundShape[]; backgroundImage?: BackgroundImage } => {
-  const fromHeight = sourceHeight(value);
+// Content from a file drawn on another board, brought onto this one: laid down if it stood, scaled
+// from its board's height to this one's while lying, and stood up again if this board stands.
+type BoardContents = Partial<Pick<MapData, "stops" | "routes" | "background" | "notes" | "backgroundImage">>;
+function ontoBoard<T extends BoardContents>(value: T, source: { format?: unknown; orientation?: unknown }, to: Pick<Board, "width" | "height">): T {
+  const fromHeight = sourceHeight(source);
+  let next = value;
+  if (source.orientation === "portrait") { const lay = turnBetween({ width: fromHeight, height: W }, "landscape")!; next = turnContents(next, lay.turn, lay.degrees); }
+  const toHeight = Math.min(to.width, to.height);
+  next = { ...next,
+    ...(next.stops ? { stops: scaleStopsToHeight(next.stops, fromHeight, toHeight) } : {}),
+    ...(next.routes ? { routes: scaleRoutesToHeight(next.routes, fromHeight, toHeight) } : {}),
+    ...(next.background ? { background: scaleBackgroundToHeight(next.background, fromHeight, toHeight) } : {}),
+    ...(next.notes ? { notes: scaleNotesToHeight(next.notes, fromHeight, toHeight) } : {}),
+    ...(next.backgroundImage ? { backgroundImage: scaleImageToHeight(next.backgroundImage, fromHeight, toHeight) } : {}) };
+  if (to.width < to.height) { const stand = turnBetween({ width: W, height: toHeight }, "portrait")!; next = turnContents(next, stand.turn, stand.degrees); }
+  return next;
+}
+export const normalizeBackgroundFile = (value: { format?: unknown; orientation?: unknown; background?: unknown; backgroundImage?: unknown }, to: Pick<Board, "width" | "height">): { background: BackgroundShape[]; backgroundImage?: BackgroundImage } => {
   const image = normalizeBackgroundImage(value.backgroundImage);
-  return { background: scaleBackgroundToHeight(Array.isArray(value.background) ? value.background : [], fromHeight, toHeight), backgroundImage: image ? scaleImageToHeight(image, fromHeight, toHeight) : undefined };
+  const moved = ontoBoard({ background: Array.isArray(value.background) ? value.background as BackgroundShape[] : [], backgroundImage: image }, value, to);
+  return { background: moved.background ?? [], backgroundImage: moved.backgroundImage };
 };
 // A network file may carry the tickets that belong to its stops, as the official reference maps do.
-export const normalizeNetworkFile = (value: { format?: unknown; stops?: unknown; routes?: unknown; lineStyles?: unknown; routeTypeStyles?: unknown; stopTypeStyles?: unknown; wagonStyles?: unknown; tickets?: unknown }, toHeight: number): { stops: Stop[]; routes: Route[]; lineStyles: LineStyle[]; routeTypeStyles: RouteTypeStyle[]; stopTypeStyles: StopTypeStyle[]; wagonStyles: WagonStyle[]; tickets: Ticket[] } => { const fromHeight = sourceHeight(value); return { stopTypeStyles: Array.isArray(value.stopTypeStyles) ? value.stopTypeStyles : [], wagonStyles: Array.isArray(value.wagonStyles) ? value.wagonStyles : [], tickets: Array.isArray(value.tickets) ? (value.tickets as Ticket[]).map((ticket, index) => ({ ...ticket, id: ticket.id || `t-import-${index}`, set: undefined })) : [], stops: scaleStopsToHeight(Array.isArray(value.stops) ? value.stops : [], fromHeight, toHeight), routes: scaleRoutesToHeight(Array.isArray(value.routes) ? value.routes : [], fromHeight, toHeight), lineStyles: Array.isArray(value.lineStyles) ? value.lineStyles : [], routeTypeStyles: Array.isArray(value.routeTypeStyles) && value.routeTypeStyles.length ? value.routeTypeStyles : defaultRouteTypeStyles.map((style) => ({ ...style })) }; };
+export const normalizeNetworkFile = (value: { format?: unknown; orientation?: unknown; stops?: unknown; routes?: unknown; lineStyles?: unknown; routeTypeStyles?: unknown; stopTypeStyles?: unknown; wagonStyles?: unknown; tickets?: unknown }, to: Pick<Board, "width" | "height">): { stops: Stop[]; routes: Route[]; lineStyles: LineStyle[]; routeTypeStyles: RouteTypeStyle[]; stopTypeStyles: StopTypeStyle[]; wagonStyles: WagonStyle[]; tickets: Ticket[] } => { const moved = ontoBoard({ stops: Array.isArray(value.stops) ? value.stops as Stop[] : [], routes: Array.isArray(value.routes) ? value.routes as Route[] : [] }, value, to); return { stopTypeStyles: Array.isArray(value.stopTypeStyles) ? value.stopTypeStyles : [], wagonStyles: Array.isArray(value.wagonStyles) ? value.wagonStyles : [], tickets: Array.isArray(value.tickets) ? (value.tickets as Ticket[]).map((ticket, index) => ({ ...ticket, id: ticket.id || `t-import-${index}`, set: undefined })) : [], stops: moved.stops ?? [], routes: moved.routes ?? [], lineStyles: Array.isArray(value.lineStyles) ? value.lineStyles : [], routeTypeStyles: Array.isArray(value.routeTypeStyles) && value.routeTypeStyles.length ? value.routeTypeStyles : defaultRouteTypeStyles.map((style) => ({ ...style })) }; };
 // A ticket-only file. Endpoints travel as stop ids *and* stop names, so a deck can be moved to
 // another copy of the map where the ids differ but the cities are the same.
 export type TicketFile = { kind: "tickets"; map: string; sets: TicketSet[]; tickets: (Ticket & { aName: string; bName: string })[] };
@@ -408,6 +433,8 @@ export function formatTimestamp(date: Date = new Date()): string {
 // Moving a map to another board format keeps x as-is and scales y by the height ratio, so objects
 // stay in the same relative positions.
 export function rescaleMapToFormat(draft: MapData, nextFormat: MapFormat): MapData {
+  // A standing map is laid down, moved to the other board, and stood up again.
+  if (draft.orientation === "portrait") return rotateMap(rescaleMapToFormat(rotateMap(draft, "landscape"), nextFormat), "portrait");
   const fromHeight = mapFormats[draft.format].height;
   const toHeight = mapFormats[nextFormat].height;
   draft.stops = scaleStopsToHeight(draft.stops, fromHeight, toHeight);

@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { useId } from "react";
-import { mapFormats, ticketsInSet, type MapData, type MapFormat, W } from "./map-data";
+import { mapFormats, ticketsInSet, type MapData, type MapFormat } from "./map-data";
+import { boardOf, type Orientation } from "./board";
 import { curvedPath, isCurved, pathFromPoints, pointsFor } from "./map-geometry";
 import { MapArtwork } from "./map-artwork";
 import { RulesText } from "./rules-text";
@@ -20,12 +21,12 @@ import { CUT_MARK_GAP_MM, CUT_MARK_REACH_MM, describePlan, papers, PRINT_CAPTION
 // The whole network, drawn once for the deck as a symbol every card's small map reuses: the
 // background's areas and lines faintly, the routes and stops in light grey. Junctions get no dot.
 function TicketMapSymbol({ data, id }: { data: MapData; id: string }) {
-  const height = mapFormats[data.format].height;
+  const { width, height } = boardOf(data);
   const junctions = new Set(data.stopTypeStyles.filter((style) => style.junction).map((style) => style.id));
   const pairs = new Set<string>();
   const routes = data.routes.filter((route) => { const key = [route.a, route.b].sort().join("~"); if (pairs.has(key)) return false; pairs.add(key); return true; });
   return <svg className="ticket-map-defs" width="0" height="0" aria-hidden="true">
-    <symbol id={id} viewBox={`0 0 ${W} ${height}`}>
+    <symbol id={id} viewBox={`0 0 ${width} ${height}`}>
       {data.background.filter((shape) => shape.type === "area").map((shape) => <polygon key={shape.id} className="ticket-map-area" points={shape.points.map((point) => `${point.x},${point.y}`).join(" ")} />)}
       {data.background.filter((shape) => shape.type === "line").map((shape) => <polyline key={shape.id} className="ticket-map-line" points={shape.points.map((point) => `${point.x},${point.y}`).join(" ")} />)}
       {routes.map((route) => { const points = pointsFor(data, route); return points.length ? <path key={route.id} className="ticket-map-route" d={isCurved(route) && points.length > 2 ? curvedPath(points) : pathFromPoints(points)} /> : null; })}
@@ -39,8 +40,9 @@ export function TicketCards({ data, setId, perRow, minimap }: { data: MapData; s
   const stop = (id: string) => data.stops.find((item) => item.id === id);
   const name = (id: string) => stop(id)?.name ?? "—";
   const tickets = ticketsInSet(data, set?.id ?? "");
-  const card = cardSize(data.format);
-  const height = mapFormats[data.format].height;
+  const board = boardOf(data);
+  const card = cardSize(data.format, board.orientation);
+  const { width, height } = board;
   const symbolId = `ticket-map-${useId().replace(/:/g, "")}`;
   // One continuous run of cards rather than sheets of a fixed height. Any arithmetic that assumes
   // the printable area is exactly the paper would break on a browser that insists on its own
@@ -58,9 +60,9 @@ export function TicketCards({ data, setId, perRow, minimap }: { data: MapData; s
           return <div className={cn("ticket-card", minimap ? "with-map" : "plain")} key={ticket.id} style={{ width: `${card.width}mm`, height: `${card.height}mm` }}>
             {minimap ? <>
               <p className="ticket-card-names"><span className="ticket-card-from">{name(ticket.a)}</span><span className="ticket-card-dash"> – </span><span className="ticket-card-to">{name(ticket.b)}</span></p>
-              <svg className="ticket-map" viewBox={`0 0 ${W} ${height}`} style={{ aspectRatio: `${W} / ${height}`, maxHeight: `${((card.width - 6 - 10 - 1.5) * height / W).toFixed(2)}mm` }}>
-                <use href={`#${symbolId}`} width={W} height={height} />
-                <rect className="ticket-map-frame" x={0} y={0} width={W} height={height} />
+              <svg className="ticket-map" viewBox={`0 0 ${width} ${height}`} style={{ aspectRatio: `${width} / ${height}`, maxHeight: `${((card.width - 6 - 10 - 1.5) * height / width).toFixed(2)}mm` }}>
+                <use href={`#${symbolId}`} width={width} height={height} />
+                <rect className="ticket-map-frame" x={0} y={0} width={width} height={height} />
                 {ends.map((end) => <circle key={end.id} className="ticket-map-end" cx={end.x} cy={end.y} r={30} />)}
               </svg>
               <div className="ticket-card-corner">
@@ -87,7 +89,7 @@ export function TicketCards({ data, setId, perRow, minimap }: { data: MapData; s
 export type PrintParts = { board: boolean; tickets: boolean; rules: boolean; minimap: boolean };
 
 export function PrintPages({ data, plan, parts, setId }: { data: MapData; plan: PrintPlan; parts: PrintParts; setId: string }) {
-  const format = mapFormats[data.format];
+  const format = boardOf(data);
   const full = plan.choice.split === "full";
   const percent = `${Math.round(plan.scale * 100)} %`;
   const caption = (page: PrintPlan["pages"][number]) => {
@@ -95,7 +97,7 @@ export function PrintPages({ data, plan, parts, setId }: { data: MapData; plan: 
     const where = `row ${page.row + 1}, column ${page.column + 1}`;
     if (full) return `Sheet ${page.index + 1} of ${count} · ${where} · full size · trim at the marks, butt to its neighbours`;
     if (plan.choice.split === "panel") return `Panel ${page.index + 1} of ${count} · ${where} · ${percent} of full size`;
-    return `${format.shortLabel} · ${plan.boardMm.width} × ${plan.boardMm.height} mm · ${percent}`;
+    return `${format.label} · ${plan.boardMm.width} × ${plan.boardMm.height} mm · ${percent}`;
   };
   return <div className="print-pages print-map" aria-hidden="true">
     {/* The paper, upright, and its margin are declared here. The page box is never the paper's size:
@@ -117,10 +119,10 @@ export function PrintPages({ data, plan, parts, setId }: { data: MapData; plan: 
             <text className="print-sheet-name" x={2.5} y={PRINT_CAPTION_MM - 2.2}>{data.name}</text>
             <text className="print-sheet-note" x={width - 2.5} y={PRINT_CAPTION_MM - 2.2} textAnchor="end">{caption(page)}</text>
             <rect className={cn("print-sheet-art", full && "trimmed")} x={0} y={PRINT_CAPTION_MM} width={width} height={artHeight} />
-            <svg x={0} y={PRINT_CAPTION_MM} width={width} height={artHeight} viewBox={`${page.tile.x * W} ${page.tile.y * format.height} ${page.tile.width * W} ${page.tile.height * format.height}`}>
+            <svg x={0} y={PRINT_CAPTION_MM} width={width} height={artHeight} viewBox={`${page.tile.x * format.width} ${page.tile.y * format.height} ${page.tile.width * format.width} ${page.tile.height * format.height}`}>
               {/* Wagons are always measured against the board the map is drawn for; printing larger or
                   smaller scales them with everything else. */}
-              <MapArtwork data={data} scaleWidthMm={format.widthMm} print />
+              <MapArtwork data={data} scaleWidthMm={mapFormats[data.format].widthMm} print />
             </svg>
             {full && corners.map(([x, y, dx, dy]) => <g className="cut-mark" key={`${x}-${y}`}>
               <line x1={x + dx * CUT_MARK_GAP_MM} y1={y} x2={x + dx * CUT_MARK_REACH_MM} y2={y} />
@@ -132,7 +134,7 @@ export function PrintPages({ data, plan, parts, setId }: { data: MapData; plan: 
     })}
     {/* The rules, if asked for, on pages of their own after the board: as many as the text needs,
         flowing in the same page box as the board's pages. */}
-    {parts.tickets && <TicketCards data={data} setId={setId} perRow={cardsPerRow(plan.pageMm, cardSize(data.format))} minimap={parts.minimap} />}
+    {parts.tickets && <TicketCards data={data} setId={setId} perRow={cardsPerRow(plan.pageMm, cardSize(data.format, format.orientation))} minimap={parts.minimap} />}
     {parts.rules && data.rules?.trim() && <section className="print-rules">
       <p className="print-rules-name">{data.name} · rules</p>
       <RulesText source={data.rules} data={data} print />
@@ -142,10 +144,11 @@ export function PrintPages({ data, plan, parts, setId }: { data: MapData; plan: 
 
 // Printing is decided per run. Nothing chosen here is written to the map; the last choice is kept
 // in this browser only, for convenience.
-export function PrintDialog({ open, onOpenChange, format, profile, choice, onChoice, parts, onPrint }: {
+export function PrintDialog({ open, onOpenChange, format, orientation = "landscape", profile, choice, onChoice, parts, onPrint }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   format: MapFormat;
+  orientation?: Orientation;
   profile: PrintProfile;
   choice: PrintChoice;
   onChoice: (choice: PrintChoice) => void;
@@ -154,8 +157,8 @@ export function PrintDialog({ open, onOpenChange, format, profile, choice, onCho
   parts: { value: PrintParts; onChange: (parts: PrintParts) => void; rulesWritten: boolean; ticketCount: number; deckLabel: string };
   onPrint: () => void;
 }) {
-  const plan = printPlan(format, choice, profile);
-  const { sizes, columns, table } = printChoices(format, profile);
+  const plan = printPlan(format, choice, profile, orientation);
+  const { sizes, columns, table } = printChoices(format, profile, orientation);
   const current = plan.choice;
   const anniversary = sizes.find((size) => size.id === "anniversary");
   // Without the board in the run, how it is split, its size and its sheet table do not apply.
@@ -164,7 +167,7 @@ export function PrintDialog({ open, onOpenChange, format, profile, choice, onCho
   const onePage = current.split === "page";
   const anything = parts.value.board || parts.value.tickets || parts.value.rules;
   const paperLabel = papers.find((paper) => paper.id === current.paper)?.label ?? "the paper";
-  const cards = cardSheets(parts.ticketCount, plan.pageMm, cardSize(format));
+  const cards = cardSheets(parts.ticketCount, plan.pageMm, cardSize(format, orientation));
   // One sentence for the whole run, in the order it prints.
   const summary = !anything ? "Nothing is ticked: tick at least one of the board, the tickets and the rules."
     : [
@@ -176,7 +179,7 @@ export function PrintDialog({ open, onOpenChange, format, profile, choice, onCho
     <DialogContent className="print-dialog">
       <DialogHeader>
         <DialogTitle>Print the map</DialogTitle>
-        <DialogDescription>How this print run comes out. None of it changes the map: the board stays a {mapFormats[format].shortLabel}.</DialogDescription>
+        <DialogDescription>How this print run comes out. None of it changes the map: the board stays a {boardOf({ format, orientation }).label}.</DialogDescription>
       </DialogHeader>
       <div className="print-choices">
         <fieldset><legend>What to print</legend>

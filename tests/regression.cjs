@@ -2790,6 +2790,86 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   check("a map saved as an A4 test sheet opens as a standard board", (await badges())[0] === "Standard board 2×3", (await badges())[0]);
   check("with everything on it", /\d+ stops/.test((await badges())[2]), (await badges())[2]);
 
+  // 35. a board that stands: chosen in Settings beside the format, everything on it turned a quarter
+  // turn, the canvas, the print, the cards and the file all standing with it. In a window of its own.
+  {
+    const sp = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
+    sp.on("pageerror", (e) => errors.push(String(e)));
+    await sp.goto(BASE, { waitUntil: "networkidle" });
+    await sp.getByRole("button", { name: "Load the example map" }).click();
+    await sp.waitForTimeout(600);
+    const KEY = "orebro-map-editor-public-v2";
+    const storedMap = () => sp.evaluate((key) => JSON.parse(localStorage.getItem(key)), KEY);
+    const lying = await storedMap();
+    const viewBox = () => sp.evaluate(() => document.querySelector(".map-canvas").getAttribute("viewBox"));
+    const spBadges = () => sp.locator(".map-status span").allTextContents();
+    await sp.getByRole("button", { name: "Settings" }).click();
+    await sp.waitForTimeout(400);
+    const orientations = await sp.locator("#settings-orientation option").evaluateAll((els) => els.map((el) => el.value));
+    check("Settings offers the board lying or standing, beside its format", JSON.stringify(orientations) === JSON.stringify(["landscape", "portrait"]) && (await sp.locator("#settings-orientation").inputValue()) === "landscape", orientations.join(", "));
+    await sp.locator("#settings-orientation").selectOption("portrait");
+    await sp.waitForTimeout(500);
+    await sp.keyboard.press("Escape");
+    await sp.waitForTimeout(300);
+    const standing = await storedMap();
+    check("standing, the board is 731 wide and 1100 tall", (await viewBox()) === "0 0 731 1100", await viewBox());
+    check("and the status line says so", (await spBadges())[0].includes("standing"), (await spBadges())[0]);
+    check("every stop has turned a quarter turn with the board", standing.orientation === "portrait" && lying.stops.every((s, i) => Math.abs(standing.stops[i].x - (731 - s.y)) < .01 && Math.abs(standing.stops[i].y - s.x) < .01));
+    const canvas = await sp.locator(".map-canvas").boundingBox();
+    check("the canvas stands too, and the whole of it fits in the window", canvas.height > canvas.width * 1.4 && canvas.y + canvas.height <= 1000 + 1 && canvas.width > 200, JSON.stringify(canvas));
+    const folds = await sp.evaluate(() => Array.from(document.querySelectorAll(".map-canvas .fold-guides line")).map((l) => (l.getAttribute("x1") === l.getAttribute("x2") ? "v" : "h")).sort().join(""));
+    check("its fold lines mark 2 panels across and 3 down", folds === "hhv", folds);
+    const labelsOff = await sp.evaluate(() => { const c = document.querySelector(".map-canvas").getBoundingClientRect(); return Array.from(document.querySelectorAll(".map-canvas .stop text")).filter((t) => { const r = t.getBoundingClientRect(); return r.width && (r.left < c.left - 1 || r.right > c.right + 1); }).map((t) => t.textContent); });
+    check("no stop's name runs off the side of the standing board", labelsOff.length === 0, labelsOff.join(", "));
+    await sp.getByRole("button", { name: "Undo" }).click();
+    await sp.waitForTimeout(400);
+    check("Undo lays it down again, every stop back where it was", (await viewBox()) === "0 0 1100 731" && (await storedMap()).stops.every((s, i) => Math.abs(s.x - lying.stops[i].x) < .01 && Math.abs(s.y - lying.stops[i].y) < .01), await viewBox());
+    await sp.getByRole("button", { name: "Redo" }).click();
+    await sp.waitForTimeout(400);
+    await sp.reload({ waitUntil: "networkidle" });
+    await sp.waitForTimeout(700);
+    check("a standing map is still standing after a reload", (await viewBox()) === "0 0 731 1100", await viewBox());
+
+    // Printed: not turned on the page, panels 2 × 3.
+    await sp.getByRole("button", { name: "Print map" }).click();
+    await sp.waitForTimeout(400);
+    const dialog = sp.locator('[role="dialog"]').first();
+    const a4Panels = await dialog.locator('.print-table tbody tr[data-paper="a4"] td:nth-of-type(2) button').getAttribute("data-pages");
+    check("the print table counts six A4 sheets for its panels", a4Panels === "6", String(a4Panels));
+    await dialog.getByRole("radio", { name: "One sheet per panel of the game board", exact: true }).check();
+    const summary = await dialog.locator(".print-summary").textContent();
+    check("and does not say the map is turned on the page", !/turned/.test(summary) && /upright/.test(summary), summary);
+    const pages = await sp.evaluate(() => Array.from(document.querySelectorAll(".print-pages .print-page")).map((p) => p.querySelector("svg.print-sheet > g").getAttribute("transform")));
+    check("the board's pages print standing, without a quarter turn", pages.length === 6 && pages.every((t) => !t), JSON.stringify(pages.slice(0, 2)));
+    await sp.keyboard.press("Escape");
+    await sp.waitForTimeout(300);
+
+    // The cards stand with the board, and so does their small map.
+    await sp.getByRole("button", { name: /^Tickets · / }).click();
+    await sp.waitForTimeout(400);
+    await sp.evaluate(() => { window.__stand = null; window.print = () => { const c = document.querySelector(".print-tickets .ticket-card"); const m = c && c.querySelector("svg.ticket-map"); const r = c && c.getBoundingClientRect(); window.__stand = { w: r && r.width, h: r && r.height, viewBox: m && m.getAttribute("viewBox") }; }; });
+    await sp.emulateMedia({ media: "print" });
+    await sp.evaluate(() => Array.from(document.querySelectorAll("button")).find((b) => b.textContent.includes("Print deck")).click());
+    await sp.waitForFunction(() => window.__stand !== null, null, { timeout: 5000 });
+    const card = await sp.evaluate(() => window.__stand);
+    await sp.emulateMedia({ media: "screen" });
+    check("on a standing board the cards stand, 45 x 62 mm", Math.abs(card.w - mm(45)) < 3 && Math.abs(card.h - mm(62)) < 3, `${(card.w / 96 * 25.4).toFixed(0)} x ${(card.h / 96 * 25.4).toFixed(0)} mm`);
+    check("with the standing board as their small map", card.viewBox === "0 0 731 1100", String(card.viewBox));
+
+    // The file says it stands.
+    await sp.waitForTimeout(300);
+    await sp.getByRole("button", { name: "Export", exact: true }).click();
+    await sp.waitForTimeout(250);
+    const saved = sp.waitForEvent("download");
+    await sp.getByRole("menuitem", { name: "Full map" }).click();
+    const file = path.join(os.tmpdir(), `ttr-standing-${Date.now()}.json`);
+    await (await saved).saveAs(file);
+    const json = JSON.parse(fs.readFileSync(file, "utf8"));
+    check("a standing map's file is version 4, its board frame standing", json.version === 4 && json.board.width === 731 && json.board.height === 1100 && json.payload.orientation === "portrait", JSON.stringify({ version: json.version, board: json.board, orientation: json.payload.orientation }));
+    fs.rmSync(file, { force: true });
+    await sp.context().close();
+  }
+
   console.log("PASS:"); ok.forEach((l) => console.log("  ✓ " + l));
   if (bad.length) { console.log("FAIL:"); bad.forEach((l) => console.log("  ✗ " + l)); }
   console.log(`\n${ok.length} passed, ${bad.length} failed`);

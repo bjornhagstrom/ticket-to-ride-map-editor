@@ -123,15 +123,15 @@ export function BackgroundProperties({ shape, change, onDelete }: { shape: Backg
   return <div className="property-form"><div><Label htmlFor="background-label">Label</Label><Input id="background-label" value={shape.label} onChange={(event) => update({ label: event.target.value })} /></div>{shape.type === "area" && <div><Label>Fill colour</Label><input className="colour-input" type="color" value={shape.fill} onChange={(event) => update({ fill: event.target.value })} /></div>}<div><Label>{shape.type === "label" ? "Text colour" : "Line colour"}</Label><input className="colour-input" type="color" value={shape.stroke} onChange={(event) => update({ stroke: event.target.value })} /></div><div><Label>Opacity · {Math.round(shape.opacity * 100)}%</Label><input className="range-input" type="range" min="0.1" max="1" step="0.05" value={shape.opacity} onChange={(event) => update({ opacity: Number(event.target.value) })} /></div>{shape.type !== "label" && <><div><Label>Line width</Label><Input type="number" min="1" max="16" value={shape.strokeWidth} onChange={(event) => update({ strokeWidth: Math.max(1, Math.min(16, Number(event.target.value))) })} /></div><Button variant="outline" onClick={() => update({ labelPoint: undefined })}>Reset label position</Button><p className="helper label-helper">Drag the green handle to position the label freely.</p></>}<Button variant="outline" onClick={() => update({ locked: !shape.locked })}>{shape.locked ? <Unlock /> : <Lock />}{shape.locked ? "Unlock geometry" : "Lock geometry"}</Button><Button variant="destructive" onClick={onDelete}><Trash2 />Delete background object</Button></div>;
 }
 
-export function BackgroundImageProperties({ image, formatHeight, change, onDelete }: { image: BackgroundImage; formatHeight: number; change: (fn: (draft: MapData) => MapData) => void; onDelete: () => void }) {
+export function BackgroundImageProperties({ image, formatHeight, formatWidth = W, change, onDelete }: { image: BackgroundImage; formatHeight: number; formatWidth?: number; change: (fn: (draft: MapData) => MapData) => void; onDelete: () => void }) {
   const update = (values: Partial<BackgroundImage>) => change((draft) => { if (draft.backgroundImage) Object.assign(draft.backgroundImage, values); return draft; });
   const updateCrop = (edge: keyof ImageCrop, percent: number) => change((draft) => { if (draft.backgroundImage) draft.backgroundImage.crop = { ...draft.backgroundImage.crop, [edge]: Math.max(0, Math.min(45, percent)) / 100 }; return draft; });
-  const center = () => update({ x: (W - image.width) / 2, y: (formatHeight - image.height) / 2 });
+  const center = () => update({ x: (formatWidth - image.width) / 2, y: (formatHeight - image.height) / 2 });
   const fitToPage = () => {
-    const scale = Math.min((W * 0.9) / image.naturalWidth, (formatHeight * 0.9) / image.naturalHeight);
+    const scale = Math.min((formatWidth * 0.9) / image.naturalWidth, (formatHeight * 0.9) / image.naturalHeight);
     const width = image.naturalWidth * scale;
     const height = image.naturalHeight * scale;
-    update({ width, height, x: (W - width) / 2, y: (formatHeight - height) / 2 });
+    update({ width, height, x: (formatWidth - width) / 2, y: (formatHeight - height) / 2 });
   };
   return <div className="property-form">
     <div className="image-fit-actions"><Button size="sm" variant="outline" onClick={center}><Crosshair />Center</Button><Button size="sm" variant="outline" onClick={fitToPage}><Maximize2 />Fit to page</Button></div>

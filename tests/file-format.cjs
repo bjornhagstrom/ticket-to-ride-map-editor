@@ -28,7 +28,9 @@ const sample = storage.normalizeMap(require(path.join(out, "map-data.js")).initi
 const file = storage.writeMapFile("map", storage.mapPayload(sample), sample);
 check("a file says which version of the editor wrote it, and it is the package's", file.app && file.app.version === JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8")).version, JSON.stringify(file.app));
 check("a file says what format it is", file.format === storage.FILE_FORMAT, String(file.format));
-check("and which schema it follows", file.version === storage.FILE_VERSION && typeof file.version === "number", String(file.version));
+// A lying map is still written as version 3, so every version 3 reader opens it; only a standing
+// map is version 4 (tests/board.cjs).
+check("and which schema it follows: 3 for a lying map, the newest a version 3 reader still opens", file.version === 3 && storage.FILE_VERSION === 4, String(file.version));
 check("and what kind of file it is", file.kind === "map");
 check("and when it was written", typeof file.written === "string" && !Number.isNaN(Date.parse(file.written)), file.written);
 check("and by what", Boolean(file.app && file.app.name && file.app.version), JSON.stringify(file.app));
@@ -37,7 +39,7 @@ check("the payload sits under its own key, never spread", Boolean(file.payload) 
 
 // ---------------------------------------------------------------- round trips
 const readBack = storage.readMapFile(JSON.parse(JSON.stringify(file)));
-check("a map file reads back as a map", readBack.kind === "map" && readBack.version === storage.FILE_VERSION);
+check("a map file reads back as a map", readBack.kind === "map" && readBack.version === 3);
 const reloaded = storage.normalizeMap(readBack.payload);
 check("a map survives a round trip", reloaded.stops.length === sample.stops.length && reloaded.routes.length === sample.routes.length && reloaded.name === sample.name,
   `${reloaded.stops.length} stops, ${reloaded.routes.length} routes`);
@@ -128,7 +130,7 @@ check("a narrower strip is not stretched: it keeps its scale and is centred on t
   near(strip.stops[1].x, 0) && near(strip.stops[1].y, (549 - 389) / 2), `${strip.stops[1].x}, ${strip.stops[1].y}`);
 const kept = open("board-2x3");
 check("a map already on a board keeps every coordinate", kept.stops[0].x === 550 && kept.stops[0].y === 389 && kept.notes[0].width === 200);
-const oldNetwork = storage.normalizeNetworkFile({ format: "a4", stops: [{ id: "s", x: 10, y: 778 }], routes: [] }, 731);
+const oldNetwork = storage.normalizeNetworkFile({ format: "a4", stops: [{ id: "s", x: 10, y: 778 }], routes: [] }, { width: 1100, height: 731 });
 check("a network file from an old format still lands on the board", near(oldNetwork.stops[0].y, 731), String(oldNetwork.stops[0].y));
 check("a migrated map is written back out under a board format", storage.writeMapFile("map", storage.mapPayload(a4), a4).payload.format === "board-2x3");
 

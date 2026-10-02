@@ -1,4 +1,5 @@
-import { mapFormats, type MapFormat } from "./map-data";
+import { type MapFormat } from "./map-data";
+import { boardOf, type Orientation } from "./board";
 
 // How a board is cut into printed sheets. The board's shape belongs to the map; everything here is
 // a choice made per print run and never stored in the map. tests/print-plan.cjs pins the figures.
@@ -66,8 +67,9 @@ export type PrintPlan = {
   /** Always portrait: the page every browser prints by default. The sheet on it is landscape and
    *  turned a quarter turn (PrintPages). */
   orientation: "portrait";
-  /** Whether the sheet is turned a quarter turn on the page. Only the one page the size of the board is
-   *  not: its page is as wide as the board, because the paper is the board's own. */
+  /** Whether the sheet is turned a quarter turn on the page. A lying board is, so it runs along the
+   *  page's long side; a standing board is not, and neither is the one page the size of the board: its
+   *  page is as wide as the board, because the paper is the board's own. */
   turned: boolean;
   /** The page as the printer should be asked for it: the paper, upright. */
   pageMm: { width: number; height: number };
@@ -80,15 +82,21 @@ export type PrintPlan = {
   pages: PrintPage[];
 };
 
-type Orientation = { pageMm: { width: number; height: number }; content: { width: number; height: number } };
+type Layout = { pageMm: { width: number; height: number }; content: { width: number; height: number } };
 // Every page is upright, and the map is laid out as a landscape sheet turned a quarter turn on it.
 // Safari ignores @page and prints portrait unless told otherwise in its own dialog; Chrome and
 // Firefox follow @page. An upright page is the one thing all three do alike, so nobody has to pick an
 // orientation. Turning the sheet only on portrait paper, by media query, was tried and failed: see
 // docs/PRINTING.md. The sheet's room is the page's long side across and its short side, less the
 // caption, down.
-const orientations = (paperId: PaperId, profile: PrintProfile): Orientation[] => {
+// A standing board needs no turn: its sheet is the page's short side across and its long side, less
+// the caption, down.
+const orientations = (paperId: PaperId, profile: PrintProfile, standing = false): Layout[] => {
   const paper = papers.find((item) => item.id === paperId) ?? papers[0];
+  if (standing) return [{
+    pageMm: { width: paper.widthMm, height: paper.heightMm },
+    content: { width: paper.widthMm - 2 * PRINT_MARGIN_MM, height: paper.heightMm - 2 * profile.longMarginMm - PRINT_CAPTION_MM },
+  }];
   return [{
     pageMm: { width: paper.widthMm, height: paper.heightMm },
     content: { width: paper.heightMm - 2 * profile.longMarginMm, height: paper.widthMm - 2 * PRINT_MARGIN_MM - PRINT_CAPTION_MM },
@@ -105,11 +113,12 @@ export function printChoiceFor(format: MapFormat, choice: PrintChoice): Required
   return { split, paper, size };
 }
 
-export function printPlan(format: MapFormat, raw: PrintChoice, profile: PrintProfile = PRINT_PROFILES.standard): PrintPlan {
+export function printPlan(format: MapFormat, raw: PrintChoice, profile: PrintProfile = PRINT_PROFILES.standard, orientation: Orientation = "landscape"): PrintPlan {
   const choice = printChoiceFor(format, raw);
-  const board = mapFormats[format] ?? mapFormats["board-2x3"];
+  const board = boardOf({ format, orientation });
+  const standing = board.orientation === "portrait";
   const size = (boardSizes[format] ?? boardSizes["board-2x3"]).find((item) => item.id === choice.size)!;
-  const boardMm = choice.split === "full" ? { width: size.widthMm, height: size.heightMm } : { width: board.widthMm, height: board.heightMm };
+  const boardMm = choice.split === "full" ? (standing ? { width: size.heightMm, height: size.widthMm } : { width: size.widthMm, height: size.heightMm }) : { width: board.widthMm, height: board.heightMm };
 
   // The whole board on a page of its own size, upright and at 100 %: for a plotter or a large-format
   // printer, or to save as a PDF. The page is the board, its caption and the margin all round, whatever
@@ -119,13 +128,13 @@ export function printPlan(format: MapFormat, raw: PrintChoice, profile: PrintPro
     return { choice, orientation: "portrait", turned: false, pageMm, scale: 1, boardMm, columns: 1, rows: 1, pages: [{ index: 0, column: 0, row: 0, tile: { x: 0, y: 0, width: 1, height: 1 }, contentMm: { ...boardMm } }] };
   }
 
-  let columns: number, rows: number, scale: number, best: Orientation;
+  let columns: number, rows: number, scale: number, best: Layout;
   if (choice.split === "full") {
     // As few sheets as possible, each tile the same size, at 100 %.
     // The cut marks reach past both ends of the sheet's length, and past the far edge of its depth
     // (the near edge's marks rise into the caption line), so they come out of the room first.
-    const room = (item: Orientation) => ({ width: item.content.width - 2 * CUT_MARK_REACH_MM, height: item.content.height - CUT_MARK_REACH_MM });
-    const counted = orientations(choice.paper, profile).map((item) => ({ item, columns: sheetsFor(boardMm.width, room(item).width), rows: sheetsFor(boardMm.height, room(item).height) }));
+    const room = (item: Layout) => ({ width: item.content.width - 2 * CUT_MARK_REACH_MM, height: item.content.height - CUT_MARK_REACH_MM });
+    const counted = orientations(choice.paper, profile, standing).map((item) => ({ item, columns: sheetsFor(boardMm.width, room(item).width), rows: sheetsFor(boardMm.height, room(item).height) }));
     const pick = counted.reduce((a, b) => (b.columns * b.rows < a.columns * a.rows ? b : a));
     ({ columns, rows } = pick); best = pick.item; scale = 1;
   } else {
@@ -133,7 +142,7 @@ export function printPlan(format: MapFormat, raw: PrintChoice, profile: PrintPro
     columns = choice.split === "panel" ? board.columns : 1;
     rows = choice.split === "panel" ? board.rows : 1;
     const tile = { width: boardMm.width / columns, height: boardMm.height / rows };
-    const scored = orientations(choice.paper, profile).map((item) => ({ item, scale: Math.min(1, item.content.width / tile.width, item.content.height / tile.height) }));
+    const scored = orientations(choice.paper, profile, standing).map((item) => ({ item, scale: Math.min(1, item.content.width / tile.width, item.content.height / tile.height) }));
     const pick = scored.reduce((a, b) => (b.scale > a.scale ? b : a));
     best = pick.item; scale = pick.scale;
   }
@@ -143,12 +152,12 @@ export function printPlan(format: MapFormat, raw: PrintChoice, profile: PrintPro
     const tile = { x: column / columns, y: row / rows, width: 1 / columns, height: 1 / rows };
     return { index, column, row, tile, contentMm: { width: tile.width * boardMm.width * scale, height: tile.height * boardMm.height * scale } };
   });
-  return { choice, orientation: "portrait", turned: true, pageMm: best.pageMm, scale, boardMm, columns, rows, pages };
+  return { choice, orientation: "portrait", turned: !standing, pageMm: best.pageMm, scale, boardMm, columns, rows, pages };
 }
 
 export type PrintTableCell = { choice: Required<PrintChoice>; label: string; pages: number; scale: number };
 /** Every way this board can be printed: the sizes on offer, and a row per paper to compare them by. */
-export function printChoices(format: MapFormat, profile: PrintProfile = PRINT_PROFILES.standard) {
+export function printChoices(format: MapFormat, profile: PrintProfile = PRINT_PROFILES.standard, orientation: Orientation = "landscape") {
   const sizes = boardSizes[format] ?? boardSizes["board-2x3"];
   const columns: { label: string; choice: (paper: PaperId) => PrintChoice }[] = [
     { label: "One sheet", choice: (paper) => ({ split: "sheet", paper }) },
@@ -158,7 +167,7 @@ export function printChoices(format: MapFormat, profile: PrintProfile = PRINT_PR
   const table = papers.map((paper) => ({
     paper,
     cells: columns.map((column): PrintTableCell => {
-      const plan = printPlan(format, column.choice(paper.id), profile);
+      const plan = printPlan(format, column.choice(paper.id), profile, orientation);
       return { choice: plan.choice, label: column.label, pages: plan.pages.length, scale: plan.scale };
     }),
   }));
@@ -172,15 +181,15 @@ export function describePlan(plan: PrintPlan): string {
   const paper = papers.find((item) => item.id === plan.choice.paper)!;
   const count = plan.pages.length;
   if (plan.choice.split === "page") return `One page, ${plan.pageMm.width} × ${plan.pageMm.height} mm, upright, with the board at 100 % — real size, ${plan.boardMm.width} × ${plan.boardMm.height} mm.`;
-  const sheets = `${count} sheet${count === 1 ? "" : "s"} of ${paper.label}, upright with the map turned`;
+  const sheets = `${count} sheet${count === 1 ? "" : "s"} of ${paper.label}, upright${plan.turned ? " with the map turned" : ""}`;
   if (plan.choice.split === "full") return `${sheets}, at 100 % — real size. Together they make the ${plan.boardMm.width} × ${plan.boardMm.height} mm board: trim each at its marks and butt it to its neighbours.`;
   return `${sheets}, at ${Math.round(plan.scale * 100)} % of real size: the board prints smaller than the real ${plan.boardMm.width} × ${plan.boardMm.height} mm.`;
 }
 
 /** Cut-out ticket cards, 62 x 45 mm, lying the way the board lies: a landscape board gives landscape
  *  cards, a portrait one upright cards. As many to a row, and as many rows, as the page holds. */
-export function cardSize(format: MapFormat): { width: number; height: number } {
-  const board = mapFormats[format];
+export function cardSize(format: MapFormat, orientation: Orientation = "landscape"): { width: number; height: number } {
+  const board = boardOf({ format, orientation });
   return board.width >= board.height ? { width: 62, height: 45 } : { width: 45, height: 62 };
 }
 export function cardsPerRow(pageMm: { width: number; height: number }, card: { width: number; height: number }): number {

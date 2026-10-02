@@ -12,7 +12,7 @@
     "dev": "next dev",
     "build": "next build",
     "typecheck": "tsc --noEmit",
-    "test": "npm run typecheck && npm run lint && npm run test:synthetic && npm run test:suggester && npm run test:calibration && npm run test:file-format && npm run test:print-plan && npm run test:markdown && npm run test:releases && npm run test:license && npm run test:csv && npm run test:csv-import && npm run build",
+    "test": "npm run typecheck && npm run lint && npm run test:synthetic && npm run test:suggester && npm run test:calibration && npm run test:file-format && npm run test:print-plan && npm run test:markdown && npm run test:releases && npm run test:license && npm run test:csv && npm run test:csv-import && npm run test:board && npm run build",
     "lint": "eslint app components lib --ignore-pattern .next --ignore-pattern out",
     "test:regression": "node tests/regression.cjs",
     "test:synthetic": "node tests/ticket-suggester-synthetic.cjs",
@@ -24,7 +24,8 @@
     "test:releases": "node tests/releases.cjs",
     "test:license": "node tests/license.cjs",
     "test:csv": "node tests/csv-export.cjs",
-    "test:csv-import": "node tests/csv-import.cjs"
+    "test:csv-import": "node tests/csv-import.cjs",
+    "test:board": "node tests/board.cjs"
   },
   "dependencies": {
     "class-variance-authority": "0.7.1",

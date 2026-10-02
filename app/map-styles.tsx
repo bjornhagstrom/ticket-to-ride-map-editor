@@ -4,6 +4,7 @@
 // Applying a style stays in the Properties panel, where the object is; defining one lives here, so
 // the panel is about the thing you clicked rather than about the map's vocabulary.
 import { useMemo } from "react";
+import { orientationLabels, orientationOf, type Orientation } from "./board";
 import { Plus, Trash2 } from "lucide-react";
 import { bandCuts, mapDiameter } from "./map-analysis";
 import { DeckRulesPanel } from "./deck-rules-panel";
@@ -54,7 +55,7 @@ const clampCount = (raw: string, fallback: number): number => {
   return Number.isFinite(number) && number >= 1 ? number : fallback;
 };
 
-export function SettingsDialog({ open, onOpenChange, target, onTarget, data, change, defaults, onChangeFormat }: {
+export function SettingsDialog({ open, onOpenChange, target, onTarget, data, change, defaults, onChangeFormat, onChangeOrientation }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   target: StyleTarget;
@@ -63,6 +64,7 @@ export function SettingsDialog({ open, onOpenChange, target, onTarget, data, cha
   change: (fn: (draft: MapData) => MapData) => void;
   defaults: EditorDefaults;
   onChangeFormat: (format: MapFormat) => void;
+  onChangeOrientation: (orientation: Orientation) => void;
 }) {
   const kind = target.kind;
   const lists: Record<string, { id: string; label: string }[]> = {
@@ -176,6 +178,8 @@ export function SettingsDialog({ open, onOpenChange, target, onTarget, data, cha
             {fresh && <p className="helper settings-start">A board format is all you need to begin. The rest — ticket lengths, stop and route types, what a new object looks like — is listed on the left and can wait until you want it.</p>}
             <div><Label htmlFor="settings-format">Board format (# of panels)</Label><NativeSelect id="settings-format" value={data.format} onChange={(event) => onChangeFormat(event.target.value as MapFormat)}>{Object.entries(mapFormats).map(([key, item]) => <NativeSelectOption key={key} value={key}>{item.label}</NativeSelectOption>)}</NativeSelect>
               <p className="helper settings-format-help">The shape of the game board. <strong>You can change this whenever you like.</strong></p></div>
+            <div><Label htmlFor="settings-orientation">Orientation</Label><NativeSelect id="settings-orientation" value={orientationOf(data)} onChange={(event) => onChangeOrientation(event.target.value as Orientation)}>{(Object.keys(orientationLabels) as Orientation[]).map((key) => <NativeSelectOption key={key} value={key}>{orientationLabels[key]}</NativeSelectOption>)}</NativeSelect>
+              <p className="helper settings-orientation-help">Whether the board lies or stands. Changing it turns everything on the map a quarter turn, and the ticket cards turn with it.</p></div>
             <div className="settings-pair">
               <div><Label htmlFor="settings-players-min">Players, fewest</Label>
                 <Input id="settings-players-min" type="number" min={1} max={8} value={players.min}
