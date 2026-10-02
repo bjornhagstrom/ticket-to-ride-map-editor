@@ -1415,7 +1415,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.getByRole("button", { name: /Help/ }).click();
   await page.waitForTimeout(300);
   const helpItems = await page.locator('[role="menuitem"]').allTextContents();
-  check("Help offers the guide, About and What's new, and nothing clutters the header", helpItems.length === 3 && helpItems.some((t) => /About/.test(t)) && helpItems.some((t) => /What.s new/.test(t)), helpItems.join(" | "));
+  check("Help offers the guide, About, What's new and the source code, and nothing clutters the header", helpItems.length === 4 && helpItems.some((t) => /About/.test(t)) && helpItems.some((t) => /What.s new/.test(t)) && helpItems.some((t) => /Source code/.test(t)), helpItems.join(" | "));
   await page.getByRole("menuitem", { name: /About/ }).click();
   await page.waitForTimeout(1200);
   check("About is a page of its own", page.url().includes("/about"), page.url());
@@ -2542,6 +2542,8 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     const whatsNew = page.getByRole("menuitem", { name: /What.s new/ });
     check("the Help menu has What's new, as a link", (await whatsNew.count()) === 1 && /whats-new\/?$/.test((await whatsNew.getAttribute("href")) || ""), String(await whatsNew.getAttribute("href")));
     check("and says which version this is", (await page.locator('[role="menu"]').textContent()).includes(`Version ${pkgVersion}`));
+    const repoItem = page.getByRole("menuitem", { name: /Source code on GitHub/ });
+    check("Help links to the source code on GitHub, in a new tab that is not given the page to look at", (await repoItem.count()) === 1 && (await repoItem.getAttribute("href")) === "https://github.com/bjornhagstrom/ticket-to-ride-map-editor" && (await repoItem.getAttribute("target")) === "_blank" && /noopener/.test(await repoItem.getAttribute("rel")) && /noreferrer/.test(await repoItem.getAttribute("rel")));
     await page.keyboard.press("Escape");
     await page.waitForTimeout(250);
     const other = await (await browser.newContext({ viewport: { width: 1200, height: 900 } })).newPage();
@@ -2554,6 +2556,8 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     await other.goto(BASE + "about/", { waitUntil: "networkidle" });
     const aboutText = await other.locator("body").textContent();
     check("the About page speaks of the many many prototypes, not of ten or twenty", /the many many prototypes/.test(aboutText) && !/ten or twenty/.test(aboutText));
+    const aboutRepo = other.getByRole("link", { name: /source code/i });
+    check("the About page links to the source code too", (await aboutRepo.count()) >= 1 && (await aboutRepo.first().getAttribute("href")) === "https://github.com/bjornhagstrom/ticket-to-ride-map-editor" && /noopener/.test(await aboutRepo.first().getAttribute("rel")));
     check("the About page shows the version and links to What's new", (await other.locator("body").textContent()).includes(`Version ${pkgVersion}`) && (await other.getByRole("link", { name: /What.s new/ }).count()) >= 1);
     await other.context().close();
   }

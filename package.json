@@ -3,6 +3,8 @@
   "version": "0.3.0",
   "private": true,
   "license": "MIT",
+  "repository": { "type": "git", "url": "git+https://github.com/bjornhagstrom/ticket-to-ride-map-editor.git" },
+  "homepage": "https://hagstrom.nu/ttr/",
   "engines": {
     "node": ">=22.13.0"
   },

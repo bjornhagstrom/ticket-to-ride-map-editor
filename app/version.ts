@@ -1,17 +1,21 @@
 // The version of the editor, and what changed in each. The notes are for the people who use the
 // editor, so they say what a person can now do, in plain words: no file names, no commit hashes.
 // The newest release comes first, and its version is the one in package.json (a test checks it).
+// Where the source code lives. Linked from Help and from the About page.
+export const REPO_URL = "https://github.com/bjornhagstrom/ticket-to-ride-map-editor";
+
 export type Release = { version: string; date: string; title: string; changes: string[] };
 
 export const RELEASES: Release[] = [
   {
     version: "0.3.0",
-    date: "2026-10-01",
+    date: "2026-10-02",
     title: "One print run for the board, the tickets and the rules",
     changes: [
       "The print dialog has a tick box for the board, one for the tickets and one for the rules. Tick any of them and they print in one run: the board, then the tickets as cut-out cards, then the rules.",
       "The dialog says how many sheets the cards take on the paper you chose, and offers only what there is to print: no cards from a deck without tickets, and no rules from a map without rules.",
       "Suggest a deck no longer counts a junction as a stop when it works out how many tickets to propose; a map with junctions now gets a slightly smaller suggested deck.",
+      "The source code is public, under the MIT licence, with a link to it from the About page and the Help menu.",
     ],
   },
   {

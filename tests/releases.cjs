@@ -12,7 +12,7 @@ const path = require("path");
 const root = path.join(__dirname, "..");
 const out = fs.mkdtempSync(path.join(os.tmpdir(), "ttr-releases-"));
 execFileSync("npx", ["tsc", "app/version.ts", "--outDir", out, "--module", "commonjs", "--target", "es2022", "--moduleResolution", "node", "--skipLibCheck", "--lib", "es2022,dom"], { cwd: root, stdio: "inherit" });
-const { APP_VERSION, RELEASES } = require(path.join(out, "version.js"));
+const { APP_VERSION, RELEASES, REPO_URL } = require(path.join(out, "version.js"));
 const pkg = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
 
 const ok = [];
@@ -31,6 +31,8 @@ check("no release is dated in the future", RELEASES.every((r) => Date.parse(r.da
 check("every release has a title and at least one change", RELEASES.every((r) => typeof r.title === "string" && r.title.trim() && Array.isArray(r.changes) && r.changes.length >= 1));
 check("every change is a sentence of plain words, not a stub and not an essay", RELEASES.every((r) => r.changes.every((c) => typeof c === "string" && c.trim().length >= 25 && c.length <= 320 && /[.!]$/.test(c.trim()))));
 check("the notes name no files, commits or tools", RELEASES.every((r) => [r.title, ...r.changes].every((t) => !/\b[0-9a-f]{7,40}\b/.test(t) && !/\bapp\/|\.tsx?\b|\.cjs\b|\bAGENTS\b|\bCodex\b|\bClaude\b|\bnpm\b|\bgit\b/i.test(t))));
+check("the repository link is a GitHub address to an owner and a repository", /^https:\/\/github\.com\/[\w.-]+\/[\w.-]+$/.test(REPO_URL), String(REPO_URL));
+check("the package names the same repository, and the public address of the tool", pkg.repository && String(pkg.repository.url).includes(REPO_URL.replace("https://", "")) && pkg.homepage === "https://hagstrom.nu/ttr/", JSON.stringify([pkg.repository, pkg.homepage]));
 check("the first version is in the list", RELEASES.some((r) => r.version === "0.1.0"));
 check("no two releases share a version", new Set(RELEASES.map((r) => r.version)).size === RELEASES.length);
 

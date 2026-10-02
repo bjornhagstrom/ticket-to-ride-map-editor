@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { BusFront, ArrowLeft } from "lucide-react";
 import { APP_VERSION, FILE_VERSION } from "../map-storage";
+import { REPO_URL } from "../version";
 import "../about.css";
 
 export const metadata = { title: "About – Ticket to Ride – Map prototypes" };
@@ -130,7 +131,7 @@ export default function About() {
     </section>
 
     <footer className="about-foot">
-      <p>Version {APP_VERSION} · file format {FILE_VERSION} · <Link href="/whats-new">What&apos;s new</Link></p>
+      <p>Version {APP_VERSION} · file format {FILE_VERSION} · <Link href="/whats-new">What&apos;s new</Link> · <a href={REPO_URL} target="_blank" rel="noopener noreferrer">Source code</a> (MIT licence)</p>
       <p>
         Ticket to Ride is a game by Alan R. Moon, published by Days of Wonder. This is an unofficial
         tool for designing your own boards, and is not affiliated with them. The reference data is a

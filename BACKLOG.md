@@ -6,14 +6,6 @@ Editing, scoring, coverage, decks, ticket-only transfer and card printing are bu
 
 - Tickets to countries or groups of stops, as Switzerland has, are not modelled.
 
-## When the repository is made public
-
-- A link to the repository from the About page and the Help menu, so people who find the tool can
-  find the code, and a line in What's new when it happens.
-- Check once more before the switch: the licence is MIT (`LICENSE`), the commit e-mail is
-  `bjorn@hagstrom.nu`, and the repository has been deleted and recreated if anything was ever pushed
-  that should not be reachable by its hash.
-
 ## Map collaboration
 
 Allow several people to work on the same map without passing project files manually.
