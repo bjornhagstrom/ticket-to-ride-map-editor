@@ -2,7 +2,7 @@
 
 // The modal surfaces: the first-visit guide, the balance report and the route suggestions.
 import { useEffect, useState } from "react";
-import { ChevronDown, Copy, Download, FileStack, Sparkles, Layers3, Pencil, Plus, Printer, Save, ScrollText, Ticket as TicketIcon, Trash2, Upload } from "lucide-react";
+import { ChevronDown, Copy, FileSpreadsheet, Download, FileStack, Sparkles, Layers3, Pencil, Plus, Printer, Save, ScrollText, Ticket as TicketIcon, Trash2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -165,7 +165,7 @@ export function SuggestionsPanel({ suggestions, onAdd, onHover, onClose }: { sug
 
 type TicketSortColumn = "ticket" | "spaces" | "points" | "suggested" | "long";
 
-export function TicketsPanel({ compare, onHoverTicket, lengthView, wide, onToggleWide, onClose, data, reviews, coverage, rate, selected, activeSet, onSelect, onUpdate, onDelete, onSelectSet, onAddSet, onDuplicateSet, onRenameSet, onDeleteSet, onExport, onImport, onPrint, onStartFrom, onSuggest }: {
+export function TicketsPanel({ compare, onHoverTicket, lengthView, wide, onToggleWide, onClose, data, reviews, coverage, rate, selected, activeSet, onSelect, onUpdate, onDelete, onSelectSet, onAddSet, onDuplicateSet, onRenameSet, onDeleteSet, onExport, onExportCsv, onImport, onPrint, onStartFrom, onSuggest }: {
   compare: DeckCompareView | null;
   onHoverTicket: (ticketId: string | null) => void;
   lengthView: TicketLengthsView;
@@ -187,6 +187,7 @@ export function TicketsPanel({ compare, onHoverTicket, lengthView, wide, onToggl
   onRenameSet: (label: string) => void;
   onDeleteSet: () => void;
   onExport: (scope: "set" | "all") => void;
+  onExportCsv: (scope: "set" | "all") => void;
   onImport: () => void;
   onPrint: () => void;
   onStartFrom: (stopId: string) => void;
@@ -240,6 +241,7 @@ export function TicketsPanel({ compare, onHoverTicket, lengthView, wide, onToggl
               <DropdownMenuItem onClick={onImport}><Upload />Import decks</DropdownMenuItem>
               <DropdownMenuItem onClick={() => onExport("set")}><Download />Export this deck</DropdownMenuItem>
               <DropdownMenuItem disabled={data.ticketSets.length < 2} onClick={() => onExport("all")}><Download />Export every deck</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onExportCsv("set")}><FileSpreadsheet />Export this deck as CSV</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
           <Button size="sm" variant="outline" disabled={!reviews.length} onClick={onPrint}><Printer />Print deck</Button>

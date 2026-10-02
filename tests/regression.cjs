@@ -681,6 +681,59 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     fs.rmSync(pngFile, { force: true });
   }
 
+  // 11c. spreadsheets: the tickets, the routes, the stops and the distances between stops as CSV,
+  // from a menu of their own under Export, named after the map, readable with å, ä and ö intact.
+  const readCsv = (file) => {
+    const text = fs.readFileSync(file, "utf8");
+    const rows = []; let row = [], cell = "", quoted = false;
+    const body = text.replace(/^﻿/, "");
+    for (let i = 0; i < body.length; i++) {
+      const c = body[i];
+      if (quoted) { if (c === '"' && body[i + 1] === '"') { cell += '"'; i++; } else if (c === '"') quoted = false; else cell += c; }
+      else if (c === '"') quoted = true;
+      else if (c === ",") { row.push(cell); cell = ""; }
+      else if (c === "\r" && body[i + 1] === "\n") { row.push(cell); rows.push(row); row = []; cell = ""; i++; }
+      else cell += c;
+    }
+    return { bom: text.startsWith("﻿"), header: rows[0], rows: rows.slice(1) };
+  };
+  const downloadFrom = async (openMenu, item) => {
+    await openMenu();
+    const pending = page.waitForEvent("download", { timeout: 10000 });
+    await page.getByRole("menuitem", { name: item, exact: true }).click();
+    const done = await pending;
+    const file = path.join(os.tmpdir(), `ttr-${Date.now()}-${done.suggestedFilename()}`);
+    await done.saveAs(file);
+    return { name: done.suggestedFilename(), ...readCsv(file) };
+  };
+  {
+    const stored = await page.evaluate(() => JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")));
+    const slug = stored.name.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
+    const openCsvMenu = async () => {
+      await page.getByRole("button", { name: "Export", exact: true }).click();
+      await page.waitForTimeout(250);
+      await page.getByRole("menuitem", { name: "Spreadsheet (CSV)" }).click();
+      await page.waitForTimeout(250);
+    };
+    await openCsvMenu();
+    const items = await page.getByRole("menu").last().getByRole("menuitem").allTextContents();
+    check("Export has a spreadsheet menu with the tickets, routes, stops and distances", ["Tickets", "Routes", "Stops", "Distances between stops"].every((name) => items.includes(name)), items.join(" | "));
+    await page.keyboard.press("Escape"); await page.keyboard.press("Escape");
+    await page.waitForTimeout(200);
+    const tickets = await downloadFrom(openCsvMenu, "Tickets");
+    check("the tickets come as a .csv named after the map", tickets.name.startsWith(`${slug}-tickets-`) && tickets.name.endsWith(".csv"), tickets.name);
+    check("with a BOM and a header row", tickets.bom && tickets.header.includes("From") && tickets.header.includes("Points"), String(tickets.header));
+    check("and a row for every ticket in every deck", tickets.rows.length === stored.tickets.length, `${tickets.rows.length} of ${stored.tickets.length}`);
+    check("each named by its stops, as on the map", tickets.rows.every((r) => stored.stops.some((s) => s.name === r[tickets.header.indexOf("From")]) && stored.stops.some((s) => s.name === r[tickets.header.indexOf("To")])));
+    const routes = await downloadFrom(openCsvMenu, "Routes");
+    check("the routes: one row each", routes.name.endsWith(".csv") && routes.rows.length === stored.routes.length, `${routes.rows.length} of ${stored.routes.length}`);
+    const stops = await downloadFrom(openCsvMenu, "Stops");
+    check("the stops: one row each", stops.name.endsWith(".csv") && stops.rows.length === stored.stops.length, `${stops.rows.length} of ${stored.stops.length}`);
+    const distances = await downloadFrom(openCsvMenu, "Distances between stops");
+    const ends = stored.stops.filter((s) => !(stored.stopTypeStyles || []).some((t) => t.junction && t.id === s.type));
+    check("the distances: a square table, a row and a column per stop a ticket can name", distances.name.endsWith(".csv") && distances.rows.length === ends.length && distances.header.length === ends.length + 1 && distances.rows.every((r) => r.length === ends.length + 1), `${distances.rows.length} rows for ${ends.length} stops`);
+  }
+
   // Ticket lengths against a reference: the deck's share in each of the five length bands, with the
   // official decks' share marked on each bar and, when the map has chosen rules of its own, theirs too.
   const lengthsIn = async (scope) => scope.evaluate((root) => {
@@ -801,7 +854,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   const download = page.waitForEvent("download");
   await page.getByRole("button", { name: /Import\/Export decks/ }).click();
   await page.waitForTimeout(250);
-  await page.getByRole("menuitem", { name: "Export this deck" }).click();
+  await page.getByRole("menuitem", { name: "Export this deck", exact: true }).click();
   await (await download).saveAs(ticketFile);
   const ticketFileJson = JSON.parse(fs.readFileSync(ticketFile, "utf8"));
   check("an exported file says what it is and which schema it follows", ticketFileJson.format === "ticket-to-ride-map" && ticketFileJson.version >= 2 && ticketFileJson.kind === "tickets",
@@ -809,6 +862,11 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   const ticketPayload = ticketFileJson.payload;
   check("ticket-only export writes a ticket file", ticketPayload.tickets.length === mainAfter, `${ticketPayload.tickets.length} of ${mainAfter}`);
   check("exported tickets carry stop names for re-matching", ticketPayload.tickets.every((t) => t.aName && t.bName), JSON.stringify(ticketPayload.tickets[0]));
+  {
+    const deckCsv = await downloadFrom(async () => { await page.getByRole("button", { name: /Import\/Export decks/ }).click(); await page.waitForTimeout(250); }, "Export this deck as CSV");
+    check("a deck can be exported as a spreadsheet from the Tickets panel", deckCsv.name.endsWith(".csv") && deckCsv.rows.length === mainAfter, `${deckCsv.name}: ${deckCsv.rows.length} of ${mainAfter}`);
+    check("and every row is that deck's", deckCsv.rows.every((r) => r[deckCsv.header.indexOf("Deck")] === "Main deck"), [...new Set(deckCsv.rows.map((r) => r[deckCsv.header.indexOf("Deck")]))].join(", "));
+  }
 
   await page.getByRole("button", { name: /Add a deck/ }).click();
   await page.waitForTimeout(250);

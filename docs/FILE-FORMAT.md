@@ -51,6 +51,16 @@ away the network.
 **`tickets`** — one or more decks. Each ticket carries `aName` and `bName` beside its stop ids, so a
 deck can be moved to another copy of a map where the ids differ but the cities are the same.
 
+## Spreadsheets (CSV) are not map files
+
+Export → Spreadsheet (CSV) writes the tickets, the routes, the stops, or the shortest distance between
+every two stops, and the Tickets panel writes one deck. They are for reading a map in a spreadsheet or
+in another tool, and the editor never reads them back. They have no envelope: one header row, then a
+row per thing, named by stop names rather than ids. RFC 4180 quoting, comma-separated, CRLF line
+ends, UTF-8 with a BOM so a spreadsheet reads å, ä and ö. Text that a spreadsheet would run as a
+formula (starting with `=`, `+`, `-` or `@`) gets a leading apostrophe. `tests/csv-export.cjs` holds
+the columns.
+
 ## Rules a reader follows
 
 1. **No envelope means version 1.** Every file the editor wrote before the envelope existed still
