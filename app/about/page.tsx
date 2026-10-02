@@ -34,7 +34,7 @@ export default function About() {
         lay the plastic trains on the paper instead of drawing at all.
       </p>
       <p>
-        It is meant for the stretch before a map is any good — the ten or twenty prototypes where
+        It is meant for the stretch before a map is any good — the many many prototypes where
         the question is whether the network hangs together at all, not whether the artwork is right.
         Nothing leaves your browser: the map you are working on is stored locally, and files move by
         export and import.

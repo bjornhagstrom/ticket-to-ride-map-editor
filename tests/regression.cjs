@@ -2552,6 +2552,8 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     check("each with what changed, in a list that shows its bullets", (await releases.first().locator("li").count()) >= 1 && (await releases.first().locator("ul").evaluate((el) => getComputedStyle(el).listStyleType)) === "disc");
     check("and a way back to the editor", (await other.getByRole("link", { name: /Back to the editor/ }).count()) >= 1);
     await other.goto(BASE + "about/", { waitUntil: "networkidle" });
+    const aboutText = await other.locator("body").textContent();
+    check("the About page speaks of the many many prototypes, not of ten or twenty", /the many many prototypes/.test(aboutText) && !/ten or twenty/.test(aboutText));
     check("the About page shows the version and links to What's new", (await other.locator("body").textContent()).includes(`Version ${pkgVersion}`) && (await other.getByRole("link", { name: /What.s new/ }).count()) >= 1);
     await other.context().close();
   }
