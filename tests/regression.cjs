@@ -351,13 +351,14 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.getByRole("button", { name: "Settings" }).click();
   await page.waitForTimeout(400);
   // Settings holds the board's shape and nothing else: paper and splitting are print choices.
-  const formatOptions = await page.locator("#settings-format option").evaluateAll((els) => els.map((el) => el.value));
+  const formatOptions = await page.locator('#settings-format input[type="radio"]').evaluateAll((els) => els.map((el) => el.value));
+  check("the board format is a choice of radio buttons, each named by its board", (await page.getByRole("radio", { name: /Standard board 2×3/ }).count()) === 1 && (await page.getByRole("radio", { name: /Extended board 2×4/ }).count()) === 1);
   check("Settings offers only the two board shapes", JSON.stringify(formatOptions) === JSON.stringify(["board-2x3", "board-2x4"]), formatOptions.join(", "));
   check("and no longer asks which board a test sheet stands in for", (await page.locator("#settings-proof").count()) === 0);
-  await page.locator("#settings-format").selectOption("board-2x4");
+  await page.locator('#settings-format input[value="board-2x4"]').check();
   await page.waitForTimeout(500);
   check("changing board format from Settings works", (await badges())[0] === "Extended board 2×4", (await badges())[0]);
-  check("the board format is labelled by its panels", /Board format \(# of panels\)/.test(await page.locator('label[for="settings-format"]').textContent()), await page.locator('label[for="settings-format"]').textContent());
+  check("the board format is labelled by its panels", /Board format \(# of panels\)/.test(await page.locator("#settings-format legend").textContent()), await page.locator("#settings-format legend").textContent());
   check("with no box of measurements under it", (await page.locator(".format-measurements").count()) === 0);
   const formatHelp = page.locator(".settings-format-help");
   check("and one short explanation, its last sentence in bold", (await formatHelp.textContent()).trim() === "The shape of the game board. You can change this whenever you like." && (await formatHelp.locator("strong").textContent()) === "You can change this whenever you like.",
@@ -452,7 +453,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   // The same questions on the standard board, where Anniversary is a choice.
   await page.getByRole("button", { name: "Settings" }).click();
   await page.waitForTimeout(400);
-  await page.locator("#settings-format").selectOption("board-2x3");
+  await page.locator('#settings-format input[value="board-2x3"]').check();
   await page.waitForTimeout(500);
   await page.keyboard.press("Escape");
   await page.waitForTimeout(400);
@@ -2805,10 +2806,27 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     const spBadges = () => sp.locator(".map-status span").allTextContents();
     await sp.getByRole("button", { name: "Settings" }).click();
     await sp.waitForTimeout(400);
-    const orientations = await sp.locator("#settings-orientation option").evaluateAll((els) => els.map((el) => el.value));
-    check("Settings offers the board lying or standing, beside its format", JSON.stringify(orientations) === JSON.stringify(["landscape", "portrait"]) && (await sp.locator("#settings-orientation").inputValue()) === "landscape", orientations.join(", "));
-    await sp.locator("#settings-orientation").selectOption("portrait");
+    const orientations = await sp.locator('#settings-orientation input[type="radio"]').evaluateAll((els) => els.map((el) => el.value));
+    check("Settings offers the board lying or standing, beside its format", JSON.stringify(orientations) === JSON.stringify(["landscape", "portrait"]) && (await sp.getByRole("radio", { name: /Landscape/ }).isChecked()) && (await sp.getByRole("radio", { name: /Portrait/ }).count()) === 1, orientations.join(", "));
+    // A line drawing beside the two choices shows what they give: the board in its proportions, its
+    // fold lines between the panels, its size, and a ticket card lying or standing as the cards will.
+    const preview = () => sp.evaluate(() => {
+      const box = document.querySelector(".board-preview"); if (!box) return null;
+      const r = (el) => el && el.getBoundingClientRect();
+      const board = box.querySelector(".board-preview-board"), card = box.querySelector(".board-preview-card");
+      const folds = Array.from(box.querySelectorAll(".board-preview-fold")).map((l) => (l.getAttribute("x1") === l.getAttribute("x2") ? "v" : "h")).sort().join("");
+      const select = r(document.querySelector("#settings-format")), orient = r(document.querySelector("#settings-orientation")), drawn = r(box);
+      return { board: board && { w: Number(board.getAttribute("width")), h: Number(board.getAttribute("height")) }, card: card && { w: Number(card.getAttribute("width")), h: Number(card.getAttribute("height")) },
+        folds, text: box.textContent, beside: drawn.left >= Math.max(select.right, orient.right) - 1 && drawn.top < orient.bottom && drawn.bottom > select.top, size: { w: drawn.width, h: drawn.height } };
+    });
+    const lyingPreview = await preview();
+    check("beside the board's format and orientation there is a drawing of the board", Boolean(lyingPreview && lyingPreview.board) && lyingPreview.beside && lyingPreview.size.w >= 80 && lyingPreview.size.w <= 220, JSON.stringify(lyingPreview && { beside: lyingPreview.beside, size: lyingPreview.size }));
+    check("lying, it is 790 × 525 in proportion, folded 3 across and 2 down, and says its size", Math.abs(lyingPreview.board.w / lyingPreview.board.h - 790 / 525) < .02 && lyingPreview.folds === "hvv" && /790 × 525 mm/.test(lyingPreview.text), JSON.stringify(lyingPreview));
+    check("with a ticket card lying beside it", lyingPreview.card && lyingPreview.card.w > lyingPreview.card.h && Math.abs(lyingPreview.card.w / lyingPreview.card.h - 62 / 45) < .02, JSON.stringify(lyingPreview.card));
+    await sp.getByRole("radio", { name: /Portrait/ }).check();
     await sp.waitForTimeout(500);
+    const standingPreview = await preview();
+    check("standing, the drawing stands: 525 × 790, folded 2 across and 3 down, with a standing card", Math.abs(standingPreview.board.h / standingPreview.board.w - 790 / 525) < .02 && standingPreview.folds === "hhv" && /525 × 790 mm/.test(standingPreview.text) && standingPreview.card.h > standingPreview.card.w, JSON.stringify(standingPreview));
     await sp.keyboard.press("Escape");
     await sp.waitForTimeout(300);
     const standing = await storedMap();
@@ -2867,6 +2885,14 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     const json = JSON.parse(fs.readFileSync(file, "utf8"));
     check("a standing map's file is version 4, its board frame standing", json.version === 4 && json.board.width === 731 && json.board.height === 1100 && json.payload.orientation === "portrait", JSON.stringify({ version: json.version, board: json.board, orientation: json.payload.orientation }));
     fs.rmSync(file, { force: true });
+    await sp.getByRole("button", { name: "Settings" }).click();
+    await sp.waitForTimeout(400);
+    await sp.getByRole("radio", { name: /Extended board 2×4/ }).check();
+    await sp.waitForTimeout(500);
+    const tallPreview = await preview();
+    check("a standing 2×4 board is drawn 526 × 1053, folded 2 across and 4 down", Math.abs(tallPreview.board.h / tallPreview.board.w - 1053 / 526) < .02 && tallPreview.folds === "hhhv" && /526 × 1,?053 mm/.test(tallPreview.text), JSON.stringify(tallPreview));
+    check("and the drawing still fits beside the choices", tallPreview.beside && tallPreview.size.h <= 220, JSON.stringify(tallPreview.size));
+    await sp.keyboard.press("Escape");
     await sp.context().close();
   }
 

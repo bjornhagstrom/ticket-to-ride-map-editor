@@ -20,6 +20,8 @@ Every exported filename ends with the local date and time it was saved, as `-YYY
 }
 ```
 
+`orientation` is optional: `"portrait"` for a board that stands. A lying board leaves it out, so a lying map is the same file it always was. A standing map is written as file version 4 (see `docs/FILE-FORMAT.md`).
+
 `endGapMm` is optional and sets how much room, in millimetres, is left beyond a stop's own circle before the first wagon of every route into it. Leaving it out uses the default of 2 mm. A stop can carry its own `endGapMm` that overrides the map's, which is what lets the two ends of one route differ. It is a property of the map rather than of the viewer, so printing and exporting agree with what is on screen.
 
 The `kind` field identifies what a file contains. `"map"` (or a missing `kind`, for compatibility with files exported before this field existed) is a full map and replaces everything on import. The Import action reads this field to decide what to do with a file — there is no separate control for choosing the import type.
@@ -36,7 +38,7 @@ The Export menu can also produce two narrower files:
 { "kind": "network", "format": "board-2x3", "stops": [], "routes": [] }
 ```
 
-Importing one of these only replaces its own part of the current map (background objects, or stops and routes) and leaves the rest untouched. If that part already has content, the editor asks for confirmation before replacing it. Coordinates are rescaled from the file's `format` to the current map's format on import, the same way a full map is rescaled when you change board format.
+Importing one of these only replaces its own part of the current map (background objects, or stops and routes) and leaves the rest untouched. If that part already has content, the editor asks for confirmation before replacing it. Coordinates are rescaled from the file's `format` to the current map's format on import, the same way a full map is rescaled when you change board format. Both files carry `orientation` when their board stands; content from a board that lies or stands the other way is turned a quarter turn to fit.
 
 ## Board formats
 
@@ -45,8 +47,9 @@ Importing one of these only replaces its own part of the current map (background
 | `board-2x3` | 790 × 525 mm | Standard 3 columns × 2 rows |
 | `board-2x4` | 1,053 × 526 mm | Custom 4 columns × 2 rows |
 
-The format is the board's shape only. Paper, splitting and the Anniversary size are chosen when
-printing and are not stored.
+The format is the board's shape only; whether it lies or stands is `orientation`. A standing 2×3 is
+525 × 790 mm in 2 columns × 3 rows, a standing 2×4 526 × 1,053 mm in 2 × 4. Paper, splitting and the
+Anniversary size are chosen when printing and are not stored.
 
 Older files may name a format that has since become a print choice: `board-2x3-large`, `a4`, `a3`
 and `us-letter` open as `board-2x3`; `a4-3x2`, `a4-4x2`, `letter-3x2` and `letter-4x2` open as
@@ -55,7 +58,7 @@ without a recognized format open as `board-2x3`.
 
 ## Coordinates
 
-All geometry uses SVG editor coordinates, for example `{ "x": 420, "y": 345 }`. The logical canvas is 1,100 units wide. Height depends on the selected format. Coordinates are rescaled vertically when the format changes.
+All geometry uses SVG editor coordinates, for example `{ "x": 420, "y": 345 }`. The board's long side is 1,100 units: the width of a lying board, the height of a standing one. The other side depends on the format. Coordinates along the short side are rescaled when the format changes, and everything turns a quarter turn when the orientation does.
 
 ## Stops
 

@@ -23,7 +23,7 @@ Live site: <https://hagstrom.nu/ttr/>
 - Add areas, boundaries and labels behind the route network.
 - Import a background image (PNG, JPEG or WebP) — from the Import menu or the Draw background tool — and move, scale, rotate, crop, fade or lock it behind the rest of the map, or centre it and fit it to the page with a print-safe margin in one click.
 - Place resizable evaluation notes with explanatory text on the map, for reviewers and playtesters, and fold one down to a single line when it is in the way.
-- Choose the board's shape in Settings: the standard 2×3 board or an extended 2×4. That is all the map itself knows about paper.
+- Choose the board in Settings: the standard 2×3 board or an extended 2×4, lying (landscape) or standing (portrait), with a line drawing beside the choices of the board, its fold panels, its size and a ticket card as it will print. Standing a board up or laying it down turns everything on it a quarter turn, as one undoable step. That is all the map itself knows about paper.
 - Detect crossings between buildable routes.
 - Check that each route is drawn about as long as its wagon count needs, and see which routes are too short or unnecessarily roomy.
 - Analyse how balanced the network is: hub degree and neighbour count per stop, a colour-by-length distribution table with the wagons each colour adds up to, set against the seven classic maps, the deck's ticket lengths against the official decks and the map's own rules, and a flag for under-connected stops. It opens in the right column beside the map: point at a row or number to see it on the map, click to keep it marked, drag the column wider.
@@ -39,11 +39,12 @@ Live site: <https://hagstrom.nu/ttr/>
 - An About page under Help explains what the tool is for, how the numbers are arrived at and the choices behind it, for anyone you share a map with.
 - Suggest a whole destination-ticket deck for the map that is open. The three shapes — Generic, Classic and Europe — are laid out side by side with what each does to the deck, its lengths and its scoring, so they can be compared before one is picked.
 - Sort the ticket list by any of its headings — ticket, spaces, points, suggested value or the long flag — on a deck you built by hand and on one that came from a suggestion. It starts in the order the deck was built, and tickets stay editable while sorted.
-- Keep several named ticket decks in one map and switch between them, and set this deck against another figure by figure in the Tickets panel (tickets, points, lengths, length bands, stops no ticket names, crowded routes and more, with the difference), so variants can be judged side by side. Decks can be duplicated, exported and imported on their own, and printed as cut-out cards, sixteen to an A4 sheet. An imported deck always arrives as a new deck and matches stops by name when the ids differ, so a deck can travel between copies of a map. Selecting a stop lists every ticket that names it, in any deck, and each one opens for editing.
+- Keep several named ticket decks in one map and switch between them, and set this deck against another figure by figure in the Tickets panel (tickets, points, lengths, length bands, stops no ticket names, crowded routes and more, with the difference), so variants can be judged side by side. Decks can be duplicated, exported and imported on their own, and printed as cut-out cards, 62 × 45 mm, lying or standing as the board does, each with a small map of the whole board and its two stops ringed, as on the real tickets (it can be turned off in the print dialog). An imported deck always arrives as a new deck and matches stops by name when the ids differ, so a deck can travel between copies of a map. Selecting a stop lists every ticket that names it, in any deck, and each one opens for editing.
 - Get automatic route suggestions between nearby, unconnected, poorly-connected stops, with a starting length and colour guess drawn from the balance analysis, that you can add with one click and then adjust.
 - Undo and redo up to 200 changes during the current session, with Cmd/Ctrl+Z and Cmd/Ctrl+Shift+Z.
 - Save automatically in the current browser.
 - Import and export complete maps as JSON, or just the background or the route network on their own, and save the board as a PNG picture.
+- Export the tickets, routes, stops or the distance between every two stops as spreadsheets (CSV), and import stops, routes and tickets from spreadsheets: our own exports, the reference data's, or a list typed by hand. Positions are kept, fitted to the board, or worked out from the routes when there are none.
 - Print from a dialog that decides each run without touching the map: the whole board on one sheet, one sheet per fold panel, or full size across as many sheets as it takes, with trim marks; on A4, A3, US Letter or Tabloid; and for a 2×3, an Anniversary size tick under Supersize that prints the larger Anniversary board at full size. A table compares the sheet count and scale of every combination and picks one when clicked. The last choice is remembered in the browser.
 - Show a neutral example map to first-time visitors.
 
@@ -87,6 +88,10 @@ The deployable website is generated in `out/`. Its contents are intended to be s
 | Path | Purpose |
 | --- | --- |
 | `app/map-data.ts` | Map types, board formats, empty map and first-visit example map |
+| `app/board.ts` | The board as it lies or stands, and turning a map a quarter turn |
+| `app/board-preview.tsx` | The line drawing of the board beside its choices in Settings |
+| `app/csv-export.ts` | Tickets, routes, stops and distances as spreadsheets |
+| `app/csv-import.ts` | Stops, routes and tickets read back from spreadsheets, with positions |
 | `app/map-editor.tsx` | Editor state, pointer interactions and layout |
 | `app/map-geometry.ts` | Route geometry, curves and intersection primitives |
 | `app/map-analysis.ts` | Balance metrics, shortest path and route suggestions |
@@ -125,8 +130,8 @@ the example map through route editing, real-size wagons, the balance, ticket and
 the ticket tools to the print dialog, including real PDFs printed with the browser's own margins. If it
 breaks off part way, it still lists the checks it made before stopping.
 
-`npm test` runs the typecheck, lint, the suggester, calibration, file-format, print-plan, markdown and
-release-notes checks, and the build. The suggester and calibration checks measure the ticket suggester against official maps, which
+`npm test` runs the typecheck, lint, the suggester, calibration, file-format, print-plan, markdown,
+release-notes, CSV export and import, and board checks, and the build. The suggester and calibration checks measure the ticket suggester against official maps, which
 are private and live in their own repository beside this one, `../ttr-reference-data` (or wherever
 `TTR_REFERENCE_DATA` points). Without it those two say so and are skipped; everything else, and the
 editor itself, needs none of that data. `npm run test:synthetic` runs the suggester on small invented

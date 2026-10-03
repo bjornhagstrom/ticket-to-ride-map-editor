@@ -4,7 +4,8 @@
 // Applying a style stays in the Properties panel, where the object is; defining one lives here, so
 // the panel is about the thing you clicked rather than about the map's vocabulary.
 import { useMemo } from "react";
-import { orientationLabels, orientationOf, type Orientation } from "./board";
+import { boardOf, orientationLabels, orientationOf, type Orientation } from "./board";
+import { BoardPreview } from "./board-preview";
 import { Plus, Trash2 } from "lucide-react";
 import { bandCuts, mapDiameter } from "./map-analysis";
 import { DeckRulesPanel } from "./deck-rules-panel";
@@ -176,10 +177,25 @@ export function SettingsDialog({ open, onOpenChange, target, onTarget, data, cha
 
           {kind === "map" && <div className="style-fields">
             {fresh && <p className="helper settings-start">A board format is all you need to begin. The rest — ticket lengths, stop and route types, what a new object looks like — is listed on the left and can wait until you want it.</p>}
-            <div><Label htmlFor="settings-format">Board format (# of panels)</Label><NativeSelect id="settings-format" value={data.format} onChange={(event) => onChangeFormat(event.target.value as MapFormat)}>{Object.entries(mapFormats).map(([key, item]) => <NativeSelectOption key={key} value={key}>{item.label}</NativeSelectOption>)}</NativeSelect>
-              <p className="helper settings-format-help">The shape of the game board. <strong>You can change this whenever you like.</strong></p></div>
-            <div><Label htmlFor="settings-orientation">Orientation</Label><NativeSelect id="settings-orientation" value={orientationOf(data)} onChange={(event) => onChangeOrientation(event.target.value as Orientation)}>{(Object.keys(orientationLabels) as Orientation[]).map((key) => <NativeSelectOption key={key} value={key}>{orientationLabels[key]}</NativeSelectOption>)}</NativeSelect>
-              <p className="helper settings-orientation-help">Whether the board lies or stands. Changing it turns everything on the map a quarter turn, and the ticket cards turn with it.</p></div>
+            <div className="settings-board">
+              <div className="settings-board-fields">
+                <fieldset id="settings-format" className="settings-radios"><legend>Board format (# of panels)</legend>
+                  {Object.entries(mapFormats).map(([key, item]) => <label key={key} className="print-option">
+                    <input type="radio" name="settings-format" value={key} checked={data.format === key} onChange={() => onChangeFormat(key as MapFormat)} />
+                    <span><strong>{item.label}</strong><small>{(() => { const shape = boardOf({ format: key as MapFormat, orientation: data.orientation }); return `${shape.widthMm.toLocaleString("en-GB")} × ${shape.heightMm.toLocaleString("en-GB")} mm, ${item.columns * item.rows} panels`; })()}</small></span>
+                  </label>)}
+                  <p className="helper settings-format-help">The shape of the game board. <strong>You can change this whenever you like.</strong></p>
+                </fieldset>
+                <fieldset id="settings-orientation" className="settings-radios"><legend>Orientation</legend>
+                  {(Object.keys(orientationLabels) as Orientation[]).map((key) => <label key={key} className="print-option">
+                    <input type="radio" name="settings-orientation" value={key} checked={orientationOf(data) === key} onChange={() => onChangeOrientation(key)} />
+                    <span><strong>{orientationLabels[key]}</strong></span>
+                  </label>)}
+                  <p className="helper settings-orientation-help">Whether the board lies or stands. Changing it turns everything on the map a quarter turn, and the ticket cards turn with it.</p>
+                </fieldset>
+              </div>
+              <BoardPreview data={data} />
+            </div>
             <div className="settings-pair">
               <div><Label htmlFor="settings-players-min">Players, fewest</Label>
                 <Input id="settings-players-min" type="number" min={1} max={8} value={players.min}

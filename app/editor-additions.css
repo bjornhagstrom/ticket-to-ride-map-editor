@@ -4,6 +4,19 @@
 .map-canvas{-webkit-user-select:none;user-select:none}
 /* A standing board as wide as the column would be far taller than the window: it is sized by the
    window's height instead (less the top bar and the badges), and centred in the column. */
+/* Settings: the board's format and orientation, with a line drawing of what they give beside them. */
+.settings-board{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px;align-items:start}
+.settings-board-fields{display:grid;gap:12px;min-width:0}
+.settings-radios{border:0;margin:0;padding:0;min-width:0}
+.settings-radios legend{font-size:14px;font-weight:500;margin-bottom:4px;padding:0}
+.board-preview{padding-top:22px}
+.board-preview svg{display:block;overflow:visible}
+.board-preview-board{fill:#fbf7ef;stroke:#5d554a;stroke-width:1.2}
+.board-preview-fold{stroke:#8f877b;stroke-width:.8;stroke-dasharray:3 2}
+.board-preview-card{fill:#fff;stroke:#5d554a;stroke-width:1}
+.board-preview-card-line{stroke:#8f877b;stroke-width:1.4;stroke-linecap:round}
+.board-preview-card-points{fill:none;stroke:#5d554a;stroke-width:.9}
+.board-preview-size{font:8px "Segoe UI",Arial,sans-serif;fill:#5d554a}
 .map-canvas.standing{min-width:420px;width:min(100%,calc((100vh - 150px) * var(--map-ratio,.66)));margin:0 auto}
 /* A stop's name can be taken and turned round its stop. */
 .map-canvas .stop-label-handle{cursor:grab;pointer-events:auto}

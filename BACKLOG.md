@@ -38,22 +38,8 @@ Allow several people to work on the same map without passing project files manua
 
 ## Version number and a "what's new" page
 
-Planned, not built. Two pieces that belong together:
-
-- **The version, shown discreetly.** One place holds it — `package.json` — and everything else reads
-  from there: the file envelope's `app.version`, a line in the page footer, and the About page. It
-  should never be typed twice. `app/map-storage.ts` currently repeats it as `APP_VERSION`; that
-  constant should come from the build instead, so a release cannot ship a file stamped with the
-  wrong version.
-- **A page that says what changed.** `CHANGELOG.md` as the source, written for the person using the
-  editor rather than for whoever wrote the code: what is new, what changed shape, and what a file
-  written by an older version will do. The page renders it and links from the version line in the
-  footer, so "0.2.0" is clickable and lands on what 0.2.0 brought.
-
-Worth deciding before building: whether a version bump is manual or comes from the release, and
-whether the changelog is one entry per release or one per user-visible change. The file format has
-its own version, separate from the app's, and the changelog should say when the two move together.
-
+Built: the version lives in `package.json`, is shown under Help, and `app/version.ts` holds the notes
+the What's new page renders (`npm run test:releases` checks them).
 
 ## Illustrations for the settings that are hard to picture
 
@@ -65,6 +51,8 @@ being described is something the editor already knows how to draw. Worth doing t
 - **Stop types** — the circle, square and symbol as they will appear, at real size.
 - **Print choices** — a small diagram of how the sheets tile the board, beside the table in the print dialog.
 - **Label angles** — where a stop's name lands, which is currently eight numbers with no picture.
+- ~~**The board**~~ — done: a line drawing of the board, its fold panels, its size and a ticket card
+  sits beside the format and orientation choices in Settings (`app/board-preview.tsx`).
 
 For anything the editor cannot draw from its own data — the print-and-cut workflow, what a finished
 marked-up board looks like after a game — a photograph would do more than a diagram, and those have
@@ -96,3 +84,18 @@ The rules box is built: markdown in the right column, `[[Stop]]` and
 print dialog says so. Not done: the rules are not in the PNG; a print run of the rules alone; a link
 to another part of the rules; images in the text; and a way to see in the preview where a page
 would break.
+
+## Follow-ups from the CSV, ticket map and standing board work
+
+- **Standing ticket cards** carry a narrow small map, because the points column takes a share of an
+  already narrow card. Putting the points under the map, or over its corner, would give the map the
+  card's whole width.
+- **Mirror or turn a map's content on its own board** — upside down or left to right — for a network
+  that arrives the wrong way round, such as a CSV of routes laid out from the routes alone (the spring
+  layout knows nothing of north).
+- **Names after a turn.** A name left to place itself is placed again after the board turns, and some
+  then sit on a route; Move names clear fixes it in one click. Doing that as part of the turn would
+  save the click, at the cost of moving names the person may have liked.
+- **Read an adjacency matrix** (a stop × stop table of route lengths, as fan generators use) as a
+  route list. Today a distance table is recognised and turned away.
+- **Safari** has not been tried for the small ticket map, the standing board or its print.

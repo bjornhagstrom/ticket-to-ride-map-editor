@@ -34,12 +34,15 @@ The editor is split by responsibility, with dependencies pointing one way and no
 | Module | Responsibility |
 | --- | --- |
 | `app/map-data.ts` | Types, board formats, colours, real-component sizes, the empty and example maps |
+| `app/board.ts` | The board a map is on (`boardOf`: format and orientation, its size in units and mm, its panels) and `rotateMap`, which turns everything a quarter turn |
+| `app/csv-export.ts`, `app/csv-import.ts` | Spreadsheets out and in: pure, no React, tested straight from `MapData` |
 | `app/map-geometry.ts` | Route geometry: bend points, parallel offsets, curves, point-along-line, segment intersection |
 | `app/map-analysis.ts` | Everything derived from the network: hub degree, shortest path, colour×length, route suggestions, room per wagon |
 | `app/map-storage.ts` | Local-storage keys, file normalizers, board-format rescaling, image reading |
 | `app/map-artwork.tsx` | The SVG layer stack, object renderers and editing handles |
 | `app/map-properties.tsx` | The Properties panel editors, which apply styles but never define them |
 | `app/map-styles.tsx` | The style library dialog, where every kind of reusable appearance is created and edited |
+| `app/board-preview.tsx` | The line drawing of the board and a ticket card beside the board choices in Settings |
 | `app/map-dialogs.tsx` | Welcome guide, balance report, route suggestions |
 | `app/map-print.tsx` | The hidden print tree |
 | `app/map-editor.tsx` | Editor state, pointer interactions and the surrounding layout |
@@ -55,9 +58,9 @@ Normal edits pass through `change()`. Before applying an edit it stores a deep c
 
 ## Coordinate system
 
-The SVG coordinate width is always 1,100 units. Each board format calculates its SVG height from its physical aspect ratio. Object coordinates are therefore editor units, not millimetres.
+The board's long side is always 1,100 units; the short side follows the format's physical aspect ratio (731 for a 2×3). A lying board is 1,100 wide, a standing one 1,100 tall. Object coordinates are therefore editor units, not millimetres, and one unit is the same length in millimetres either way. Everything that needs the board's size asks `boardOf(data)` in `app/board.ts`, never the format alone.
 
-Changing format keeps the x-coordinate unchanged and scales every y-coordinate by the ratio between the old and new canvas heights. This keeps objects in approximately the same relative positions.
+Changing format keeps the long-side coordinate unchanged and scales the short-side one by the ratio between the old and new boards (a standing map is laid down, rescaled and stood up again). Changing orientation turns everything a quarter turn: clockwise to stand, anticlockwise to lie, so one undoes the other exactly. Stops, the angles their names were set at, route bends, background shapes and the background image turn; notes keep their size, stay upright and are kept on the board. No distance changes, so wagons, spacing and every analysis are unaffected. Wagons are still measured against the lying board's width (`scaleWidthMm`), which is the same millimetres per unit.
 
 Physical finished dimensions belong to the format definition in `map-data.ts`. Do not infer physical measurements directly from SVG units.
 
@@ -169,7 +172,7 @@ Shared maps and live collaboration require a server API, central storage and an 
 
 ## Printing
 
-The board's shape lives in the map; how it is printed does not. `app/print-plan.ts` turns a board and a print choice — split (one sheet, per panel, full size), paper (A4, A3, US Letter, Tabloid) and, for a 2×3, an Anniversary size tick that implies full size — into a plan: the page in millimetres with its orientation, the scale, and one tile per page as a share of the board. It allows a 10 mm printer margin and an 8 mm caption on every page, lays every sheet out landscape and turns it on an upright page, and never enlarges a panel beyond full size. `tests/print-plan.cjs` pins its figures.
+The board's shape lives in the map; how it is printed does not. `app/print-plan.ts` turns a board and a print choice — split (one sheet, per panel, full size), paper (A4, A3, US Letter, Tabloid) and, for a 2×3, an Anniversary size tick that implies full size — into a plan: the page in millimetres with its orientation, the scale, and one tile per page as a share of the board. It allows a 10 mm printer margin and an 8 mm caption on every page, lays a lying board's sheets out landscape and turns them on an upright page, prints a standing board's sheets upright without the turn, and never enlarges a panel beyond full size. Ticket cards lie or stand with the board (`cardSize`) and can carry a small map of the board, drawn once per deck as an SVG symbol. `tests/print-plan.cjs` pins its figures.
 
 `PrintDialog` in `app/map-print.tsx` offers the choices and a table of every combination, all computed by the same `printPlan`, so the table cannot disagree with what is printed. The choice is kept in `localStorage` under `ttr-print-choice`, never in the map or the undo history.
 
@@ -179,10 +182,11 @@ The arithmetic behind every sheet count, why the page box is smaller than the pa
 
 ## Testing
 
-`tests/regression.cjs` is the only automated test: a Playwright script that drives the running
-editor and asserts on what it finds in the DOM and in local storage. It covers the interactions
-that have broken before rather than aiming for coverage, and it needs `npm run dev` in another
-terminal. There are no unit tests, and nothing runs in CI.
+`tests/regression.cjs` is a Playwright script that drives the running editor and asserts on what it
+finds in the DOM and in local storage. It covers the interactions that have broken before rather than
+aiming for coverage, and it needs `npm run dev` in another terminal. Beside it are scripts that test
+the pure modules without a browser — file format, print plan, board, CSV export and import, markdown,
+release notes and the ticket suggester — and `npm test` runs those. Nothing runs in CI.
 
 Because it asserts against rendered geometry — wagon spacing in millimetres, stop circle diameter,
 parallel line separation — it is also where the calibrated constants in `map-data.ts` are pinned.
