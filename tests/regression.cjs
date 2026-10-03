@@ -2990,6 +2990,93 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     await cp.context().close();
   }
 
+  // 37. A reminder to export: the map lives in this browser only, so after a while of work without an
+  // export a note says so. "Later" waits another while, "Remind me less often" waits longer each time
+  // and in the end offers to stop; Settings turns it back on. Work is counted in actions: building a
+  // whole deck of tickets is one, a burst of typing is one.
+  {
+    const rp = await (await browser.newContext({ viewport: { width: 1500, height: 1000 }, acceptDownloads: true })).newPage();
+    rp.on("pageerror", (e) => errors.push(String(e)));
+    await rp.goto(BASE, { waitUntil: "networkidle" });
+    await rp.getByRole("button", { name: "Load the example map" }).click();
+    await rp.waitForTimeout(600);
+    const RKEY = "ttr-export-reminder";
+    const state = () => rp.evaluate((k) => JSON.parse(localStorage.getItem(k) || "null"), RKEY);
+    const seed = async (patch) => { await rp.evaluate(([k, p]) => localStorage.setItem(k, JSON.stringify({ ...(JSON.parse(localStorage.getItem(k) || "{}")), ...p })), [RKEY, patch]); await rp.reload({ waitUntil: "networkidle" }); await rp.waitForTimeout(600); };
+    const note = rp.locator(".export-reminder");
+    const oneChange = async () => { await rp.locator("#map-name").fill(`Reminder test ${Date.now()}`); await rp.waitForTimeout(1700); };
+    const status = () => rp.locator(".save-state").textContent();
+    check("the header says the map is saved in this browser, and not exported yet", /Saved in this browser/.test(await status()) && /not exported yet/i.test(await status()), await status());
+    check("no reminder at the start of the work", (await note.count()) === 0);
+
+    // An action is counted once, however many keystrokes it took. (A pause first, so the typing is not
+    // taken as part of loading the example map a moment ago.)
+    await rp.waitForTimeout(1700);
+    const before = (await state())?.changes ?? 0;
+    await rp.locator("#map-name").pressSequentially("abc", { delay: 40 });
+    await rp.waitForTimeout(1700);
+    check("typing a name counts as one change, not one per key", (await state()).changes === before + 1, `${before} -> ${(await state()).changes}`);
+
+    // Building a whole deck of tickets is one change.
+    await rp.getByRole("button", { name: /^Tickets · / }).click(); await rp.waitForTimeout(400);
+    const deckBefore = (await state()).changes;
+    await rp.getByRole("button", { name: /Add a deck/ }).click(); await rp.waitForTimeout(250);
+    await rp.getByRole("menuitem", { name: /Build a full deck of tickets/ }).click();
+    await rp.waitForFunction(() => { const row = [...document.querySelectorAll(".suggest-table tbody tr")].find((tr) => tr.children[0].textContent.trim() === "Score"); return row && row.children[2].textContent.trim() !== "—"; }, null, { timeout: 30000 });
+    await rp.getByRole("button", { name: /^Replace / }).click();
+    await rp.waitForTimeout(1700);
+    check("building a whole deck of tickets counts as one change", (await state()).changes === deckBefore + 1, `${deckBefore} -> ${(await state()).changes}`);
+    await rp.keyboard.press("Escape"); await rp.waitForTimeout(300);
+
+    // The first reminder comes after 40 changes.
+    await seed({ changes: 39 });
+    check("39 changes in, still no reminder", (await note.count()) === 0);
+    await oneChange();
+    const text = await note.textContent().catch(() => "");
+    check("after 40, a note in the tools column says the map is only in this browser and asks for an export", (await note.count()) === 1 && /only saved in this browser/i.test(text) && /export/i.test(text), text);
+    const buttons = await note.getByRole("button").allTextContents();
+    check("it offers Export map, Later and Remind me less often", ["Export map", "Later", "Remind me less often"].every((b) => buttons.includes(b)), buttons.join(" | "));
+    check("the header's save line turns to a warning too", /not exported yet/i.test(await status()) && (await rp.locator(".save-state.needs-export").count()) === 1);
+
+    // Later: gone for now, back after another 40.
+    await note.getByRole("button", { name: "Later" }).click(); await rp.waitForTimeout(300);
+    check("Later puts it away", (await note.count()) === 0);
+    await seed({ changes: 79 }); await oneChange();
+    check("and it comes back after another 40 changes", (await note.count()) === 1);
+
+    // Less often: 120 between reminders, then 300, then an offer to stop.
+    await note.getByRole("button", { name: "Remind me less often" }).click(); await rp.waitForTimeout(300);
+    check("Remind me less often puts it away", (await note.count()) === 0 && (await state()).level === 1);
+    await seed({ changes: (await state()).changes + 120 - 1 }); await oneChange();
+    check("and waits 120 changes before the next", (await note.count()) === 1);
+    await note.getByRole("button", { name: "Remind me less often" }).click(); await rp.waitForTimeout(300);
+    await seed({ changes: (await state()).changes + 300 - 1 }); await oneChange();
+    const last = await note.getByRole("button").allTextContents().catch(() => []);
+    check("then 300, and now it offers to stop reminding altogether", (await note.count()) === 1 && last.includes("Don't remind me again") && !last.includes("Remind me less often"), last.join(" | "));
+    await note.getByRole("button", { name: "Don't remind me again" }).click(); await rp.waitForTimeout(300);
+    await seed({ changes: 5000 }); await oneChange();
+    check("turned off, it stays away however much is changed", (await note.count()) === 0 && (await state()).off === true);
+
+    // Settings can turn it back on, from the start.
+    await rp.getByRole("button", { name: "Settings" }).click(); await rp.waitForTimeout(400);
+    const box = rp.getByRole("checkbox", { name: /Remind me to export/ });
+    check("Settings shows the reminder turned off", (await box.count()) === 1 && !(await box.isChecked()));
+    await box.check(); await rp.waitForTimeout(300);
+    check("and turns it on again, from the first step", (await state()).off === false && (await state()).level === 0);
+    await rp.keyboard.press("Escape"); await rp.waitForTimeout(300);
+
+    // Exporting the full map resets it all and says when.
+    await seed({ changes: (await state()).changes + 40 - 1 }); await oneChange();
+    check("the reminder is back after 40 changes", (await note.count()) === 1);
+    const saved = rp.waitForEvent("download");
+    await note.getByRole("button", { name: "Export map" }).click();
+    await (await saved).path();
+    await rp.waitForTimeout(400);
+    check("Export map from the note downloads the map, puts the note away and starts counting again", (await note.count()) === 0 && (await state()).changes === 0 && Boolean((await state()).lastExport));
+    check("and the header says it was exported just now", /exported just now/i.test(await status()) && (await rp.locator(".save-state.needs-export").count()) === 0, await status());
+    await rp.context().close();
+  }
+
   console.log("PASS:"); ok.forEach((l) => console.log("  ✓ " + l));
   if (bad.length) { console.log("FAIL:"); bad.forEach((l) => console.log("  ✗ " + l)); }
   console.log(`\n${ok.length} passed, ${bad.length} failed`);

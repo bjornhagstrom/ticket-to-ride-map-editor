@@ -56,7 +56,7 @@ const clampCount = (raw: string, fallback: number): number => {
   return Number.isFinite(number) && number >= 1 ? number : fallback;
 };
 
-export function SettingsDialog({ open, onOpenChange, target, onTarget, data, change, defaults, onChangeFormat, onChangeOrientation }: {
+export function SettingsDialog({ open, onOpenChange, target, onTarget, data, change, defaults, onChangeFormat, onChangeOrientation, exportReminder }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   target: StyleTarget;
@@ -66,6 +66,7 @@ export function SettingsDialog({ open, onOpenChange, target, onTarget, data, cha
   defaults: EditorDefaults;
   onChangeFormat: (format: MapFormat) => void;
   onChangeOrientation: (orientation: Orientation) => void;
+  exportReminder: { on: boolean; onChange: (on: boolean) => void };
 }) {
   const kind = target.kind;
   const lists: Record<string, { id: string; label: string }[]> = {
@@ -223,6 +224,9 @@ export function SettingsDialog({ open, onOpenChange, target, onTarget, data, cha
                   onChange={(event) => change((draft) => { draft.keptTickets = Math.min(clampCount(event.target.value, DEFAULT_KEPT_TICKETS), draft.startingTickets ?? DEFAULT_STARTING_TICKETS); return draft; })} /></div>
             </div>
             <p className="helper">How a game on this map is set up. The original game gives each player {DEFAULT_WAGONS_PER_PLAYER} wagons and deals {DEFAULT_STARTING_TICKETS} tickets, of which {DEFAULT_KEPT_TICKETS} must be kept; a smaller map usually wants fewer wagons. {totalSpaces > 0 ? `This map has ${totalSpaces} wagon spaces in all, so one player's supply could claim about ${Math.round((data.wagonsPerPlayer ?? DEFAULT_WAGONS_PER_PLAYER) / totalSpaces * 100)}% of it.` : ""}</p>
+            {/* Last: it belongs to this browser, not to the map. */}
+            <label className="checkbox-row export-reminder-setting"><input type="checkbox" checked={exportReminder.on} onChange={(event) => exportReminder.onChange(event.target.checked)} />Remind me to export a copy now and then</label>
+            <p className="helper">Your map is saved only in this browser. The reminder comes after a while of work without an export; it can be made rarer from the reminder itself, or turned off here. Kept in this browser, not in the map.</p>
           </div>}
 
           {kind === "defaults" && <div className="style-fields">

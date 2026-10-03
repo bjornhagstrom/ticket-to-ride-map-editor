@@ -27,6 +27,7 @@ import { bandsOf, bandCuts, mapDiameter, deckFigures, defaultStyle, deckRuleFor,
 import { canvasPoint, canvasPointRaw, pointsFor, samePair, stopById } from "./map-geometry";
 import { REPO_URL } from "./version";
 import { RouteLogo } from "./logo";
+import { ACTION_GAP_MS, countChange, EXPORT_REMINDER_KEY, exportAge, exported, freshReminder, isDue, isLastStep, later, lessOften, readReminder, stop as stopReminding, turnOn, type ExportReminder } from "./export-reminder";
 import { boardOf, rotateMap, type Orientation } from "./board";
 import { csvTemplate, distancesCsv, routesCsv, stopsCsv, ticketsCsv } from "./csv-export";
 import { decodeCsvBytes, readCsvImport, type CsvImport } from "./csv-import";
@@ -94,6 +95,15 @@ export function MapEditor() {
   // at the print dialog, kept in this browser like the other print choices.
   const [showRules, setShowRules] = useState(false);
   // The rules panel asks for stops to be clicked on the map; the map hands the click to it.
+  // The reminder to export: read once, kept in this browser. Changes less than a moment apart count as
+  // one action, so typing a name or building a deck is one change, not dozens.
+  const [reminder, setReminder] = useState<ExportReminder>(freshReminder);
+  const reminderLoaded = useRef(false);
+  const lastChangeAt = useRef(0);
+  const [clock, setClock] = useState(() => new Date());
+  useEffect(() => { queueMicrotask(() => { try { setReminder(readReminder(localStorage.getItem(EXPORT_REMINDER_KEY))); } catch { /* storage blocked: start fresh */ } reminderLoaded.current = true; }); const timer = window.setInterval(() => setClock(new Date()), 60000); return () => window.clearInterval(timer); }, []);
+  useEffect(() => { if (!reminderLoaded.current) return; try { localStorage.setItem(EXPORT_REMINDER_KEY, JSON.stringify(reminder)); } catch { /* not remembered, still shown */ } }, [reminder]);
+  const noteChange = () => { const now = Date.now(); if (now - lastChangeAt.current > ACTION_GAP_MS) setReminder(countChange); lastChangeAt.current = now; };
   const rulesPickRef = useRef<{ stop: (stopId: string) => boolean; cancel: () => boolean } | null>(null);
   const [rulesPicking, setRulesPicking] = useState(false);
   // What a print run holds is ticked in the print dialog and kept in this browser, like the other print
@@ -371,8 +381,9 @@ export function MapEditor() {
   })();
   const selectedB = data.background.find((shape) => shape.id === selectedBackground);
   const selectedN = data.notes.find((note) => note.id === selectedNote);
-  const change = (fn: (draft: MapData) => MapData) => setData((previous) => { setPast((history) => [...history, cloneForHistory(previous)].slice(-HISTORY_LIMIT)); setFuture([]); setSaved(false); return fn(cloneMap(previous)); });
-  const pushHistory = (snapshot: MapData) => { setPast((history) => [...history, snapshot].slice(-HISTORY_LIMIT)); setFuture([]); setSaved(false); };
+  const change = (fn: (draft: MapData) => MapData) => { noteChange(); applyChange(fn); };
+  const applyChange = (fn: (draft: MapData) => MapData) => setData((previous) => { setPast((history) => [...history, cloneForHistory(previous)].slice(-HISTORY_LIMIT)); setFuture([]); setSaved(false); return fn(cloneMap(previous)); });
+  const pushHistory = (snapshot: MapData) => { noteChange(); setPast((history) => [...history, snapshot].slice(-HISTORY_LIMIT)); setFuture([]); setSaved(false); };
   const beginDrag = () => { dragSnapshotRef.current = cloneForHistory(data); draggedRef.current = false; };
   const clearSelection = () => { setSelectedStop(null); setSelectedRoute(null); setSelectedBackground(null); setImageSelected(false); setSelectedNote(null); };
   const chooseImage = () => { setImageSelected(true); setSelectedStop(null); setSelectedRoute(null); setSelectedBackground(null); setSelectedNote(null); setTool("select"); };
@@ -663,7 +674,7 @@ export function MapEditor() {
   const downloadTemplate = (kind: "stops" | "routes" | "tickets") => { const url = URL.createObjectURL(new Blob([csvTemplate(kind)], { type: "text/csv;charset=utf-8" })); const link = document.createElement("a"); link.href = url; link.download = `${kind}-template.csv`; link.click(); URL.revokeObjectURL(url); };
   const downloadCsv = (text: string, filenameBase: string) => download(new Blob([text], { type: "text/csv;charset=utf-8" }), filenameBase, "csv");
   const saveImage = (blob: Blob) => { setMakingImage(false); const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = `${data.name}.png`; document.body.append(link); link.click(); link.remove(); URL.revokeObjectURL(url); };
-  const exportMap = () => downloadJson(writeMapFile("map", mapPayload(data), data), data.name);
+  const exportMap = () => { downloadJson(writeMapFile("map", mapPayload(data), data), data.name); setReminder((r) => exported(r, new Date())); setClock(new Date()); };
   const exportBackground = () => downloadJson(writeMapFile("background", { format: data.format, ...(data.orientation === "portrait" ? { orientation: "portrait" } : {}), background: data.background, backgroundImage: data.backgroundImage }, data), `${data.name} background`);
   const exportNetwork = () => downloadJson(writeMapFile("network", networkPayload(data), data), `${data.name} network`);
   const exportTickets = (scope: "set" | "all") => { const ids = scope === "all" ? data.ticketSets.map((set) => set.id) : [activeTicketSet.id]; downloadJson(writeMapFile("tickets", buildTicketFile(data, ids), data), `${data.name} ${scope === "all" ? "tickets" : activeTicketSet.label}`); };
@@ -734,6 +745,8 @@ export function MapEditor() {
         }
         const incoming = normalizeMap(raw);
         change(() => incoming);
+        // A whole map opened from a file is safe in that file: counting starts again.
+        setReminder((r) => ({ ...r, changes: 0, nextAt: r.nextAt - r.changes }));
         clearSelection();
       } catch (error) {
         // A file from a newer build says so in its own words; anything else is simply not ours.
@@ -775,7 +788,7 @@ export function MapEditor() {
   return <TooltipProvider delayDuration={0} disableHoverableContent><main className="app-shell">
     <header className="topbar">
       <div className="brand"><RouteLogo className="brand-mark" /><div><p>Ticket to Ride</p><h1>Map prototypes – Print and draw</h1></div></div>
-      <div className="map-title"><Label htmlFor="map-name" className="sr-only">Map name</Label><Input id="map-name" value={data.name} onChange={(event) => change((draft) => ({ ...draft, name: event.target.value }))} /><span className="save-state"><Check />{saved ? "Saved locally" : "Saving…"}</span></div>
+      <div className="map-title"><Label htmlFor="map-name" className="sr-only">Map name</Label><Input id="map-name" value={data.name} onChange={(event) => change((draft) => ({ ...draft, name: event.target.value }))} /><span className={cn("save-state", isDue(reminder) && "needs-export")}>{isDue(reminder) ? <AlertTriangle /> : <Check />}{saved ? `Saved in this browser · ${exportAge(reminder.lastExport, clock)}` : "Saving…"}</span></div>
       <div className="header-actions"><DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" size="sm"><CircleHelp />Help</Button></DropdownMenuTrigger><DropdownMenuContent align="start"><DropdownMenuItem onClick={() => setShowGuide(true)}><CircleHelp />Getting started</DropdownMenuItem><DropdownMenuItem asChild><a href="./about"><RouteLogo className="menu-logo" />About Map prototypes</a></DropdownMenuItem><DropdownMenuItem asChild><a href="./whats-new"><Sparkles />What&apos;s new</a></DropdownMenuItem><DropdownMenuItem asChild><a href={REPO_URL} target="_blank" rel="noopener noreferrer"><Code />Source code on GitHub</a></DropdownMenuItem><DropdownMenuLabel className="version-label">Version {APP_VERSION}</DropdownMenuLabel></DropdownMenuContent></DropdownMenu><Button variant="ghost" size="icon" aria-label="Undo" title="Undo (Ctrl/Cmd+Z)" disabled={!past.length} onClick={undo}><Undo2 /></Button><Button variant="ghost" size="icon" aria-label="Redo" title="Redo (Ctrl/Cmd+Shift+Z)" disabled={!future.length} onClick={redo}><Redo2 /></Button><DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" size="sm"><Upload />Import</Button></DropdownMenuTrigger><DropdownMenuContent align="start"><DropdownMenuItem onClick={() => fileRef.current?.click()}><Upload />Map project</DropdownMenuItem><DropdownMenuItem onClick={() => fileRef.current?.click()}><TicketIcon />Tickets only</DropdownMenuItem><DropdownMenuItem onClick={() => imageFileRef.current?.click()}><ImageIcon />Background image</DropdownMenuItem><DropdownMenuSub><DropdownMenuSubTrigger><FileSpreadsheet />Spreadsheet (CSV)</DropdownMenuSubTrigger><DropdownMenuSubContent><DropdownMenuItem onClick={() => csvFileRef.current?.click()}><Upload />Import spreadsheets…</DropdownMenuItem><DropdownMenuSeparator />{(["stops", "routes", "tickets"] as const).map((kind) => <DropdownMenuItem key={kind} onClick={() => downloadTemplate(kind)}><Download />{kind[0].toUpperCase() + kind.slice(1)} template</DropdownMenuItem>)}<DropdownMenuItem asChild><a href={`${REPO_URL}/blob/main/docs/CSV.md`} target="_blank" rel="noopener noreferrer"><CircleHelp />What the columns mean</a></DropdownMenuItem></DropdownMenuSubContent></DropdownMenuSub></DropdownMenuContent></DropdownMenu><input ref={csvFileRef} hidden type="file" multiple accept=".csv,.tsv,.txt,text/csv,text/plain" onChange={(event) => { void importCsv(event.target.files); event.target.value = ""; }} /><input ref={fileRef} hidden type="file" accept="application/json" onChange={(event) => { importMap(event.target.files?.[0]); event.target.value = ""; }} /><input ref={imageFileRef} hidden type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => { importBackgroundImage(event.target.files?.[0]); event.target.value = ""; }} /><Button variant="outline" size="sm" onClick={() => setShowPrint(true)}><Printer />Print map</Button><DropdownMenu><DropdownMenuTrigger asChild><Button size="sm"><Download />Export</Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onClick={exportMap}><Download />Full map</DropdownMenuItem><DropdownMenuItem onClick={() => setMakingImage(true)}><ImageIcon />Map as image (PNG)</DropdownMenuItem><DropdownMenuItem onClick={exportBackground}><Layers3 />Background only</DropdownMenuItem><DropdownMenuItem onClick={exportNetwork}><Link2 />Network only</DropdownMenuItem><DropdownMenuItem onClick={() => exportTickets("all")}><TicketIcon />Tickets only</DropdownMenuItem><DropdownMenuSub><DropdownMenuSubTrigger><FileSpreadsheet />Spreadsheet (CSV)</DropdownMenuSubTrigger><DropdownMenuSubContent><DropdownMenuItem onClick={() => exportTicketsCsv("all")}><TicketIcon />Tickets</DropdownMenuItem><DropdownMenuItem onClick={() => downloadCsv(routesCsv(data), `${data.name} routes`)}><RouteIcon />Routes</DropdownMenuItem><DropdownMenuItem onClick={() => downloadCsv(stopsCsv(data), `${data.name} stops`)}><MapPin />Stops</DropdownMenuItem><DropdownMenuItem onClick={() => downloadCsv(distancesCsv(data), `${data.name} distances`)}><Grid3x3 />Distances between stops</DropdownMenuItem></DropdownMenuSubContent></DropdownMenuSub></DropdownMenuContent></DropdownMenu></div>
     </header>
     <div className={cn("workspace", widePanel && "showing-balance")} style={{ "--right-width": `${rightWidth}px`, "--map-ratio": format.width / format.height } as React.CSSProperties}>
@@ -794,6 +807,20 @@ export function MapEditor() {
           {tool === "route" && <div className="tool-options"><StylePicker label="Route type" value={routeType} styles={data.routeTypeStyles} placeholder="" onChange={(id) => id && setRouteType(id)} onEdit={() => openStyles({ kind: "route", id: routeType })} /><label className="checkbox-row"><input type="checkbox" checked={routeCurved} onChange={(event) => setRouteCurved(event.target.checked)} />Draw as a smooth curve</label><div><Label>Colour</Label><NativeSelect value={routeColor} onChange={(event) => setRouteColor(event.target.value)}>{Object.keys(routeColors).map((key) => <NativeSelectOption key={key} value={key}>{colorLabels[key]}</NativeSelectOption>)}</NativeSelect></div></div>}
           {tool === "background" && <div className="tool-options background-tools"><div className="image-import-row"><Label>Background image</Label><div className="image-import-buttons"><Button size="sm" variant="outline" onClick={() => imageFileRef.current?.click()}><ImageIcon />{data.backgroundImage ? "Replace image" : "Import image"}</Button>{data.backgroundImage && <Button size="sm" variant="ghost" onClick={() => { chooseImage(); setDanger("delete"); }}><Trash2 />Remove</Button>}</div></div><Label>Object</Label><NativeSelect value={backgroundType} onChange={(event) => { setBackgroundType(event.target.value as BackgroundType); setDraftPoints([]); }}><NativeSelectOption value="area">Area</NativeSelectOption><NativeSelectOption value="line">Line</NativeSelectOption><NativeSelectOption value="label">Label</NativeSelectOption></NativeSelect>{backgroundType !== "label" && <><div className="colour-row"><label>Fill <input type="color" value={backgroundFill} onChange={(event) => setBackgroundFill(event.target.value)} disabled={backgroundType === "line"} /></label><label>Outline <input type="color" value={backgroundStroke} onChange={(event) => setBackgroundStroke(event.target.value)} /></label></div><p className="helper">Click to add points. Finish when the shape is ready.</p><div className="draft-actions"><Button size="sm" disabled={draftPoints.length < (backgroundType === "area" ? 3 : 2)} onClick={finishBackground}>Finish shape</Button><Button size="sm" variant="ghost" disabled={!draftPoints.length} onClick={() => setDraftPoints([])}>Cancel</Button></div></>}</div>}
         </div>
+        {isDue(reminder) && <div className="crossing-card has-warning export-reminder" role="status">
+          <div className="crossing-icon"><AlertTriangle /></div>
+          <div>
+            <strong>Export a copy of your map</strong>
+            <p>Your map is only saved in this browser. Export a copy now and then so you don&apos;t lose it.</p>
+            <div className="export-reminder-buttons">
+              <Button size="sm" onClick={exportMap}><Download />Export map</Button>
+              <Button size="sm" variant="ghost" onClick={() => setReminder(later)}>Later</Button>
+              {isLastStep(reminder)
+                ? <Button size="sm" variant="ghost" onClick={() => setReminder(stopReminding)}>Don&apos;t remind me again</Button>
+                : <Button size="sm" variant="ghost" onClick={() => setReminder(lessOften)}>Remind me less often</Button>}
+            </div>
+          </div>
+        </div>}
         {coveredNames.length > 0 && <Tooltip><TooltipTrigger asChild>
           <div className="crossing-card has-warning name-card" tabIndex={0}>
             <div className="crossing-icon"><AlertTriangle /></div>
@@ -878,7 +905,7 @@ export function MapEditor() {
       busy={suggestBusy} deckName={suggestName} onDeckName={setSuggestName} currentDeck={activeTicketSet.label}
       onShuffle={() => setSuggestSeed((seed) => seed + 1)} onApply={(mode) => applySuggestion(mode, `ts-${Date.now()}`)} />
     <WelcomeGuide open={showGuide} onOpenChange={(open) => !open && dismissGuide()} onChooseBlank={() => chooseFromGuide("blank")} onChooseExample={() => chooseFromGuide("example")} />
-    <SettingsDialog open={showStyles} onOpenChange={setShowStyles} target={styleTarget} onTarget={setStyleTarget} data={data} change={change} onChangeFormat={changeFormat} onChangeOrientation={changeOrientation} defaults={{ stopType, setStopType, stopSize, setStopSize: (value) => setStopSize(value as StopSize), routeType, setRouteType, routeColor, setRouteColor, routeCurved, setRouteCurved, routeLineStyle, setRouteLineStyle, linkParallel, setLinkParallel }} />
+    <SettingsDialog open={showStyles} onOpenChange={setShowStyles} target={styleTarget} onTarget={setStyleTarget} data={data} change={change} onChangeFormat={changeFormat} onChangeOrientation={changeOrientation} exportReminder={{ on: !reminder.off, onChange: (on) => setReminder((r) => (on ? turnOn(r) : stopReminding(r))) }} defaults={{ stopType, setStopType, stopSize, setStopSize: (value) => setStopSize(value as StopSize), routeType, setRouteType, routeColor, setRouteColor, routeCurved, setRouteCurved, routeLineStyle, setRouteLineStyle, linkParallel, setLinkParallel }} />
     <PrintPages data={data} plan={printPlan(data.format, printChoice, printProfile, format.orientation)} parts={runParts} setId={activeTicketSet.id} />
     {makingImage && <ImageStage data={data} onDone={saveImage} onFail={() => setMakingImage(false)} />}
     <PrintDialog open={showPrint} onOpenChange={setShowPrint} format={data.format} orientation={format.orientation} profile={printProfile} choice={printChoice} onChoice={choosePrint} parts={{ value: printPartsNow, onChange: choosePrintParts, rulesWritten: Boolean(data.rules?.trim()), ticketCount: ticketsHere.length, deckLabel: activeTicketSet.label }} onPrint={() => { setShowPrint(false); setPrintRequest((count) => count + 1); }} />
