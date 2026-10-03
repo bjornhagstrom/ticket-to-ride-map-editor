@@ -19,11 +19,11 @@ export function WelcomeGuide({ open, onOpenChange, onChooseBlank, onChooseExampl
   // What matters, in a line or two each. How a print is laid out is for the print dialog to say.
   const steps: Array<{ icon: React.ReactNode; title: string; text: string }> = [
     { icon: <FileStack />, title: "Choose a board", text: "The standard 2×3 or the extended 2×4, lying or standing. You can change it whenever you like; everything on the map comes along." },
-    { icon: <Layers3 />, title: "Draw the map", text: "Sketch the background (land, water, regions), place stops, and connect them with routes, each with a length, a type and a colour." },
+    { icon: <Layers3 />, title: "Draw the map", text: "Sketch the background (land, water, regions), place stops, and connect them with routes, each with a length, a type and a colour, or bring them in from a spreadsheet." },
     { icon: <TicketIcon />, title: "Add destination tickets", text: "Link two stops to make a ticket, or let the editor suggest a whole deck. Map balance shows how well the map and the tickets work together." },
     { icon: <ScrollText />, title: "Write the rules", text: "Keep the rules of your map in the Rules panel, in plain text with links to its stops and routes." },
-    { icon: <Printer />, title: "Print it and play on paper", text: "Print the board, the tickets as cut-out cards and the rules, or save them as a PDF. Then play with coloured pens instead of plastic trains." },
-    { icon: <Save />, title: "Saved in your browser and download to your computer", text: "Your map saves automatically here. Export a file now and then as a backup, since browser storage does not travel." },
+    { icon: <Printer />, title: "Print it and play on paper", text: "Print the board, the tickets as cut-out cards with a small map, and the rules, or save them as a PDF. Then play with coloured pens instead of plastic trains." },
+    { icon: <Save />, title: "Saved in your browser and download to your computer", text: "Your map saves automatically in this browser. Export it to a file now and then as a backup, since browser storage does not travel." },
   ];
   return <Dialog open={open} onOpenChange={onOpenChange}>
     <DialogContent className="welcome-guide">

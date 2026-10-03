@@ -34,6 +34,8 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     const steps = await page.locator(".welcome-guide .guide-steps li").evaluateAll((lis) => lis.map((li) => ({ title: li.querySelector("strong").textContent.trim(), text: li.querySelector("p").textContent.trim() })));
     const all = steps.map((s) => `${s.title}. ${s.text}`).join(" ");
     check("the guide has a handful of steps", steps.length >= 5 && steps.length <= 7, String(steps.length));
+    check("drawing the map says stops and routes can come from a spreadsheet", steps.some((s) => /draw/i.test(s.title) && /spreadsheet/i.test(s.text)), steps.map((s) => s.text).join(" | "));
+    check("printing says each ticket card has a small map", steps.some((s) => /print/i.test(s.title) && /small map/i.test(s.text)));
     check("one of them is about destination tickets, and says the editor can suggest a deck", steps.some((s) => /ticket/i.test(s.title) && /suggest/i.test(s.text)), steps.map((s) => s.title).join(" | "));
     check("one is about the rules, one about printing, one about keeping the map safe", steps.some((s) => /rules/i.test(s.title)) && steps.some((s) => /print/i.test(s.title)) && steps.some((s) => /saved|save|backup/i.test(`${s.title} ${s.text}`)));
     check("the printing step names what can be printed: the board, the tickets as cards, the rules", (() => { const p = steps.find((s) => /print/i.test(s.title)); return Boolean(p) && /board/i.test(p.text) && /ticket/i.test(p.text) && /rules/i.test(p.text); })());
@@ -2762,8 +2764,17 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     check("it lists the releases, newest first, each with its version and date", (await releases.count()) >= 2 && (await releases.first().locator("h2").textContent()).includes(pkgVersion) && /\d{4}-\d{2}-\d{2}/.test(await releases.first().locator("time").textContent()));
     check("each with what changed, in a list that shows its bullets", (await releases.first().locator("li").count()) >= 1 && (await releases.first().locator("ul").evaluate((el) => getComputedStyle(el).listStyleType)) === "disc");
     check("and a way back to the editor", (await other.getByRole("link", { name: /Back to the editor/ }).count()) >= 1);
+    // The newest release leads with what it brings: spreadsheets, boards that stand, tickets with a map.
+    const newestTitle = await releases.first().locator(".release-title").textContent();
+    const newestFirst = (await releases.first().locator("li").allTextContents()).slice(0, 3).join(" ");
+    check("the newest release is named after what it brings", /spreadsheet/i.test(newestTitle) && /stand/i.test(newestTitle) && /ticket/i.test(newestTitle), newestTitle);
+    check("and its list starts with those, not with the small things", /spreadsheet/i.test(newestFirst) && /stand/i.test(newestFirst) && /small map/i.test(newestFirst), newestFirst);
     await other.goto(BASE + "about/", { waitUntil: "networkidle" });
     const aboutText = await other.locator("body").textContent();
+    check("the About page tells of boards that stand, of ticket cards with a small map, and of spreadsheets", /stand/.test(aboutText) && /small map/.test(aboutText) && /spreadsheet/i.test(aboutText));
+    const docLinks = await other.locator('a[href*="/blob/main/docs/"]').evaluateAll((els) => els.map((el) => el.getAttribute("href")));
+    check("it links to the decisions and the file format in the public source, rather than naming files", docLinks.some((h) => h.endsWith("/docs/DECISIONS.md")) && docLinks.some((h) => h.endsWith("/docs/FILE-FORMAT.md")) && docLinks.every((h) => h.startsWith("https://github.com/bjornhagstrom/ticket-to-ride-map-editor/blob/main/")), docLinks.join(", "));
+    check("it says which file format a map is written in: 3, or 4 for a board that stands", /file format 3, or 4 for a standing board/.test(aboutText), (aboutText.match(/file format[^·]*/) || [""])[0]);
     check("the About page speaks of the many many prototypes, not of ten or twenty", /the many many prototypes/.test(aboutText) && !/ten or twenty/.test(aboutText));
     const aboutRepo = other.getByRole("link", { name: /source code/i });
     check("the About page links to the source code too", (await aboutRepo.count()) >= 1 && (await aboutRepo.first().getAttribute("href")) === "https://github.com/bjornhagstrom/ticket-to-ride-map-editor" && /noopener/.test(await aboutRepo.first().getAttribute("rel")));

@@ -116,7 +116,7 @@ export const FILE_FORMAT = "ticket-to-ride-map";
 // every version 3 reader opens unchanged; only a standing map needs 4, so that a reader that cannot
 // stand a board refuses it instead of laying it down wrong.
 export const FILE_VERSION = 4;
-const LYING_FILE_VERSION = 3;
+export const LYING_FILE_VERSION = 3;
 export const APP_NAME = "Map prototypes";
 // The version, and the notes on what changed in it, live in version.ts.
 export { APP_VERSION };

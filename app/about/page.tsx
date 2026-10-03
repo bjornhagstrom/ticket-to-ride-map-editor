@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { BusFront, ArrowLeft } from "lucide-react";
-import { APP_VERSION, FILE_VERSION } from "../map-storage";
+import { APP_VERSION, FILE_VERSION, LYING_FILE_VERSION } from "../map-storage";
 import { REPO_URL } from "../version";
 import "../about.css";
 
@@ -49,6 +49,26 @@ export default function About() {
         the spacing measured from a hundred real routes. So a route that is six spaces long has room
         for six actual plastic trains when you print at full size. If a route is drawn too short for
         the number of spaces you gave it, the balance report says so, in millimetres.
+      </p>
+    </section>
+
+    <section>
+      <h2>Boards, cards and spreadsheets</h2>
+      <p>
+        A board lies or stands, in the standard 2×3 or the extended 2×4. Standing it up or laying it
+        down turns everything on it a quarter turn without changing a single distance, so the wagons
+        and every number the editor gives stay as they were.
+      </p>
+      <p>
+        The ticket cards print to be cut out, lying or standing as the board does, and each carries a
+        small map of the whole board with its two stops ringed and joined by a line, as the real cards
+        do.
+      </p>
+      <p>
+        The tickets, the routes, the stops and the distance between every two stops can go out to a
+        spreadsheet, and stops, routes and tickets can come back in from one: an export of your own, or
+        a list typed by hand. Stops that come without a position are laid out from the routes, ready to
+        be dragged into place.
       </p>
     </section>
 
@@ -125,13 +145,14 @@ export default function About() {
         </div>
       </dl>
       <p className="about-note">
-        The full record, with what was rejected and what would change our minds, is in
-        <code>docs/DECISIONS.md</code>; the file format is described in <code>docs/FILE-FORMAT.md</code>.
+        The full record, with what was rejected and what would change our minds, is in{" "}
+        <a href={`${REPO_URL}/blob/main/docs/DECISIONS.md`} target="_blank" rel="noopener noreferrer">the decisions</a>; the file format is
+        described in <a href={`${REPO_URL}/blob/main/docs/FILE-FORMAT.md`} target="_blank" rel="noopener noreferrer">the file format</a>.
       </p>
     </section>
 
     <footer className="about-foot">
-      <p>Version {APP_VERSION} · file format {FILE_VERSION} · <Link href="/whats-new">What&apos;s new</Link> · <a href={REPO_URL} target="_blank" rel="noopener noreferrer">Source code</a> (MIT licence)</p>
+      <p>Version {APP_VERSION} · file format {LYING_FILE_VERSION}, or {FILE_VERSION} for a standing board · <Link href="/whats-new">What&apos;s new</Link> · <a href={REPO_URL} target="_blank" rel="noopener noreferrer">Source code</a> (MIT licence)</p>
       <p>
         Ticket to Ride is a game by Alan R. Moon, published by Days of Wonder. This is an unofficial
         tool for designing your own boards, and is not affiliated with them. The reference data is a
