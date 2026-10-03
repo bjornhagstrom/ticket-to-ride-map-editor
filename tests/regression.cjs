@@ -39,6 +39,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     check("the printing step names what can be printed: the board, the tickets as cards, the rules", (() => { const p = steps.find((s) => /print/i.test(s.title)); return Boolean(p) && /board/i.test(p.text) && /ticket/i.test(p.text) && /rules/i.test(p.text); })());
     const board = steps.find((s) => /board/i.test(s.title));
     check("choosing the board says nothing about paper or how a print is cut up", Boolean(board) && !/\b(A4|A3|letter|tabloid|paper|sheet|panel|full size|print)/i.test(board.text), board && board.text);
+    check("the step on keeping the map says it is saved in the browser and can be downloaded to the computer", steps.some((s) => s.title === "Saved in your browser and download to your computer"), steps.map((s) => s.title).join(" | "));
     check("every step is short, and the whole guide is", steps.every((s) => s.text.length <= 190) && all.length <= 1000, `${Math.max(...steps.map((s) => s.text.length))} characters at most in a step, ${all.length} in all`);
   }
   await page.getByRole("button", { name: "Load the example map" }).click();
@@ -1027,11 +1028,12 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
               const map = card.querySelector("svg.ticket-map");
               const ends = map ? Array.from(map.querySelectorAll(".ticket-map-end")).map((c) => ({ x: Number(c.getAttribute("cx")), y: Number(c.getAttribute("cy")), stroke: getComputedStyle(c).stroke })) : [];
               const stop = map ? map.ownerDocument.querySelector(".print-tickets symbol .ticket-map-stop") : null;
+              const links = map ? Array.from(map.querySelectorAll(".ticket-map-link")).map((l) => ({ x1: Number(l.getAttribute("x1")), y1: Number(l.getAttribute("y1")), x2: Number(l.getAttribute("x2")), y2: Number(l.getAttribute("y2")), stroke: getComputedStyle(l).stroke, width: parseFloat(getComputedStyle(l).strokeWidth) })) : [];
               return {
                 card: box(card), map: box(map), viewBox: map && map.getAttribute("viewBox"), uses: map ? map.querySelectorAll("use").length : 0,
                 parts: ["from", "to", "points"].map((part) => box(card.querySelector(`.ticket-card-${part}`))),
                 clipped: ["from", "to"].some((part) => { const p = card.querySelector(`.ticket-card-${part}`); return p && p.scrollWidth > p.clientWidth + 1; }),
-                ends, stopFill: stop ? getComputedStyle(stop).fill : null,
+                ends, links, stopFill: stop ? getComputedStyle(stop).fill : null,
               };
             }),
           };
@@ -1056,6 +1058,10 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     check("the network is drawn once for the whole deck and reused on every card", tree.symbols === 1 && tree.cards.every((c) => c.uses === 1), `${tree.symbols} symbols`);
     const name = (id) => stored.stops.find((s) => s.id === id);
     check("each card marks its own two stops, where they are on the board", tree.cards.every((c, i) => { const t = deck[i], a = name(t.a), b = name(t.b); const at = (s) => c.ends.some((e) => Math.abs(e.x - s.x) < .5 && Math.abs(e.y - s.y) < .5); return c.ends.length === 2 && at(a) && at(b); }), JSON.stringify(tree.cards[0] && tree.cards[0].ends));
+    // As on the real tickets, a line joins the two stops: from ring to ring, never into either.
+    const onLink = (c) => { if (c.links.length !== 1 || c.ends.length !== 2) return false; const [a, b] = c.ends, l = c.links[0]; const len = Math.hypot(b.x - a.x, b.y - a.y); if (len <= 60) return Math.hypot(l.x2 - l.x1, l.y2 - l.y1) < 1; const ux = (b.x - a.x) / len, uy = (b.y - a.y) / len; const near = (x, y, px, py) => Math.hypot(x - px, y - py) < 1; return (near(l.x1, l.y1, a.x + ux * 30, a.y + uy * 30) && near(l.x2, l.y2, b.x - ux * 30, b.y - uy * 30)); };
+    check("a line joins each card's two stops, from ring to ring", tree.cards.every(onLink), JSON.stringify(tree.cards[0] && { ends: tree.cards[0].ends, links: tree.cards[0].links }));
+    check("and it is dark, so it reads in black and white, but thinner than the rings", tree.cards.every((c) => c.links.every((l) => lum(l.stroke) < 70 && l.width < 12)), JSON.stringify(tree.cards[0] && tree.cards[0].links));
     check("the marks are black and the other stops a light grey, so they read in black and white", tree.cards.every((c) => c.ends.every((e) => lum(e.stroke) < 40)) && lum(tree.cards[0].stopFill) > 110, `${tree.cards[0].ends.map((e) => e.stroke).join()} against ${tree.cards[0].stopFill}`);
     const inside = (c, r) => r && r.x >= c.card.x - .5 && r.right <= c.card.right + .5 && r.y >= c.card.y - .5 && r.bottom <= c.card.bottom + .5;
     check("the map, both names and the points all fit on the card", tree.cards.every((c) => inside(c, c.map) && c.parts.every((p) => inside(c, p)) && !c.clipped));
@@ -1073,26 +1079,10 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     const long = await deckTree();
     check("a card with two long names still holds both, and its points, uncut", inside(long.cards[0], long.cards[0].parts[0]) && inside(long.cards[0], long.cards[0].parts[1]) && inside(long.cards[0], long.cards[0].parts[2]) && !long.cards[0].clipped, JSON.stringify(long.cards[0].parts));
 
-    // The print dialog offers the map as a choice, ticked from the start, and remembers it.
+    // Every card has its map: there is nothing to tick.
     await page.getByRole("button", { name: "Print map" }).click();
     await page.waitForTimeout(400);
-    const tick = page.getByRole("checkbox", { name: "A small map on each ticket" });
-    check("the print dialog offers a small map on each ticket, ticked", (await tick.count()) === 1 && (await tick.isChecked()));
-    await tick.uncheck();
-    await page.keyboard.press("Escape");
-    await page.waitForTimeout(300);
-    await page.reload({ waitUntil: "networkidle" });
-    await page.waitForTimeout(700);
-    await page.getByRole("button", { name: "Print map" }).click();
-    await page.waitForTimeout(400);
-    check("unticked, it stays unticked", !(await page.getByRole("checkbox", { name: "A small map on each ticket" }).isChecked()));
-    await page.keyboard.press("Escape");
-    await page.waitForTimeout(300);
-    const plain = await deckTree();
-    check("and the cards then print without it, names and points as before", plain.cards.length === deck.length && plain.cards.every((c) => !c.map && c.parts.every((p) => p && inside(c, p))));
-    await page.getByRole("button", { name: "Print map" }).click();
-    await page.waitForTimeout(400);
-    await page.getByRole("checkbox", { name: "A small map on each ticket" }).check();
+    check("the print dialog has no tick box for the small map: every card has one", (await page.getByRole("checkbox", { name: /map on each ticket/i }).count()) === 0);
     await page.keyboard.press("Escape");
     await page.waitForTimeout(300);
     await page.evaluate(([key, map]) => localStorage.setItem(key, JSON.stringify(map)), [KEY, stored]);
@@ -2637,7 +2627,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     check("when Print is pressed, the cards and the rules reach the printer, and no board, after the dialog has gone", reached.cards === deckSize && reached.rules === 1 && reached.boards === 0 && reached.dialogs === 0, JSON.stringify(reached));
     // remembered, and choices an earlier build wrote still mean what they meant
     const rememberedParts = await page.evaluate(() => JSON.parse(localStorage.getItem("ttr-print-parts")));
-    check("the choice is remembered, the small map on the tickets with it", Boolean(rememberedParts) && rememberedParts.board === false && rememberedParts.tickets === true && rememberedParts.rules === true && rememberedParts.minimap === true, JSON.stringify(rememberedParts));
+    check("the choice is remembered", Boolean(rememberedParts) && rememberedParts.board === false && rememberedParts.tickets === true && rememberedParts.rules === true, JSON.stringify(rememberedParts));
     const ticked = async () => { await printButton().click(); await page.waitForTimeout(400); const state = [await printPart("Print the board").isChecked(), await printPart("Print the tickets").isChecked(), await printPart("Print the rules").isChecked()]; await printDialog().getByRole("button", { name: "Cancel" }).click(); await page.waitForTimeout(250); return state; };
     await page.reload({ waitUntil: "networkidle" });
     await page.waitForTimeout(600);

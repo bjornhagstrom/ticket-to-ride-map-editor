@@ -102,21 +102,16 @@
   .print-page .stop text{font-size:12px}
   .print-page .wagon-slot-outline{stroke-width:4px}
   /* Ticket cards: 62 x 45 mm, lying as the board lies (cardSize, inline), as many to a row as the paper
-     holds, with no bleed. Two layouts: names above a small map with the points in the corner, or
-     the names stacked over the points when the small map is left out. */
+     holds, with no bleed: the names above a small map of the board, the points in the corner. */
   .ticket-run{width:100%;position:relative}
   .ticket-map-defs{position:absolute;width:0;height:0;overflow:hidden}
   .ticket-row{display:flex;gap:0;justify-content:center;break-inside:avoid;page-break-inside:avoid}
   .print-tickets .print-caption{break-after:avoid}
   .ticket-card{break-inside:avoid;page-break-inside:avoid;border:.25mm dashed #81786c;padding:3mm;overflow:hidden;background:white;color:#24211d}
   .ticket-card p{margin:0}
-  .ticket-card.plain{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:.8mm}
-  .ticket-card.plain .ticket-card-from,.ticket-card.plain .ticket-card-to{font:700 10pt Georgia,serif;line-height:1.15;overflow-wrap:anywhere}
-  .ticket-card-arrow{font:8pt "Segoe UI",Arial,sans-serif;color:#81786c}
   .ticket-card-points{width:10mm;height:10mm;border:.4mm solid #24211d;border-radius:50%;font:700 11pt Georgia,serif;line-height:9.2mm;text-align:center;color:#24211d}
-  .ticket-card.plain .ticket-card-points{margin-top:1.5mm!important}
   .ticket-card-flag{font:6pt "Segoe UI",Arial,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:#24221e;text-align:center}
-  .ticket-card.with-map{display:grid;grid-template-columns:minmax(0,1fr) 10mm;grid-template-rows:auto minmax(0,1fr);gap:1.2mm 1.5mm}
+  .ticket-card{display:grid;grid-template-columns:minmax(0,1fr) 10mm;grid-template-rows:auto minmax(0,1fr);gap:1.2mm 1.5mm}
   .ticket-card-names{grid-column:1/-1;font:700 8.5pt Georgia,serif;line-height:1.15;overflow-wrap:anywhere}
   .ticket-card-dash{font-weight:400;color:#81786c}
   /* Height fills the row; width follows the board's proportions; max-height (inline) keeps it clear of the points. */
@@ -128,6 +123,7 @@
   .ticket-map-route{fill:none;stroke:#c2baad;stroke-width:9;stroke-linecap:round}
   .ticket-map-stop{fill:#aaa296}
   .ticket-map-frame{fill:none;stroke:#cfc8bb;stroke-width:5}
+  .ticket-map-link{stroke:#24211d;stroke-width:6;stroke-linecap:round}
   .ticket-map-end{fill:none;stroke:#000;stroke-width:12}
   /* The rules text, on pages of their own after the board. It flows in the same page box as the board's pages. */
   /* Whatever follows the board starts on a page of its own; the first thing in the run does not leave a blank page before it. */

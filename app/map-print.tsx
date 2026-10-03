@@ -35,7 +35,10 @@ function TicketMapSymbol({ data, id }: { data: MapData; id: string }) {
   </svg>;
 }
 
-export function TicketCards({ data, setId, perRow, minimap }: { data: MapData; setId: string; perRow: number; minimap: boolean }) {
+// The rings round a ticket's two stops, in map units.
+const RING = 30;
+
+export function TicketCards({ data, setId, perRow }: { data: MapData; setId: string; perRow: number }) {
   const set = data.ticketSets.find((item) => item.id === setId) ?? data.ticketSets[0];
   const stop = (id: string) => data.stops.find((item) => item.id === id);
   const name = (id: string) => stop(id)?.name ?? "—";
@@ -50,32 +53,30 @@ export function TicketCards({ data, setId, perRow, minimap }: { data: MapData; s
   // paginate, with a card never split across a break, cannot overflow by construction.
   return <section className="print-tickets">
     <div className="ticket-run">
-      {minimap && <TicketMapSymbol data={data} id={symbolId} />}
+      <TicketMapSymbol data={data} id={symbolId} />
       <div className="print-caption"><strong>{data.name}</strong><span>{set?.label} · {tickets.length} ticket{tickets.length === 1 ? "" : "s"}</span></div>
       {/* Explicit rows, each a block that may not be split. Safari ignores break-inside on grid
           cells, which cut cards in half across the page break. */}
       {Array.from({ length: Math.ceil(tickets.length / perRow) }, (_, row) => tickets.slice(row * perRow, row * perRow + perRow)).map((row, index) => <div className="ticket-row" key={index}>
         {row.map((ticket) => {
           const ends = [stop(ticket.a), stop(ticket.b)].filter((item): item is NonNullable<typeof item> => Boolean(item));
-          return <div className={cn("ticket-card", minimap ? "with-map" : "plain")} key={ticket.id} style={{ width: `${card.width}mm`, height: `${card.height}mm` }}>
-            {minimap ? <>
-              <p className="ticket-card-names"><span className="ticket-card-from">{name(ticket.a)}</span><span className="ticket-card-dash"> – </span><span className="ticket-card-to">{name(ticket.b)}</span></p>
-              <svg className="ticket-map" viewBox={`0 0 ${width} ${height}`} style={{ aspectRatio: `${width} / ${height}`, maxHeight: `${((card.width - 6 - 10 - 1.5) * height / width).toFixed(2)}mm` }}>
-                <use href={`#${symbolId}`} width={width} height={height} />
-                <rect className="ticket-map-frame" x={0} y={0} width={width} height={height} />
-                {ends.map((end) => <circle key={end.id} className="ticket-map-end" cx={end.x} cy={end.y} r={30} />)}
-              </svg>
-              <div className="ticket-card-corner">
-                {ticket.long && <p className="ticket-card-flag">Long</p>}
-                <p className="ticket-card-points">{ticket.points}</p>
-              </div>
-            </> : <>
-              <p className="ticket-card-from">{name(ticket.a)}</p>
-              <p className="ticket-card-arrow">↕</p>
-              <p className="ticket-card-to">{name(ticket.b)}</p>
+          // As on the real tickets, a line joins the two stops, from ring to ring.
+          const [from, to] = ends;
+          const length = from && to ? Math.hypot(to.x - from.x, to.y - from.y) : 0;
+          const ux = length ? (to.x - from.x) / length : 0, uy = length ? (to.y - from.y) / length : 0;
+          const gap = Math.min(RING, length / 2);
+          return <div className="ticket-card" key={ticket.id} style={{ width: `${card.width}mm`, height: `${card.height}mm` }}>
+            <p className="ticket-card-names"><span className="ticket-card-from">{name(ticket.a)}</span><span className="ticket-card-dash"> – </span><span className="ticket-card-to">{name(ticket.b)}</span></p>
+            <svg className="ticket-map" viewBox={`0 0 ${width} ${height}`} style={{ aspectRatio: `${width} / ${height}`, maxHeight: `${((card.width - 6 - 10 - 1.5) * height / width).toFixed(2)}mm` }}>
+              <use href={`#${symbolId}`} width={width} height={height} />
+              <rect className="ticket-map-frame" x={0} y={0} width={width} height={height} />
+              {from && to && <line className="ticket-map-link" x1={from.x + ux * gap} y1={from.y + uy * gap} x2={to.x - ux * gap} y2={to.y - uy * gap} />}
+              {ends.map((end) => <circle key={end.id} className="ticket-map-end" cx={end.x} cy={end.y} r={RING} />)}
+            </svg>
+            <div className="ticket-card-corner">
+              {ticket.long && <p className="ticket-card-flag">Long</p>}
               <p className="ticket-card-points">{ticket.points}</p>
-              {ticket.long && <p className="ticket-card-flag">Long route</p>}
-            </>}
+            </div>
           </div>;
         })}
       </div>)}
@@ -86,7 +87,7 @@ export function TicketCards({ data, setId, perRow, minimap }: { data: MapData; s
 // The board as the chosen print run cuts it. Page size, margins and the size of every tile come
 // from printPlan, in millimetres, so the pages cannot disagree with what the dialog promised.
 // What a print run holds, in the order it is printed: the board, then the tickets as cards, then the rules.
-export type PrintParts = { board: boolean; tickets: boolean; rules: boolean; minimap: boolean };
+export type PrintParts = { board: boolean; tickets: boolean; rules: boolean };
 
 export function PrintPages({ data, plan, parts, setId }: { data: MapData; plan: PrintPlan; parts: PrintParts; setId: string }) {
   const format = boardOf(data);
@@ -134,7 +135,7 @@ export function PrintPages({ data, plan, parts, setId }: { data: MapData; plan: 
     })}
     {/* The rules, if asked for, on pages of their own after the board: as many as the text needs,
         flowing in the same page box as the board's pages. */}
-    {parts.tickets && <TicketCards data={data} setId={setId} perRow={cardsPerRow(plan.pageMm, cardSize(data.format, format.orientation))} minimap={parts.minimap} />}
+    {parts.tickets && <TicketCards data={data} setId={setId} perRow={cardsPerRow(plan.pageMm, cardSize(data.format, format.orientation))} />}
     {parts.rules && data.rules?.trim() && <section className="print-rules">
       <p className="print-rules-name">{data.name} · rules</p>
       <RulesText source={data.rules} data={data} print />
@@ -192,12 +193,6 @@ export function PrintDialog({ open, onOpenChange, format, orientation = "landsca
             <input type="checkbox" name="print-tickets" aria-label="Print the tickets" aria-describedby="print-tickets-note" disabled={parts.ticketCount === 0 || onePage}
               checked={parts.value.tickets} onChange={(event) => parts.onChange({ ...parts.value, tickets: event.target.checked })} />
             <span><strong>The tickets</strong><small id="print-tickets-note">{parts.ticketCount === 0 ? "This deck has no tickets yet." : `${parts.deckLabel}, ${parts.ticketCount} ticket${parts.ticketCount === 1 ? "" : "s"}, as cut-out cards.`}</small></span>
-          </label>
-          {/* Applies to "Print deck" in the Tickets panel too, so it is offered even when the tickets are not ticked here. */}
-          <label className="print-option print-suboption">
-            <input type="checkbox" name="print-minimap" aria-label="A small map on each ticket" aria-describedby="print-minimap-note"
-              checked={parts.value.minimap} onChange={(event) => parts.onChange({ ...parts.value, minimap: event.target.checked })} />
-            <span><strong>A small map on each ticket</strong><small id="print-minimap-note">The whole board in light grey, with the ticket&apos;s two stops marked, as on the real cards.</small></span>
           </label>
           <label className="print-option">
             <input type="checkbox" name="print-rules" aria-label="Print the rules" aria-describedby="print-rules-note" disabled={!parts.rulesWritten || onePage}

@@ -23,7 +23,7 @@ export function WelcomeGuide({ open, onOpenChange, onChooseBlank, onChooseExampl
     { icon: <TicketIcon />, title: "Add destination tickets", text: "Link two stops to make a ticket, or let the editor suggest a whole deck. Map balance shows how well the map and the tickets work together." },
     { icon: <ScrollText />, title: "Write the rules", text: "Keep the rules of your map in the Rules panel, in plain text with links to its stops and routes." },
     { icon: <Printer />, title: "Print it and play on paper", text: "Print the board, the tickets as cut-out cards and the rules, or save them as a PDF. Then play with coloured pens instead of plastic trains." },
-    { icon: <Save />, title: "Saved in your browser", text: "Your map saves automatically here. Export a file now and then as a backup, since browser storage does not travel." },
+    { icon: <Save />, title: "Saved in your browser and download to your computer", text: "Your map saves automatically here. Export a file now and then as a backup, since browser storage does not travel." },
   ];
   return <Dialog open={open} onOpenChange={onOpenChange}>
     <DialogContent className="welcome-guide">

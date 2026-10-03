@@ -16,7 +16,7 @@ export const RELEASES: Release[] = [
       "The welcome guide is shorter and now covers destination tickets and the rules, and says nothing about how a print is laid out.",
       "Export the tickets, the routes, the stops or the distances between every two stops as a spreadsheet (CSV), from Export or from the Tickets panel.",
       "A board can stand as well as lie: choose it in Settings beside the board format, where a drawing shows the board and its ticket cards as you will get them. Everything on the map turns a quarter turn with it.",
-      "Ticket cards lie the way the board lies, and carry a small map of the whole board with their two stops ringed, as on the real cards. It can be turned off in the print dialog.",
+      "Ticket cards lie the way the board lies, and carry a small map of the whole board with their two stops ringed and joined by a line, as on the real cards.",
       "Import stops, routes and tickets from spreadsheets (CSV). Stops keep their positions; stops without one are laid out from the routes, ready to be dragged into place.",
     ],
   },

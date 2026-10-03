@@ -194,15 +194,14 @@ them. So the layout is made to fit with them on.
   quarter turn: its sheet is the page's short side across and its long side, less the caption, down.
   Its panels are 2 across and 3 (or 4) down. The figures are in `tests/print-plan.cjs`.
 - **Ticket cards** are 62 × 45 mm and lie the way the board lies (`cardSize` in `app/print-plan.ts`):
-  landscape on a lying board, 45 × 62 mm upright on a standing one. Three to
-  a row on A4 and Letter. A fourth tick box, "A small map on each ticket", on from the start and kept
-  in `ttr-print-parts` as `minimap`, puts the whole board on every card in light grey with the
-  ticket's two stops ringed in black, as the real cards do. It applies to "Print deck" too, so it is
-  offered even when the tickets are not ticked. The network is drawn once per deck as an SVG
-  `<symbol>` that every card `<use>`s, so a deck of a hundred cards is no heavier to print than the
-  board. Areas and lines of the background are drawn faintly; their labels, notes and a background
-  image are not. Junctions get no dot. The map keeps the board's proportions and never runs into the
-  points; the names sit above it and wrap rather than being cut.
+  landscape on a lying board, 45 × 62 mm upright on a standing one. Three to a row on A4 and Letter.
+  Every card carries a small map: the whole board in light grey, the ticket's two stops ringed in
+  black and joined by a line from ring to ring, as the real cards do. There is no tick box for it;
+  there was one briefly, and a card without its map was nobody's wish. The network is drawn once per
+  deck as an SVG `<symbol>` that every card `<use>`s, so a deck of a hundred cards is no heavier to
+  print than the board. Areas and lines of the background are drawn faintly; their labels, notes and a
+  background image are not. Junctions get no dot. The map keeps the board's proportions and never runs
+  into the points; the names sit above it and wrap rather than being cut.
 - **One page, real size** is a fourth way to split. The page is the board's own size (the board, the
   caption above it and the 10 mm margin all round: 810 × 553 mm for the standard board, 1073 × 554 mm
   for the extended one), upright and not turned, at 100 %. It is for a plotter or a large-format printer,
