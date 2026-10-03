@@ -48,6 +48,16 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.waitForTimeout(600);
 
   const badges = async () => (await page.locator(".map-status span").allTextContents());
+  // The logo: a route, two stops joined by three wagon spaces, the same everywhere it appears, and
+  // no vehicle. The favicon is the same drawing.
+  const logoOn = (p) => p.evaluate(() => Array.from(document.querySelectorAll("svg.route-logo")).map((svg) => ({ wagons: svg.querySelectorAll(".route-logo-wagon").length, stops: svg.querySelectorAll(".route-logo-stop").length, label: svg.getAttribute("aria-label"), header: Boolean(svg.closest(".brand, .about-head")) })));
+  {
+    const logos = await logoOn(page);
+    check("the header shows the route logo: two stops and three wagon spaces", logos.some((l) => l.header && l.wagons === 3 && l.stops === 2 && l.label === "Map prototypes"), JSON.stringify(logos));
+    check("and no bus anywhere", (await page.locator(".lucide-bus-front").count()) === 0);
+    const favicon = await page.evaluate(async () => { const link = document.querySelector('link[rel="icon"]'); if (!link) return null; const res = await fetch(link.href); return { href: link.getAttribute("href"), ok: res.ok, text: await res.text() }; });
+    check("the favicon is the route logo too", Boolean(favicon) && favicon.ok && /data-logo="route"/.test(favicon.text) && (favicon.text.match(/route-logo-wagon/g) || []).length === 3, favicon && favicon.href);
+  }
   check("example map loads", (await badges())[2] === "15 stops", (await badges()).slice(0, 4).join(", "));
 
   // 1a. Safari gets smaller sheets, and is told why. A second page claiming to be Safari.
@@ -2795,6 +2805,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     const other = await (await browser.newContext({ viewport: { width: 1200, height: 900 } })).newPage();
     await other.goto(BASE + "whats-new/", { waitUntil: "networkidle" });
     check("the What's new page opens", /What.s new/.test(await other.locator("h1").first().textContent()));
+    check("with the route logo in its head, and no bus", (await logoOn(other)).some((l) => l.header && l.wagons === 3) && (await other.locator(".lucide-bus-front").count()) === 0);
     const releases = other.locator("article.release");
     check("it lists the releases, newest first, each with its version and date", (await releases.count()) >= 2 && (await releases.first().locator("h2").textContent()).includes(pkgVersion) && /\d{4}-\d{2}-\d{2}/.test(await releases.first().locator("time").textContent()));
     check("each with what changed, in a list that shows its bullets", (await releases.first().locator("li").count()) >= 1 && (await releases.first().locator("ul").evaluate((el) => getComputedStyle(el).listStyleType)) === "disc");
@@ -2813,6 +2824,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     // Since route load was weighted 2 the official decks score 4 to 35 (docs/TICKET-SUGGESTER.md §2b):
     // what holds is the order, official below random and a suggestion below official, not a number.
     check("the About page does not promise official decks a score below 5", !/below 5/.test(aboutText) && /random/.test(aboutText));
+    check("the About page has the route logo in its head, and no bus", (await logoOn(other)).some((l) => l.header && l.wagons === 3) && (await other.locator(".lucide-bus-front").count()) === 0);
     check("the About page speaks of the many many prototypes, not of ten or twenty", /the many many prototypes/.test(aboutText) && !/ten or twenty/.test(aboutText));
     const aboutRepo = other.getByRole("link", { name: /source code/i });
     check("the About page links to the source code too", (await aboutRepo.count()) >= 1 && (await aboutRepo.first().getAttribute("href")) === "https://github.com/bjornhagstrom/ticket-to-ride-map-editor" && /noopener/.test(await aboutRepo.first().getAttribute("rel")));

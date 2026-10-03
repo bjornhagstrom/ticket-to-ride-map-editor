@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { BusFront, ArrowLeft } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
+import { RouteLogo } from "../logo";
 import { RELEASES } from "../version";
 import "../about.css";
 
@@ -8,7 +9,7 @@ export const metadata = { title: "What's new – Ticket to Ride – Map prototyp
 export default function WhatsNew() {
   return <main className="about whats-new">
     <header className="about-head">
-      <span className="brand-mark"><BusFront /></span>
+      <RouteLogo className="brand-mark" />
       <div>
         <p>Ticket to Ride · Map prototypes</p>
         <h1>What&apos;s new</h1>

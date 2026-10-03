@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { BusFront, ArrowLeft } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
+import { RouteLogo } from "../logo";
 import { APP_VERSION, FILE_VERSION, LYING_FILE_VERSION } from "../map-storage";
 import { REPO_URL } from "../version";
 import "../about.css";
@@ -11,7 +12,7 @@ export const metadata = { title: "About – Ticket to Ride – Map prototypes" }
 export default function About() {
   return <main className="about">
     <header className="about-head">
-      <span className="brand-mark"><BusFront /></span>
+      <RouteLogo className="brand-mark" />
       <div>
         <p>Ticket to Ride</p>
         <h1>Map prototypes</h1>

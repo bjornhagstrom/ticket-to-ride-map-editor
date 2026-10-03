@@ -13,6 +13,7 @@ export const RELEASES: Release[] = [
     title: "Spreadsheets, boards that stand, and tickets with a map",
     changes: [
       "A board can stand as well as lie: choose it in Settings beside the board format, where a drawing shows the board and its ticket cards as you will get them. Everything on the map turns a quarter turn with it.",
+      "A logo of its own: two stops joined by a route of wagon spaces, in the header, on the About pages and in the browser tab. It used to be a bus.",
       "Ticket cards lie or stand the way the board does, and every card carries a small map of the whole board with its two stops ringed and joined by a line, as on the real cards.",
       "Export the tickets, the routes, the stops or the distances between every two stops as a spreadsheet (CSV), from Export or from the Tickets panel.",
       "Import stops, routes and tickets from spreadsheets (CSV). Stops keep their positions; stops without one are laid out from the routes, ready to be dragged into place.",
