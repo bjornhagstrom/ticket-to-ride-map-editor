@@ -128,7 +128,7 @@ designing your own boards, and is not affiliated with them.
 - Undo and redo up to 200 changes during the current session, with Cmd/Ctrl+Z and Cmd/Ctrl+Shift+Z.
 - Save automatically in the current browser.
 - Import and export complete maps as JSON, or just the background or the route network on their own, and save the board as a PNG picture.
-- Export the tickets, routes, stops or the distance between every two stops as spreadsheets (CSV), and import stops, routes and tickets from spreadsheets: our own exports, the reference data's, or a list typed by hand. Positions are kept, fitted to the board, or worked out from the routes when there are none.
+- Export the tickets, routes, stops or the distance between every two stops as spreadsheets (CSV), and import stops, routes and tickets from spreadsheets: our own exports, the reference data's, or a list typed by hand. Positions are kept, fitted to the board, or worked out from the routes when there are none. Templates for each kind, and a guide to their columns ([docs/CSV.md](docs/CSV.md)), are under Import.
 - Print from a dialog that decides each run without touching the map: the whole board on one sheet, one sheet per fold panel, or full size across as many sheets as it takes, with trim marks; on A4, A3, US Letter or Tabloid; and for a 2×3, an Anniversary size tick under Supersize that prints the larger Anniversary board at full size. A table compares the sheet count and scale of every combination and picks one when clicked. The last choice is remembered in the browser.
 - Show a neutral example map to first-time visitors.
 

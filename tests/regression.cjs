@@ -740,8 +740,14 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     // editor asks first. Stops and routes are replaced by the same ones; the tickets come as new decks.
     await page.getByRole("button", { name: "Import", exact: true }).click();
     await page.waitForTimeout(250);
-    const chooser = page.waitForEvent("filechooser");
     await page.getByRole("menuitem", { name: "Spreadsheet (CSV)" }).click();
+    await page.waitForTimeout(250);
+    const csvItems = await page.getByRole("menu").last().getByRole("menuitem").allTextContents();
+    check("Import has a spreadsheet menu: import, a template for each kind, and what the columns mean", ["Import spreadsheets…", "Stops template", "Routes template", "Tickets template", "What the columns mean"].every((name) => csvItems.includes(name)), csvItems.join(" | "));
+    const guideLink = await page.getByRole("menuitem", { name: "What the columns mean" }).getAttribute("href");
+    check("the column guide opens from the repository, in a new tab", guideLink === "https://github.com/bjornhagstrom/ticket-to-ride-map-editor/blob/main/docs/CSV.md" && (await page.getByRole("menuitem", { name: "What the columns mean" }).getAttribute("target")) === "_blank", String(guideLink));
+    const chooser = page.waitForEvent("filechooser");
+    await page.getByRole("menuitem", { name: "Import spreadsheets…" }).click();
     await (await chooser).setFiles([stops.file, routes.file, tickets.file]);
     await page.waitForTimeout(600);
     const ask = await page.getByRole("alertdialog").textContent().catch(() => "");
@@ -754,6 +760,23 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     check("the tickets arrive as new decks beside the old ones", after.ticketSets.length === stored.ticketSets.length * 2 && after.tickets.length === stored.tickets.length * 2, `${after.ticketSets.length} decks, ${after.tickets.length} tickets`);
     const toastText = (await page.locator("[data-sonner-toast]").allTextContents()).join(" | ");
     check("and the editor says what it read", /stops/.test(toastText) && /routes/.test(toastText) && /tickets/.test(toastText), toastText);
+    // The templates: downloaded from the same menu, named for what they hold, and good enough to import
+    // as they are.
+    const openTemplates = async () => { await page.getByRole("button", { name: "Import", exact: true }).click(); await page.waitForTimeout(250); await page.getByRole("menuitem", { name: "Spreadsheet (CSV)" }).click(); await page.waitForTimeout(250); };
+    const templates = [];
+    for (const kind of ["Stops", "Routes", "Tickets"]) templates.push(await downloadFrom(openTemplates, `${kind} template`));
+    check("each template downloads as a .csv named for its kind, with a header and example rows", templates.every((t, i) => t.name === `${["stops", "routes", "tickets"][i]}-template.csv` && t.bom && t.header.length >= 3 && t.rows.length >= 2), templates.map((t) => `${t.name} ${t.rows.length}`).join(", "));
+    await page.evaluate(() => { const map = JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")); localStorage.setItem("orebro-map-editor-public-v2", JSON.stringify({ ...map, stops: [], routes: [], tickets: [], ticketSets: [{ id: "main", label: "Main deck" }] })); });
+    await page.reload({ waitUntil: "networkidle" });
+    await page.waitForTimeout(700);
+    await openTemplates();
+    const templateChooser = page.waitForEvent("filechooser");
+    await page.getByRole("menuitem", { name: "Import spreadsheets…" }).click();
+    await (await templateChooser).setFiles(templates.map((t) => t.file));
+    await page.waitForTimeout(800);
+    const fromTemplates = await page.evaluate(() => JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")));
+    const templateToast = (await page.locator("[data-sonner-toast]").allTextContents()).join(" | ");
+    check("imported into an empty map, the three templates give a small working map, and nothing to warn about", fromTemplates.stops.length >= 4 && fromTemplates.routes.length >= 4 && fromTemplates.tickets.length >= 2 && !/had no position|left out|became/.test(templateToast), `${fromTemplates.stops.length} stops, ${fromTemplates.routes.length} routes | ${templateToast}`);
     // Leave the map as the rest of the suite expects it.
     await page.evaluate((map) => localStorage.setItem("orebro-map-editor-public-v2", JSON.stringify(map)), stored);
     await page.reload({ waitUntil: "networkidle" });

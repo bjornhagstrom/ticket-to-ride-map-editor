@@ -72,3 +72,31 @@ export function distancesCsv(data: MapData): string {
   for (const from of ends) rows.push([from.name, ...ends.map((to) => (from.id === to.id ? 0 : shortestPath(adjacency, from.id, to.id)?.distance ?? null))]);
   return toCsv(rows);
 }
+
+// Templates to start a spreadsheet from: the columns the import reads, in our export's names, and a
+// few rows that together make a tiny map. Imported as they are they give a working board with no
+// warnings, and the rows show the harder cases: a double route, a tunnel, a boat with a locomotive, a
+// junction, and a ticket from the long deck. Positions fit a board that lies or stands. docs/CSV.md
+// explains every column; tests/csv-import.cjs keeps the two in step.
+const TEMPLATES: Record<"stops" | "routes" | "tickets", Cell[][]> = {
+  stops: [
+    ["Name", "Type", "X", "Y"],
+    ["Harbour", "Regular", 150, 200],
+    ["Hill Town", "Regular", 450, 150],
+    ["Junction 1", "Junction", 400, 400],
+    ["River End", "Ferry port", 650, 600],
+  ],
+  routes: [
+    ["From", "To", "Length", "Colour", "Type", "Wagon style", "Locomotives"],
+    ["Harbour", "Hill Town", 3, "Red", "Railway", "", 0],
+    ["Harbour", "Hill Town", 3, "Blue", "Railway", "", 0],
+    ["Hill Town", "Junction 1", 2, "Grey", "Railway", "Tunnel", 0],
+    ["Junction 1", "River End", 4, "Grey", "Boat", "", 1],
+  ],
+  tickets: [
+    ["Deck", "From", "To", "Points", "Long deck"],
+    ["Main deck", "Hill Town", "River End", 6, ""],
+    ["Main deck", "Harbour", "River End", 9, "yes"],
+  ],
+};
+export const csvTemplate = (kind: keyof typeof TEMPLATES): string => toCsv(TEMPLATES[kind]);

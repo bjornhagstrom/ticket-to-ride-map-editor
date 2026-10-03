@@ -138,6 +138,29 @@ const neighbours = (result, name) => { const id = byName(result, name).id; retur
   check("the import says it is tickets only", result.network === false);
 }
 
+// ---------------------------------------------------------------- the templates a person can start from
+// Three files, one per kind, with the columns the import reads and a few rows that together make a
+// tiny map: imported as they are, they give a working board with no warnings. The column guide in
+// docs/CSV.md names every column the templates have.
+{
+  check("there is a template for stops, routes and tickets", ["stops", "routes", "tickets"].every((kind) => typeof exp.csvTemplate(kind) === "string"));
+  check("each template is read as the kind it is for", ["stops", "routes", "tickets"].every((kind) => imp.csvFileKind(imp.parseCsv(exp.csvTemplate(kind))) === kind));
+  const fromTemplates = imp.readCsvImport(["stops", "routes", "tickets"].map((kind) => ({ name: `${kind}.csv`, text: exp.csvTemplate(kind) })), blank);
+  check("imported as they are, the three make a small map with no warnings", fromTemplates.stops.length >= 4 && fromTemplates.routes.length >= 4 && fromTemplates.tickets.length >= 2 && fromTemplates.warnings.length === 0 && fromTemplates.placed.length === 0, `${fromTemplates.stops.length} stops, ${fromTemplates.routes.length} routes, ${fromTemplates.tickets.length} tickets | ${fromTemplates.warnings.join(" | ")}`);
+  check("on the board whether it lies or stands", fromTemplates.stops.every((s) => inBoard(s) && s.x <= mapFormats["board-2x3"].height && s.y <= mapFormats["board-2x3"].height));
+  const net = { ...blank, stops: fromTemplates.stops, routes: fromTemplates.routes };
+  const adjacency = buildAdjacency(net);
+  check("and every example ticket is worth its shortest path", fromTemplates.tickets.every((t) => shortestPath(adjacency, t.a, t.b)?.distance === t.points));
+  check("the examples show the harder cases: a double route, a tunnel, a locomotive, a boat, a junction and a long-deck ticket",
+    fromTemplates.routes.some((r, i) => fromTemplates.routes.some((o, j) => i !== j && [r.a, r.b].sort().join() === [o.a, o.b].sort().join()))
+    && fromTemplates.routes.some((r) => r.wagonStyle === "tunnel") && fromTemplates.routes.some((r) => (r.locomotiveSlots || []).length > 0)
+    && fromTemplates.routes.some((r) => r.type === "boat") && fromTemplates.stops.some((s) => s.type === "junction") && fromTemplates.tickets.some((t) => t.long));
+  const guide = fs.readFileSync(path.join(root, "docs", "CSV.md"), "utf8");
+  const columns = ["stops", "routes", "tickets"].flatMap((kind) => imp.parseCsv(exp.csvTemplate(kind))[0].map((name) => [kind, name]));
+  check("the column guide names every column the templates have", columns.every(([, name]) => guide.includes(`\`${name}\``)), columns.filter(([, name]) => !guide.includes(`\`${name}\``)).map((c) => c.join(":")).join(", "));
+  check("and every colour the editor knows by name", Object.values(require(path.join(out, "map-data.js")).colorLabels).every((label) => guide.includes(label)));
+}
+
 // ---------------------------------------------------------------- the official maps, when the private data is here
 const reference = process.env.TTR_REFERENCE_DATA ? path.join(path.dirname(process.env.TTR_REFERENCE_DATA), "export") : path.join(root, "..", "ttr-reference-data", "export");
 if (!fs.existsSync(path.join(reference, "europe", "routes.csv"))) {
