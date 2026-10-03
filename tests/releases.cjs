@@ -36,6 +36,22 @@ check("the package names the same repository, and the public address of the tool
 check("the first version is in the list", RELEASES.some((r) => r.version === "0.1.0"));
 check("no two releases share a version", new Set(RELEASES.map((r) => r.version)).size === RELEASES.length);
 
+// The README is the repository's front page on GitHub: it should send a visitor to the tool first,
+// and tell them what it is for in the same terms as the About page, before any developer detail.
+{
+  const readme = fs.readFileSync(path.join(root, "README.md"), "utf8");
+  const firstScreen = readme.split("\n").slice(0, 12).join("\n");
+  const firstHeading = readme.indexOf("\n## ");
+  check("the README opens with a link to the editor itself", firstScreen.includes(`](${pkg.homepage})`), firstScreen.slice(0, 300));
+  const about = fs.readFileSync(path.join(root, "app", "about", "page.tsx"), "utf8");
+  const sections = [...about.matchAll(/<h2>([^<]+)<\/h2>/g)].map((m) => m[1]);
+  const before = (title) => { const at = readme.indexOf(`## ${title}`); return at >= 0 && at < readme.indexOf("## Local development"); };
+  check("and tells what the About page tells, section by section, before the developer notes", sections.length >= 4 && sections.every(before), sections.filter((t) => !before(t)).join(" | ") || sections.join(" | "));
+  check("the README shows the editor and the ticket cards in pictures that are in the repository", /!\[[^\]]+\]\(docs\/images\/[\w-]+\.png\)/.test(readme) && [...readme.matchAll(/\(docs\/images\/([\w-]+\.png)\)/g)].every((m) => fs.existsSync(path.join(root, "docs", "images", m[1]))) && [...readme.matchAll(/\(docs\/images\//g)].length >= 2);
+  check("and says it is unofficial, as the About page does", /not affiliated/i.test(readme) && /Days of Wonder/.test(readme));
+  check("the README's opening is short enough to read before the feature list", firstHeading > 0 && firstHeading < 900, String(firstHeading));
+}
+
 console.log(`${ok.length} passed, ${bad.length} failed`);
 if (bad.length) { console.log("FAIL:"); for (const b of bad) console.log("  ✗ " + b); }
 fs.rmSync(out, { recursive: true, force: true });

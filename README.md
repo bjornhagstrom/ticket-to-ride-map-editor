@@ -1,10 +1,94 @@
 # Ticket to Ride Map Editor
 
-A browser-based editor for designing custom Ticket to Ride-style maps. The editor supports schematic backgrounds, stops, routes, foldable board formats, printing, and portable JSON project files.
+**[Open the editor at hagstrom.nu/ttr](https://hagstrom.nu/ttr/)**: it runs in the browser, there is
+nothing to install, and the map you work on stays in your browser.
 
-Live site: <https://hagstrom.nu/ttr/>
+A workshop for Ticket to Ride maps that do not exist yet. Draw a board, place the stops, connect them
+with routes, work out a deck of destination tickets, and print it all to play on paper.
 
-## Current capabilities
+![The editor with its example map: a board with stops, coloured routes, a lake and a river](docs/images/editor.png)
+
+## What this is for
+
+You draw a board, print it, and play on it with highlighter pens: each player takes a colour and fills
+in the wagon spaces they claim. When the game is over you have a marked-up sheet showing what was fought
+over and what nobody touched, which is the part that tells you what to change.
+
+Two things make that feel like a real game rather than a sketch. Keep each player's wagons in front of
+them from a real set, and put one back in the box for every space they fill in: the pile in front of
+them is then exactly how many they have left, which is the pressure the game runs on. And if you print
+the board at full size, the spaces are the size of real wagons, so you can lay the plastic trains on the
+paper instead of drawing at all.
+
+It is meant for the stretch before a map is any good — the many many prototypes where the question is
+whether the network hangs together at all, not whether the artwork is right. Nothing leaves your
+browser: the map is stored locally, and files move by export and import.
+
+## Wagon spaces are real size
+
+A wagon space is drawn at the size a real 20 × 9 mm train takes up on a 790 mm board, with the spacing
+measured from a hundred real routes. A route six spaces long has room for six plastic trains when you
+print at full size, and if a route is drawn too short for its spaces, the balance report says so, in
+millimetres.
+
+## Boards, cards and spreadsheets
+
+A board lies or stands, in the standard 2×3 or the extended 2×4. Standing it up or laying it down turns
+everything on it a quarter turn without changing a single distance.
+
+The ticket cards print to be cut out, lying or standing as the board does, and each carries a small map
+of the whole board with its two stops ringed and joined by a line, as the real cards do.
+
+![Six ticket cards, each with a small map of the board and its two stops joined by a line](docs/images/ticket-cards.png)
+
+The tickets, the routes, the stops and the distance between every two stops can go out to a
+spreadsheet, and stops, routes and tickets can come back in from one: an export of your own, or a list
+typed by hand. Stops without a position are laid out from the routes, ready to be dragged into place.
+
+## Where the numbers come from
+
+The advice the editor gives is measured against fifteen official Ticket to Ride maps, transcribed route
+by route and ticket by ticket, eight of which are complete and consistent enough to calibrate against:
+USA, Europe, Nordic Countries, India, Switzerland, Old West, Polska and Northern Lights.
+
+- **A ticket is worth the shortest path between its two stops**, counted in wagon spaces. That is what
+  the official maps do: Nordic gets 46 of 46 tickets right that way, India 58 of 58, Polska 35 of 35.
+  Colour, grey routes, tunnels and ferry locomotives are difficulty, not worth.
+- **A deck gets a score**, lower is better: how the ticket lengths are spread, whether long tickets reach
+  the edges, how many stops no ticket names, near-duplicate pairs, routes no ticket needs, and how evenly
+  the traffic falls. Official decks land below 5 and a random deck of the same size above 10. Suggesting
+  a deck is a search for a low score.
+- Every target is an average of the official decks rather than one game's habits. Fitted to the USA map
+  alone, several official decks scored worse than random ones.
+
+## What it will not do
+
+It does not play the game. Everything it says is read off the shape of the network, not off simulated
+play, so it can tell you that eleven tickets all want the same route, but not whether that is exciting
+or unfair. That is what the highlighter pens are for. It has no opinion about the art, no country or
+region tickets yet, and no rules for zones, festivals or shared track.
+
+## Choices behind it
+
+- **Points are the shortest path, always.** A long-ticket bonus and a ferry premium exist as options,
+  both off unless a map asks for them.
+- **Crowding is shown, never priced.** The balance view lists the routes more tickets want than they can
+  carry; no official designer pays extra for a crowded corridor.
+- **Ticket lengths are relative to the map**, as shares of its longest journey, so the same mix means the
+  same thing on a small map and a large one.
+- **Files keep what they do not understand.** Every file says which schema it follows, and fields written
+  by a newer version are carried through untouched.
+
+The full record is in [docs/DECISIONS.md](docs/DECISIONS.md), and the file format in
+[docs/FILE-FORMAT.md](docs/FILE-FORMAT.md).
+
+Ticket to Ride is a game by Alan R. Moon, published by Days of Wonder. This is an unofficial tool for
+designing your own boards, and is not affiliated with them.
+
+## Everything it does
+
+<details>
+<summary>The full list, feature by feature</summary>
 
 - Draw, move and edit stops and routes, each with a hint box over the map listing what can be done with the selected object directly on the canvas.
 - Shape a route freely: add as many bend points as you like anywhere along it, and optionally draw it as a smooth curve that the wagon slots follow.
@@ -47,6 +131,8 @@ Live site: <https://hagstrom.nu/ttr/>
 - Export the tickets, routes, stops or the distance between every two stops as spreadsheets (CSV), and import stops, routes and tickets from spreadsheets: our own exports, the reference data's, or a list typed by hand. Positions are kept, fitted to the board, or worked out from the routes when there are none.
 - Print from a dialog that decides each run without touching the map: the whole board on one sheet, one sheet per fold panel, or full size across as many sheets as it takes, with trim marks; on A4, A3, US Letter or Tabloid; and for a 2×3, an Anniversary size tick under Supersize that prints the larger Anniversary board at full size. A table compares the sheet count and scale of every combination and picks one when clicked. The last choice is remembered in the browser.
 - Show a neutral example map to first-time visitors.
+
+</details>
 
 Styles are applied from the Properties panel and defined in one shared Styles dialog, reachable in
 one click from wherever a style is applied.

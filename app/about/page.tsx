@@ -6,6 +6,8 @@ import "../about.css";
 
 export const metadata = { title: "About – Ticket to Ride – Map prototypes" };
 
+// README.md tells the same story on GitHub, section by section under the same headings;
+// tests/releases.cjs checks that every heading here is there too. Change them together.
 export default function About() {
   return <main className="about">
     <header className="about-head">
