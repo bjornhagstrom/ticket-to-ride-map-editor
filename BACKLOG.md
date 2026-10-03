@@ -96,7 +96,7 @@ official deck worse than our own suggestions. The steps, in the order the propos
   fact; warnings kept only for what is rarely intended; the crowding advice rewritten as options.
 - **Fragility apart from contention** (small): bridges, cut points and dead ends on the map, with the
   official counts.
-- **Deck tension as a choice** (medium): calm, official-like or tense, in Suggest a deck and in the deck
+- **Deck tension as a choice** (medium): calm, official-like or tense, in Build a full deck of tickets and in the deck
   rules, its range taken from the official decks.
 - **Intended chokepoints and hubs** (medium): a route or stop marked as contested on purpose, listed as
   intended by the analysis and respected by the suggester; stored in the map.

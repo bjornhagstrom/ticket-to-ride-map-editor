@@ -20,7 +20,7 @@ export function WelcomeGuide({ open, onOpenChange, onChooseBlank, onChooseExampl
   const steps: Array<{ icon: React.ReactNode; title: string; text: string }> = [
     { icon: <FileStack />, title: "Choose a board", text: "The standard 2×3 or the extended 2×4, lying or standing. You can change it whenever you like; everything on the map comes along." },
     { icon: <Layers3 />, title: "Draw the map", text: "Sketch the background (land, water, regions), place stops, and connect them with routes, each with a length, a type and a colour, or bring them in from a spreadsheet." },
-    { icon: <TicketIcon />, title: "Add destination tickets", text: "Link two stops to make a ticket, or let the editor suggest a whole deck. Map balance shows how well the map and the tickets work together." },
+    { icon: <TicketIcon />, title: "Add destination tickets", text: "Link two stops to make a ticket, or let the editor build a full deck of tickets. Map balance shows how well the map and the tickets work together." },
     { icon: <ScrollText />, title: "Write the rules", text: "Keep the rules of your map in the Rules panel, in plain text with links to its stops and routes." },
     { icon: <Printer />, title: "Print it and play on paper", text: "Print the board, the tickets as cut-out cards with a small map, and the rules, or save them as a PDF. Then play with coloured pens instead of plastic trains." },
     { icon: <Save />, title: "Saved in your browser and download to your computer", text: "Your map saves automatically in this browser. Export it to a file now and then as a backup, since browser storage does not travel." },
@@ -232,7 +232,7 @@ export function TicketsPanel({ compare, onHoverTicket, lengthView, wide, onToggl
             <DropdownMenuContent align="start">
               <DropdownMenuItem onClick={onAddSet}><Plus />New, empty deck</DropdownMenuItem>
               <DropdownMenuItem onClick={onDuplicateSet}><Copy />Duplicate this one</DropdownMenuItem>
-              <DropdownMenuItem onClick={onSuggest}><Sparkles />Suggest a deck…</DropdownMenuItem>
+              <DropdownMenuItem onClick={onSuggest}><Sparkles />Build a full deck of tickets…</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
           <DropdownMenu>
@@ -313,7 +313,7 @@ export function StopTicketsDialog({ open, onOpenChange, stopName, band, tickets,
   </Dialog>;
 }
 
-// Suggest a whole deck for the map that is open, then let the person edit it as ordinary tickets.
+// Build a full deck of tickets for the map that is open, then let the person edit it as ordinary tickets.
 export function SuggestTicketsDialog({ open, onOpenChange, data, current, suggestion, style, onStyle, wagons, onWagons, deckSize, onDeckSize, keepExisting, onKeepExisting, busy, deckName, onDeckName, currentDeck, onShuffle, onApply }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -359,7 +359,7 @@ export function SuggestTicketsDialog({ open, onOpenChange, data, current, sugges
         cannot win: shuffling repeatedly must not move the button under the pointer. */}
     <DialogContent className="suggest-dialog" style={{ height: "86vh", maxHeight: 860 }}>
       <DialogHeader>
-        <DialogTitle>Suggest a ticket deck</DialogTitle>
+        <DialogTitle>Build a full deck of tickets</DialogTitle>
         <DialogDescription>Every target below comes from the official Ticket to Ride decks, not from this map. Applying puts the result in a new deck stamped with today&apos;s date, so nothing you already have is touched.</DialogDescription>
       </DialogHeader>
 

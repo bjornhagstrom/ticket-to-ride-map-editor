@@ -96,7 +96,7 @@ export default function About() {
         middle, how many stops no ticket ever names, how many near-duplicate pairs there are, how
         many routes no ticket needs, and how evenly the traffic falls across the board. Every official
         deck scores clearly better than random decks of the same size on the same map. When the
-        editor suggests a deck it is searching for a low score, starting from a rough deck and
+        editor builds a deck it is searching for a low score, starting from a rough deck and
         swapping tickets some thousands of times. The score is a guide, not a verdict: the official
         decks are more uneven than the editor&apos;s own suggestions, on purpose.
       </p>

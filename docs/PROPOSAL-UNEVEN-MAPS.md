@@ -96,7 +96,7 @@ mostly wording, plus figures we already compute.*
 spreading tickets away from them. Stored in the map file. *Medium.*
 
 **D. A deck tension setting.** On the same map, a calm deck spreads tickets out and a tense one sends
-them through the same corridors. A choice in Suggest a deck (and in the map's deck rules), with the
+them through the same corridors. A choice in Build a full deck of tickets (and in the map's deck rules), with the
 official range marked: calm, like the official average, tense. Technically the weight on load per lane,
 already a single number. *Medium, including calibration tests.*
 

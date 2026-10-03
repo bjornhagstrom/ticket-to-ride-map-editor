@@ -36,7 +36,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     check("the guide has a handful of steps", steps.length >= 5 && steps.length <= 7, String(steps.length));
     check("drawing the map says stops and routes can come from a spreadsheet", steps.some((s) => /draw/i.test(s.title) && /spreadsheet/i.test(s.text)), steps.map((s) => s.text).join(" | "));
     check("printing says each ticket card has a small map", steps.some((s) => /print/i.test(s.title) && /small map/i.test(s.text)));
-    check("one of them is about destination tickets, and says the editor can suggest a deck", steps.some((s) => /ticket/i.test(s.title) && /suggest/i.test(s.text)), steps.map((s) => s.title).join(" | "));
+    check("one of them is about destination tickets, and says the editor can build a full deck of them", steps.some((s) => /ticket/i.test(s.title) && /build a full deck of tickets/i.test(s.text)), steps.map((s) => s.text).join(" | "));
     check("one is about the rules, one about printing, one about keeping the map safe", steps.some((s) => /rules/i.test(s.title)) && steps.some((s) => /print/i.test(s.title)) && steps.some((s) => /saved|save|backup/i.test(`${s.title} ${s.text}`)));
     check("the printing step names what can be printed: the board, the tickets as cards, the rules", (() => { const p = steps.find((s) => /print/i.test(s.title)); return Boolean(p) && /board/i.test(p.text) && /ticket/i.test(p.text) && /rules/i.test(p.text); })());
     const board = steps.find((s) => /board/i.test(s.title));
@@ -1347,8 +1347,11 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     const deckBefore = await page.locator("#ticket-set").inputValue();
     await page.getByRole("button", { name: /Add a deck/ }).click();
     await page.waitForTimeout(250);
-    await page.getByRole("menuitem", { name: /Suggest a deck/ }).click();
+    const deckMenu = await page.getByRole("menu").last().getByRole("menuitem").allTextContents();
+    check("the deck menu offers to build a full deck of tickets, under that name and no other", deckMenu.some((t) => /^Build a full deck of tickets…$/.test(t.trim())) && !deckMenu.some((t) => /suggest/i.test(t)), deckMenu.join(" | "));
+    await page.getByRole("menuitem", { name: /Build a full deck of tickets/ }).click();
     await page.waitForSelector('[role="dialog"]', { timeout: 20000 });
+    check("and the dialog is called the same", (await page.locator('[role="dialog"] h2').first().textContent()).trim() === "Build a full deck of tickets");
     await page.waitForTimeout(300);
     await page.keyboard.press("Escape");
     await page.waitForTimeout(500);
@@ -1359,7 +1362,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   const suggestStarted = Date.now();
   await page.getByRole("button", { name: /Add a deck/ }).click();
   await page.waitForTimeout(250);
-  await page.getByRole("menuitem", { name: /Suggest a deck/ }).click();
+  await page.getByRole("menuitem", { name: /Build a full deck of tickets/ }).click();
   await page.waitForSelector(".suggest-table tbody tr", { timeout: 20000 });
   check("the suggest dialog opens at once", Date.now() - suggestStarted < 1500, `${Date.now() - suggestStarted} ms`);
   // The deck is worked out off the main thread, so the column fills a moment later.
@@ -1596,7 +1599,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.waitForTimeout(400);
   await page.getByRole("button", { name: /Add a deck/ }).click();
   await page.waitForTimeout(250);
-  await page.getByRole("menuitem", { name: /Suggest a deck/ }).click();
+  await page.getByRole("menuitem", { name: /Build a full deck of tickets/ }).click();
   await page.waitForSelector(".suggest-dialog", { timeout: 20000 });
   await page.waitForTimeout(400);
   const styleCards = page.locator(".style-card");
@@ -2004,7 +2007,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   }
   await page.getByRole("button", { name: /Add a deck/ }).click();
   await page.waitForTimeout(250);
-  await page.getByRole("menuitem", { name: /Suggest a deck/ }).click();
+  await page.getByRole("menuitem", { name: /Build a full deck of tickets/ }).click();
   await page.waitForTimeout(800);
   // A card is found by its title: your own set's card also says which of ours it was made from.
   const styleCard = (name) => page.locator(".style-card").filter({ has: page.locator("strong", { hasText: new RegExp(`^${name}$`) }) });
@@ -2777,7 +2780,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     await page.waitForTimeout(400);
     await page.getByRole("button", { name: /Add a deck/ }).click();
     await page.waitForTimeout(250);
-    await page.getByRole("menuitem", { name: /Suggest a deck/ }).click();
+    await page.getByRole("menuitem", { name: /Build a full deck of tickets/ }).click();
     await page.waitForSelector(".suggest-table tbody tr", { timeout: 20000 });
     await page.waitForTimeout(300);
     const sm = await measure();
