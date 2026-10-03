@@ -197,6 +197,8 @@ The deployable website is generated in `out/`. Its contents are intended to be s
 | `docs/MAP-FORMAT.md` | JSON project format and compatibility rules |
 | `docs/DEPLOYMENT.md` | Build, Websupport deployment and rollback |
 | `docs/PRINTING.md` | Board versus print choices, sheet arithmetic, page box and print testing |
+| `docs/TERMINOLOGY.md` | The words the editor uses, what they mean, and the ones it does not |
+| `docs/CSV.md` | What the spreadsheet columns mean |
 
 ## Verification
 
