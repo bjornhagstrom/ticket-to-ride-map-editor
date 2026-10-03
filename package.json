@@ -25,7 +25,8 @@
     "test:license": "node tests/license.cjs",
     "test:csv": "node tests/csv-export.cjs",
     "test:csv-import": "node tests/csv-import.cjs",
-    "test:board": "node tests/board.cjs"
+    "test:board": "node tests/board.cjs",
+    "changelog": "node scripts/changelog.cjs"
   },
   "dependencies": {
     "class-variance-authority": "0.7.1",

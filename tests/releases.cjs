@@ -36,6 +36,18 @@ check("the package names the same repository, and the public address of the tool
 check("the first version is in the list", RELEASES.some((r) => r.version === "0.1.0"));
 check("no two releases share a version", new Set(RELEASES.map((r) => r.version)).size === RELEASES.length);
 
+// What's new on GitHub: CHANGELOG.md is written from the same notes by scripts/changelog.cjs, so the
+// page in the editor and the page in the repository cannot say different things.
+{
+  const file = path.join(root, "CHANGELOG.md");
+  const { changelog } = require(path.join(root, "scripts", "changelog.cjs"));
+  const text = fs.existsSync(file) ? fs.readFileSync(file, "utf8") : "";
+  check("CHANGELOG.md is in the repository, written from the release notes, and up to date (npm run changelog)", text !== "" && text === changelog(RELEASES, pkg.homepage), text ? "out of date" : "missing");
+  check("it has every release under its version and date, newest first", RELEASES.every((r) => text.includes(`## ${r.version} · ${r.date}`)) && text.indexOf(`## ${RELEASES[0].version}`) < text.indexOf(`## ${RELEASES[RELEASES.length - 1].version}`));
+  check("it links to the editor", text.includes(`](${pkg.homepage})`));
+  check("and the README links to it", /\]\(CHANGELOG\.md\)/.test(fs.readFileSync(path.join(root, "README.md"), "utf8")));
+}
+
 // The README is the repository's front page on GitHub: it should send a visitor to the tool first,
 // and tell them what it is for in the same terms as the About page, before any developer detail.
 {

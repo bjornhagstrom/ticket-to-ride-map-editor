@@ -1,7 +1,7 @@
 # Ticket to Ride Map Editor
 
 **[Open the editor at hagstrom.nu/ttr](https://hagstrom.nu/ttr/)**: it runs in the browser, there is
-nothing to install, and the map you work on stays in your browser.
+nothing to install, and the map you work on stays in your browser. [What's new](CHANGELOG.md)
 
 A workshop for Ticket to Ride maps that do not exist yet. Draw a board, place the stops, connect them
 with routes, work out a deck of destination tickets, and print it all to play on paper.
@@ -119,7 +119,7 @@ designing your own boards, and is not affiliated with them.
 - Set up how a game on the map is played: how many players it is built for, how many wagons each has, how many destination tickets are dealt at the start and how many of those a player must keep. The balance report reads all of it against the map — whether the map holds enough wagon spaces for a table to spend their supplies, and whether the deck is thick enough to deal from. They sit with the board format in Settings, which opens by itself on a new map, and travel in the map file, defaulting to the original game's 45 wagons and 3 tickets of which 2 are kept.
 - Decide the map's own mix of short, medium and long tickets: where each boundary sits, as a fraction of the map's longest journey, and what share of the deck belongs in each band. The official USA and Europe mixes are one click away. The ticket panel counts by those boundaries, and the suggester aims at that mix instead of its style's own spread.
 - Write the rules of the map being designed in a Rules panel beside the map: markdown in a plain text area with a toolbar (bold, italic, heading, lists, quote, table, line, and pickers that write a stop or a route), kept in the map file, with a live preview. The example map comes with example rules. `[[Westport]]` and `[[Westport–Central]]` are drawn as the map draws that stop and route, and pointing at one marks it on the map. The print dialog ticks what goes in a run, the board, the tickets as cut-out cards and the rules, in any combination, and prints them in that order. The board can also go on one page as big as the board itself, at real size, to send to a large-format printer or to save as a PDF.
-- A version number, shown under Help, with a What's new page that says what changed in each version (kept in `app/version.ts`, checked by `npm run test:releases`).
+- A version number, shown under Help, with a What's new page that says what changed in each version (kept in `app/version.ts`, checked by `npm run test:releases`, and on GitHub as [CHANGELOG.md](CHANGELOG.md)).
 - An About page under Help explains what the tool is for, how the numbers are arrived at and the choices behind it, for anyone you share a map with.
 - Suggest a whole destination-ticket deck for the map that is open. The three shapes — Generic, Classic and Europe — are laid out side by side with what each does to the deck, its lengths and its scoring, so they can be compared before one is picked.
 - Sort the ticket list by any of its headings — ticket, spaces, points, suggested value or the long flag — on a deck you built by hand and on one that came from a suggestion. It starts in the order the deck was built, and tickets stay editable while sorted.
