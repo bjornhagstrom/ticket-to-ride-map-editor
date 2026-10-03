@@ -9,12 +9,13 @@ This file is written from `app/version.ts` by `npm run changelog`; edit the note
 **Spreadsheets, boards that stand, and tickets with a map**
 
 - A board can stand as well as lie: choose it in Settings beside the board format, where a drawing shows the board and its ticket cards as you will get them. Everything on the map turns a quarter turn with it.
-- A logo of its own: two stops joined by a route of wagon spaces, in the header, on the About pages and in the browser tab. It used to be a bus.
 - Ticket cards lie or stand the way the board does, and every card carries a small map of the whole board with its two stops ringed and joined by a line, as on the real cards.
 - Export the tickets, the routes, the stops or the distances between every two stops as a spreadsheet (CSV), from Export or from the Tickets panel.
 - Import stops, routes and tickets from spreadsheets (CSV). Stops keep their positions; stops without one are laid out from the routes, ready to be dragged into place.
 - Start a spreadsheet from a template: one each for stops, routes and tickets, under Import, with a guide to what every column means. Imported as they are, the three make a small map.
 - Å, ä and ö come through in a spreadsheet saved however Excel saves it, and a name typed with a different kind of å still finds its stop.
+- Point at the crossings warning to see them: the routes that cross are marked on the map and every crossing is ringed. Crossings are now found on the lines as drawn, curves included.
+- A logo of its own: two stops joined by a route of wagon spaces, in the header, on the About pages and in the browser tab. It used to be a bus.
 - Print the whole board on one page as big as the board, at real size, for a large-format printer or to save as a PDF. The page is the board's own size, and the dialog says how big.
 - The welcome guide is shorter, covers destination tickets, the rules and spreadsheets, and says nothing about how a print is laid out.
 

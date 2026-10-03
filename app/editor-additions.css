@@ -4,6 +4,10 @@
 .map-canvas{-webkit-user-select:none;user-select:none}
 /* A standing board as wide as the column would be far taller than the window: it is sized by the
    window's height instead (less the top bar and the badges), and centred in the column. */
+/* Crossings ringed while the crossings card is pointed at: red on a white band, like a pointed stop. */
+.crossing-mark-band{fill:none;stroke:#fff;stroke-width:9px}
+.crossing-mark{fill:none;stroke:#b3261e;stroke-width:4px}
+.balance-tooltip.crossing-tooltip{max-width:226px}
 /* Settings: the board's format and orientation, with a line drawing of what they give beside them. */
 .settings-board{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px;align-items:start}
 .settings-board-fields{display:grid;gap:12px;min-width:0}

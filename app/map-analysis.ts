@@ -20,20 +20,31 @@ export function routeSpacing(data: MapData, scaleWidthMm: number): RouteSpacing[
     return { route, drawnMm, neededMm, ratio, verdict: ratio < SPACING_SHORT ? "short" : ratio > SPACING_LONG ? "long" : "ok" } as RouteSpacing;
   });
 }
-export function crossingPairs(data: MapData) {
+// Where two buildable routes pass over each other without meeting at a stop, measured on the lines as
+// they are drawn (curves sampled, not the straight lines between their points), with the point where
+// they cross, so the editor can ring it.
+export type Crossing = { a: Route; b: Route; at: Point };
+export function crossings(data: MapData): Crossing[] {
   const infrastructureTypes = new Set(data.routeTypeStyles.filter((style) => style.infrastructure).map((style) => style.id));
   const routes = data.routes.filter((route) => !infrastructureTypes.has(route.type));
-  const found: Array<[Route, Route]> = [];
+  const drawn = new Map(routes.map((route) => { const geometry = pointsFor(data, route); return [route.id, isCurved(route) && geometry.length > 2 ? curvedSamples(geometry) : geometry]; }));
+  const found: Crossing[] = [];
   for (let i = 0; i < routes.length; i++) for (let j = i + 1; j < routes.length; j++) {
     const a = routes[i], b = routes[j];
     if ([a.a, a.b].some((id) => id === b.a || id === b.b)) continue;
-    const ap = pointsFor(data, a), bp = pointsFor(data, b);
-    let hit = false;
-    for (let x = 0; x < ap.length - 1 && !hit; x++) for (let y = 0; y < bp.length - 1; y++) if (intersects(ap[x], ap[x + 1], bp[y], bp[y + 1])) { hit = true; break; }
-    if (hit) found.push([a, b]);
+    const ap = drawn.get(a.id)!, bp = drawn.get(b.id)!;
+    let at: Point | null = null;
+    for (let x = 0; x < ap.length - 1 && !at; x++) for (let y = 0; y < bp.length - 1; y++) if (intersects(ap[x], ap[x + 1], bp[y], bp[y + 1])) { at = meetingPoint(ap[x], ap[x + 1], bp[y], bp[y + 1]); break; }
+    if (at) found.push({ a, b, at });
   }
   return found;
 }
+const meetingPoint = (p: Point, q: Point, r: Point, s: Point): Point => {
+  const d = (q.x - p.x) * (s.y - r.y) - (q.y - p.y) * (s.x - r.x);
+  const t = d ? ((r.x - p.x) * (s.y - r.y) - (r.y - p.y) * (s.x - r.x)) / d : 0;
+  return { x: p.x + t * (q.x - p.x), y: p.y + t * (q.y - p.y) };
+};
+export const crossingPairs = (data: MapData): Array<[Route, Route]> => crossings(data).map(({ a, b }) => [a, b]);
 export type NetworkEdge = { to: string; weight: number; routeId: string };
 export function buildAdjacency(data: MapData): Map<string, NetworkEdge[]> {
   const adjacency = new Map<string, NetworkEdge[]>();

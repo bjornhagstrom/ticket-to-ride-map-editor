@@ -2947,6 +2947,46 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     await sp.context().close();
   }
 
+  // 36. Crossings, pointed at: the card marks every route that crosses another, rings each place where
+  // two cross, and lets go when the pointer leaves. A route straight across the example map makes some.
+  {
+    const cp = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
+    cp.on("pageerror", (e) => errors.push(String(e)));
+    await cp.goto(BASE, { waitUntil: "networkidle" });
+    await cp.getByRole("button", { name: "Load the example map" }).click();
+    await cp.waitForTimeout(600);
+    await cp.evaluate(() => { const key = "orebro-map-editor-public-v2"; const m = JSON.parse(localStorage.getItem(key)); m.routes.push({ id: "r-across", a: "example-westport", b: "example-quarry", length: 6, type: m.routes[0].type, color: "neutral", curved: false }); localStorage.setItem(key, JSON.stringify(m)); });
+    await cp.reload({ waitUntil: "networkidle" });
+    await cp.waitForTimeout(700);
+    const card = cp.locator(".crossing-card").filter({ hasText: /crossing/ });
+    const count = Number(((await card.textContent()).match(/(\d+) crossing/) || [])[1] || 0);
+    check("a route straight across the map crosses others, and the card counts them", count >= 2, await card.textContent());
+    const state = () => cp.evaluate(() => {
+      const canvas = document.querySelector(".map-canvas").getBoundingClientRect();
+      const marked = Array.from(document.querySelectorAll(".map-canvas .route-group.on-preview"));
+      const others = Array.from(document.querySelectorAll(".map-canvas .route-group:not(.on-preview)"));
+      const rings = Array.from(document.querySelectorAll(".map-canvas .crossing-mark")).map((r) => r.getBoundingClientRect());
+      return { marked: marked.length, acrossMarked: marked.some((g) => g.getAttribute("data-route-id") === "r-across"), dimmed: others.length > 0 && others.every((g) => parseFloat(getComputedStyle(g).opacity) <= 0.5),
+        rings: rings.length, ringsOnCanvas: rings.every((r) => r.left >= canvas.left && r.right <= canvas.right && r.top >= canvas.top && r.bottom <= canvas.bottom), ringStroke: (() => { const r = document.querySelector(".map-canvas .crossing-mark"); return r ? getComputedStyle(r).stroke : null; })() };
+    });
+    check("before pointing at it, nothing is marked", (await state()).marked === 0 && (await state()).rings === 0);
+    await card.hover();
+    await cp.waitForTimeout(300);
+    const on = await state();
+    check("pointing at the card marks the crossing routes, the long one among them, and the rest step back", on.marked >= 2 && on.acrossMarked && on.dimmed, JSON.stringify(on));
+    check("and rings every crossing, one ring each, on the map", on.rings === count && on.ringsOnCanvas, JSON.stringify(on));
+    const tip = await cp.evaluate(() => { const t = document.querySelector('[data-slot="tooltip-content"]'); const c = document.querySelector(".map-canvas").getBoundingClientRect(); if (!t) return null; const r = t.getBoundingClientRect(); return { right: r.right, canvasLeft: c.left }; });
+    check("and its explanation opens beside the column, not over the crossings on the map", !tip || tip.right <= tip.canvasLeft + 1, JSON.stringify(tip));
+    await cp.mouse.move(5, 995);
+    await cp.waitForTimeout(300);
+    const off = await state();
+    check("and lets them go when the pointer leaves", off.marked === 0 && off.rings === 0, JSON.stringify(off));
+    await card.focus();
+    await cp.waitForTimeout(300);
+    check("the keyboard reaches it too: focusing the card marks them", (await state()).rings === count);
+    await cp.context().close();
+  }
+
   console.log("PASS:"); ok.forEach((l) => console.log("  ✓ " + l));
   if (bad.length) { console.log("FAIL:"); bad.forEach((l) => console.log("  ✗ " + l)); }
   console.log(`\n${ok.length} passed, ${bad.length} failed`);
