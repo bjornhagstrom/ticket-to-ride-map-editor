@@ -56,8 +56,9 @@ USA, Europe, Nordic Countries, India, Switzerland, Old West, Polska and Northern
   Colour, grey routes, tunnels and ferry locomotives are difficulty, not worth.
 - **A deck gets a score**, lower is better: how the ticket lengths are spread, whether long tickets reach
   the edges, how many stops no ticket names, near-duplicate pairs, routes no ticket needs, and how evenly
-  the traffic falls. Official decks land below 5 and a random deck of the same size above 10. Suggesting
-  a deck is a search for a low score.
+  the traffic falls. Every official deck scores clearly better than random decks of the same size.
+  Suggesting a deck is a search for a low score. The score is a guide, not a verdict: the official decks
+  are more uneven than the editor's own suggestions, on purpose.
 - Every target is an average of the official decks rather than one game's habits. Fitted to the USA map
   alone, several official decks scored worse than random ones.
 

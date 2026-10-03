@@ -93,10 +93,11 @@ export default function About() {
         <strong>A deck gets a score</strong>, and lower is better. It weighs how the ticket lengths
         are spread, whether long tickets reach the edges of the map while short ones stay nearer the
         middle, how many stops no ticket ever names, how many near-duplicate pairs there are, how
-        many routes no ticket needs, and how evenly the traffic falls across the board. The scale is
-        set so that the official decks land below 5 and a random deck of the same size lands above
-        10. When the editor suggests a deck it is searching for a low score, starting from a rough
-        deck and swapping tickets some thousands of times.
+        many routes no ticket needs, and how evenly the traffic falls across the board. Every official
+        deck scores clearly better than random decks of the same size on the same map. When the
+        editor suggests a deck it is searching for a low score, starting from a rough deck and
+        swapping tickets some thousands of times. The score is a guide, not a verdict: the official
+        decks are more uneven than the editor&apos;s own suggestions, on purpose.
       </p>
       <p>
         Every target in that score is an average of the official decks rather than one game&apos;s

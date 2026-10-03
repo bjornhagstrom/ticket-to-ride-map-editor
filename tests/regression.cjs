@@ -2798,6 +2798,9 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     const docLinks = await other.locator('a[href*="/blob/main/docs/"]').evaluateAll((els) => els.map((el) => el.getAttribute("href")));
     check("it links to the decisions and the file format in the public source, rather than naming files", docLinks.some((h) => h.endsWith("/docs/DECISIONS.md")) && docLinks.some((h) => h.endsWith("/docs/FILE-FORMAT.md")) && docLinks.every((h) => h.startsWith("https://github.com/bjornhagstrom/ticket-to-ride-map-editor/blob/main/")), docLinks.join(", "));
     check("it says which file format a map is written in: 3, or 4 for a board that stands", /file format 3, or 4 for a standing board/.test(aboutText), (aboutText.match(/file format[^·]*/) || [""])[0]);
+    // Since route load was weighted 2 the official decks score 4 to 35 (docs/TICKET-SUGGESTER.md §2b):
+    // what holds is the order, official below random and a suggestion below official, not a number.
+    check("the About page does not promise official decks a score below 5", !/below 5/.test(aboutText) && /random/.test(aboutText));
     check("the About page speaks of the many many prototypes, not of ten or twenty", /the many many prototypes/.test(aboutText) && !/ten or twenty/.test(aboutText));
     const aboutRepo = other.getByRole("link", { name: /source code/i });
     check("the About page links to the source code too", (await aboutRepo.count()) >= 1 && (await aboutRepo.first().getAttribute("href")) === "https://github.com/bjornhagstrom/ticket-to-ride-map-editor" && /noopener/.test(await aboutRepo.first().getAttribute("rel")));
