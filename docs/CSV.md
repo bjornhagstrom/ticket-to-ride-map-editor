@@ -65,9 +65,13 @@ laid out from the routes alone. That layout knows nothing of north, so expect to
 
 - **Separator:** comma, semicolon or tab all work. Swedish and other European versions of Excel save
   with semicolons; that is fine.
-- **Letters:** save as UTF-8 (Excel: *CSV UTF-8*), so å, ä and ö come through.
+- **Letters:** å, ä and ö come through whichever way the file was saved: UTF-8 (Excel's *CSV UTF-8*,
+  Numbers, Google Sheets) or Excel's plain *CSV*, which on Windows and older Macs uses an older encoding.
 - **The first row is the headings.** Their order does not matter, nor does upper or lower case.
 - A name with a comma in it needs quotes, which every spreadsheet adds by itself.
+- **Opening an export in Excel:** the export is comma-separated. Excel with Swedish or other European
+  settings expects semicolons and may put everything in one column; open it with *Data → From
+  Text/CSV* instead of double-clicking. Numbers and Google Sheets open it as it is.
 
 ## What the export writes
 

@@ -777,6 +777,18 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     const fromTemplates = await page.evaluate(() => JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")));
     const templateToast = (await page.locator("[data-sonner-toast]").allTextContents()).join(" | ");
     check("imported into an empty map, the three templates give a small working map, and nothing to warn about", fromTemplates.stops.length >= 4 && fromTemplates.routes.length >= 4 && fromTemplates.tickets.length >= 2 && !/had no position|left out|became/.test(templateToast), `${fromTemplates.stops.length} stops, ${fromTemplates.routes.length} routes | ${templateToast}`);
+    // Saved from Excel on Windows as plain "CSV": semicolons and Windows-1252, not UTF-8. å, ä and ö survive.
+    const excelFile = path.join(os.tmpdir(), `ttr-excel-${Date.now()}.csv`);
+    fs.writeFileSync(excelFile, Buffer.from("Name;X;Y\r\nÅhus;100;100\r\nMalmö;300;300\r\nHässleholm;500;200\r\n", "latin1"));
+    await openTemplates();
+    const excelChooser = page.waitForEvent("filechooser");
+    await page.getByRole("menuitem", { name: "Import spreadsheets…" }).click();
+    await (await excelChooser).setFiles(excelFile);
+    await page.waitForTimeout(500);
+    if (await page.getByRole("button", { name: "Continue" }).count()) { await page.getByRole("button", { name: "Continue" }).click(); await page.waitForTimeout(500); }
+    const excelNames = (await page.evaluate(() => JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")))).stops.map((s) => s.name);
+    check("a file Excel saved as plain CSV on Windows keeps å, ä and ö", JSON.stringify(excelNames) === JSON.stringify(["Åhus", "Malmö", "Hässleholm"]), excelNames.join(", "));
+    fs.rmSync(excelFile, { force: true });
     // Leave the map as the rest of the suite expects it.
     await page.evaluate((map) => localStorage.setItem("orebro-map-editor-public-v2", JSON.stringify(map)), stored);
     await page.reload({ waitUntil: "networkidle" });

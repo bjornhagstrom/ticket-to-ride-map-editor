@@ -47,6 +47,33 @@ const neighbours = (result, name) => { const id = byName(result, name).id; retur
   check("a cell our export defused with an apostrophe reads back as it was written", defused[1][0] === "=SUM(A1)" && defused[2][0] === "-x", JSON.stringify(defused));
 }
 
+// ---------------------------------------------------------------- å, ä and ö, however the file was saved
+// Excel's plain "CSV" is not UTF-8: Windows-1252 on Windows, Mac Roman on older Macs. And the same å can
+// be one character or an a with a ring added (macOS file names, some exports). All of them must read as
+// the names a person typed, and match each other.
+{
+  const bytes = (codes) => new Uint8Array(codes);
+  const text = "Name;X;Y\nMalmö;10;20\nÅhus;30;40\nBjärsjölagård;50;60\n";
+  const utf8 = new TextEncoder().encode(text);
+  check("UTF-8 reads as written", imp.decodeCsvBytes(utf8) === text);
+  check("UTF-8 with a BOM reads as written, BOM and all for the parser to drop", imp.decodeCsvBytes(new Uint8Array([0xef, 0xbb, 0xbf, ...utf8])).replace(/^\uFEFF/, "") === text);
+  const latin = { "ö": 0xf6, "Å": 0xc5, "ä": 0xe4, "å": 0xe5 };
+  const win = bytes([...text].map((c) => latin[c] ?? c.charCodeAt(0)));
+  check("Excel's CSV from Windows (Windows-1252) reads with å, ä and ö", imp.decodeCsvBytes(win) === text, JSON.stringify(imp.decodeCsvBytes(win).slice(0, 40)));
+  const mac = { "ö": 0x9a, "Å": 0x81, "ä": 0x8a, "å": 0x8c };
+  const roman = bytes([...text].map((c) => mac[c] ?? c.charCodeAt(0)));
+  check("Excel's CSV from an older Mac (Mac Roman) reads with å, ä and ö", imp.decodeCsvBytes(roman) === text, JSON.stringify(imp.decodeCsvBytes(roman).slice(0, 40)));
+  check("plain ASCII is left alone", imp.decodeCsvBytes(new TextEncoder().encode("Name,X\nA,1\n")) === "Name,X\nA,1\n");
+  // One file with the composed å, the other with a + ring: they are the same stop.
+  const nfd = imp.readCsvImport([
+    { name: "s.csv", text: "Name,X,Y\nÅhus,100,100\nMalmö,300,300\n" },
+    { name: "r.csv", text: "From,To,Length\n" + "Åhus".normalize("NFD") + "," + "Malmö".normalize("NFD") + ",3\n" },
+  ], blank);
+  check("a name with å written as a + ring finds the stop written with å, and is kept as å", nfd.routes.length === 1 && nfd.warnings.length === 0 && nfd.stops.every((s) => s.name === s.name.normalize("NFC")), nfd.warnings.join(" | "));
+  const tickets = imp.readCsvImport([{ name: "t.csv", text: "From,To,Points\n" + "Westport".normalize("NFD") + ",Harbour,5\n" }], initialMap);
+  check("and tickets alone find the map's stops the same way", tickets.tickets.length === 1);
+}
+
 // ---------------------------------------------------------------- telling the files apart
 {
   const kind = (text) => imp.csvFileKind(imp.parseCsv(text));

@@ -28,7 +28,7 @@ import { canvasPoint, canvasPointRaw, pointsFor, samePair, stopById } from "./ma
 import { REPO_URL } from "./version";
 import { boardOf, rotateMap, type Orientation } from "./board";
 import { csvTemplate, distancesCsv, routesCsv, stopsCsv, ticketsCsv } from "./csv-export";
-import { readCsvImport, type CsvImport } from "./csv-import";
+import { decodeCsvBytes, readCsvImport, type CsvImport } from "./csv-import";
 import { APP_VERSION, cloneForHistory, cloneMap, formatTimestamp, GUIDE_SEEN_KEY, HISTORY_LIMIT, MAX_IMAGE_WARN_BYTES, normalizeBackgroundFile, normalizeMap, normalizeNetworkFile, normalizeTicketFile, buildTicketFile, readMapFile, writeMapFile, mapPayload, networkPayload, readBackgroundImage, rescaleMapToFormat, MAP_HINT_KEY, MAP_HINT_X_KEY } from "./map-storage";
 import { colorLabels, defaultTicketSet, DEFAULT_PLAYERS, DEFAULT_WAGONS_PER_PLAYER, IMAGE_KEEP_ON_BOARD, type Ticket, type StopTypeStyle, type WagonStyle, ticketsInSet, type TicketSet, emptyMap, initialMap, type LineStyle, DEFAULT_END_GAP_MM, mapFormats, type BackgroundImage, type BackgroundShape, type BackgroundType, type MapData, type MapFormat, type Point, type Route, type RouteType, type RouteTypeStyle, routeColors, STORAGE_KEY, type Stop, type StopSize, stopSizeMeta, type StopSymbol, stopSymbolMeta, type StopType } from "./map-data";
 
@@ -692,7 +692,7 @@ export function MapEditor() {
   };
   const importCsv = async (list: FileList | null) => {
     if (!list?.length) return;
-    const files = await Promise.all([...list].map(async (file) => ({ name: file.name, text: await file.text() })));
+    const files = await Promise.all([...list].map(async (file) => ({ name: file.name, text: decodeCsvBytes(new Uint8Array(await file.arrayBuffer())) })));
     const result = readCsvImport(files, data);
     if (!result.stops.length && !result.routes.length && !result.tickets.length) { toast.error(result.warnings.join(" ") || "Nothing in those files could be read."); return; }
     if (result.network && (data.stops.length || data.routes.length)) { setPendingImport({ kind: "csv", result }); setDanger("import-csv"); }

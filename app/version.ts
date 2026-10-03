@@ -17,6 +17,7 @@ export const RELEASES: Release[] = [
       "Export the tickets, the routes, the stops or the distances between every two stops as a spreadsheet (CSV), from Export or from the Tickets panel.",
       "Import stops, routes and tickets from spreadsheets (CSV). Stops keep their positions; stops without one are laid out from the routes, ready to be dragged into place.",
       "Start a spreadsheet from a template: one each for stops, routes and tickets, under Import, with a guide to what every column means. Imported as they are, the three make a small map.",
+      "Å, ä and ö come through in a spreadsheet saved however Excel saves it, and a name typed with a different kind of å still finds its stop.",
       "Print the whole board on one page as big as the board, at real size, for a large-format printer or to save as a PDF. The page is the board's own size, and the dialog says how big.",
       "The welcome guide is shorter, covers destination tickets, the rules and spreadsheets, and says nothing about how a print is laid out.",
     ],

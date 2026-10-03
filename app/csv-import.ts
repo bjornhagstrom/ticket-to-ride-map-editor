@@ -20,10 +20,22 @@ export type CsvImport = {
   warnings: string[];
 };
 
+// The bytes of a file as text. UTF-8 when they are UTF-8; otherwise a single-byte encoding, which is
+// what Excel's plain "CSV" saves: Windows-1252 on Windows, Mac Roman on older Macs. The two are told
+// apart by where their letters sit: Windows-1252 keeps å, ä, ö and the like at 0xC0–0xFF, Mac Roman
+// at 0x80–0x9F, where Windows-1252 has symbols and letters no place name uses (Œ, Š, š, ‰).
+export function decodeCsvBytes(bytes: Uint8Array): string {
+  try { return new TextDecoder("utf-8", { fatal: true }).decode(bytes); } catch { /* not UTF-8 */ }
+  let low = 0, high = 0;
+  for (const byte of bytes) { if (byte >= 0x80 && byte <= 0x9f) low += 1; else if (byte >= 0xc0) high += 1; }
+  return new TextDecoder(low > high ? "macintosh" : "windows-1252").decode(bytes);
+}
+
 // RFC 4180, with whichever of comma, semicolon and tab the first line uses most (Swedish Excel saves
 // with semicolons). A leading apostrophe that our export put before formula-like text is taken off.
 export function parseCsv(text: string): string[][] {
-  const body = text.replace(/^﻿/, "");
+  // NFC: an å typed as one character and an å made of a and a ring are the same name.
+  const body = text.replace(/^\uFEFF/, "").normalize("NFC");
   const firstLine = body.split(/\r?\n/, 1)[0].replace(/"[^"]*"/g, "");
   const delimiter = [",", ";", "\t"].map((d) => [d, firstLine.split(d).length] as const).sort((a, b) => b[1] - a[1])[0][0];
   const rows: string[][] = [];
@@ -168,7 +180,7 @@ export function readCsvImport(files: { name: string; text: string }[], data: Map
   // ---- tickets, through the same reader as a ticket file, so decks arrive the same way
   let sets: TicketSet[] = [], tickets: Ticket[] = [], dropped = 0;
   if (sorted.tickets.length) {
-    const lookup = network ? byKey : new Map<string, Stop>([...data.stops.map((stop) => [stop.id.toLowerCase(), stop] as const), ...data.stops.map((stop) => [stop.name.trim().toLowerCase(), stop] as const)]);
+    const lookup = network ? byKey : new Map<string, Stop>([...data.stops.map((stop) => [stop.id.toLowerCase(), stop] as const), ...data.stops.map((stop) => [stop.name.trim().normalize("NFC").toLowerCase(), stop] as const)]);
     const raw: TicketFile = { kind: "tickets", map: data.name, sets: [], tickets: [] };
     const decks = new Map<string, string>();
     for (const file of sorted.tickets) {

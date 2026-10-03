@@ -85,6 +85,26 @@ print dialog says so. Not done: the rules are not in the PNG; a print run of the
 to another part of the rules; images in the text; and a way to see in the preview where a page
 would break.
 
+## Uneven maps on purpose
+
+Awaiting the owner's decision; the case and the measurements are in `docs/PROPOSAL-UNEVEN-MAPS.md`.
+The official maps build contention in on purpose (8–19 crowded routes at a full table, mostly on double
+routes) while avoiding routes or stops that cut the board in two, and our deck score rates every
+official deck worse than our own suggestions. The steps, in the order the proposal recommends:
+
+- **Describe, don't judge** (small): every balance figure with the official range beside it, worded as a
+  fact; warnings kept only for what is rarely intended; the crowding advice rewritten as options.
+- **Fragility apart from contention** (small): bridges, cut points and dead ends on the map, with the
+  official counts.
+- **Deck tension as a choice** (medium): calm, official-like or tense, in Suggest a deck and in the deck
+  rules, its range taken from the official decks.
+- **Intended chokepoints and hubs** (medium): a route or stop marked as contested on purpose, listed as
+  intended by the analysis and respected by the suggester; stored in the map.
+- **Two-sided score targets** (medium): too even counts against a deck too, so suggestions take on the
+  official character by default. Needs the calibration redone.
+- **Playtest results** (large, not now): which routes were claimed on the marked-up sheet, against the
+  predicted crowding.
+
 ## Follow-ups from the CSV, ticket map and standing board work
 
 - **Standing ticket cards** carry a narrow small map, because the points column takes a share of an
