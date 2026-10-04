@@ -51,7 +51,7 @@ export default function About() {
         A wagon space is drawn at the size a real 20 × 9 mm train takes up on a 790 mm board, with
         the spacing measured from a hundred real routes. So a route that is six spaces long has room
         for six actual plastic trains when you print at full size. If a route is drawn too short for
-        the number of spaces you gave it, the balance report says so, in millimetres.
+        the number of spaces you gave it, Map balance says so, in millimetres.
       </p>
     </section>
 
@@ -133,7 +133,7 @@ export default function About() {
         </div>
         <div>
           <dt>Crowding is shown, never priced</dt>
-          <dd>The balance view lists the routes more tickets want than they can carry. No official
+          <dd>Map balance lists the routes more tickets want than they can carry. No official
             designer pays extra for a crowded corridor, so neither does this.</dd>
         </div>
         <div>

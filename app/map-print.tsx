@@ -246,7 +246,7 @@ export function PrintDialog({ open, onOpenChange, format, orientation = "landsca
       {onePage && <p className="helper print-dialog-foot print-page-note">{profile.id === "safari"
         ? `Safari ignores the size of a page. In its print dialog, add a custom paper size of ${plan.pageMm.width} × ${plan.pageMm.height} mm (Paper Size, Manage Custom Sizes), then choose PDF, or use Chrome, Edge or Firefox.`
         : `The page is ${plan.pageMm.width} × ${plan.pageMm.height} mm. In the print dialog, choose Save as PDF, or a large-format printer.`}</p>}
-      {boardIn && !onePage && <p className="helper print-dialog-foot">Every page prints upright (portrait), the default in every browser, with the map turned a quarter turn on it: leave the print dialog on Portrait. Print at 100 % — “fit to page” would undo the sizes above. The same dialog can save the run as a PDF.</p>}
+      {boardIn && !onePage && <p className="helper print-dialog-foot">Every page prints upright (portrait), the default in every browser{plan.turned ? ", with the map turned a quarter turn on it" : ", and a standing board stands on it"}: leave the print dialog on Portrait. Print at 100 % — “fit to page” would undo the sizes above. The same dialog can save the run as a PDF.</p>}
       <DialogFooter>
         <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
         <Button onClick={onPrint} disabled={!anything}><Printer />Print</Button>

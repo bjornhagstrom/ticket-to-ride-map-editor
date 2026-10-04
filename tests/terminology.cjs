@@ -30,7 +30,9 @@ for (const { word, instead } of avoided) {
   const pattern = new RegExp(`\\b${word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i");
   const found = sources.filter((file) => {
     const text = fs.readFileSync(path.join(root, file), "utf8");
-    return pattern.test(file.endsWith(".md") ? text : stripComments(text));
+    // The README's developer notes, from "Local development" on, talk about the code by its names.
+    const read = file === "README.md" ? text.split("\n## Local development")[0] : text;
+    return pattern.test(file.endsWith(".md") ? read : stripComments(read));
   });
   check(`"${word}" is not used; it is "${instead}"`, found.length === 0, found.join(", "));
 }

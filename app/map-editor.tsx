@@ -295,7 +295,7 @@ export function MapEditor() {
     setSelectedTicket(null);
     setShowSuggest(false);
     openTickets();
-    toast.success(`${suggestion.tickets.length} tickets suggested into ${mode === "replace" ? activeTicketSet.label : label}.`);
+    toast.success(`${suggestion.tickets.length} tickets built into ${mode === "replace" ? activeTicketSet.label : label}.`);
   };
   // The Tickets panel stays under the dialog, so backing out leaves it as it was.
   const openSuggest = () => { setSuggestStyle(null); setSuggestSize(null); setSuggestSeed(1); setSuggestName(""); setShowSuggest(true); };
@@ -833,7 +833,7 @@ export function MapEditor() {
         </TooltipTrigger><TooltipContent side="right" className="balance-tooltip">
           <p>A stop&apos;s name is drawn over a route line, which is hard to read in print.</p>
           <p>The button turns each name around its own stop, away from the routes and away from the other names. Stops with the fewest clear positions are placed first, and a name that already sits well is left alone.</p>
-          <p>Any that cannot be placed are named afterwards, so you can move the stop, bend the route away, or set those by hand with <strong>Name position</strong>.</p>
+          <p>Any that cannot be placed are named afterwards, so you can move the stop, bend the route away, or set those by hand with <strong>Name on the map</strong>.</p>
         </TooltipContent></Tooltip>}
         <Tooltip><TooltipTrigger asChild>
           <div className={cn("crossing-card", crossings.length && "has-warning")} tabIndex={0} onPointerEnter={() => setCrossingHover(true)} onPointerLeave={() => setCrossingHover(false)} onFocus={() => setCrossingHover(true)} onBlur={() => setCrossingHover(false)}><div className="crossing-icon">{crossings.length ? <AlertTriangle /> : <Check />}</div><div><strong>{crossings.length ? `${crossings.length} crossing${crossings.length === 1 ? "" : "s"}` : "No crossings"}</strong><p>{crossings.length ? "between buildable routes" : "The route network is geometrically clean"}</p></div></div>
@@ -917,7 +917,7 @@ const toolDefinitions: Array<{ id: Tool; icon: React.ReactNode; title: string; n
   { id: "stop", icon: <MapPinPlus />, title: "Add stop", note: "Click the map to place a stop, using the type, size and symbol set below." },
   { id: "route", icon: <Link2 />, title: "Draw route", note: "Click two stops to connect them, using the route type, colour and special-rule style set below." },
   { id: "background", icon: <Layers3 />, title: "Draw background", note: "Draw areas, boundaries and labels behind the network, or import a background map image." },
-  { id: "note", icon: <StickyNote />, title: "Add note", note: "Click the map to drop an evaluation note. Notes show on screen, in print and in the PNG, but aren't part of the map itself." },
+  { id: "note", icon: <StickyNote />, title: "Add note", note: "Click the map to drop an evaluation note. Notes are saved with the map and show on screen, in print and in the PNG, but they are not part of the game." },
   { id: "ticket", icon: <TicketIcon />, title: "Add ticket", note: "Click two stops to make a destination ticket between them. The points are suggested from the shortest path and from what this map's other tickets are worth." },
   { id: "measure", icon: <Ruler />, title: "Measure distance", note: "Click two stops to see the shortest path between them, counted in wagon spaces rather than straight-line distance." },
 ];

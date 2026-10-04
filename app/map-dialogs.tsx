@@ -360,7 +360,7 @@ export function SuggestTicketsDialog({ open, onOpenChange, data, current, sugges
     <DialogContent className="suggest-dialog" style={{ height: "86vh", maxHeight: 860 }}>
       <DialogHeader>
         <DialogTitle>Build a full deck of tickets</DialogTitle>
-        <DialogDescription>Every target below comes from the official Ticket to Ride decks, not from this map. Applying puts the result in a new deck stamped with today&apos;s date, so nothing you already have is touched.</DialogDescription>
+        <DialogDescription>Every target below comes from the official Ticket to Ride decks, not from this map. Save the result as a new deck under a name of your own, or let it replace the deck you are working on.</DialogDescription>
       </DialogHeader>
 
       <div className="suggest-scroll">

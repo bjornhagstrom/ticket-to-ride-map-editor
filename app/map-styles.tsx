@@ -23,7 +23,7 @@ export type StyleTarget = { kind: StyleKind; id?: string };
 
 const kindMeta: Record<StyleKind, { label: string; blurb: string }> = {
   map: { label: "Map", blurb: "Basic map settings." },
-  ticket: { label: "Deck rules", blurb: "The rules the ticket suggester follows on this map — ours, which are fixed, or a set of your own made from one of them — and where a ticket stops being short and starts being long, with how much of the deck belongs in each band." },
+  ticket: { label: "Deck rules", blurb: "The rules the editor follows when it builds a full deck of tickets on this map — ours, which are fixed, or a set of your own made from one of them — and where a ticket stops being short and starts being long, with how much of the deck belongs in each band." },
   stop: { label: "Stop types", blurb: "What each kind of stop looks like on the map." },
   route: { label: "Route types", blurb: "Line thickness and dash pattern per type. Colour comes from each route, so types are told apart by shape." },
   defaults: { label: "Default object style", blurb: "The style the next stop or route you draw will get. These are settings for your pen, not for the map: changing them leaves everything already drawn exactly as it is." },
@@ -161,8 +161,8 @@ export function SettingsDialog({ open, onOpenChange, target, onTarget, data, cha
                 {share("mix-long", "Long %", mix.long, "long")}
               </div>
               {total !== 100
-                ? <p className="helper helper-warning">These add up to {total} %, not 100. The suggester will read them as proportions all the same, but the numbers are easier to judge when they add up.</p>
-                : <p className="helper">The share of the deck that should sit in each band. The suggester aims at this, and the suggestion dialog shows the current deck and the proposed one against it.</p>}
+                ? <p className="helper helper-warning">These add up to {total} %, not 100. When the editor builds a deck it reads them as proportions all the same, but the numbers are easier to judge when they add up.</p>
+                : <p className="helper">The share of the deck that should sit in each band. A full deck of tickets is built to this, and its dialog shows the current deck and the proposed one against it.</p>}
 
               <div className="mix-presets">
                 <p className="eyebrow">Follow an official map</p>

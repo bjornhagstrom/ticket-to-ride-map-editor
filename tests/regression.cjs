@@ -1352,6 +1352,8 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     await page.getByRole("menuitem", { name: /Build a full deck of tickets/ }).click();
     await page.waitForSelector('[role="dialog"]', { timeout: 20000 });
     check("and the dialog is called the same", (await page.locator('[role="dialog"] h2').first().textContent()).trim() === "Build a full deck of tickets");
+    const deckIntro = await page.locator('[role="dialog"] [data-slot="dialog-description"]').first().textContent();
+    check("it says the deck can be saved as a new one or replace the current one, and promises no date stamp", /new deck/i.test(deckIntro) && /replace/i.test(deckIntro) && !/stamped|today/i.test(deckIntro), deckIntro);
     await page.waitForTimeout(300);
     await page.keyboard.press("Escape");
     await page.waitForTimeout(500);
@@ -2911,6 +2913,8 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     await dialog.getByRole("radio", { name: "One sheet per panel of the game board", exact: true }).check();
     const summary = await dialog.locator(".print-summary").textContent();
     check("and does not say the map is turned on the page", !/turned/.test(summary) && /upright/.test(summary), summary);
+    const foot = await dialog.locator(".print-dialog-foot").allTextContents();
+    check("nor does the note at the foot of the dialog", foot.length > 0 && foot.every((t) => !/turned/.test(t)), foot.join(" | "));
     const pages = await sp.evaluate(() => Array.from(document.querySelectorAll(".print-pages .print-page")).map((p) => p.querySelector("svg.print-sheet > g").getAttribute("transform")));
     check("the board's pages print standing, without a quarter turn", pages.length === 6 && pages.every((t) => !t), JSON.stringify(pages.slice(0, 2)));
     await sp.keyboard.press("Escape");

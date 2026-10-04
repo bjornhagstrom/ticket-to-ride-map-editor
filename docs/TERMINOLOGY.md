@@ -76,6 +76,11 @@ Words we have chosen not to use, each with the word to use instead.
 - `mini map`, use `small map`
 - `ticket's score`, use `points`
 - `Analyze balance`, use `Map balance`
+- `the suggester`, use `Build a full deck of tickets` (or "when the editor builds a deck")
+- `ticket suggester`, use `Build a full deck of tickets`
+- `balance report`, use `Map balance`
+- `balance view`, use `Map balance`
+- `Name position`, use `Name on the map`
 
 ## Open questions
 

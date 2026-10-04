@@ -61,19 +61,19 @@ export function DeckRulesPanel({ data, change }: { data: MapData; change: (fn: (
 
   return <div className="deck-rules">
     <fieldset className="deck-rule-list">
-      <legend>Rules the suggester follows on this map</legend>
+      <legend>Rules for building a full deck of tickets on this map</legend>
       {rules.map((rule) => <label key={rule.id} className={cn("deck-rule-choice", rule.id === chosen.id && "chosen")}>
         <input type="radio" name="deck-rule" aria-label={rule.label} checked={rule.id === chosen.id} onChange={() => choose(rule.id)} />
         <span><strong>{rule.label}</strong><small>{rule.custom ? "this map's own" : "ours, fixed"}</small></span>
       </label>)}
     </fieldset>
-    {data.deckRule === undefined && <p className="helper deck-rule-default">Nothing chosen yet, so the suggester picks {chosen.label}, because {why}. Choose a set to fix it for this map.</p>}
+    {data.deckRule === undefined && <p className="helper deck-rule-default">Nothing chosen yet, so a full deck of tickets is built on {chosen.label}, because {why}. Choose a set to fix it for this map.</p>}
     <div className="deck-rule-values">
       {chosen.custom ? <OwnRuleFields rule={chosen} onChange={(patch) => update(chosen.id, patch)} onDelete={() => remove(chosen.id)} /> : <FixedRuleValues rule={chosen} />}
       {!chosen.custom && <Button size="sm" variant="outline" onClick={() => createFrom(chosen)}><Plus />Create your own from {chosen.label}</Button>}
       <p className="helper">{data.ticketMix
-        ? "This map has its own ticket mix, below. The suggester aims at that mix rather than at these length shares."
-        : "The suggester follows these length shares until you change the ticket mix below; from then on it aims at the map's own mix instead."}</p>
+        ? "This map has its own ticket mix, below. A full deck of tickets is built to that mix rather than to these length shares."
+        : "A full deck of tickets follows these length shares until you change the ticket mix below; from then on it is built to the map's own mix instead."}</p>
     </div>
   </div>;
 }
@@ -137,7 +137,7 @@ function OwnRuleFields({ rule, onChange, onDelete }: { rule: DeckRule; onChange:
         <Input id={`rule-bin-${index}`} type="number" step={1} min={0} max={100} value={pct(share)} onChange={(event) => setBin(index, Number(event.target.value) || 0)} />
       </div>)}
     </div>
-    <p className={cn("helper", Math.abs(binTotal - 100) > 1 && "helper-warning")}>{Math.abs(binTotal - 100) > 1 ? `These add up to ${binTotal} %, not 100 %. The suggester scales them, but the shares will not mean what they say.` : "Reach is the longest ticket a player can build with the map's wagons."}</p>
+    <p className={cn("helper", Math.abs(binTotal - 100) > 1 && "helper-warning")}>{Math.abs(binTotal - 100) > 1 ? `These add up to ${binTotal} %, not 100 %. The editor scales them when it builds a deck, but the shares will not mean what they say.` : "Reach is the longest ticket a player can build with the map's wagons."}</p>
     <Button size="sm" variant="ghost" onClick={onDelete}><Trash2 />Delete this set</Button>
   </>;
 }
