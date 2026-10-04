@@ -5,14 +5,15 @@ in the same commit as the work (AGENTS.md).
 
 ## Agreed and next
 
-- **Intended chokepoints and hubs**: a route marked *contested on purpose*, a stop marked *hub*, in
-  Properties. Map balance lists them as intended instead of among the crowded, and Build a full deck
-  of tickets keeps sending tickets through them. Stored in the map file as an addition.
 - **Illustrations where words fall short** (list to be made, then drawn from the editor's own data):
   line styles, stop types, how the sheets tile the board in the print dialog, label angles.
 - **The tour video in the welcome box**, from YouTube, played only when asked (a picture with a play
   button that loads the player on click), and a link to About.
 - **About** checked against the film and the editor as it is, with screenshots.
+
+- **The columns scroll on their own**: on a computer a tall Tools or Properties column makes the whole
+  page scroll, and the map scrolls out of view while a stop or a route is being edited. Each column
+  should scroll by itself, with the map staying in view.
 
 ## Waiting
 
@@ -48,6 +49,6 @@ in the same commit as the work (AGENTS.md).
 
 ## The case for uneven maps
 
-`docs/PROPOSAL-UNEVEN-MAPS.md` has the measurements. Built: a deck's tension (calm, like the official maps, tense), every balance figure beside the official range (Against the official maps), crowding set against it,
+`docs/PROPOSAL-UNEVEN-MAPS.md` has the measurements. Built: hubs and routes contested on purpose, a deck's tension (calm, like the official maps, tense), every balance figure beside the official range (Against the official maps), crowding set against it,
 and how the network holds together (dead ends, routes that cut the map in two, corners), with buttons
 for what it warns of. The rest is above.

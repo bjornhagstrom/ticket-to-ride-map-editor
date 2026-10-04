@@ -158,6 +158,11 @@ A note may have `kind: "playtest"`: the playtest box, which the editor draws its
 line for the date played and where the players' names go. Its `text` says the same in words, so an
 older build, which keeps the field, shows it as an ordinary note.
 
+### Hubs and routes contested on purpose
+
+Added after 0.4.1: additions. A stop may carry `hub: true`, a route `contested: true` (every lane between
+the same two stops is marked together). Only `true` is kept when read. Older builds keep both untouched.
+
 ### A deck's tension
 
 Added after 0.4.1: an addition. A map may carry `deckTension`: `"official"` or `"tense"`. Without it a

@@ -1827,6 +1827,8 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   const storedCentral = () => page.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")).stops.find((stop) => stop.name === "Central"));
   const bearingGap = (a, b) => Math.abs(((a - b + 540) % 360) - 180);
   const dragName = async (angle, { release = true } = {}) => {
+    // A tall Properties panel can scroll the page, taking the map with it: bring the map back first.
+    await page.evaluate(() => window.scrollTo(0, 0));
     const at = await centralName();
     const to = { x: at.cx + Math.cos(angle * Math.PI / 180) * 45, y: at.cy + Math.sin(angle * Math.PI / 180) * 45 };
     await page.mouse.move(at.lx, at.ly);
@@ -3700,6 +3702,45 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     await openBuild();
     check("and a full deck starts from it", await tension("Like the official maps").isChecked());
     await tp2.context().close();
+  }
+
+  // 52. Intended chokepoints and hubs: marked in Properties, kept in the map, and listed in Map balance
+  // as on purpose instead of among the crowded routes.
+  {
+    const ip = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
+    ip.on("pageerror", (e) => errors.push(String(e)));
+    await ip.goto(BASE, { waitUntil: "networkidle" });
+    await ip.getByRole("button", { name: "Load the example map" }).click();
+    await ip.waitForTimeout(600);
+    const stored = () => ip.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")));
+    // A stop: select Central, mark it a hub.
+    await ip.evaluate(() => { const s = Array.from(document.querySelectorAll(".map-canvas .stop")).find((g) => Array.from(g.querySelectorAll("text, title")).some((t) => t.textContent === "Central")); s.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true })); s.dispatchEvent(new PointerEvent("pointerup", { bubbles: true })); });
+    await ip.waitForTimeout(400);
+    const hub = ip.getByRole("checkbox", { name: "A hub on purpose" });
+    check("a stop can be marked a hub on purpose in Properties", (await hub.count()) === 1 && !(await hub.isChecked()));
+    await hub.check();
+    await ip.waitForTimeout(300);
+    check("which is kept in the map", (await stored()).stops.find((s) => s.name === "Central").hub === true);
+    // A route of two lanes: marking one marks the pair.
+    const pair = await ip.evaluate(() => { const m = JSON.parse(localStorage.getItem("ttr-map")); const key = (r) => [r.a, r.b].sort().join("|"); const counts = {}; for (const r of m.routes) counts[key(r)] = (counts[key(r)] || 0) + 1; const r = m.routes.find((x) => counts[key(x)] === 2); return { id: r.id, key: key(r) }; });
+    await ip.evaluate((id) => { const g = document.querySelector(`.map-canvas .route-group[data-route-id="${id}"]`); g.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true })); g.dispatchEvent(new PointerEvent("pointerup", { bubbles: true })); }, pair.id);
+    await ip.waitForTimeout(400);
+    const contested = ip.getByRole("checkbox", { name: "Contested on purpose" });
+    check("a route can be marked contested on purpose in Properties", (await contested.count()) === 1);
+    await contested.check();
+    await ip.waitForTimeout(300);
+    const lanes = (await stored()).routes.filter((r) => [r.a, r.b].sort().join("|") === pair.key);
+    check("which marks every lane between the two stops", lanes.length === 2 && lanes.every((r) => r.contested === true), JSON.stringify(lanes.map((r) => r.contested)));
+    await ip.keyboard.press("Escape");
+    // Map balance: crowded on purpose, listed as such.
+    await ip.evaluate((ids) => { const m = JSON.parse(localStorage.getItem("ttr-map")); const a = m.routes.find((r) => r.id === ids).a, b = m.routes.find((r) => r.id === ids).b; for (let i = 0; i < 8; i++) m.tickets.push({ id: `t-crowd-${i}`, a, b, points: 5, set: "main" }); localStorage.setItem("ttr-map", JSON.stringify(m)); }, pair.id);
+    await ip.reload({ waitUntil: "networkidle" });
+    await ip.waitForTimeout(600);
+    await ip.getByRole("button", { name: "Map balance", exact: true }).click();
+    await ip.waitForTimeout(800);
+    const crowding = (await ip.locator(".analysis-section.bottlenecks").textContent()).replace(/\s+/g, " ");
+    check("Map balance lists a route crowded on purpose as on purpose", /on purpose/i.test(crowding) && (await ip.locator(".bottleneck-row.on-purpose").count()) >= 1, crowding.slice(0, 300));
+    await ip.context().close();
   }
 
   console.log("PASS:"); ok.forEach((l) => console.log("  ✓ " + l));

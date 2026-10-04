@@ -442,3 +442,6 @@
 .tension-option span { display: grid; gap: 2px; }
 .tension-option small { color: #5d554a; font-size: 12px; line-height: 1.35; }
 @media (max-width: 720px) { .tension-choice { grid-template-columns: 1fr; } }
+
+/* A route crowded on purpose, in Map balance. */
+.on-purpose-tag { margin-left: 6px; padding: 0 6px; border-radius: 999px; background: #e6eedb; color: #2f5a2a; font-style: normal; font-size: 12px; font-weight: 600; }

@@ -9,6 +9,7 @@ This file is written from `app/version.ts` by `npm run changelog`; edit the note
 Changes since the last release, to go into the next version.
 
 - A damaged map file opens with what can be used, and says what was left out and why; a file that holds no map at all is refused with a reason, and the map you had stays as it was.
+- A stop can be marked a hub on purpose and a route contested on purpose, in Properties. A full deck of tickets then sends more tickets to the hub and through the route, and Map balance lists such a route as crowded on purpose.
 - A full deck of tickets can be calm, like the official maps, or tense: chosen when it is built, and set for the map in its deck rules. Like the official maps crowds its busiest corridor about as hard as the official decks do; tense, like the tensest of them.
 - Map balance opens with the map against the official maps: crowded routes at a full table, the ticket traffic on double routes against single ones, routes no ticket needs, the busiest stop and the average hub degree, each beside what the eight official maps measure.
 - The Rules panel has Print the rules, for the rules alone on pages of their own.

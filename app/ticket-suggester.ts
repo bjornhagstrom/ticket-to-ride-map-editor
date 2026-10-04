@@ -92,6 +92,10 @@ export const TICKET_SUGGESTER = {
   peripheryLong: .62,
   peripheryShortDelta: -.05,
   unusedRate: .20,
+  // How strongly a route contested on purpose draws tickets through it, against the spread of the rest.
+  contestedPull: 4,
+  // And a hub on purpose, tickets to it.
+  hubPull: .4,
   maxLocos: 2,
   minLengthFraction: .15,
   sampleSize: 80,
@@ -132,6 +136,8 @@ export const TENSION_CHOICES: { id: DeckTension; label: string; note: string }[]
 export type Bottleneck = {
   a: string; b: string; length: number; lanes: number; lanesUsable: number;
   load: number; ratio: number; tickets: number; ticketIds: string[]; routeIds: string[];
+  // Crowded because the designer marked the route contested on purpose.
+  onPurpose: boolean;
 };
 
 export type TicketDeckReport = {
@@ -251,6 +257,9 @@ class SuggesterModel {
   lanesAtLargestTable: number[] = [];
   // Every stop the graph runs through, junctions included. `nodes` is the subset a ticket may end at.
   graphNodes: string[] = [];
+  // Marked by the designer: an edge contested on purpose (any of its lanes marked), and hubs on purpose.
+  contested: boolean[] = [];
+  hubs = new Set<string>();
 
   constructor(data: MapData, wagonsPerPlayer: number, lengthCap: number) {
     this.bands = data.ticketBands ?? DEFAULT_TICKET_BANDS;
@@ -266,6 +275,9 @@ class SuggesterModel {
     this.nodes = network.ends;
     nodes.forEach((id, i) => this.index.set(id, i));
     this.edges = edges.filter((edge) => inside.has(edge.a) && inside.has(edge.b));
+    const markedRoutes = new Set(data.routes.filter((route) => route.contested).map((route) => route.id));
+    this.contested = this.edges.map((edge) => edge.routeIds.some((id) => markedRoutes.has(id)));
+    this.hubs = new Set(data.stops.filter((stop) => stop.hub).map((stop) => stop.id));
 
     this.adjacency = nodes.map(() => []);
     this.edges.forEach((edge, edgeIndex) => {
@@ -557,28 +569,36 @@ class DeckState {
       if (shortMean !== null) ends += (shortMean - (model.mapPeriphery + TICKET_SUGGESTER.peripheryShortDelta)) ** 2;
     }
 
-    let cov = 0, zero = 0;
+    let cov = 0, zero = 0, hubbed = 0;
     for (const id of model.nodes) {
       const count = this.stopCounts[model.index.get(id)!];
+      if (model.hubs.has(id)) hubbed += count;
       if (count === 0) zero += 1;
       const over = count - style.maxPerStop;
-      if (over > 0) cov += over * over;
+      // A hub on purpose may take as many tickets as the deck sends it.
+      if (over > 0 && !model.hubs.has(id)) cov += over * over;
     }
 
     const pairs = this.members.length * (this.members.length - 1) / 2;
     const dup = Math.max(0, this.duplicates - style.dupRate * pairs);
 
-    let unused = 0, loadSum = 0;
+    // Uneven traffic per lane counts against a deck, except on a route contested on purpose: there it is
+    // the point, so those edges are left out of the spread and pull a little traffic towards them.
+    let unused = 0, loadSum = 0, spread = 0, pulled = 0;
     const perLane = new Float64Array(model.edges.length);
     for (let i = 0; i < model.edges.length; i++) {
       if (this.edgeLoad[i] <= 1e-9) unused += 1;
       perLane[i] = this.edgeLoad[i] / model.lanesAtLargestTable[i];
-      loadSum += perLane[i];
+      if (model.contested[i]) { pulled += perLane[i]; continue; }
+      loadSum += perLane[i]; spread += 1;
     }
-    const mean = model.edges.length ? loadSum / model.edges.length : 0;
+    const mean = spread ? loadSum / spread : 0;
     let variance = 0;
-    for (let i = 0; i < model.edges.length; i++) variance += (perLane[i] - mean) ** 2;
-    variance = model.edges.length ? variance / model.edges.length : 0;
+    for (let i = 0; i < model.edges.length; i++) if (!model.contested[i]) variance += (perLane[i] - mean) ** 2;
+    variance = spread ? variance / spread : 0;
+    variance -= TICKET_SUGGESTER.contestedPull * pulled / Math.max(1, model.edges.length);
+    // A hub on purpose draws tickets to it, the way a contested route draws them through.
+    cov -= TICKET_SUGGESTER.hubPull * hubbed;
     const unusedPenalty = Math.max(0, unused - TICKET_SUGGESTER.unusedRate * model.edges.length);
 
     return w.bins * bins + w.ends * ends + w.cov * cov + w.zero * zero
@@ -695,6 +715,7 @@ function findBottlenecks(model: SuggesterModel, deck: DeckState, ids: Map<Candid
       load: row.load, ratio: row.ratio, tickets: row.users.length,
       ticketIds: row.users.map((user) => ids.get(user) ?? "").filter(Boolean),
       routeIds: row.edge.routeIds,
+      onPurpose: model.contested[row.index],
     }));
 }
 

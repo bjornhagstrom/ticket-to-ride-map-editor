@@ -10,12 +10,12 @@ export type BackgroundType = "area" | "line" | "label";
 // adds up to a standard or an Anniversary board — is chosen per print run; see app/print-plan.ts.
 export type MapFormat = "board-2x3" | "board-2x4";
 export type Point = { x: number; y: number };
-export type Stop = Point & { id: string; name: string; type: StopType; size?: StopSize; symbol?: StopSymbol; letter?: string; labelAngle?: number; endGapMm?: number; locked?: boolean; labelLocked?: boolean };
+export type Stop = Point & { id: string; name: string; type: StopType; /** A hub on purpose: many tickets may name it. */ hub?: boolean; size?: StopSize; symbol?: StopSymbol; letter?: string; labelAngle?: number; endGapMm?: number; locked?: boolean; labelLocked?: boolean };
 
 // Where a stop's name sits, as a compass bearing around the stop in degrees (0 = right, 90 = below).
 // Undefined keeps the original behaviour: up and to the right, flipping left near the right edge.
 export const defaultLabelAngle = (stop: Point, boardWidth = W) => (stop.x > boardWidth - 200 ? 215 : 325);
-export type Route = { id: string; a: string; b: string; length: number; type: RouteType; color: string; points?: Point[]; locomotiveSlots?: number[]; lineStyle?: string; curved?: boolean; wagonStyle?: string };
+export type Route = { id: string; a: string; b: string; length: number; type: RouteType; color: string; /** Contested on purpose: tickets may crowd it. */ contested?: boolean; points?: Point[]; locomotiveSlots?: number[]; lineStyle?: string; curved?: boolean; wagonStyle?: string };
 export type LineStyle = { id: string; label: string; strokeWidth: number; dash: string };
 
 // How a route's wagon spaces are drawn, to signal that it plays by a rule of its own. Shape is

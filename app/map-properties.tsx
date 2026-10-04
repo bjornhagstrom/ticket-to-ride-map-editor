@@ -71,6 +71,9 @@ export function StopProperties({ stop, change, onDelete, labelState, mapEndGapMm
           : <p className="helper">Nothing in this deck.</p>}
       </div>) : <p className="helper">No ticket sends a player here yet.</p>}
     </div>
+    {/* A hub on purpose: many tickets may name it (BACKLOG, uneven maps). */}
+    <label className="checkbox-row"><input type="checkbox" aria-label="A hub on purpose" checked={Boolean(stop.hub)} onChange={(event) => update({ hub: event.target.checked || undefined })} />A hub on purpose</label>
+    <p className="helper">Many tickets may name it. Building a full deck of tickets sends more of them here, and does not hold it to the rules&apos; limit per stop.</p>
     <Button variant="destructive" onClick={onDelete}><Trash2 />Delete stop</Button>
     <p className="delete-note">Connected routes will also be deleted.</p>
   </div>;
@@ -103,6 +106,9 @@ export function RouteProperties({ route, stops, routes, routeTypeStyles, change,
       {parallelCount > 1 && <label className="checkbox-row"><input type="checkbox" checked={linkParallel} onChange={(event) => onLinkParallel(event.target.checked)} />Shape the parallel line{parallelCount > 2 ? "s" : ""} together with this one</label>}
       {Boolean(route.points?.length) && <Button size="sm" variant="ghost" onClick={() => onStraighten(route.id)}>Straighten route</Button>}
     </div>
+    {/* Contested on purpose: every lane between the two stops, since the corridor is what is meant. */}
+    <label className="checkbox-row"><input type="checkbox" aria-label="Contested on purpose" checked={Boolean(route.contested)} onChange={(event) => change((draft) => { for (const item of draft.routes) if ((item.a === route.a && item.b === route.b) || (item.a === route.b && item.b === route.a)) item.contested = event.target.checked || undefined; return draft; })} />Contested on purpose</label>
+    <p className="helper">Tickets may crowd it, every lane between these two stops. Building a full deck of tickets sends more of them through it, and Map balance lists it as on purpose.</p>
     <Button variant="destructive" onClick={onDelete}><Trash2 />Delete route</Button>
   </div>;
 }

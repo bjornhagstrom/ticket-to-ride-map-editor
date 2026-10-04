@@ -321,6 +321,7 @@ export function repairMap(raw: unknown): { map: MapData; repairs: string[] } {
     const stop = { ...(entry as object), ...at } as Stop;
     if (typeof stop.name !== "string") stop.name = id;
     if (typeof stop.type !== "string") stop.type = "city";
+    if (stop.hub !== undefined && stop.hub !== true) delete stop.hub;
     return [stop];
   });
   say(stopsLeft, "stop left out: it was not a stop, had no place on the map, or used an id already taken.", "stops left out: they were not stops, had no place on the map, or used an id already taken.");
@@ -338,6 +339,7 @@ export function repairMap(raw: unknown): { map: MapData; repairs: string[] } {
     route.length = mended;
     if (typeof route.type !== "string") route.type = "city";
     if (typeof route.color !== "string") route.color = "neutral";
+    if (route.contested !== undefined && route.contested !== true) delete route.contested;
     if (entry.points !== undefined) { const bends = Array.isArray(entry.points) ? entry.points.map(point).filter((p): p is Point => Boolean(p)) : []; if (bends.length) route.points = bends; else delete route.points; }
     if (entry.locomotiveSlots !== undefined) { const slots = Array.isArray(entry.locomotiveSlots) ? [...new Set(entry.locomotiveSlots.filter((slot): slot is number => Number.isInteger(slot) && (slot as number) >= 0 && (slot as number) < mended))] : []; if (slots.length) route.locomotiveSlots = slots; else delete route.locomotiveSlots; }
     return [route];

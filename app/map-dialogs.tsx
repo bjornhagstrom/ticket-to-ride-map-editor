@@ -65,10 +65,11 @@ export function AnalysisPanel({ official, wide, onToggleWide, onAddParallel, len
         {bottlenecks.length === 0
           ? <p className="helper">No route is wanted by more tickets than it can carry. Official maps have {CROWDING_OFFICIAL[0]}–{CROWDING_OFFICIAL[1]} such routes at a full table: some contention is part of the game.</p>
           : <>
-            <div className="bottleneck-list">{bottlenecks.slice(0, 8).map((edge) => <button type="button" key={`${edge.a}|${edge.b}`} className="bottleneck-row" onPointerEnter={() => onPreviewRoutes(edge.routeIds)} onPointerLeave={() => onPreviewRoutes(null)} aria-pressed={edge.routeIds.length === bottleneckShown.size && edge.routeIds.every((id) => bottleneckShown.has(id))} onClick={() => onShowBottleneck(edge.routeIds)}>
-              <strong>{stopName(edge.a)} → {stopName(edge.b)}</strong>
+            <div className="bottleneck-list">{bottlenecks.slice(0, 8).map((edge) => <button type="button" key={`${edge.a}|${edge.b}`} className={cn("bottleneck-row", edge.onPurpose && "on-purpose")} onPointerEnter={() => onPreviewRoutes(edge.routeIds)} onPointerLeave={() => onPreviewRoutes(null)} aria-pressed={edge.routeIds.length === bottleneckShown.size && edge.routeIds.every((id) => bottleneckShown.has(id))} onClick={() => onShowBottleneck(edge.routeIds)}>
+              <strong>{stopName(edge.a)} → {stopName(edge.b)}{edge.onPurpose && <em className="on-purpose-tag">on purpose</em>}</strong>
               <span>{edge.length} spaces · {edge.lanesUsable} of {edge.lanes} lane{edge.lanes === 1 ? "" : "s"} usable · {edge.tickets} ticket{edge.tickets === 1 ? "" : "s"} want it</span>
             </button>)}</div>
+            {bottlenecks.some((edge) => edge.onPurpose) && <p className="helper">{bottlenecks.filter((edge) => edge.onPurpose).length} of them {bottlenecks.filter((edge) => edge.onPurpose).length === 1 ? "is" : "are"} contested on purpose, as marked in Properties.</p>}
             <p className="helper">{bottlenecks.length} route{bottlenecks.length === 1 ? " is" : "s are"} wanted by more tickets than {bottlenecks.length === 1 ? "it" : "they"} can carry at this table. Official maps have {CROWDING_OFFICIAL[0]}–{CROWDING_OFFICIAL[1]} at a full table, most of them on double routes: contention is part of the game. Where a corridor is crowded on purpose, a second lane keeps it open at bigger tables; where it is not, a way round or another ticket eases it. Click a row to keep its route marked, and click again to let go.</p>
           </>}
       </div>

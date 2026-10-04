@@ -49,6 +49,7 @@ The editor speaks English. Swedish equivalents are given where the work is discu
 | **corner** | Two or more stops reached only through one or two **gates**, as Iberia is through Pamplona and Marseille. Character, not a fault. | hörn |
 | **gate** | A stop through which a corner is reached. | port |
 | **tension** (of a deck) | How much a full deck of tickets sends players through the same corridors: **calm**, **like the official maps**, or **tense**. | spänning |
+| **hub on purpose**, **contested on purpose** | A stop many tickets may name, and a route tickets may crowd, as the designer marks them; a full deck is built to keep them so. | avsiktlig knutpunkt, avsiktligt omstridd |
 
 ## Printing and files
 
