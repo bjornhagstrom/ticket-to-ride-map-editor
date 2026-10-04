@@ -1928,9 +1928,9 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   check("the ticket length bands and mix are on the Deck rules page", await page.locator("#mix-medium-edge").isVisible() && await page.locator("#mix-short").isVisible());
   const ruleChoices = await page.locator(".deck-rule-choice").allTextContents();
   check("our three sets are offered", ["Generic", "Classic", "Europe"].every((name) => ruleChoices.some((text) => text.includes(name))), ruleChoices.join(" | "));
-  // With no choice of its own, the page shows what the suggester would pick: the example deck has
-  // long tickets, so that is Europe, and the page says why.
-  check("with no choice made, it shows the suggester's own pick, and why", (await storedRules()).chosen === undefined && await page.getByRole("radio", { name: "Europe", exact: true }).isChecked() && /long tickets/i.test(await page.locator(".deck-rule-default").textContent()),
+  // With no choice of its own, a map is built on Generic, the average of the official maps, and the
+  // page says so.
+  check("with no choice made, a full deck is built on Generic, and the page says why", (await storedRules()).chosen === undefined && await page.getByRole("radio", { name: "Generic", exact: true }).isChecked() && /average/i.test(await page.locator(".deck-rule-default").textContent()),
     await page.locator(".deck-rule-default").textContent().catch(() => "no note"));
   await page.getByRole("radio", { name: "Generic", exact: true }).check();
   await page.waitForTimeout(200);
@@ -3415,6 +3415,76 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     await dp.waitForTimeout(300);
     check("two stops with no route between them draw one without a word", (await dp.locator("[data-sonner-toast]", { hasText: "already" }).count()) <= toastsBefore && pair(await stored(), "Westport", "Quarry").length === 1);
     await dp.context().close();
+  }
+
+  // 45. Map balance made easier to act on: it can be widened like the Tickets and Rules panels; each
+  // route's room per wagon is marked as fine, too short or roomy; and what the network section warns
+  // of comes with something to do about it. Deck rules read in plain words, Generic is the default,
+  // and a new map starts with the playtest box in its top right corner.
+  {
+    const bp = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
+    bp.on("pageerror", (e) => errors.push(String(e)));
+    await bp.goto(BASE, { waitUntil: "networkidle" });
+    await bp.getByRole("button", { name: "Load the example map" }).click();
+    await bp.waitForTimeout(600);
+    const KEY = "ttr-map";
+    const stored = () => bp.evaluate((key) => JSON.parse(localStorage.getItem(key)), KEY);
+    const edit = async (src) => { await bp.evaluate(([key, code]) => { const m = JSON.parse(localStorage.getItem(key)); (new Function("m", code))(m); localStorage.setItem(key, JSON.stringify(m)); }, [KEY, src]); await bp.reload({ waitUntil: "networkidle" }); await bp.waitForTimeout(500); };
+    await bp.getByRole("button", { name: "Map balance", exact: true }).click();
+    await bp.waitForTimeout(700);
+    const panel = bp.locator(".balance-panel").first();
+    const widen = panel.getByRole("button", { name: "Expand" });
+    check("Map balance can be expanded like the Tickets and Rules panels", (await widen.count()) === 1);
+    const narrow = (await panel.boundingBox()).width;
+    await widen.click();
+    await bp.waitForTimeout(500);
+    check("and is wider when it is", (await panel.boundingBox()).width > narrow + 50 && (await panel.getByRole("button", { name: "Collapse" }).count()) === 1);
+    await panel.getByRole("button", { name: "Collapse" }).click();
+    await bp.waitForTimeout(400);
+    const marks = await bp.evaluate(() => Array.from(document.querySelectorAll(".balance-panel .room-mark")).map((m) => ({ cls: m.className, text: m.textContent.trim(), bg: getComputedStyle(m).backgroundColor })));
+    check("every route's room per wagon is marked: fine, too short or roomy", marks.length > 0 && marks.every((m) => /\b(ok|short|long)\b/.test(m.cls) && /^(OK|Too short|Roomy)$/.test(m.text)), JSON.stringify(marks.slice(0, 3)));
+    check("each in a colour of its own", new Set(marks.map((m) => m.bg)).size === new Set(marks.map((m) => m.cls)).size && marks.every((m) => m.bg !== "rgba(0, 0, 0, 0)"), JSON.stringify([...new Set(marks.map((m) => m.cls + " " + m.bg))]));
+    // A cape behind one lane: the network section offers to add a second.
+    await edit(`const t = m.routes[0].type; m.stops.push({ id: "cape", name: "Cape", type: "city", x: 1060, y: 60 }); m.routes.push({ id: "r-cape", a: "example-eastgate", b: "cape", length: 2, type: t, color: "green" });`);
+    await bp.getByRole("button", { name: "Map balance", exact: true }).click();
+    await bp.waitForTimeout(700);
+    const second = bp.locator(".network-shape").getByRole("button", { name: "Add a second lane" });
+    check("a route with one lane that cuts the map in two comes with a button to add a second lane", (await second.count()) === 1);
+    await second.click();
+    await bp.waitForTimeout(500);
+    const lanes = (await stored()).routes.filter((r) => (r.a === "cape" || r.b === "cape")).length;
+    check("which adds it, so the cape is a dead end behind a double route, as Edinburgh is", lanes === 2 && !(await bp.locator(".crossing-card.shape-card").evaluate((el) => el.classList.contains("has-warning"))), String(lanes));
+    // A stop with no route: the section offers to select it.
+    await edit(`m.stops.push({ id: "alone", name: "Alone", type: "city", x: 560, y: 40 });`);
+    await bp.getByRole("button", { name: "Map balance", exact: true }).click();
+    await bp.waitForTimeout(700);
+    const pick = bp.locator(".network-shape").getByRole("button", { name: "Select Alone" });
+    check("a stop with no route comes with a button that selects it", (await pick.count()) === 1);
+    if (await pick.count()) { await pick.click(); await bp.waitForTimeout(400); }
+    const fields = await bp.locator("aside.properties input").evaluateAll((els) => els.map((el) => el.value));
+    check("and selecting it shows the stop, ready to connect or delete", fields.includes("Alone") && (await bp.getByRole("button", { name: "Delete stop" }).count()) === 1, JSON.stringify(fields.slice(0, 4)));
+    // Deck rules, in plain words.
+    await bp.getByRole("button", { name: "Settings" }).click();
+    await bp.waitForTimeout(400);
+    await bp.locator(".settings-nav-item", { hasText: /deck rules/i }).click();
+    await bp.waitForTimeout(400);
+    await bp.getByRole("radio", { name: "Classic", exact: true }).check();
+    await bp.waitForTimeout(300);
+    const rules = (await bp.locator(".deck-rule-values").textContent()).replace(/\s+/g, " ");
+    check("ticket lengths are said in words: how many of the tickets reach how far across the map", /of the tickets/i.test(rules) && /across the map/i.test(rules) && !/% < 30 %/.test(rules), rules.slice(0, 300));
+    check("the bonus says what it is: extra points for the longest tickets, +1 and +2", /Extra points for the longest tickets/.test(rules) && /\+1/.test(rules) && /\+2/.test(rules), rules.slice(0, 400));
+    await bp.keyboard.press("Escape");
+    // A new map starts with the playtest box, in its top right corner.
+    await bp.evaluate(() => localStorage.clear());
+    await bp.reload({ waitUntil: "networkidle" });
+    await bp.waitForTimeout(500);
+    const blank = bp.getByRole("button", { name: /blank/i }).first();
+    if (await blank.count()) { await blank.click(); await bp.waitForTimeout(600); }
+    const fresh = await stored();
+    const box = fresh && fresh.notes.find((n) => n.kind === "playtest");
+    check("a new, empty map starts with the playtest box", Boolean(box), JSON.stringify(fresh && fresh.notes));
+    check("in its top right corner", box && box.x + box.width >= 1100 - 20 && box.y <= 24, JSON.stringify(box));
+    await bp.context().close();
   }
 
   console.log("PASS:"); ok.forEach((l) => console.log("  ✓ " + l));

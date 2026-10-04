@@ -4,7 +4,7 @@
 // so the sheets from several playtests can be told apart. Stored in the map file as `mapVersion`
 // (docs/FILE-FORMAT.md); tests/map-version.cjs holds the rules.
 import { boardOf } from "./board";
-import { type MapData, type MapVersion, type NoteBox } from "./map-data";
+import { PLAYTEST_MARGIN, PLAYTEST_SIZE, PLAYTEST_TEXT, type MapData, type MapVersion, type NoteBox } from "./map-data";
 
 export type VersionBy = "print" | "export" | "image";
 
@@ -68,19 +68,16 @@ export function olderCopyWarning(current: Pick<MapData, "name" | "mapVersion">, 
   return `This copy of “${incoming.name}” is version ${then}, older than version ${now} that it replaces, so its next print would repeat a number already on paper. Give it a new name, such as “${incoming.name} (from v${then})”, to keep the two apart.`;
 }
 
-const PLAYTEST_SIZE = { width: 230, height: 96 };
-/** What the playtest box says in a build that does not draw it itself. */
-export const PLAYTEST_TEXT = "Played: ______________\nPlayers: write their names on the back";
+export { PLAYTEST_TEXT };
 
-/** A playtest box, placed where it covers the fewest stops and routes and no other note. */
+/** A playtest box: in the top right corner, the owner's choice, unless that covers a stop, a route or
+ *  a note; then where it covers least. */
 export function playtestNote(data: MapData): NoteBox {
   const board = boardOf(data);
   const { width, height } = PLAYTEST_SIZE;
-  const margin = 16;
-  const xs = [margin, (board.width - width) / 2, board.width - width - margin];
-  // On screen the row of figures (stops, routes, version) lies over the top of the board: a box placed
-  // at the top sits below it, so its version line can be read there too.
-  const ys = [board.height - height - margin, 64, (board.height - height) / 2];
+  const margin = PLAYTEST_MARGIN;
+  const xs = [board.width - width - margin, margin, (board.width - width) / 2];
+  const ys = [margin, board.height - height - margin, (board.height - height) / 2];
   const stops = new Map(data.stops.map((stop) => [stop.id, stop]));
   // Points along every route, through its bends, to count what a box would cover.
   const samples = data.routes.flatMap((route) => {

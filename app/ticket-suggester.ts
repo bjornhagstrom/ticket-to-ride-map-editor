@@ -585,16 +585,13 @@ function resolveOptions(data: MapData, options: Partial<TicketSuggestOptions>): 
   };
 }
 
-// Europe deals a long ticket alongside the regular ones, so a map set up to deal four or more, or a
-// deck that already has long tickets, is taken to want the Europe shape.
+// The rules the map has chosen come first, whether ours or its own; without a choice, Generic, the
+// average of the official maps. (It used to guess Europe from long tickets or a deal of four; the
+// owner wants one plain default, for the example map too.)
 export function defaultStyle(data: MapData, setId?: string): TicketStyle {
-  // The rules the map has chosen come first, whether ours or its own.
+  void setId;
   if (data.deckRule && deckRules(data).some((rule) => rule.id === data.deckRule)) return data.deckRule;
-  const deck = setId ? ticketsInSet(data, setId) : data.tickets;
-  // A deck that already has long tickets, or a map that deals four or more, is shaped like Europe.
-  // Everything else starts from the average of the official maps.
-  if (deck.some((ticket) => ticket.long)) return "europe";
-  return (data.startingTickets ?? DEFAULT_STARTING_TICKETS) >= 4 ? "europe" : "generic";
+  return "generic";
 }
 
 // Every set of rules the suggester can follow on this map: ours first, fixed, then the map's own.

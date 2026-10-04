@@ -107,7 +107,7 @@ const inside = (b, p) => p.x >= b.x && p.x <= b.x + b.width && p.y >= b.y && p.y
 check("it is placed where no stop is", !crowded.stops.some((stop) => inside(box, stop)), JSON.stringify(box));
 const labelOf = (shape) => shape.labelPoint ?? { x: shape.points.reduce((t, p) => t + p.x, 0) / shape.points.length, y: shape.points.reduce((t, p) => t + p.y, 0) / shape.points.length };
 check("nor over the name of a background shape", !crowded.background.filter((shape) => shape.label && shape.points.length).some((shape) => inside({ x: box.x - 20, y: box.y - 20, width: box.width + 40, height: box.height + 40 }, labelOf(shape))), crowded.background.map((shape) => `${shape.label} ${JSON.stringify(labelOf(shape))}`).join("; "));
-check("and below the row of figures that lies over the top of the board on screen, so its version line shows", box.y >= 60, String(box.y));
+check("in the top right corner when it is free, as the owner wants it", box.x + box.width >= 1100 - 20 && box.y <= 24, JSON.stringify(box));
 check("and over no other note", !crowded.notes.some((note) => note.x < box.x + box.width && box.x < note.x + note.width && note.y < box.y + box.height && box.y < note.y + note.height));
 
 // ---------------------------------------------------------------- through the build the live site runs

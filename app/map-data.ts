@@ -305,13 +305,20 @@ export const colorLabels: Record<string, string> = {
   black: "Black", white: "White", orange: "Orange", purple: "Purple",
 };
 
+/** The playtest box: its size, its place in the top right corner of a lying 2×3 board, and what it
+ *  says in a build that does not draw it itself. map-version.ts places it on other maps. */
+export const PLAYTEST_SIZE = { width: 230, height: 96 };
+export const PLAYTEST_MARGIN = 16;
+export const PLAYTEST_TEXT = "Played: ______________\nPlayers: write their names on the back";
+
 export const emptyMap: MapData = {
   name: "New map",
   format: "board-2x3",
   background: [],
   stops: [],
   routes: [],
-  notes: [],
+  // A new map starts with the playtest box, in its top right corner, where the owner wants it.
+  notes: [{ id: "playtest", kind: "playtest", x: W - PLAYTEST_SIZE.width - PLAYTEST_MARGIN, y: PLAYTEST_MARGIN, width: PLAYTEST_SIZE.width, height: PLAYTEST_SIZE.height, text: PLAYTEST_TEXT }],
   lineStyles: [],
   routeTypeStyles: defaultRouteTypeStyles.map((style) => ({ ...style })),
   wagonStyles: defaultWagonStyles.map((style) => ({ ...style })),

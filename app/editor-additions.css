@@ -370,3 +370,17 @@
 
 /* The note beside the figures above the map, in the same shape, quieter. */
 .map-status .map-status-note { background: rgba(255, 250, 240, .85); color: #5d554a; font-weight: 400; white-space: normal; flex-shrink: 1; min-width: 0; max-width: 15rem; line-height: 1.25; text-align: left; }
+
+/* Deck rules: ticket lengths as a short list. */
+.deck-rule-lengths { margin: 0 0 4px; padding-left: 1.1em; }
+.deck-rule-lengths li { margin: 1px 0; }
+/* Room per wagon: fine, too short or roomy, at a glance. */
+.room-mark { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+.room-mark.ok { background: #dcebd7; color: #2f5a2a; }
+.room-mark.short { background: #f4d3cf; color: #7a1f17; }
+.room-mark.long { background: #f6e6bf; color: #6a4b0b; }
+
+/* A row of the network section with something to do beside it. */
+.shape-line { display: flex; align-items: center; gap: 6px; }
+.shape-line .shape-row { flex: 1; min-width: 0; }
+.shape-action { flex: none; }

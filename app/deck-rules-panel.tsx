@@ -13,6 +13,8 @@ import type { DeckRuleSet, MapData } from "./map-data";
 
 // Short enough to sit on one line above a field; how far a ticket reaches, as a share of reach.
 export const BIN_LABELS = ["< 30 %", "30–45 %", "45–60 %", "60–75 %", "75 %+"];
+// The same bands in words, for the deck rules: how far across the map a ticket reaches.
+const REACH_WORDS = ["less than 30 % of the way across the map", "30–45 % of the way across", "45–60 % of the way across", "60–75 % of the way across", "75 % of the way across or more"];
 const pct = (share: number) => Math.round(share * 1000) / 10;
 const clamp = (value: number, low: number, high: number) => Math.min(high, Math.max(low, value));
 const official = TICKET_SUGGESTER.official;
@@ -56,8 +58,7 @@ export function DeckRulesPanel({ data, change }: { data: MapData; change: (fn: (
     if (draft.deckRule === id) draft.deckRule = undefined;
     return draft;
   });
-  const deck = data.tickets;
-  const why = deck.some((ticket) => ticket.long) ? "the deck already has long tickets" : (data.startingTickets ?? 3) >= 4 ? "the map deals four or more tickets" : "it is the average of seven official maps";
+  const why = "it is the average of the official maps";
 
   return <div className="deck-rules">
     <fieldset className="deck-rule-list">
@@ -86,9 +87,9 @@ function FixedRuleValues({ rule }: { rule: DeckRule }) {
     <dl className="deck-rule-table">
       {row("Tickets per stop", String(rule.ticketsPerStop), `${official.perStop[0]}–${official.perStop[1]}`)}
       {row("Long deck, per stop", rule.longPerStop ? String(rule.longPerStop) : "none")}
-      {row("Lengths, share of the deck", rule.bins.map((share, index) => `${pct(share)} % ${BIN_LABELS[index]}`).join(" · "))}
+      <div key="lengths"><dt>How far the tickets reach</dt><dd><ul className="deck-rule-lengths">{rule.bins.map((share, index) => <li key={index}>{pct(share)} % of the tickets reach {REACH_WORDS[index]}</li>)}</ul><small>Across the map means its longest shortest path, from one end to the other.</small></dd></div>
       {row("Long tickets reach", rule.longRange ? `${pct(rule.longRange[0])}–${pct(rule.longRange[1])} % of reach` : "no separate long deck")}
-      {row("Bonus for the longest", rule.bonusFrom === null ? "none" : `from ${pct(rule.bonusFrom)} % of reach`)}
+      {row("Extra points for the longest tickets", rule.bonusFrom === null ? "none: a ticket is worth its distance" : `+1 for a ticket reaching ${pct(rule.bonusFrom)} % of the way across the map or more, +2 for the single longest`)}
       {row("Longest regular ticket", `${pct(rule.lengthCap)} % of reach`, `${pct(official.lengthCap[0])}–${pct(official.lengthCap[1])} %`)}
       {row("Most tickets at one stop", String(rule.maxPerStop), `${official.maxPerStop[0]}–${official.maxPerStop[1]}`)}
       {row("Near-duplicate tickets", `${pct(rule.dupRate)} %`, `${official.dupPct[0]}–${official.dupPct[1]} %`)}

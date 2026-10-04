@@ -40,7 +40,7 @@ export function WelcomeGuide({ open, onOpenChange, onChooseBlank, onChooseExampl
 const NUMBER_WORDS: Record<number, string> = {2: "two", 3: "three", 4: "four", 5: "five", 6: "six", 7: "seven", 8: "eight"};
 const tableWord = (count: number) => NUMBER_WORDS[count] ?? String(count);
 
-export function AnalysisPanel({ lengthView, pinKey, onPin, bottleneckShown, onClose, onPreviewRoutes, onPreviewStop, data, stats, colourTable, spacing, scaleWidthMm, setup, bottlenecks, atTable, onAtTable, onShowBottleneck, onSelectRoute, onSelectStop }: { lengthView: TicketLengthsView; pinKey: string | null; onPin: (key: string, routes: string[] | null, stop: string | null) => void; bottleneckShown: Set<string>; setup: SetupBalance; bottlenecks: Bottleneck[]; atTable: number; onAtTable: (players: number) => void; onShowBottleneck: (routeIds: string[]) => void; onClose: () => void; onPreviewRoutes: (routeIds: string[] | null) => void; onPreviewStop: (stopId: string | null) => void; onSelectRoute: (routeId: string) => void; onSelectStop: (stopId: string) => void; data: MapData; stats: NetworkStats; colourTable: ColourLengthTable; spacing: RouteSpacing[]; scaleWidthMm: number }) {
+export function AnalysisPanel({ wide, onToggleWide, onAddParallel, lengthView, pinKey, onPin, bottleneckShown, onClose, onPreviewRoutes, onPreviewStop, data, stats, colourTable, spacing, scaleWidthMm, setup, bottlenecks, atTable, onAtTable, onShowBottleneck, onSelectRoute, onSelectStop }: { wide: boolean; onToggleWide: () => void; onAddParallel: (routeId: string) => void; lengthView: TicketLengthsView; pinKey: string | null; onPin: (key: string, routes: string[] | null, stop: string | null) => void; bottleneckShown: Set<string>; setup: SetupBalance; bottlenecks: Bottleneck[]; atTable: number; onAtTable: (players: number) => void; onShowBottleneck: (routeIds: string[]) => void; onClose: () => void; onPreviewRoutes: (routeIds: string[] | null) => void; onPreviewStop: (stopId: string | null) => void; onSelectRoute: (routeId: string) => void; onSelectStop: (stopId: string) => void; data: MapData; stats: NetworkStats; colourTable: ColourLengthTable; spacing: RouteSpacing[]; scaleWidthMm: number }) {
   const stopName = (id: string) => data.stops.find((stop) => stop.id === id)?.name ?? "";
   // A number in the colour table marks the routes it counts while it is pointed at.
   const classicRows = compareWithClassics(data);
@@ -50,7 +50,8 @@ export function AnalysisPanel({ lengthView, pinKey, onPin, bottleneckShown, onCl
   // In the right column rather than a dialog, so the map stays in view: pointing at a row marks
   // the stop or routes it is about, and picking one selects it as before.
   return <div className="balance-panel">
-    <div className="panel-heading"><span>Map balance</span><small>Point at a row to see it on the map</small></div>
+    <div className="panel-heading"><span>Map balance</span><Button size="sm" variant="outline" aria-expanded={wide} onClick={onToggleWide}>{wide ? "Collapse" : "Expand"}</Button></div>
+    <p className="helper">Point at a row to see it on the map.</p>
       <p className="helper">A quick read on how evenly connected and coloured the network is, and how the tickets lie on it. Point at a row to see it on the map. Click one to keep it marked, and click again to let it go; double-click a stop or a route to pick it for editing.</p>
       <div className="analysis-section bottlenecks">
         <h3>Where the tickets crowd</h3>
@@ -71,7 +72,7 @@ export function AnalysisPanel({ lengthView, pinKey, onPin, bottleneckShown, onCl
             <p className="helper">{bottlenecks.length} route{bottlenecks.length === 1 ? " is" : "s are"} wanted by more tickets than {bottlenecks.length === 1 ? "it" : "they"} can carry at this table. Official maps have {CROWDING_OFFICIAL[0]}–{CROWDING_OFFICIAL[1]} at a full table, most of them on double routes: contention is part of the game. Where a corridor is crowded on purpose, a second lane keeps it open at bigger tables; where it is not, a way round or another ticket eases it. Click a row to keep its route marked, and click again to let go.</p>
           </>}
       </div>
-      <NetworkShapeSection data={data} onPreviewRoutes={onPreviewRoutes} onPreviewStop={onPreviewStop} />
+      <NetworkShapeSection data={data} onPreviewRoutes={onPreviewRoutes} onPreviewStop={onPreviewStop} onAddParallel={onAddParallel} onSelectStop={onSelectStop} />
       <TicketLengths view={lengthView} />
       <div className="analysis-section setup-balance">
         <h3>Game setup against the map</h3>
@@ -104,7 +105,7 @@ export function AnalysisPanel({ lengthView, pinKey, onPin, bottleneckShown, onCl
             <td>{item.route.length}</td>
             <td>{Math.round(item.drawnMm)} mm</td>
             <td>{Math.round(item.neededMm)} mm</td>
-            <td>{Math.round(item.ratio * 100)}%{item.verdict === "short" ? " · too short" : item.verdict === "long" ? " · roomy" : ""}</td>
+            <td>{Math.round(item.ratio * 100)}%<span className={cn("room-mark", item.verdict)}>{item.verdict === "short" ? "Too short" : item.verdict === "long" ? "Roomy" : "OK"}</span></td>
           </tr>)}</tbody>
         </table></div>}
       </div>
@@ -437,7 +438,9 @@ export function SuggestTicketsDialog({ open, onOpenChange, data, current, sugges
 // How the network holds together, described rather than judged: dead ends, routes whose loss cuts
 // the map in two, and corners reached only through one or two stops, each beside what the official
 // maps have. Pointing at a row marks it on the map.
-function NetworkShapeSection({ data, onPreviewRoutes, onPreviewStop }: { data: MapData; onPreviewRoutes: (routeIds: string[] | null) => void; onPreviewStop: (stopId: string | null) => void }) {
+// What it warns of comes with something to do: a second lane for a route that cuts the map with one,
+// and the stop itself, selected, for a stop no route reaches. Dead ends and corners are character.
+function NetworkShapeSection({ data, onPreviewRoutes, onPreviewStop, onAddParallel, onSelectStop }: { data: MapData; onPreviewRoutes: (routeIds: string[] | null) => void; onPreviewStop: (stopId: string | null) => void; onAddParallel: (routeId: string) => void; onSelectStop: (stopId: string) => void }) {
   const shape = networkShape(data);
   const names = (stops: { name: string }[]) => stops.map((stop) => stop.name).join(", ");
   const and = (stops: { name: string }[]) => stops.length === 1 ? stops[0].name : `${stops.slice(0, -1).map((stop) => stop.name).join(", ")} and ${stops[stops.length - 1].name}`;
@@ -447,9 +450,9 @@ function NetworkShapeSection({ data, onPreviewRoutes, onPreviewStop }: { data: M
     <h3>How the network holds together</h3>
     <p className="helper">Edges and corners give a map its character. Of {SHAPE_OFFICIAL.maps} official maps, {SHAPE_OFFICIAL.mapsWithCorners} have corners reached through one or two stops, such as Iberia in Europe, behind Pamplona and Marseille, and one has a dead end, Edinburgh, behind a double route. None has a route with one lane whose loss cuts the map in two: there, a single claim shuts part of the map off.</p>
     {nothing && <p className="helper">No dead end, nothing that cuts the map in two, no corner: every part of the map can be reached more than one way.</p>}
-    {shape.unconnected.length > 0 && <div className="shape-group"><h4>Stops with no route</h4>{shape.unconnected.map((stop) => <button type="button" key={stop.id} className="shape-row has-warning" onPointerEnter={() => onPreviewStop(stop.id)} onPointerLeave={leave} onFocus={() => onPreviewStop(stop.id)} onBlur={leave}><strong>{stop.name}</strong><span>no route reaches it</span></button>)}</div>}
+    {shape.unconnected.length > 0 && <div className="shape-group"><h4>Stops with no route</h4>{shape.unconnected.map((stop) => <div key={stop.id} className="shape-line"><button type="button" className="shape-row has-warning" onPointerEnter={() => onPreviewStop(stop.id)} onPointerLeave={leave} onFocus={() => onPreviewStop(stop.id)} onBlur={leave}><strong>{stop.name}</strong><span>no route reaches it</span></button><Button size="sm" variant="outline" className="shape-action" aria-label={`Select ${stop.name}`} onClick={() => { leave(); onSelectStop(stop.id); }}>Select it</Button></div>)}</div>}
     {shape.deadEnds.length > 0 && <div className="shape-group"><h4>Dead ends</h4>{shape.deadEnds.map((stop) => <button type="button" key={stop.id} className="shape-row" onPointerEnter={() => onPreviewStop(stop.id)} onPointerLeave={leave} onFocus={() => onPreviewStop(stop.id)} onBlur={leave}><strong>{stop.name}</strong><span>one way in</span></button>)}</div>}
-    {shape.bridges.length > 0 && <div className="shape-group"><h4>Routes that cut the map in two</h4>{shape.bridges.map((bridge) => <button type="button" key={bridge.routeIds.join()} className={cn("shape-row", bridge.lanes === 1 && "has-warning")} onPointerEnter={() => onPreviewRoutes(bridge.routeIds)} onPointerLeave={leave} onFocus={() => onPreviewRoutes(bridge.routeIds)} onBlur={leave}><strong>{bridge.a.name}–{bridge.b.name}</strong><span>{bridge.lanes === 1 ? "one lane: a single claim cuts off what lies beyond" : `a double route, as Edinburgh–London is: still open while one lane is free`}</span></button>)}</div>}
+    {shape.bridges.length > 0 && <div className="shape-group"><h4>Routes that cut the map in two</h4>{shape.bridges.map((bridge) => <div key={bridge.routeIds.join()} className="shape-line"><button type="button" className={cn("shape-row", bridge.lanes === 1 && "has-warning")} onPointerEnter={() => onPreviewRoutes(bridge.routeIds)} onPointerLeave={leave} onFocus={() => onPreviewRoutes(bridge.routeIds)} onBlur={leave}><strong>{bridge.a.name}–{bridge.b.name}</strong><span>{bridge.lanes === 1 ? "one lane: a single claim cuts off what lies beyond" : `a double route, as Edinburgh–London is: still open while one lane is free`}</span></button>{bridge.lanes === 1 && <Button size="sm" variant="outline" className="shape-action" onClick={() => { leave(); onAddParallel(bridge.routeIds[0]); }}>Add a second lane</Button>}</div>)}</div>}
     {shape.corners.length > 0 && <div className="shape-group"><h4>Corners</h4>{shape.corners.map((corner) => <button type="button" key={corner.stops.map((stop) => stop.id).join()} className="shape-row" onPointerEnter={() => onPreviewRoutes(corner.routeIds)} onPointerLeave={leave} onFocus={() => onPreviewRoutes(corner.routeIds)} onBlur={leave}><strong>{names(corner.stops)}</strong><span>reached only through {and(corner.gates)} ({corner.routeIds.length} route{corner.routeIds.length === 1 ? "" : "s"})</span></button>)}</div>}
   </div>;
 }
