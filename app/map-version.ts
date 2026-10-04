@@ -78,7 +78,9 @@ export function playtestNote(data: MapData): NoteBox {
   const { width, height } = PLAYTEST_SIZE;
   const margin = 16;
   const xs = [margin, (board.width - width) / 2, board.width - width - margin];
-  const ys = [board.height - height - margin, margin, (board.height - height) / 2];
+  // On screen the row of figures (stops, routes, version) lies over the top of the board: a box placed
+  // at the top sits below it, so its version line can be read there too.
+  const ys = [board.height - height - margin, 64, (board.height - height) / 2];
   const stops = new Map(data.stops.map((stop) => [stop.id, stop]));
   // Points along every route, through its bends, to count what a box would cover.
   const samples = data.routes.flatMap((route) => {
