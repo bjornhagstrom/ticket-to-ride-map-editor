@@ -125,6 +125,9 @@ export type MapData = { name: string; format: MapFormat; orientation?: "landscap
   // written by a newer version never quietly throws its work away.
   unknown?: Record<string, unknown> };
 
+/** Points for claiming a route, by its length, as the standard rules list them (lengths 1 to 8). */
+export const ROUTE_POINTS: Record<number, number> = { 1: 1, 2: 2, 3: 4, 4: 7, 5: 10, 6: 15, 7: 18, 8: 21 };
+export const routePointsTable = () => `| Route length | Points |\n| ---: | ---: |\n${Object.entries(ROUTE_POINTS).map(([length, points]) => `| ${length} | ${points} |`).join("\n")}`;
 export const W = 1100;
 export const STORAGE_KEY = "orebro-map-editor-public-v2";
 
@@ -327,6 +330,12 @@ This map follows the standard *Ticket to Ride* rules, except where it says other
 - **Tunnel.** [[Central–Deepcut]] is a tunnel. XXX
 - **Restricted route.** [[Harbour–Eastgate]] is marked R. XXX
 - **Double route.** [[Westport–Millbrook]] has two lanes, but with two or three players only one of them is used, as in the standard rules.
+
+## Points for routes
+
+A claimed route scores by its length, as in the standard rules:
+
+${routePointsTable()}
 
 ## Still to decide
 

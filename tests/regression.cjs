@@ -2438,6 +2438,13 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     check("they say the map follows the standard rules, except where they say otherwise", /follows the standard[^.]*except/i.test(await examplePreview.textContent()));
     check("with a stop and a route named, drawn in the preview", (await examplePreview.locator(".rule-ref.stop").count()) >= 1 && (await examplePreview.locator(".rule-ref.route").count()) >= 1);
     check("and every name in them is on the map", (await examplePreview.locator(".rule-ref.missing").count()) === 0);
+    // The standard points for a claimed route, by its length, as the standard rules list them, with
+    // every route on the example map covered.
+    const pointsTable = await examplePreview.locator("table").filter({ hasText: /points/i }).first().evaluate((t) => Array.from(t.querySelectorAll("tbody tr")).map((tr) => Array.from(tr.cells).map((c) => c.textContent.trim()))).catch(() => []);
+    const standardPoints = [["1", "1"], ["2", "2"], ["3", "4"], ["4", "7"], ["5", "10"], ["6", "15"], ["7", "18"], ["8", "21"]];
+    check("the rules list the standard points for each length of claimed route", JSON.stringify(pointsTable) === JSON.stringify(standardPoints), JSON.stringify(pointsTable));
+    const longestRoute = await page.evaluate(() => Math.max(...JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")).routes.map((r) => r.length)));
+    check("and the list covers the longest route on the map", longestRoute <= 8, String(longestRoute));
     check("with XXX where a rule is still to be written", (await examplePreview.locator("li").filter({ hasText: "XXX" }).count()) >= 2);
     // A link to a neutral page that explains markdown
     const help = panel.getByRole("link", { name: /markdown/i });
