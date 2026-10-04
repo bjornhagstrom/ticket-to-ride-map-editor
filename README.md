@@ -149,7 +149,7 @@ The application has no server-side database. A map is automatically stored in th
 
 Browser storage is specific to one browser and device. Export the map regularly to create a portable backup.
 
-The example map is used only when no stored map exists. **Clear map** creates a genuinely empty map and never reloads the example.
+The example map is used only when no stored map exists. **Start over** (Settings, under Map) creates a genuinely empty map and never reloads the example.
 
 ## Local development
 
