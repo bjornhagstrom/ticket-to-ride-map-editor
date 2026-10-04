@@ -11,6 +11,7 @@ export type Release = { version: string; date: string; title: string; changes: s
 // decided; the What's new page in the editor shows released versions only.
 export const UNRELEASED: string[] = [
   "A damaged map file opens with what can be used, and says what was left out and why; a file that holds no map at all is refused with a reason, and the map you had stays as it was.",
+  "In smaller windows the map shrinks to the room there is instead of running in under the Properties column, a tablet no longer scrolls sideways, and on a phone every button in the header shows.",
   "A map kept in the browser that cannot be read is put aside untouched instead of being overwritten, and the editor starts afresh and says so.",
 ];
 

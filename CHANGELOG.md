@@ -9,6 +9,7 @@ This file is written from `app/version.ts` by `npm run changelog`; edit the note
 Changes since the last release, to go into the next version.
 
 - A damaged map file opens with what can be used, and says what was left out and why; a file that holds no map at all is refused with a reason, and the map you had stays as it was.
+- In smaller windows the map shrinks to the room there is instead of running in under the Properties column, a tablet no longer scrolls sideways, and on a phone every button in the header shows.
 - A map kept in the browser that cannot be read is put aside untouched instead of being overwritten, and the editor starts afresh and says so.
 
 ## 0.4.1 · 2026-10-04

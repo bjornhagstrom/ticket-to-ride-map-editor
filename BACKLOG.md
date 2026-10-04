@@ -28,8 +28,6 @@ in the same commit as the work (AGENTS.md).
 - **The tour video in the welcome box**, from YouTube, played only when asked (a picture with a play
   button that loads the player on click), and a link to About.
 - **About** checked against the film and the editor as it is, with screenshots.
-- **Small windows**: at 1280 × 720 the map runs in under the Properties column; check smaller screens
-  and phones generally.
 
 ## Waiting
 
@@ -53,6 +51,9 @@ in the same commit as the work (AGENTS.md).
 - **Rules text**: a link from one part of the rules to another, images, and a way to see in the
   preview where a printed page would break.
 - **Safari** has not been tried for the small ticket map, the standing board or its print.
+- **Phones**: the editor works, with the map panning inside its own area at a width a finger can use,
+  but the tools come first and push the map down the page. A phone layout with the map first and the
+  tools in a drawer would suit looking and light editing better.
 
 ## Decided against
 

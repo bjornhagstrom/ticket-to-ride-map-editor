@@ -3530,6 +3530,24 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     await cp2.context().close();
   }
 
+  // 47. Smaller windows: at 1280 × 720 the map stays clear of the Properties column; on a tablet the
+  // page never scrolls sideways; on a phone the header's buttons all show, and the map pans inside its
+  // own area (it keeps a width where a finger can hit a wagon space) without the page scrolling.
+  for (const [w, h, mobile] of [[1280, 720, false], [1024, 768, false], [768, 1024, true], [390, 844, true]]) {
+    const sp2 = await (await browser.newContext({ viewport: { width: w, height: h }, isMobile: mobile, hasTouch: mobile })).newPage();
+    sp2.on("pageerror", (e) => errors.push(String(e)));
+    await sp2.goto(BASE, { waitUntil: "networkidle" });
+    await sp2.getByRole("button", { name: "Load the example map" }).click();
+    await sp2.waitForTimeout(700);
+    const m = await sp2.evaluate(() => { const box = (sel) => { const el = document.querySelector(sel); return el ? el.getBoundingClientRect() : null; }; const canvas = box(".map-canvas"), wrap = box(".map-wrap"), props = box("aside.properties"); return { scroll: document.documentElement.scrollWidth, client: document.documentElement.clientWidth, canvasRight: canvas.right, wrapRight: wrap.right, propsLeft: props.left, propsTop: props.top, wrapBottom: wrap.bottom }; });
+    check(`${w} × ${h}: the page does not scroll sideways`, m.scroll <= m.client + 1, `${m.scroll} wide in ${m.client}`);
+    if (w >= 1051) check(`${w} × ${h}: the map stays clear of the Properties column`, m.canvasRight <= m.propsLeft + 1, `map ends at ${Math.round(m.canvasRight)}, Properties begins at ${Math.round(m.propsLeft)}`);
+    else if (w > 720) check(`${w} × ${h}: the map fits its area`, m.canvasRight <= m.wrapRight + 1, `${Math.round(m.canvasRight)} against ${Math.round(m.wrapRight)}`);
+    const exportBox = await sp2.getByRole("button", { name: "Export", exact: true }).boundingBox();
+    check(`${w} × ${h}: every button in the header can be seen, Export too`, exportBox && exportBox.x >= 0 && exportBox.x + exportBox.width <= w + 1, JSON.stringify(exportBox));
+    await sp2.context().close();
+  }
+
   console.log("PASS:"); ok.forEach((l) => console.log("  ✓ " + l));
   if (bad.length) { console.log("FAIL:"); bad.forEach((l) => console.log("  ✗ " + l)); }
   console.log(`\n${ok.length} passed, ${bad.length} failed`);

@@ -384,3 +384,19 @@
 .shape-line { display: flex; align-items: center; gap: 6px; }
 .shape-line .shape-row { flex: 1; min-width: 0; }
 .shape-action { flex: none; }
+
+/* Smaller windows (written as body .workspace: globals.css sets the columns later in the cascade). The map column and the map itself may shrink to the room there is: at 1280 × 720 a
+   fixed 600 px column and a 760 px map ran in under the Properties column, and on a tablet they made
+   the whole page scroll sideways. On a phone the map keeps its 900 px and pans inside its own area,
+   so a finger can still hit a wagon space; the header's buttons wrap instead of hiding off the edge. */
+@media screen and (min-width:1051px){
+  body .workspace:not(.showing-balance){grid-template-columns:246px minmax(0,1fr) 258px}
+  .map-canvas:not(.standing){min-width:0}
+}
+@media screen and (min-width:721px) and (max-width:1050px){
+  body .workspace{grid-template-columns:210px minmax(0,1fr)}
+  .map-canvas:not(.standing){min-width:0}
+}
+@media screen and (max-width:720px){
+  .header-actions{flex-wrap:wrap;overflow:visible}
+}
