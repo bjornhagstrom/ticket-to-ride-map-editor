@@ -445,3 +445,11 @@
 
 /* A route crowded on purpose, in Map balance. */
 .on-purpose-tag { margin-left: 6px; padding: 0 6px; border-radius: 999px; background: #e6eedb; color: #2f5a2a; font-style: normal; font-size: 12px; font-weight: 600; }
+
+/* A stop type as the map draws it, in Settings. */
+.stop-type-preview { display: block; width: 100%; max-width: 260px; height: auto; border: 1px solid #ddd4c6; border-radius: 8px; background: #f7f1e5; margin-bottom: 8px; }
+/* How the sheets divide the board, in the print dialog. */
+.print-split-preview { display: block; width: 100%; max-width: 220px; height: auto; margin: 6px 0 2px; }
+.print-split-board { fill: #f7f1e5; stroke: #81786c; stroke-width: 3; }
+.print-split-sheet rect { fill: none; stroke: #721c24; stroke-width: 3; stroke-dasharray: 10 6; }
+.print-split-sheet text { font: 700 40px "Avenir Next", "Segoe UI", Arial, sans-serif; fill: #721c24; text-anchor: middle; }

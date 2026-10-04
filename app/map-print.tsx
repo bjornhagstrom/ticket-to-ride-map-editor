@@ -200,6 +200,20 @@ function PrintBalance({ data, setId }: { data: MapData; setId: string }) {
   </section>;
 }
 
+// How the sheets of a run divide the board, drawn from the plan itself: the board's outline, each
+// sheet's share of it, numbered as the captions number them.
+function PrintSplitPreview({ plan }: { plan: PrintPlan }) {
+  const width = plan.boardMm.width, height = plan.boardMm.height;
+  const label = `${plan.pages.length} sheet${plan.pages.length === 1 ? "" : "s"}: ${plan.columns} across, ${plan.rows} down`;
+  return <svg className="print-split-preview" viewBox={`-4 -4 ${width + 8} ${height + 8}`} role="img" aria-label={`How the sheets divide the board: ${label}`}>
+    <rect className="print-split-board" x={0} y={0} width={width} height={height} />
+    {plan.pages.map((page) => <g key={page.index} className="print-split-sheet">
+      <rect x={page.tile.x * width} y={page.tile.y * height} width={page.tile.width * width} height={page.tile.height * height} />
+      {plan.pages.length > 1 && <text x={(page.tile.x + page.tile.width / 2) * width} y={(page.tile.y + page.tile.height / 2) * height} dy="0.35em">{page.index + 1}</text>}
+    </g>)}
+  </svg>;
+}
+
 // Printing is decided per run. Nothing chosen here is written to the map; the last choice is kept
 // in this browser only, for convenience.
 export function PrintDialog({ open, onOpenChange, format, orientation = "landscape", profile, choice, onChoice, parts, onPrint, version }: {
@@ -276,6 +290,7 @@ export function PrintDialog({ open, onOpenChange, format, orientation = "landsca
               checked={current.split === split.id} onChange={() => onChoice({ ...current, split: split.id })} />
             <span><strong>{split.label}</strong><small id={`print-split-${split.id}`}>{split.note}</small></span>
           </label>)}
+          <PrintSplitPreview plan={plan} />
         </fieldset>}
         {!onePage && <fieldset><legend>Paper</legend>
           {papers.map((paper) => <label key={paper.id} className="print-option">

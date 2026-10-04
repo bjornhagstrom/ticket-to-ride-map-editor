@@ -9,7 +9,7 @@ import { BoardPreview } from "./board-preview";
 import { Download, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { bandCuts, mapDiameter } from "./map-analysis";
 import { DeckRulesPanel } from "./deck-rules-panel";
-import { notchedSlotPath, ovalSlotPath, tunnelSlotPath } from "./map-artwork";
+import { MapArtwork, notchedSlotPath, ovalSlotPath, tunnelSlotPath } from "./map-artwork";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -260,7 +260,7 @@ export function SettingsDialog({ open, onOpenChange, target, onTarget, data, cha
             </div>
             {selected ? <div className="style-fields">
               <div><Label>Name</Label><Input value={selected.label} onChange={(event) => update({ label: event.target.value })} /></div>
-              {kind === "stop" && <StopTypeFields style={selected as StopTypeStyle} update={update} />}
+              {kind === "stop" && <StopTypeFields style={selected as StopTypeStyle} update={update} data={data} />}
               {kind === "route" && <RouteTypeFields style={selected as RouteTypeStyle} update={update} />}
               <Button size="sm" variant="ghost" disabled={locked} onClick={() => remove(selected.id)}>
                 <Trash2 />{locked ? (list.length <= 1 ? "The only one left" : `In use by ${usage(selected.id)}`) : "Delete"}
@@ -284,8 +284,19 @@ const blankStyle = (kind: StyleKind, id: string) => kind === "stop" ? { id, labe
 
 type Update = (values: Record<string, unknown>) => void;
 
-function StopTypeFields({ style, update }: { style: StopTypeStyle; update: Update }) {
+// A stop of this type as the map draws it, named, at the size it has on the board: drawn by the map's
+// own artwork from a map holding just that stop (away from the fold lines), so it cannot drift from
+// the real thing.
+function StopTypePreview({ style, data }: { style: StopTypeStyle; data: MapData }) {
+  const sample = { ...data, stops: [{ id: "preview", name: style.label || "Stop", type: style.id, x: 520, y: 200 }], routes: [], notes: [], background: [], backgroundImage: undefined, tickets: [] };
+  return <svg className="stop-type-preview" viewBox="470 160 160 70" role="img" aria-label={`A ${style.label} stop as the map draws it`}>
+    <MapArtwork data={sample} print />
+  </svg>;
+}
+
+function StopTypeFields({ style, update, data }: { style: StopTypeStyle; update: Update; data: MapData }) {
   return <>
+    <StopTypePreview style={style} data={data} />
     <div className="colour-row">
       <label>Fill<input className="colour-input" type="color" value={style.fill} onChange={(event) => update({ fill: event.target.value })} /></label>
       <label>Outline<input className="colour-input" type="color" value={style.stroke} onChange={(event) => update({ stroke: event.target.value })} /></label>

@@ -11,6 +11,7 @@ export type Release = { version: string; date: string; title: string; changes: s
 // decided; the What's new page in the editor shows released versions only.
 export const UNRELEASED: string[] = [
   "A damaged map file opens with what can be used, and says what was left out and why; a file that holds no map at all is refused with a reason, and the map you had stays as it was.",
+  "Settings show a stop type as the map draws it, beside its settings, and the print dialog draws how the sheets of a run divide the board.",
   "A stop can be marked a hub on purpose and a route contested on purpose, in Properties. A full deck of tickets then sends more tickets to the hub and through the route, and Map balance lists such a route as crowded on purpose.",
   "A full deck of tickets can be calm, like the official maps, or tense: chosen when it is built, and set for the map in its deck rules. Like the official maps crowds its busiest corridor about as hard as the official decks do; tense, like the tensest of them.",
   "Map balance opens with the map against the official maps: crowded routes at a full table, the ticket traffic on double routes against single ones, routes no ticket needs, the busiest stop and the average hub degree, each beside what the eight official maps measure.",

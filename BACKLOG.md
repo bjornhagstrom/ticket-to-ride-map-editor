@@ -5,8 +5,6 @@ in the same commit as the work (AGENTS.md).
 
 ## Agreed and next
 
-- **Illustrations where words fall short** (list to be made, then drawn from the editor's own data):
-  line styles, stop types, how the sheets tile the board in the print dialog, label angles.
 - **The tour video in the welcome box**, from YouTube, played only when asked (a picture with a play
   button that loads the player on click), and a link to About.
 - **About** checked against the film and the editor as it is, with screenshots.
@@ -42,6 +40,10 @@ in the same commit as the work (AGENTS.md).
   tools in a drawer would suit looking and light editing better.
 
 ## Decided against
+
+- Pictures for a stop's size and symbol (the selected stop shows on the map) and for where its name
+  sits (it is dragged on the map now). Route types, the board and the wagon spaces already have theirs;
+  stop types and the print split were added after 0.4.1.
 
 - The rules in the PNG image of the map.
 - Mirroring or turning a map's content on its own board.

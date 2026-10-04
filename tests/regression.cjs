@@ -3743,6 +3743,42 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     await ip.context().close();
   }
 
+  // 53. Pictures where words fall short, drawn from the editor's own data: a stop type as the map draws
+  // it, beside its settings; and in the print dialog, how the sheets divide the board.
+  {
+    const il = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
+    il.on("pageerror", (e) => errors.push(String(e)));
+    await il.goto(BASE, { waitUntil: "networkidle" });
+    await il.getByRole("button", { name: "Load the example map" }).click();
+    await il.waitForTimeout(600);
+    await il.getByRole("button", { name: "Settings" }).click();
+    await il.waitForTimeout(400);
+    await il.locator(".settings-nav-item", { hasText: /Stop types/ }).click();
+    await il.waitForTimeout(400);
+    const preview = il.locator(".stop-type-preview");
+    check("a stop type is shown as the map draws it, beside its settings", (await preview.count()) === 1 && (await preview.locator(".stop").count()) === 1);
+    const squares = async () => preview.locator(".stop rect").count();
+    const before = await squares();
+    await il.getByRole("checkbox", { name: "Draw a square inside the circle" }).click();
+    await il.waitForTimeout(300);
+    check("and changes as its settings do", (await squares()) !== before, `${before} → ${await squares()}`);
+    await il.keyboard.press("Escape");
+    await il.waitForTimeout(300);
+    await il.getByRole("button", { name: "Print map" }).click();
+    await il.waitForTimeout(400);
+    const dialog = il.getByRole("dialog", { name: "Print the map" });
+    const tiles = () => dialog.locator(".print-split-preview .print-split-sheet").count();
+    check("the print dialog draws how the sheets divide the board: one sheet", (await dialog.locator(".print-split-preview").count()) === 1 && (await tiles()) === 1, String(await tiles()));
+    await dialog.getByRole("radio", { name: "One sheet per panel of the game board", exact: true }).check();
+    await il.waitForTimeout(300);
+    check("one per panel: six on a standard board", (await tiles()) === 6, String(await tiles()));
+    await dialog.getByRole("radio", { name: "Full size" }).check();
+    await il.waitForTimeout(300);
+    const promised = Number(await dialog.locator('.print-table tbody tr[data-paper="a4"] td button[aria-pressed="true"], .print-table tbody tr[data-paper="a4"] td button.chosen').first().getAttribute("data-pages").catch(() => "0"));
+    check("full size: as many as the table says", (await tiles()) > 6 && (promised === 0 || (await tiles()) === promised), `${await tiles()} drawn, ${promised} in the table`);
+    await il.context().close();
+  }
+
   console.log("PASS:"); ok.forEach((l) => console.log("  ✓ " + l));
   if (bad.length) { console.log("FAIL:"); bad.forEach((l) => console.log("  ✗ " + l)); }
   console.log(`\n${ok.length} passed, ${bad.length} failed`);
