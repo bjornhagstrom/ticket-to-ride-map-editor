@@ -3779,6 +3779,23 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     await il.context().close();
   }
 
+  // 54. About tells the whole loop the film does — draw, build a deck, check the balance, print, play
+  // with highlighters, revise and print again with the next version number — with pictures of the
+  // editor as it is.
+  {
+    const ab = await (await browser.newContext({ viewport: { width: 1300, height: 1000 } })).newPage();
+    ab.on("pageerror", (e) => errors.push(String(e)));
+    await ab.goto(BASE + "about/", { waitUntil: "networkidle" });
+    const text = (await ab.locator("main").textContent()).replace(/\s+/g, " ");
+    check("About has a section on printing, playing and printing again", (await ab.getByRole("heading", { name: "Print, play, print again" }).count()) === 1);
+    check("which tells of the version number on every sheet and the playtest box", /version number/i.test(text) && /playtest box/i.test(text), text.slice(0, 120));
+    check("it says the editor is free and unofficial, with nothing to install", /free/i.test(text) && /unofficial/i.test(text) && /nothing to install/i.test(text));
+    check("and that a deck can be calm, like the official maps, or tense", /calm/i.test(text) && /tense/i.test(text) && /like the official maps/i.test(text));
+    const pictures = await ab.locator("main figure img").evaluateAll((imgs) => imgs.map((img) => ({ src: img.getAttribute("src"), w: img.naturalWidth, alt: img.alt })));
+    check("with pictures of the editor, each loaded and described", pictures.length >= 3 && pictures.every((p) => p.w > 0 && p.alt.length > 20), JSON.stringify(pictures));
+    await ab.context().close();
+  }
+
   console.log("PASS:"); ok.forEach((l) => console.log("  ✓ " + l));
   if (bad.length) { console.log("FAIL:"); bad.forEach((l) => console.log("  ✗ " + l)); }
   console.log(`\n${ok.length} passed, ${bad.length} failed`);

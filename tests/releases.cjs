@@ -64,7 +64,9 @@ check("no two releases share a version", new Set(RELEASES.map((r) => r.version))
   const sections = [...about.matchAll(/<h2>([^<]+)<\/h2>/g)].map((m) => m[1]);
   const before = (title) => { const at = readme.indexOf(`## ${title}`); return at >= 0 && at < readme.indexOf("## Local development"); };
   check("and tells what the About page tells, section by section, before the developer notes", sections.length >= 4 && sections.every(before), sections.filter((t) => !before(t)).join(" | ") || sections.join(" | "));
-  check("the README shows the editor and the ticket cards in pictures that are in the repository", /!\[[^\]]+\]\(docs\/images\/[\w-]+\.png\)/.test(readme) && [...readme.matchAll(/\(docs\/images\/([\w-]+\.png)\)/g)].every((m) => fs.existsSync(path.join(root, "docs", "images", m[1]))) && [...readme.matchAll(/\(docs\/images\//g)].length >= 2);
+  // The same pictures as the About page (public/images), so the two show the editor as it is.
+  const pictures = [...readme.matchAll(/!\[[^\]]+\]\(((?:docs|public)\/images\/[\w-]+\.(?:png|jpg))\)/g)].map((m) => m[1]);
+  check("the README shows the editor and the ticket cards in pictures that are in the repository", pictures.some((p) => /editor/.test(p)) && pictures.some((p) => /card/.test(p)) && pictures.every((p) => fs.existsSync(path.join(root, p))), JSON.stringify(pictures));
   check("the README does not promise official decks a score below 5", !/below 5/.test(readme));
   check("and says it is unofficial, as the About page does", /not affiliated/i.test(readme) && /Days of Wonder/.test(readme));
   check("the README's opening is short enough to read before the feature list", firstHeading > 0 && firstHeading < 900, String(firstHeading));

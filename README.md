@@ -6,7 +6,7 @@ nothing to install, and the map you work on stays in your browser. [What's new](
 A workshop for Ticket to Ride maps that do not exist yet. Draw a board, place the stops, connect them
 with routes, work out a deck of destination tickets, and print it all to play on paper.
 
-![The editor with its example map: a board with stops, coloured routes, a lake and a river](docs/images/editor.png)
+![The editor with its example map: stops, coloured routes, a lake and a river, with the tools on the left](public/images/about-editor.jpg)
 
 ## What this is for
 
@@ -36,19 +36,26 @@ millimetres.
 A board lies or stands, in the standard 2×3 or the extended 2×4. Standing it up or laying it down turns
 everything on it a quarter turn without changing a single distance.
 
-Every print and export after a change gets the map's next version number, one series for all of them.
-It is on every sheet, card and rules page, so after a few playtests you can tell which sheets belong to
-which version. A yellow playtest box on the board has a line for the date you played it; write the
-players' names on the back of the sheet.
-
 The ticket cards print to be cut out, lying or standing as the board does, and each carries a small map
 of the whole board with its two stops ringed and joined by a line, as the real cards do.
-
-![Six ticket cards, each with a small map of the board and its two stops joined by a line](docs/images/ticket-cards.png)
 
 The tickets, the routes, the stops and the distance between every two stops can go out to a
 spreadsheet, and stops, routes and tickets can come back in from one: an export of your own, or a list
 typed by hand. Stops without a position are laid out from the routes, ready to be dragged into place.
+
+## Print, play, print again
+
+One print run takes the board, the ticket cards and the rules, or any of them: the board on a single A4
+or Letter sheet for a quick game, one sheet per fold panel, or at full size. The rules can be printed
+from the Rules panel on their own, and a page of the balance figures can go with them, so a printed or
+saved milestone says what the editor thought of the map at the time. The same dialog saves a PDF.
+
+![Six printed ticket cards, each with its two cities, a small map of the board and its points](public/images/about-cards.png)
+
+Then you play, look at the marked-up sheet, change the map and print again. Every print and export after
+a change gets the map's next version number, on every sheet and card, so the sheets from several
+playtests never get mixed up. A yellow playtest box on the board has a line for the date you played it;
+the players' names go on the back of the sheet.
 
 ## Where the numbers come from
 
@@ -64,6 +71,14 @@ USA, Europe, Nordic Countries, India, Switzerland, Old West, Polska and Northern
   the traffic falls. Every official deck scores clearly better than random decks of the same size.
   Building a deck is a search for a low score. The score is a guide, not a verdict: the official decks
   are more uneven than the editor's own suggestions, on purpose.
+- **Official maps are tense, but connected.** Each has 8 to 19 routes at a full table that more tickets
+  want than they can carry, mostly on double routes, yet almost nothing on them can be cut off. Map
+  balance describes crowding, dead ends and corners against them, and warns only about a single-lane
+  route that cuts the map in two. A deck can be built calm, like the official maps, or tense, and a
+  route or stop can be marked as crowded on purpose.
+
+![Map balance setting the example map beside the official maps](public/images/about-balance.png)
+
 - Every target is an average of the official decks rather than one game's habits. Fitted to the USA map
   alone, several official decks scored worse than random ones.
 

@@ -40,9 +40,14 @@ export default function About() {
       <p>
         It is meant for the stretch before a map is any good — the many many prototypes where
         the question is whether the network hangs together at all, not whether the artwork is right.
-        Nothing leaves your browser: the map you are working on is stored locally, and files move by
-        export and import.
+        It is free and unofficial, and runs in your browser: no account and nothing to install.
+        Nothing leaves your browser either: the map you are working on is stored locally, and files
+        move by export and import.
       </p>
+      <figure>
+        <img src="/ttr/images/about-editor.jpg" width={1600} height={900} alt="The editor with its example map: stops, coloured routes, a lake and a river, with the tools on the left" />
+        <figcaption>The editor with its example map. The tools are on the left, the map in the middle, and what you select is edited on the right.</figcaption>
+      </figure>
     </section>
 
     <section>
@@ -76,6 +81,26 @@ export default function About() {
     </section>
 
     <section>
+      <h2>Print, play, print again</h2>
+      <p>
+        One print run takes the board, the ticket cards and the rules, or any of them. The board goes
+        on a single A4 or Letter sheet for a quick game, one sheet per fold panel, or at full size
+        across as many sheets as it takes. The rules can also be printed from the Rules panel on their
+        own, and a page of the balance figures can go with them, so a printed or saved milestone says
+        what the editor thought of the map at the time. The same dialog saves it all as a PDF.
+      </p>
+      <figure>
+        <img src="/ttr/images/about-cards.png" width={1089} height={546} alt="Six printed ticket cards, each with its two cities, a small map of the board with the two stops ringed and joined, and its points" />
+        <figcaption>Ticket cards as they print, ready to cut: a small map of the board on each, as on the real cards.</figcaption>
+      </figure>
+      <p>
+        Then you play, look at the marked-up sheet, change the map and print again. Every print and
+        export after a change gets the map&apos;s next version number, on every sheet and every card,
+        so the sheets from several playtests never get mixed up. A yellow playtest box on the board
+        has a line for the date you played it; the players&apos; names go on the back of the sheet.
+      </p>
+    </section>
+    <section>
       <h2>Where the numbers come from</h2>
       <p>
         The advice the editor gives is not invented. It is measured against fifteen official Ticket
@@ -100,6 +125,19 @@ export default function About() {
         swapping tickets some thousands of times. The score is a guide, not a verdict: the official
         decks are more uneven than the editor&apos;s own suggestions, on purpose.
       </p>
+      <p>
+        <strong>Official maps are tense, but connected.</strong> Every one of them has routes that more
+        tickets want than they can carry — 8 to 19 at a full table — mostly on double routes, so the
+        squeeze tightens as the table shrinks. Yet almost nothing on them can be cut off: only Europe
+        has a route whose loss splits the map, and it is a double route. So Map balance describes
+        crowding, dead ends and corners against what the official maps have, and warns only about a
+        single-lane route that cuts the map in two. A full deck can be built calm, like the official
+        maps, or tense, and a route or a stop can be marked as crowded on purpose.
+      </p>
+      <figure>
+        <img src="/ttr/images/about-balance.png" width={1000} height={378} alt="Map balance comparing the example map with the official maps: crowded routes, traffic on double routes, routes no ticket needs, the busiest stop and the average hub degree" />
+        <figcaption>Map balance sets each figure beside what the eight official maps measure.</figcaption>
+      </figure>
       <p>
         Every target in that score is an average of the official decks rather than one game&apos;s
         habits. The first version was fitted to the USA map alone, and several official decks then
