@@ -87,7 +87,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.waitForTimeout(300);
 
   // 1b. the example map shows what the editor can do, and is itself a clean map
-  const exampleStored = () => page.evaluate(() => JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")));
+  const exampleStored = () => page.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")));
   const example = await exampleStored();
   await page.reload({ waitUntil: "networkidle" });
   await page.waitForTimeout(700);
@@ -162,7 +162,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   // A boat space has pointed ends, so it cannot be mistaken for a wagon: a point towards its corner
   // lies outside it, where it would lie inside an ordinary space.
   const pointed = await page.evaluate(() => {
-    const map = JSON.parse(localStorage.getItem("orebro-map-editor-public-v2"));
+    const map = JSON.parse(localStorage.getItem("ttr-map"));
     const groups = Array.from(document.querySelectorAll(".map-canvas .route-group"));
     const shapeOfRoute = (r) => (map.routeTypeStyles.find((t) => t.id === r.type) || {}).shape;
     const probe = (i) => { const slot = groups[i].querySelector(".wagon-slot"); const shape = slot.querySelector("path:not(.wagon-slot-outline), rect:not(.wagon-slot-outline)"); const box = shape.getBBox(); return shape.isPointInFill(new DOMPoint(box.x + box.width * 0.85, box.y + box.height * 0.2)); };
@@ -228,7 +228,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   // Grey and black wagon spaces must be told apart at a glance: their rings sit inside the same dark
   // outline, so the two colours need real contrast between them, and grey still has to show on paper.
   const ringContrast = await page.evaluate(() => {
-    const map = JSON.parse(localStorage.getItem("orebro-map-editor-public-v2"));
+    const map = JSON.parse(localStorage.getItem("ttr-map"));
     const groups = Array.from(document.querySelectorAll(".map-canvas .route-group"));
     const ring = (colour) => { const i = map.routes.findIndex((r) => r.color === colour); return groups[i].querySelector(".wagon-slot > :nth-child(2)").getAttribute("stroke"); };
     const lum = (hex) => { const v = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((c) => c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4); return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2]; };
@@ -257,7 +257,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   check("parallel count reported", (await page.locator(".parallel-controls label").textContent()).includes("2 between"));
   await page.locator(".bend-insert-handle").first().click({ force: true });
   await page.waitForTimeout(350);
-  const pts = await page.evaluate(() => JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")).routes
+  const pts = await page.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")).routes
     .filter((r) => (r.a === "example-westport" && r.b === "example-millbrook") || (r.a === "example-millbrook" && r.b === "example-westport"))
     .map((r) => (r.points || []).length));
   check("bend added to both lines of the double route", pts.length === 2 && pts[0] === 2 && pts[1] === 2, `points per line: ${pts.join("/")}`);
@@ -265,7 +265,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.waitForTimeout(350);
   // The two lines of the double route, found by their stops rather than by their colours.
   const curved = await page.evaluate(() => {
-    const routes = JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")).routes;
+    const routes = JSON.parse(localStorage.getItem("ttr-map")).routes;
     const groups = Array.from(document.querySelectorAll(".map-canvas .route-group"));
     const pair = new Set(["example-westport", "example-millbrook"]);
     return routes.map((r, i) => ({ r, guide: groups[i].querySelector(".route-guide") }))
@@ -289,7 +289,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   check("clicking a wagon space marks a locomotive", (await slotState()).includes("L"), await slotState());
 
   // 5. undo (which also clears the selection, so read the stored map rather than the selected group)
-  const storedLocos = () => page.evaluate(() => JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")).routes.reduce((sum, r) => sum + (r.locomotiveSlots?.length ?? 0), 0));
+  const storedLocos = () => page.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")).routes.reduce((sum, r) => sum + (r.locomotiveSlots?.length ?? 0), 0));
   const beforeUndo = await storedLocos();
   await page.evaluate(() => document.activeElement.blur());
   await page.keyboard.press("Meta+z");
@@ -317,7 +317,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     const h = Array.from(document.querySelectorAll(".analysis-section h3")).find((x) => x.textContent === "Room per wagon");
     return h ? h.parentElement.querySelectorAll("tbody tr").length : 0;
   });
-  const cardRoutes = await page.evaluate(() => JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")).routes.length);
+  const cardRoutes = await page.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")).routes.length);
   check("room-per-wagon table lists the card routes", roomRows === cardRoutes, `${roomRows} rows for ${cardRoutes} routes`);
   const hubRows = await page.evaluate(() => document.querySelectorAll(".analysis-section table tbody tr").length);
   check("balance dialog renders its tables", hubRows > 10);
@@ -382,7 +382,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   check("wagons on a 2×4 are measured against its own 1,053 mm", /1,053 mm board/.test(await wagonHelper()), await wagonHelper());
 
   // 10. printing is decided per run, in a dialog behind the Print button, never in the map
-  const storedMap = () => page.evaluate(() => localStorage.getItem("orebro-map-editor-public-v2"));
+  const storedMap = () => page.evaluate(() => localStorage.getItem("ttr-map"));
   const mapBeforePrinting = await storedMap();
   // A print gives the map its version number and, if asked for, a playtest box (block 39); nothing else
   // on the map may change.
@@ -675,7 +675,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
 
   // 11b. the board as a picture: a PNG from the Export menu, drawn like the print, without the editor's marks
   {
-    const mapName = await page.evaluate(() => JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")).name);
+    const mapName = await page.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")).name);
     const viewBox = await page.evaluate(() => document.querySelector(".map-canvas").getAttribute("viewBox").split(/\s+/).map(Number));
     await page.getByRole("button", { name: "Export", exact: true }).click();
     await page.waitForTimeout(250);
@@ -734,7 +734,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     return { name: done.suggestedFilename(), file, ...readCsv(file) };
   };
   {
-    const stored = await page.evaluate(() => JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")));
+    const stored = await page.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")));
     const slug = stored.name.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
     const openCsvMenu = async () => {
       await page.getByRole("button", { name: "Export", exact: true }).click();
@@ -777,7 +777,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     check("importing a spreadsheet over a map asks before it replaces the stops and routes", /Replace stops and routes/i.test(ask) && /new deck/i.test(ask), ask);
     await page.getByRole("button", { name: "Continue" }).click();
     await page.waitForTimeout(600);
-    const after = await page.evaluate(() => JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")));
+    const after = await page.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")));
     const sameStops = stored.stops.every((s) => after.stops.some((t) => t.name === s.name && Math.abs(t.x - s.x) <= .5 && Math.abs(t.y - s.y) <= .5));
     check("the map comes back from its own spreadsheets: every stop in its place, every route", after.stops.length === stored.stops.length && sameStops && after.routes.length === stored.routes.length, `${after.stops.length} stops, ${after.routes.length} routes`);
     check("the tickets arrive as new decks beside the old ones", after.ticketSets.length === stored.ticketSets.length * 2 && after.tickets.length === stored.tickets.length * 2, `${after.ticketSets.length} decks, ${after.tickets.length} tickets`);
@@ -789,7 +789,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     const templates = [];
     for (const kind of ["Stops", "Routes", "Tickets"]) templates.push(await downloadFrom(openTemplates, `${kind} template`));
     check("each template downloads as a .csv named for its kind, with a header and example rows", templates.every((t, i) => t.name === `${["stops", "routes", "tickets"][i]}-template.csv` && t.bom && t.header.length >= 3 && t.rows.length >= 2), templates.map((t) => `${t.name} ${t.rows.length}`).join(", "));
-    await page.evaluate(() => { const map = JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")); localStorage.setItem("orebro-map-editor-public-v2", JSON.stringify({ ...map, stops: [], routes: [], tickets: [], ticketSets: [{ id: "main", label: "Main deck" }] })); });
+    await page.evaluate(() => { const map = JSON.parse(localStorage.getItem("ttr-map")); localStorage.setItem("ttr-map", JSON.stringify({ ...map, stops: [], routes: [], tickets: [], ticketSets: [{ id: "main", label: "Main deck" }] })); });
     await page.reload({ waitUntil: "networkidle" });
     await page.waitForTimeout(700);
     await openTemplates();
@@ -797,7 +797,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     await page.getByRole("menuitem", { name: "Import spreadsheets…" }).click();
     await (await templateChooser).setFiles(templates.map((t) => t.file));
     await page.waitForTimeout(800);
-    const fromTemplates = await page.evaluate(() => JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")));
+    const fromTemplates = await page.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")));
     const templateToast = (await page.locator("[data-sonner-toast]").allTextContents()).join(" | ");
     check("imported into an empty map, the three templates give a small working map, and nothing to warn about", fromTemplates.stops.length >= 4 && fromTemplates.routes.length >= 4 && fromTemplates.tickets.length >= 2 && !/had no position|left out|became/.test(templateToast), `${fromTemplates.stops.length} stops, ${fromTemplates.routes.length} routes | ${templateToast}`);
     // Saved from Excel on Windows as plain "CSV": semicolons and Windows-1252, not UTF-8. å, ä and ö survive.
@@ -809,11 +809,11 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     await (await excelChooser).setFiles(excelFile);
     await page.waitForTimeout(500);
     if (await page.getByRole("button", { name: "Continue" }).count()) { await page.getByRole("button", { name: "Continue" }).click(); await page.waitForTimeout(500); }
-    const excelNames = (await page.evaluate(() => JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")))).stops.map((s) => s.name);
+    const excelNames = (await page.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")))).stops.map((s) => s.name);
     check("a file Excel saved as plain CSV on Windows keeps å, ä and ö", JSON.stringify(excelNames) === JSON.stringify(["Åhus", "Malmö", "Hässleholm"]), excelNames.join(", "));
     fs.rmSync(excelFile, { force: true });
     // Leave the map as the rest of the suite expects it.
-    await page.evaluate((map) => localStorage.setItem("orebro-map-editor-public-v2", JSON.stringify(map)), stored);
+    await page.evaluate((map) => localStorage.setItem("ttr-map", JSON.stringify(map)), stored);
     await page.reload({ waitUntil: "networkidle" });
     await page.waitForTimeout(700);
   }
@@ -857,7 +857,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
 
   // 12. destination tickets: decks, ticket-only export and import, card printing
   // Counted against what the map already holds, so a richer example map does not move the goalposts.
-  const ticketsNow = () => page.evaluate(() => { const m = JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")); return { main: m.tickets.filter((t) => (t.set || "main") === "main").length, decks: m.ticketSets.map((d) => `${d.label} (${m.tickets.filter((t) => (t.set || "main") === d.id).length})`) }; });
+  const ticketsNow = () => page.evaluate(() => { const m = JSON.parse(localStorage.getItem("ttr-map")); return { main: m.tickets.filter((t) => (t.set || "main") === "main").length, decks: m.ticketSets.map((d) => `${d.label} (${m.tickets.filter((t) => (t.set || "main") === d.id).length})`) }; });
   const mainBefore = (await ticketsNow()).main;
   await tool("Add ticket").click();
   await clickStop("Westport"); await clickStop("Quarry");
@@ -923,7 +923,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   }
 
   {
-    const inDeck = await page.evaluate(() => JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")).tickets.filter((t) => (t.set || "main") === "main").length);
+    const inDeck = await page.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")).tickets.filter((t) => (t.set || "main") === "main").length);
     // Tickets longer than a player can build are left out of the bars, and the section says how many.
     const left = await page.locator(".tickets-panel .length-excluded").evaluateAll((els) => els.reduce((sum, el) => sum + Number(el.dataset.skipped) + Number(el.dataset.long), 0));
     const keptInDeck = inDeck - left;
@@ -971,7 +971,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   check("imported tickets land on real stops", (await page.locator(".analysis-table tbody tr td:first-child").allTextContents()).every((r) => !r.includes("—")));
   // Two decks side by side: this deck against another, figure by figure, with the difference
   {
-    const KEY = "orebro-map-editor-public-v2";
+    const KEY = "ttr-map";
     const cmp = page.locator(".tickets-panel .deck-compare");
     const oracle = (setId) => page.evaluate(([key, id]) => { const m = JSON.parse(localStorage.getItem(key)); const first = m.ticketSets[0].id; const ts = m.tickets.filter((t) => (t.set ?? first) === id); return { tickets: ts.length, long: ts.filter((t) => t.long).length, points: ts.reduce((sum, t) => sum + t.points, 0), label: m.ticketSets.find((x) => x.id === id).label }; }, [KEY, setId]);
     const figure = async (row, col) => { const raw = await cmp.locator(`tr[data-row="${row}"] .cmp-${col}`).getAttribute("data-value"); return raw === "" || raw === null ? null : Number(raw); };
@@ -1065,7 +1065,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   check("ticket printing lays out one card per ticket", printed.cards === mainAfter, `${printed.cards} cards for ${mainAfter} tickets`);
   // No fixed sheet box any more: the browser paginates, so only the card size is ours to check.
   check("ticket cards are 62 x 45 mm, lying as the board lies, cut from a run the browser paginates", Math.abs(printed.card.width - mm(62)) < 3 && Math.abs(printed.card.height - mm(45)) < 4, `${(printed.card.width / 96 * 25.4).toFixed(0)} x ${(printed.card.height / 96 * 25.4).toFixed(0)} mm`);
-  const firstTicket = await page.evaluate(() => { const m = JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")); const t = m.tickets.find((x) => (x.set || "main") === "main"); const name = (id) => m.stops.find((st) => st.id === id).name; return { a: name(t.a), b: name(t.b), points: t.points }; });
+  const firstTicket = await page.evaluate(() => { const m = JSON.parse(localStorage.getItem("ttr-map")); const t = m.tickets.find((x) => (x.set || "main") === "main"); const name = (id) => m.stops.find((st) => st.id === id).name; return { a: name(t.a), b: name(t.b), points: t.points }; });
   check("a card names both ends and its points", printed.text.includes(firstTicket.a) && printed.text.includes(firstTicket.b) && printed.text.includes(String(firstTicket.points)), `${printed.text} for ${JSON.stringify(firstTicket)}`);
   await page.emulateMedia({ media: "screen" });
   await page.waitForTimeout(400);
@@ -1075,7 +1075,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   // ticket's two stops marked where they are, in black so the mark survives a black-and-white print.
   // Cards lie the way the board lies: a landscape board gives landscape cards.
   {
-    const KEY = "orebro-map-editor-public-v2";
+    const KEY = "ttr-map";
     const deckTree = async () => {
       await ticketsButton.click();
       await page.waitForTimeout(400);
@@ -1159,7 +1159,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await clickStop("Westport");
   await page.waitForTimeout(400);
   const stopLinks = await page.locator(".stop-ticket-link").allTextContents();
-  const westportTickets = await page.evaluate(() => { const m = JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")); return { all: m.tickets.filter((t) => t.a === "example-westport" || t.b === "example-westport").length, decks: new Set(m.tickets.filter((t) => t.a === "example-westport" || t.b === "example-westport").map((t) => t.set || "main")).size }; });
+  const westportTickets = await page.evaluate(() => { const m = JSON.parse(localStorage.getItem("ttr-map")); return { all: m.tickets.filter((t) => t.a === "example-westport" || t.b === "example-westport").length, decks: new Set(m.tickets.filter((t) => t.a === "example-westport" || t.b === "example-westport").map((t) => t.set || "main")).size }; });
   check("a stop lists its tickets from every deck", stopLinks.length === westportTickets.all, `${stopLinks.length} listed, ${westportTickets.all} in the map`);
   await page.locator(".stop-ticket-link").first().click();
   await page.waitForTimeout(500);
@@ -1199,7 +1199,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   check("hovering the far end previews the ticket", /Westport/.test(previewText) && /Quarry/.test(previewText) && /point/.test(previewText), previewText);
   // The lit routes must form one unbroken path from Westport to Quarry, whatever the map looks like.
   const litPath = await page.evaluate(() => {
-    const routes = JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")).routes;
+    const routes = JSON.parse(localStorage.getItem("ttr-map")).routes;
     const lit = Array.from(document.querySelectorAll(".map-canvas .route-group")).map((g, i) => g.classList.contains("on-preview") ? routes[i] : null).filter(Boolean);
     let at = "example-westport";
     const left = [...lit];
@@ -1245,7 +1245,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   const cells = () => page.$$eval(".coverage-table tbody tr", (trs) => trs.map((tr) => Array.from(tr.children).map((td) => td.textContent.trim())));
   check("the ticket tool fills the right panel", await page.locator(".coverage-table").isVisible());
   // A junction is never a ticket's end, so it has no row: it would sit under "not reached" for ever.
-  const ticketStops = await page.evaluate(() => { const m = JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")); const j = new Set(m.stopTypeStyles.filter((t) => t.junction).map((t) => t.id)); return m.stops.filter((st) => !j.has(st.type)).length; });
+  const ticketStops = await page.evaluate(() => { const m = JSON.parse(localStorage.getItem("ttr-map")); const j = new Set(m.stopTypeStyles.filter((t) => t.junction).map((t) => t.id)); return m.stops.filter((st) => !j.has(st.type)).length; });
   check("with a row per stop a ticket can go to and a column per ticket length", (await cells()).length === ticketStops && (await cells())[0].length === 4, `${(await cells()).length} rows for ${ticketStops} stops; ${JSON.stringify((await cells())[0])}`);
   const rowOf = async (name) => (await cells()).find((row) => row[0] === name).slice(1).map(Number);
   const westportBefore = await rowOf("Westport"), centralBefore = await rowOf("Central");
@@ -1290,7 +1290,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await clickStop("Westport");
   await page.waitForTimeout(400);
   const deckNames = await page.locator(".stop-ticket-deck-name").allTextContents();
-  const westportDecks = await page.evaluate(() => { const m = JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")); return new Set(m.tickets.filter((t) => t.a === "example-westport" || t.b === "example-westport").map((t) => t.set || "main")).size; });
+  const westportDecks = await page.evaluate(() => { const m = JSON.parse(localStorage.getItem("ttr-map")); return new Set(m.tickets.filter((t) => t.a === "example-westport" || t.b === "example-westport").map((t) => t.set || "main")).size; });
   check("a stop's tickets are listed deck by deck", deckNames.length === westportDecks, `${deckNames.join(" | ")} for ${westportDecks} decks`);
   check("and every deck group holds only its own", (await page.locator(".stop-ticket-deck").first().locator(".stop-ticket-link").count()) >= 1);
 
@@ -1303,7 +1303,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.locator("#settings-players-max").fill("4");
   await page.locator("#settings-players-max").blur();
   await page.waitForTimeout(400);
-  const newTable = await page.evaluate(() => JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")).players);
+  const newTable = await page.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")).players);
   check("a different table is stored with the map", newTable.max === 4 && newTable.min <= 4, `${newTable.min}–${newTable.max}`);
   await page.keyboard.press("Escape");
   await page.waitForTimeout(300);
@@ -1317,19 +1317,19 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.locator("#settings-players-max").fill("5");
   await page.locator("#settings-players-max").blur();
   await page.waitForTimeout(400);
-  check("showing the map's own setup", (await page.locator("#settings-wagons").inputValue()) === String(await page.evaluate(() => JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")).wagonsPerPlayer)) && (await page.locator("#settings-starting-tickets").inputValue()) === "3", `${await page.locator("#settings-wagons").inputValue()}/${await page.locator("#settings-starting-tickets").inputValue()}`);
+  check("showing the map's own setup", (await page.locator("#settings-wagons").inputValue()) === String(await page.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")).wagonsPerPlayer)) && (await page.locator("#settings-starting-tickets").inputValue()) === "3", `${await page.locator("#settings-wagons").inputValue()}/${await page.locator("#settings-starting-tickets").inputValue()}`);
   await page.locator("#settings-wagons").fill("40");
   await page.locator("#settings-wagons").blur();
   await page.waitForTimeout(400);
-  check("the setup is stored with the map", await page.evaluate(() => JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")).wagonsPerPlayer) === 40);
+  check("the setup is stored with the map", await page.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")).wagonsPerPlayer) === 40);
   await page.locator("#settings-wagons").fill("0");
   await page.locator("#settings-wagons").blur();
   await page.waitForTimeout(400);
-  check("a player cannot be given zero wagons", await page.evaluate(() => JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")).wagonsPerPlayer) >= 1);
+  check("a player cannot be given zero wagons", await page.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")).wagonsPerPlayer) >= 1);
   await page.locator("#settings-kept-tickets").fill("9");
   await page.locator("#settings-kept-tickets").blur();
   await page.waitForTimeout(400);
-  const setupStored = await page.evaluate(() => JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")));
+  const setupStored = await page.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")));
   check("nobody must keep more tickets than they are dealt", setupStored.keptTickets <= setupStored.startingTickets, `${setupStored.keptTickets} of ${setupStored.startingTickets}`);
   await page.keyboard.press("Escape");
   await page.waitForTimeout(300);
@@ -1338,7 +1338,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   // Give each player more wagons than two players could ever place, so the report has to object.
   await page.getByRole("button", { name: "Settings" }).click();
   await page.waitForTimeout(400);
-  const spaces = await page.evaluate(() => JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")).routes.reduce((sum, r) => sum + r.length, 0));
+  const spaces = await page.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")).routes.reduce((sum, r) => sum + r.length, 0));
   await page.locator("#settings-wagons").fill(String(Math.ceil(spaces / 1.5)));
   await page.locator("#settings-wagons").blur();
   await page.waitForTimeout(400);
@@ -1533,7 +1533,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     return { w, h, left: r.left, top: r.top, width: r.width, height: r.height };
   });
   const onScreen = (x, y) => ({ x: canvasBox.left + x / canvasBox.w * canvasBox.width, y: canvasBox.top + y / canvasBox.h * canvasBox.height });
-  const storedImage = () => page.evaluate(() => JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")).backgroundImage);
+  const storedImage = () => page.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")).backgroundImage);
   let bg = await storedImage();
   check("a background image can be imported", Boolean(bg), `canvas ${JSON.stringify(canvasBox)}`);
   // The probe is two units across, so select it by the element rather than by hitting it, and give
@@ -1578,7 +1578,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await mixPresets.filter({ hasText: "Ticket to Ride: Europe" }).first().click();
   await page.waitForTimeout(400);
   check("clicking one takes that map's mix", (await mixShares()) === "76/11/13", await mixShares());
-  check("and stores it with the map", await page.evaluate(() => JSON.stringify(JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")).ticketMix)) === '{"short":76,"medium":11,"long":13}');
+  check("and stores it with the map", await page.evaluate(() => JSON.stringify(JSON.parse(localStorage.getItem("ttr-map")).ticketMix)) === '{"short":76,"medium":11,"long":13}');
   await page.locator("#mix-short").fill("50");
   await page.locator("#mix-short").blur();
   await page.waitForTimeout(400);
@@ -1721,7 +1721,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.waitForTimeout(600);
   await page.getByRole("button", { name: "Settings" }).click();
   await page.waitForTimeout(500);
-  check("a new map has no deck rules of its own", await page.evaluate(() => { const m = JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")); return !(m.deckRules || []).length && !m.deckRule; }));
+  check("a new map has no deck rules of its own", await page.evaluate(() => { const m = JSON.parse(localStorage.getItem("ttr-map")); return !(m.deckRules || []).length && !m.deckRule; }));
   check("a new map starts at the original game's numbers: 45 wagons, 3 tickets, 2–5 players",
     (await page.locator("#settings-wagons").inputValue()) === "45" && (await page.locator("#settings-starting-tickets").inputValue()) === "3" && (await page.locator("#settings-players-min").inputValue()) === "2" && (await page.locator("#settings-players-max").inputValue()) === "5",
     `${await page.locator("#settings-wagons").inputValue()} / ${await page.locator("#settings-starting-tickets").inputValue()} / ${await page.locator("#settings-players-min").inputValue()}–${await page.locator("#settings-players-max").inputValue()}`);
@@ -1823,7 +1823,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     const cx = c.x + c.width / 2, cy = c.y + c.height / 2, lx = t.x + t.width / 2, ly = t.y + t.height / 2;
     return { cx, cy, lx, ly, bearing: (Math.atan2(ly - cy, lx - cx) * 180 / Math.PI + 360) % 360 };
   });
-  const storedCentral = () => page.evaluate(() => JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")).stops.find((stop) => stop.name === "Central"));
+  const storedCentral = () => page.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")).stops.find((stop) => stop.name === "Central"));
   const bearingGap = (a, b) => Math.abs(((a - b + 540) % 360) - 180);
   const dragName = async (angle, { release = true } = {}) => {
     const at = await centralName();
@@ -1896,7 +1896,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   check("Unlock name frees it again", !(await storedCentral()).labelLocked);
   await page.getByRole("button", { name: "Lock every name" }).click();
   await page.waitForTimeout(200);
-  const allNamesLocked = await page.evaluate(() => JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")).stops.every((st) => st.labelLocked));
+  const allNamesLocked = await page.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")).stops.every((st) => st.labelLocked));
   check("Lock every name locks them all", allNamesLocked);
   // Put Central's name on one of its own routes, then ask for every name to be moved clear.
   let coveredAt = null;
@@ -1913,12 +1913,12 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   }
   await page.getByRole("button", { name: "Unlock every name" }).click();
   await page.waitForTimeout(200);
-  check("Unlock every name frees them all", await page.evaluate(() => JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")).stops.every((st) => !st.labelLocked)));
+  check("Unlock every name frees them all", await page.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")).stops.every((st) => !st.labelLocked)));
   await dragName(165);
   await page.keyboard.press("Escape");
 
   // 33f. deck rules: our three sets are fixed, and a set of your own changes the terms for a map
-  const storedRules = () => page.evaluate(() => { const m = JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")); return { rules: m.deckRules || [], chosen: m.deckRule }; });
+  const storedRules = () => page.evaluate(() => { const m = JSON.parse(localStorage.getItem("ttr-map")); return { rules: m.deckRules || [], chosen: m.deckRule }; });
   await page.getByRole("button", { name: "Settings" }).click();
   await page.waitForTimeout(400);
   const navItems = (await page.locator(".settings-nav-item").allTextContents()).join(" | ");
@@ -2017,7 +2017,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.waitForTimeout(700);
   {
     const lengths = await lengthsIn(page.locator(".balance-panel"));
-    const chosenOwn = await page.evaluate(() => { const m = JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")); const rule = (m.deckRules || []).find((r) => r.id === m.deckRule); return rule ? { label: rule.label, bins: rule.bins } : null; });
+    const chosenOwn = await page.evaluate(() => { const m = JSON.parse(localStorage.getItem("ttr-map")); const rule = (m.deckRules || []).find((r) => r.id === m.deckRule); return rule ? { label: rule.label, bins: rule.bins } : null; });
     check("Map balance shows the ticket lengths too", lengths !== null && lengths.rows.length === 5);
     check("with the official decks and the map's own rules both marked", lengths !== null && lengths.rows.every((r) => r.official !== null && r.own !== null), JSON.stringify(lengths && lengths.rows.map((r) => [r.official, r.own])));
     check("the own marks are the chosen rules' shares", chosenOwn !== null && lengths !== null && lengths.rows.every((r, i) => Math.abs(r.own - chosenOwn.bins[i] * 100) < 1), JSON.stringify([chosenOwn, lengths && lengths.rows.map((r) => r.own)]));
@@ -2043,7 +2043,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   check("the suggester offers your own set beside ours", (await styleCard("Sparse").count()) === 1 && (await page.locator(".style-card").count()) === 4);
   check("and starts on it, because the map chose it", (await styleCard("Sparse").getAttribute("aria-pressed")) === "true");
   // A deck is sized by the stops a ticket can end at: not a junction, and not a stop no route reaches.
-  const endStops = await page.evaluate(() => { const m = JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")); const junction = new Set(m.stopTypeStyles.filter((t) => t.junction).map((t) => t.id)); const touched = new Set(m.routes.flatMap((r) => [r.a, r.b])); return m.stops.filter((s) => touched.has(s.id) && !junction.has(s.type)).length; });
+  const endStops = await page.evaluate(() => { const m = JSON.parse(localStorage.getItem("ttr-map")); const junction = new Set(m.stopTypeStyles.filter((t) => t.junction).map((t) => t.id)); const touched = new Set(m.routes.flatMap((r) => [r.a, r.b])); return m.stops.filter((s) => touched.has(s.id) && !junction.has(s.type)).length; });
   const sparseSize = Number(await page.locator("#suggest-size").inputValue());
   await styleCard("Generic").click();
   await page.waitForTimeout(400);
@@ -2054,7 +2054,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     const warning = page.locator(".deck-size-warning");
     await styleCard("Sparse").click();
     await page.waitForTimeout(400);
-    const dealt = await page.evaluate(() => { const m = JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")); return (m.players ? m.players.max : 5) * (m.startingTickets ?? 3); });
+    const dealt = await page.evaluate(() => { const m = JSON.parse(localStorage.getItem("ttr-map")); return (m.players ? m.players.max : 5) * (m.startingTickets ?? 3); });
     check("a deck too small to deal a full table says so, with the number it would take", (await warning.count()) === 1 && new RegExp(`\\b${dealt}\\b`).test(await warning.textContent()) && /It is allowed/.test(await warning.textContent()), (await warning.count()) ? await warning.textContent() : "no warning");
     check("while the deck still is the size the rules ask for", Number(await page.locator("#suggest-size").inputValue()) === Math.round(0.5 * endStops));
     check("and nothing is blocked: the deck can still be saved", (await page.getByRole("button", { name: "Save as a new deck" }).isEnabled()) || (await page.getByRole("button", { name: /^Replace / }).isEnabled()));
@@ -2153,7 +2153,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     await page.waitForTimeout(150);
   }
   await tool("Select & move").click();
-  const sixStops = await page.evaluate(() => JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")).stops);
+  const sixStops = await page.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")).stops);
   check("six stops are placed", sixStops.length === 6, String(sixStops.length));
   const lowConnectionCard = page.locator(".crossing-card.shape-card");
   check("the card counts six stops with no route, as a warning", /6 stops with no route/.test(await lowConnectionCard.textContent()) && (await lowConnectionCard.evaluate((el) => el.classList.contains("has-warning"))), await lowConnectionCard.textContent());
@@ -2178,10 +2178,10 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.mouse.move(5, 5);
   await page.waitForTimeout(250);
   check("and the drawing goes when the pointer leaves", (await page.locator(".map-canvas .suggestion-preview").count()) === 0);
-  const routesBefore = await page.evaluate(() => JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")).routes.length);
+  const routesBefore = await page.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")).routes.length);
   await suggestionRows.first().getByRole("button", { name: "Add" }).click();
   await page.waitForTimeout(400);
-  check("Add puts the route on the map", (await page.evaluate(() => JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")).routes.length)) === routesBefore + 1);
+  check("Add puts the route on the map", (await page.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")).routes.length)) === routesBefore + 1);
   check("and the panel stays open for the next one", (await suggestionPanel.count()) === 1);
   await suggestionPanel.getByRole("button", { name: "Done" }).click();
   await page.waitForTimeout(300);
@@ -2252,7 +2252,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   // Colour × length: a row of wagons per colour, and pointing at a number marks its routes on the map.
   {
     const table = balancePanel.locator(".analysis-section", { has: page.locator("h3", { hasText: "Colour × length" }) }).locator("table.analysis-table:not(.classic-table)");
-    const stored = await page.evaluate(() => { const m = JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")); const infra = new Set(m.routeTypeStyles.filter((x) => x.infrastructure).map((x) => x.id)); return m.routes.filter((r) => !infra.has(r.type)).map((r) => ({ length: r.length, color: r.color })); });
+    const stored = await page.evaluate(() => { const m = JSON.parse(localStorage.getItem("ttr-map")); const infra = new Set(m.routeTypeStyles.filter((x) => x.infrastructure).map((x) => x.id)); return m.routes.filter((r) => !infra.has(r.type)).map((r) => ({ length: r.length, color: r.color })); });
     const heads = (await table.locator("thead th").allTextContents()).map((t) => t.trim());
     const colourOf = (label) => (label === "Grey" ? "neutral" : label.toLowerCase());
     const colourLabels = heads.slice(1, -1);
@@ -2426,7 +2426,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   // 33b. rules text: written in markdown beside the map, previewed with live references, saved in
   // the map, and printed on pages of their own after the board when asked
   {
-    const mapKey = "orebro-map-editor-public-v2";
+    const mapKey = "ttr-map";
     await page.evaluate(() => { localStorage.removeItem("ttr-print-rules"); localStorage.removeItem("ttr-print-parts"); });
     const first = await page.evaluate((key) => { const m = JSON.parse(localStorage.getItem(key)); const r = m.routes[0]; const name = (id) => m.stops.find((st) => st.id === id).name; const isJunction = (st) => Boolean((m.stopTypeStyles.find((t) => t.id === st.type) || {}).junction);
       const near = new Set(m.routes.filter((x) => x.a === r.a || x.b === r.a).map((x) => (x.a === r.a ? x.b : x.a)));
@@ -2456,7 +2456,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     const pointsTable = await examplePreview.locator("table").filter({ hasText: /points/i }).first().evaluate((t) => Array.from(t.querySelectorAll("tbody tr")).map((tr) => Array.from(tr.cells).map((c) => c.textContent.trim()))).catch(() => []);
     const standardPoints = [["1", "1"], ["2", "2"], ["3", "4"], ["4", "7"], ["5", "10"], ["6", "15"], ["7", "18"], ["8", "21"]];
     check("the rules list the standard points for each length of claimed route", JSON.stringify(pointsTable) === JSON.stringify(standardPoints), JSON.stringify(pointsTable));
-    const longestRoute = await page.evaluate(() => Math.max(...JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")).routes.map((r) => r.length)));
+    const longestRoute = await page.evaluate(() => Math.max(...JSON.parse(localStorage.getItem("ttr-map")).routes.map((r) => r.length)));
     check("and the list covers the longest route on the map", longestRoute <= 8, String(longestRoute));
     check("with XXX where a rule is still to be written", (await examplePreview.locator("li").filter({ hasText: "XXX" }).count()) >= 2);
     // A link to a neutral page that explains markdown
@@ -2621,7 +2621,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     const pagesOf = async () => { await page.emulateMedia({ media: "print" }); const pdf = await page.pdf({ format: "A4", printBackground: true }); await page.emulateMedia({ media: "screen" }); return (pdf.toString("latin1").match(/\/Type\s*\/Page[^s]/g) || []).length; };
     const tree = () => page.evaluate(() => { const root = document.querySelector(".print-pages"); return { order: Array.from(root.children).map((el) => (el.matches("style") ? "style" : el.classList.contains("print-page") ? "board" : el.classList.contains("print-tickets") ? "tickets" : el.classList.contains("print-rules") ? "rules" : "other")).filter((x, i, all) => x !== "style" && x !== all[i - 1]), boards: document.querySelectorAll(".print-pages .print-page").length, cards: document.querySelectorAll(".print-pages .ticket-card").length, rules: document.querySelectorAll(".print-pages .print-rules").length, text: (document.querySelector(".print-pages .print-rules") || { textContent: "" }).textContent, missing: document.querySelectorAll(".print-pages .print-rules .missing").length, style: Array.from(document.querySelectorAll(".print-pages style")).map((el) => el.textContent).join(" ") }; });
     const run = async (board, tickets, rules) => { await printButton().click(); await page.waitForTimeout(350); await choosePrintParts(board, tickets, rules); await printDialog().getByRole("button", { name: "Cancel" }).click(); await page.waitForTimeout(300); };
-    const deckSize = await page.evaluate(() => { const m = JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")); const first = m.ticketSets[0].id; const active = (m.ticketSets.find((x) => x.label === document.querySelector("#ticket-set")?.selectedOptions?.[0]?.textContent?.replace(/ \(\d+\)$/, "")) || m.ticketSets[0]).id; return m.tickets.filter((t) => (t.set ?? first) === active).length; });
+    const deckSize = await page.evaluate(() => { const m = JSON.parse(localStorage.getItem("ttr-map")); const first = m.ticketSets[0].id; const active = (m.ticketSets.find((x) => x.label === document.querySelector("#ticket-set")?.selectedOptions?.[0]?.textContent?.replace(/ \(\d+\)$/, "")) || m.ticketSets[0]).id; return m.tickets.filter((t) => (t.set ?? first) === active).length; });
     // each part on its own
     const pagesBoard = await pagesOf();
     check("with the board only, the print tree has board pages and nothing else", JSON.stringify((await tree()).order) === JSON.stringify(["board"]), JSON.stringify(await tree()).slice(0, 120));
@@ -2873,8 +2873,8 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
 
   // 34. a map saved on a format that is now a print choice opens on its board
   await page.evaluate(() => {
-    const map = JSON.parse(localStorage.getItem("orebro-map-editor-public-v2"));
-    localStorage.setItem("orebro-map-editor-public-v2", JSON.stringify({ ...map, format: "a4" }));
+    const map = JSON.parse(localStorage.getItem("ttr-map"));
+    localStorage.setItem("ttr-map", JSON.stringify({ ...map, format: "a4" }));
   });
   await page.reload({ waitUntil: "networkidle" });
   await page.waitForTimeout(700);
@@ -2889,7 +2889,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     await sp.goto(BASE, { waitUntil: "networkidle" });
     await sp.getByRole("button", { name: "Load the example map" }).click();
     await sp.waitForTimeout(600);
-    const KEY = "orebro-map-editor-public-v2";
+    const KEY = "ttr-map";
     const storedMap = () => sp.evaluate((key) => JSON.parse(localStorage.getItem(key)), KEY);
     const lying = await storedMap();
     const viewBox = () => sp.evaluate(() => document.querySelector(".map-canvas").getAttribute("viewBox"));
@@ -2996,7 +2996,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     await cp.goto(BASE, { waitUntil: "networkidle" });
     await cp.getByRole("button", { name: "Load the example map" }).click();
     await cp.waitForTimeout(600);
-    await cp.evaluate(() => { const key = "orebro-map-editor-public-v2"; const m = JSON.parse(localStorage.getItem(key)); m.routes.push({ id: "r-across", a: "example-westport", b: "example-quarry", length: 6, type: m.routes[0].type, color: "neutral", curved: false }); localStorage.setItem(key, JSON.stringify(m)); });
+    await cp.evaluate(() => { const key = "ttr-map"; const m = JSON.parse(localStorage.getItem(key)); m.routes.push({ id: "r-across", a: "example-westport", b: "example-quarry", length: 6, type: m.routes[0].type, color: "neutral", curved: false }); localStorage.setItem(key, JSON.stringify(m)); });
     await cp.reload({ waitUntil: "networkidle" });
     await cp.waitForTimeout(700);
     const card = cp.locator(".crossing-card").filter({ hasText: /crossing/ });
@@ -3125,7 +3125,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     await np.goto(BASE, { waitUntil: "networkidle" });
     await np.getByRole("button", { name: "Load the example map" }).click();
     await np.waitForTimeout(600);
-    const KEY = "orebro-map-editor-public-v2";
+    const KEY = "ttr-map";
     const edit = async (fn) => { await np.evaluate(([key, src]) => { const m = JSON.parse(localStorage.getItem(key)); (new Function("m", src))(m); localStorage.setItem(key, JSON.stringify(m)); }, [KEY, fn]); await np.reload({ waitUntil: "networkidle" }); await np.waitForTimeout(700); };
     const shapeCard = np.locator(".crossing-card.shape-card");
     check("the example map holds together: the card says so, with no warning", /Well connected/.test(await shapeCard.textContent()) && !(await shapeCard.evaluate((el) => el.classList.contains("has-warning"))));
@@ -3172,7 +3172,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     await vp.goto(BASE, { waitUntil: "networkidle" });
     await vp.getByRole("button", { name: "Load the example map" }).click();
     await vp.waitForTimeout(600);
-    const KEY = "orebro-map-editor-public-v2";
+    const KEY = "ttr-map";
     const stored = () => vp.evaluate((key) => JSON.parse(localStorage.getItem(key)), KEY);
     const versionBadge = () => vp.locator(".map-status .map-version");
     const stubPrint = () => vp.evaluate(() => { window.__run = null; window.print = () => { const root = document.querySelector(".print-pages"); window.__run = {
@@ -3266,7 +3266,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     await rp2.goto(BASE, { waitUntil: "networkidle" });
     await rp2.getByRole("button", { name: "Load the example map" }).click();
     await rp2.waitForTimeout(600);
-    const KEY = "orebro-map-editor-public-v2";
+    const KEY = "ttr-map";
     const stored = () => rp2.evaluate((key) => JSON.parse(localStorage.getItem(key)), KEY);
     const tap = async (name) => { await rp2.evaluate((n) => { const s = Array.from(document.querySelectorAll(".map-canvas .stop")).find((g) => Array.from(g.querySelectorAll("text, title")).some((t) => t.textContent === n)); s.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true })); s.dispatchEvent(new PointerEvent("pointerup", { bubbles: true })); }, name); await rp2.waitForTimeout(250); };
     await rp2.locator('.tool-row .tool-button[aria-label="Draw route"]').click();
@@ -3351,6 +3351,26 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     const note = tp.locator(".map-status [data-slot=badge]", { hasText: "Everything is stored" });
     check("the note that everything is stored in the exported file is one of the figures above the map", (await note.count()) === 1);
     await tp.context().close();
+  }
+
+  // 43. The map is kept in the browser under a neutral name, ttr-map. A map kept under the old name,
+  // orebro-map-editor-public-v2, by 0.4.0 and earlier, opens as it was, and so do the settings kept
+  // beside it; the old copy is left where it was, so an older build still finds it.
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1500, height: 1000 } });
+    const old = { name: "Kept under the old name", format: "board-2x3", background: [], stops: [{ id: "a", name: "Alpha", type: "city", x: 200, y: 200 }, { id: "b", name: "Beta", type: "city", x: 600, y: 300 }], routes: [{ id: "r1", a: "a", b: "b", length: 4, type: "city", color: "red" }], notes: [], tickets: [], ticketSets: [{ id: "main", label: "Main deck" }] };
+    await ctx.addInitScript((map) => { if (sessionStorage.getItem("seeded")) return; sessionStorage.setItem("seeded", "1"); localStorage.clear(); localStorage.setItem("orebro-map-editor-public-v2", JSON.stringify(map)); localStorage.setItem("orebro-map-editor-public-v2-guide-seen", "1"); }, old);
+    const op = await ctx.newPage();
+    op.on("pageerror", (e) => errors.push(String(e)));
+    await op.goto(BASE, { waitUntil: "networkidle" });
+    await op.waitForTimeout(600);
+    const keys = await op.evaluate(() => ({ now: localStorage.getItem("ttr-map"), old: localStorage.getItem("orebro-map-editor-public-v2"), guide: localStorage.getItem("ttr-guide-seen") }));
+    check("a map kept under the old name opens as it was", (await op.locator(".map-title-input, input[aria-label='Map name']").first().inputValue().catch(() => "")) === "Kept under the old name" || (keys.now && JSON.parse(keys.now).name === "Kept under the old name"), keys.now && JSON.parse(keys.now).name);
+    check("and is kept from now on under ttr-map", keys.now !== null && JSON.parse(keys.now).stops.length === 2);
+    check("the old copy is left where it was, for an older build", keys.old !== null && JSON.parse(keys.old).name === "Kept under the old name");
+    check("the settings kept beside it come along: the welcome is not shown again", keys.guide === "1" && (await op.getByRole("button", { name: "Load the example map" }).count()) === 0);
+    check("nothing in the editor's storage still uses the old name", (await op.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith("orebro") && !["orebro-map-editor-public-v2", "orebro-map-editor-public-v2-guide-seen"].includes(k)))).length === 0);
+    await ctx.close();
   }
 
   console.log("PASS:"); ok.forEach((l) => console.log("  ✓ " + l));

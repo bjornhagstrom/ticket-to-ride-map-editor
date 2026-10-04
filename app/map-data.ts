@@ -139,7 +139,10 @@ export type MapData = { name: string; mapVersion?: MapVersion; format: MapFormat
 export const ROUTE_POINTS: Record<number, number> = { 1: 1, 2: 2, 3: 4, 4: 7, 5: 10, 6: 15, 7: 18, 8: 21 };
 export const routePointsTable = () => `| Route length | Points |\n| ---: | ---: |\n${Object.entries(ROUTE_POINTS).map(([length, points]) => `| ${length} | ${points} |`).join("\n")}`;
 export const W = 1100;
-export const STORAGE_KEY = "orebro-map-editor-public-v2";
+/** Where the map is kept in this browser. 0.4.0 and earlier used LEGACY_STORAGE_KEY; see
+ *  moveLegacyStorage in map-storage.ts. */
+export const STORAGE_KEY = "ttr-map";
+export const LEGACY_STORAGE_KEY = "orebro-map-editor-public-v2";
 
 export type MapFormatDefinition = {
   label: string;

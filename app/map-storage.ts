@@ -2,14 +2,30 @@
 // files open, board-format rescaling, and image reading.
 import { APP_VERSION } from "./version";
 import { boardOf, rotateMap, turnBetween, turnContents, type Board } from "./board";
-import { W, BUILT_IN_DECK_RULES, type DeckRuleSet, type PlayerRange, DEFAULT_WAGONS_PER_PLAYER, DEFAULT_STARTING_TICKETS, DEFAULT_KEPT_TICKETS, defaultTicketSet, type Ticket, type TicketSet, defaultStopTypeStyles, fallbackStopTypeStyle, type StopTypeStyle, defaultWagonStyles, type WagonStyle, defaultRouteTypeStyles, type LineStyle, type RouteTypeStyle, type BackgroundImage, type BackgroundShape, type ImageCrop, mapFormats, type MapData, type MapFormat, type MapVersion, type MapVersionEntry, type NoteBox, type Point, type Route, type Stop, STORAGE_KEY } from "./map-data";
+import { W, BUILT_IN_DECK_RULES, type DeckRuleSet, type PlayerRange, DEFAULT_WAGONS_PER_PLAYER, DEFAULT_STARTING_TICKETS, DEFAULT_KEPT_TICKETS, defaultTicketSet, type Ticket, type TicketSet, defaultStopTypeStyles, fallbackStopTypeStyle, type StopTypeStyle, defaultWagonStyles, type WagonStyle, defaultRouteTypeStyles, type LineStyle, type RouteTypeStyle, type BackgroundImage, type BackgroundShape, type ImageCrop, mapFormats, type MapData, type MapFormat, type MapVersion, type MapVersionEntry, type NoteBox, type Point, type Route, type Stop, STORAGE_KEY, LEGACY_STORAGE_KEY } from "./map-data";
 
-export const GUIDE_SEEN_KEY = `${STORAGE_KEY}-guide-seen`;
+export const GUIDE_SEEN_KEY = "ttr-guide-seen";
 export const MAX_IMAGE_WARN_BYTES = 2 * 1024 * 1024;
 export const HISTORY_LIMIT = 200;
 // The stored strings keep their original names so an existing browser does not lose the setting.
-export const MAP_HINT_KEY = `${STORAGE_KEY}-route-hint`;
-export const MAP_HINT_X_KEY = `${STORAGE_KEY}-route-hint-x`;
+export const MAP_HINT_KEY = "ttr-route-hint";
+export const MAP_HINT_X_KEY = "ttr-route-hint-x";
+
+// The map and the settings beside it were kept under names starting with LEGACY_STORAGE_KEY up to
+// 0.4.0. Each is copied to its neutral name the first time this build runs in a browser, when the new
+// name holds nothing yet. The old copy is left where it was, so an older build still finds the map.
+const LEGACY_KEYS: [string, string][] = [
+  [LEGACY_STORAGE_KEY, STORAGE_KEY],
+  [`${LEGACY_STORAGE_KEY}-guide-seen`, GUIDE_SEEN_KEY],
+  [`${LEGACY_STORAGE_KEY}-route-hint`, MAP_HINT_KEY],
+  [`${LEGACY_STORAGE_KEY}-route-hint-x`, MAP_HINT_X_KEY],
+];
+export function moveLegacyStorage(storage: Pick<Storage, "getItem" | "setItem">): void {
+  for (const [from, to] of LEGACY_KEYS) {
+    const kept = storage.getItem(from);
+    if (kept !== null && storage.getItem(to) === null) storage.setItem(to, kept);
+  }
+}
 export const cloneMap = (data: MapData): MapData => JSON.parse(JSON.stringify(data));
 // History snapshots deep-clone everything except the background image's base64 payload, which is
 // re-attached by reference. Strings are immutable, so every snapshot shares one copy of the image

@@ -145,7 +145,7 @@ one click from wherever a style is applied.
 
 ## Important storage behaviour
 
-The application has no server-side database. A map is automatically stored in the current browser under the key `orebro-map-editor-public-v2`. This preserves existing users' data despite the historical key name.
+The application has no server-side database. A map is automatically stored in the current browser under the key `ttr-map` (0.4.0 and earlier used `orebro-map-editor-public-v2`; a map kept there is copied over the first time a newer build runs).
 
 Browser storage is specific to one browser and device. Export the map regularly to create a portable backup.
 
