@@ -92,7 +92,9 @@ for (const [format, paper, size] of [["board-2x3", "a4"], ["board-2x3", "letter"
 // Full-size sheets carry cut marks reaching past the artwork. Safari fitted a 274 mm sheet with its
 // headers and footers on, but spilled a 263 mm sheet whose 6 mm marks made it 275. So the marks are
 // part of the budget: artwork and marks together fit the paper less its margins.
-const { CUT_MARK_REACH_MM } = require(path.join(out, "print-plan.js"));
+const { CUT_MARK_REACH_MM, DEFAULT_PRINT_CHOICE } = require(path.join(out, "print-plan.js"));
+// The first print, before anything is chosen: the whole board on one A4 sheet, the quickest playtest.
+check("by default the whole board prints on one sheet of A4", DEFAULT_PRINT_CHOICE.split === "sheet" && DEFAULT_PRINT_CHOICE.paper === "a4" && DEFAULT_PRINT_CHOICE.size === "standard", JSON.stringify(DEFAULT_PRINT_CHOICE));
 check("cut marks reach no more than 2.5 mm past the artwork", CUT_MARK_REACH_MM > 0 && CUT_MARK_REACH_MM <= 2.5, String(CUT_MARK_REACH_MM));
 for (const format of ["board-2x3", "board-2x4"]) for (const paperId of ["a4", "a3", "letter", "tabloid"]) for (const size of format === "board-2x3" ? ["standard", "anniversary"] : ["standard"]) {
   const plan = printPlan(format, { split: "full", paper: paperId, size });

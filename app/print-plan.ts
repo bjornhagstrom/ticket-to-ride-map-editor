@@ -8,8 +8,9 @@ export type PaperId = "a4" | "a3" | "letter" | "tabloid";
 export type SplitId = "sheet" | "panel" | "full" | "page";
 export type SizeId = "standard" | "anniversary";
 export type PrintChoice = { split: SplitId; paper: PaperId; size?: SizeId };
-/** A board proofed panel by panel on A4, which is what the Print button did before it asked. */
-export const DEFAULT_PRINT_CHOICE: PrintChoice = { split: "panel", paper: "a4", size: "standard" };
+// The first print, before anything is chosen: the whole board on one sheet of A4, the quickest way to a
+// playtest. Each browser remembers its last choice after that.
+export const DEFAULT_PRINT_CHOICE: PrintChoice = { split: "sheet", paper: "a4", size: "standard" };
 /** Where the last choice is remembered, in this browser only. */
 export const PRINT_CHOICE_KEY = "ttr-print-choice";
 

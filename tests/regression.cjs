@@ -434,6 +434,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   check("the Print button opens a dialog rather than printing", await printDialog().isVisible() && (await page.evaluate(() => window.__printCalls)) === 0);
   check("it offers four ways to split the board: one sheet, per panel, full size, and one page the size of the board", (await printDialog().locator('input[name="print-split"]').count()) === 4);
   check("and four papers", (await printDialog().locator('input[name="print-paper"]').count()) === 4);
+  check("the first time, the board prints whole on one sheet of A4", (await printDialog().locator('input[name="print-split"][value="sheet"]').isChecked()) && (await printDialog().locator('input[name="print-paper"][value="a4"]').isChecked()));
   // Anniversary is one checkbox under Supersize, not a choice between two board sizes.
   const supersize = () => printDialog().getByRole("checkbox", { name: "Anniversary size", exact: true });
   await printDialog().getByRole("radio", { name: "Full size" }).check();

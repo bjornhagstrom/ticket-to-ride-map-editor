@@ -21,6 +21,7 @@ This file is written from `app/version.ts` by `npm run changelog`; edit the note
 - A version number for the map: every print and export after a change gets the next one, one series for all of them. It is printed on every sheet as Version 8 with its date, on every ticket card as v8, and on the rules, and shown above the map. Exported files carry it in their names. Undo never takes it back.
 - A playtest box on the map, ticked in the print dialog: a yellow box with the version, a line for the date played, and the players' names on the back of the sheet. It is placed where it covers least and moves like a note.
 - Opening an older copy of the same map, with a lower version number, warns that its numbers would repeat and suggests a new name.
+- The first print puts the whole board on one sheet of A4; the print dialog remembers what you choose after that.
 - A reminder to export: the map lives only in this browser, so after a while of work without an export a note says so, and the header says when the map was last exported. Ask for it less often, or turn it off in Settings.
 - Point at the crossings warning to see them: the routes that cross are marked on the map and every crossing is ringed. Crossings are now found on the lines as drawn, curves included.
 - Two things have clearer names: Suggest a deck is now Build a full deck of tickets, under Add a deck in the Tickets panel, and the Analyze balance button is now Map balance, like the panel it opens.
