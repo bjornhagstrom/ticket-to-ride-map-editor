@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { TicketLengths, type TicketLengthsView } from "./ticket-lengths";
 import { DeckCompare, type DeckCompareView } from "./deck-compare";
-import { CROWDING_OFFICIAL, networkShape, SHAPE_OFFICIAL, colourRouteIds, compareWithClassics, CLASSIC_ROUTE_MAPS, type Bottleneck, dealtToFullTable, deckRuleFor, deckRules, TICKET_SUGGESTER, type TicketDeckReport, type TicketStyle, type SetupBalance, type TicketReview, type ColourLengthTable, type NetworkStats, type RouteSpacing, type RouteSuggestion } from "./map-analysis";
+import { BALANCE_OFFICIAL, CROWDING_OFFICIAL, networkShape, SHAPE_OFFICIAL, colourRouteIds, compareWithClassics, CLASSIC_ROUTE_MAPS, type Bottleneck, dealtToFullTable, deckRuleFor, deckRules, TICKET_SUGGESTER, type TicketDeckReport, type TicketStyle, type SetupBalance, type TicketReview, type ColourLengthTable, type NetworkStats, type RouteSpacing, type RouteSuggestion } from "./map-analysis";
 
 export function WelcomeGuide({ open, onOpenChange, onChooseBlank, onChooseExample }: { open: boolean; onOpenChange: (open: boolean) => void; onChooseBlank: () => void; onChooseExample: () => void }) {
   // What matters, in a line or two each. How a print is laid out is for the print dialog to say.
@@ -40,7 +40,7 @@ export function WelcomeGuide({ open, onOpenChange, onChooseBlank, onChooseExampl
 const NUMBER_WORDS: Record<number, string> = {2: "two", 3: "three", 4: "four", 5: "five", 6: "six", 7: "seven", 8: "eight"};
 const tableWord = (count: number) => NUMBER_WORDS[count] ?? String(count);
 
-export function AnalysisPanel({ wide, onToggleWide, onAddParallel, lengthView, pinKey, onPin, bottleneckShown, onClose, onPreviewRoutes, onPreviewStop, data, stats, colourTable, spacing, scaleWidthMm, setup, bottlenecks, atTable, onAtTable, onShowBottleneck, onSelectRoute, onSelectStop }: { wide: boolean; onToggleWide: () => void; onAddParallel: (routeId: string) => void; lengthView: TicketLengthsView; pinKey: string | null; onPin: (key: string, routes: string[] | null, stop: string | null) => void; bottleneckShown: Set<string>; setup: SetupBalance; bottlenecks: Bottleneck[]; atTable: number; onAtTable: (players: number) => void; onShowBottleneck: (routeIds: string[]) => void; onClose: () => void; onPreviewRoutes: (routeIds: string[] | null) => void; onPreviewStop: (stopId: string | null) => void; onSelectRoute: (routeId: string) => void; onSelectStop: (stopId: string) => void; data: MapData; stats: NetworkStats; colourTable: ColourLengthTable; spacing: RouteSpacing[]; scaleWidthMm: number }) {
+export function AnalysisPanel({ official, wide, onToggleWide, onAddParallel, lengthView, pinKey, onPin, bottleneckShown, onClose, onPreviewRoutes, onPreviewStop, data, stats, colourTable, spacing, scaleWidthMm, setup, bottlenecks, atTable, onAtTable, onShowBottleneck, onSelectRoute, onSelectStop }: { official: { players: number; crowded: number; loadRatio: number | null; unusedPct: number; maxPerStop: number }; wide: boolean; onToggleWide: () => void; onAddParallel: (routeId: string) => void; lengthView: TicketLengthsView; pinKey: string | null; onPin: (key: string, routes: string[] | null, stop: string | null) => void; bottleneckShown: Set<string>; setup: SetupBalance; bottlenecks: Bottleneck[]; atTable: number; onAtTable: (players: number) => void; onShowBottleneck: (routeIds: string[]) => void; onClose: () => void; onPreviewRoutes: (routeIds: string[] | null) => void; onPreviewStop: (stopId: string | null) => void; onSelectRoute: (routeId: string) => void; onSelectStop: (stopId: string) => void; data: MapData; stats: NetworkStats; colourTable: ColourLengthTable; spacing: RouteSpacing[]; scaleWidthMm: number }) {
   const stopName = (id: string) => data.stops.find((stop) => stop.id === id)?.name ?? "";
   // A number in the colour table marks the routes it counts while it is pointed at.
   const classicRows = compareWithClassics(data);
@@ -51,8 +51,8 @@ export function AnalysisPanel({ wide, onToggleWide, onAddParallel, lengthView, p
   // the stop or routes it is about, and picking one selects it as before.
   return <div className="balance-panel">
     <div className="panel-heading"><span>Map balance</span><Button size="sm" variant="outline" aria-expanded={wide} onClick={onToggleWide}>{wide ? "Collapse" : "Expand"}</Button></div>
-    <p className="helper">Point at a row to see it on the map.</p>
       <p className="helper">A quick read on how evenly connected and coloured the network is, and how the tickets lie on it. Point at a row to see it on the map. Click one to keep it marked, and click again to let it go; double-click a stop or a route to pick it for editing.</p>
+      <OfficialFigures official={official} stats={stats} />
       <div className="analysis-section bottlenecks">
         <h3>Where the tickets crowd</h3>
         <div className="bottleneck-players">
@@ -438,6 +438,29 @@ export function SuggestTicketsDialog({ open, onOpenChange, data, current, sugges
 // How the network holds together, described rather than judged: dead ends, routes whose loss cuts
 // the map in two, and corners reached only through one or two stops, each beside what the official
 // maps have. Pointing at a row marks it on the map.
+// This map's figures beside what the eight official maps measure, each with its own deck at a full
+// table. A fact, never a warning: outside the range says how the map differs, not that it is wrong.
+function OfficialFigures({ official, stats }: { official: { players: number; crowded: number; loadRatio: number | null; unusedPct: number; maxPerStop: number }; stats: NetworkStats }) {
+  const hubs = [...stats.hubDegree.values()];
+  const hubMean = hubs.length ? hubs.reduce((sum, value) => sum + value, 0) / hubs.length : null;
+  const span = ([low, high]: [number, number], unit = "") => `${low}–${high}${unit}`;
+  const rows: [string, string, string][] = [
+    ["Crowded routes at a full table", `${official.crowded} (${official.players} players)`, span(BALANCE_OFFICIAL.crowded)],
+    ["Double routes: their ticket traffic against single ones", official.loadRatio === null ? "no double routes" : `${official.loadRatio.toFixed(1)}×`, span(BALANCE_OFFICIAL.loadRatio, "×")],
+    ["Routes no ticket needs", `${Math.round(official.unusedPct)} %`, span(BALANCE_OFFICIAL.unusedPct, " %")],
+    ["Most tickets on one stop", String(official.maxPerStop), span(BALANCE_OFFICIAL.maxPerStop)],
+    ["Average hub degree", hubMean === null ? "no stops" : hubMean.toFixed(1), span(BALANCE_OFFICIAL.hubDegree)],
+  ];
+  return <div className="analysis-section against-official">
+    <h3>Against the official maps</h3>
+    <p className="helper">This map beside what the eight official maps measure, each with its own deck at a full table. Outside the range is not a fault: it says how this map differs.</p>
+    <div className="analysis-table-scroll"><table className="analysis-table official-table">
+      <thead><tr><th>Figure</th><th>This map</th><th>Official maps</th></tr></thead>
+      <tbody>{rows.map(([label, here, range]) => <tr key={label}><td>{label}</td><td>{here}</td><td>{range}</td></tr>)}</tbody>
+    </table></div>
+  </div>;
+}
+
 // What it warns of comes with something to do: a second lane for a route that cuts the map with one,
 // and the stop itself, selected, for a stop no route reaches. Dead ends and corners are character.
 function NetworkShapeSection({ data, onPreviewRoutes, onPreviewStop, onAddParallel, onSelectStop }: { data: MapData; onPreviewRoutes: (routeIds: string[] | null) => void; onPreviewStop: (stopId: string | null) => void; onAddParallel: (routeId: string) => void; onSelectStop: (stopId: string) => void }) {

@@ -9,6 +9,7 @@ This file is written from `app/version.ts` by `npm run changelog`; edit the note
 Changes since the last release, to go into the next version.
 
 - A damaged map file opens with what can be used, and says what was left out and why; a file that holds no map at all is refused with a reason, and the map you had stays as it was.
+- Map balance opens with the map against the official maps: crowded routes at a full table, the ticket traffic on double routes against single ones, routes no ticket needs, the busiest stop and the average hub degree, each beside what the eight official maps measure.
 - The Rules panel has Print the rules, for the rules alone on pages of their own.
 - The print dialog says how to save a run as a PDF, and the file is named after the map, its version, what it holds and the date.
 - A page of the balance figures can go with a print run, or alone: the network, crossings, how it holds together, crowding and the routes by colour and length, as they stand at that version.

@@ -5,9 +5,6 @@ in the same commit as the work (AGENTS.md).
 
 ## Agreed and next
 
-- **The official range beside every balance figure** (step one of uneven maps, the rest of it): routes
-  no ticket needs (official 7–21 %), most tickets on one stop (4–9), traffic on double routes against
-  single ones (1.4–3.1), average hub degree, colour balance. Stated as a fact, never as a warning.
 - **Intended chokepoints and hubs**: a route marked *contested on purpose*, a stop marked *hub*, in
   Properties. Map balance lists them as intended instead of among the crowded, and Build a full deck
   of tickets keeps sending tickets through them. Stored in the map file as an addition.
@@ -54,6 +51,6 @@ in the same commit as the work (AGENTS.md).
 
 ## The case for uneven maps
 
-`docs/PROPOSAL-UNEVEN-MAPS.md` has the measurements. Built: crowding set against the official range,
+`docs/PROPOSAL-UNEVEN-MAPS.md` has the measurements. Built: every balance figure beside the official range (Against the official maps), crowding set against it,
 and how the network holds together (dead ends, routes that cut the map in two, corners), with buttons
 for what it warns of. The rest is above.

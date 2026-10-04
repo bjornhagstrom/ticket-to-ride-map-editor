@@ -537,6 +537,11 @@ export type NetworkShape = {
 /** Measured on the eight calibration maps (tests/network-shape.cjs checks Europe and the USA). */
 /** Routes more tickets want than they can carry, at the largest table each official map is for. */
 export const CROWDING_OFFICIAL: [number, number] = [8, 19];
+/** The official range beside each balance figure, measured on the eight calibration maps with their own
+ *  decks at the largest table each is for (tests/balance-official.cjs measures them again): crowded
+ *  routes, mean ticket load on double routes against single ones, routes no ticket needs (%), most
+ *  tickets on one stop, and the average hub degree. */
+export const BALANCE_OFFICIAL = { crowded: [8, 19] as [number, number], loadRatio: [1.3, 3.1] as [number, number], unusedPct: [7, 21] as [number, number], maxPerStop: [4, 9] as [number, number], hubDegree: [7.6, 10.8] as [number, number] };
 export const SHAPE_OFFICIAL = { maps: 8, mapsWithDeadEnds: 1, mapsWithBridges: 1, singleLaneBridges: 0, mapsWithCorners: 4, cornersPerMap: [0, 3] as [number, number] };
 
 export function networkShape(data: MapData): NetworkShape {

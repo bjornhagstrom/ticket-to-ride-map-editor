@@ -3642,6 +3642,28 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     await pp.context().close();
   }
 
+  // 50. Every balance figure beside the official range, as a fact: crowded routes at a full table,
+  // traffic on double routes against single ones, routes no ticket needs, most tickets on one stop,
+  // and the average hub degree.
+  {
+    const ob = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
+    ob.on("pageerror", (e) => errors.push(String(e)));
+    await ob.goto(BASE, { waitUntil: "networkidle" });
+    await ob.getByRole("button", { name: "Load the example map" }).click();
+    await ob.waitForTimeout(600);
+    await ob.getByRole("button", { name: "Map balance", exact: true }).click();
+    await ob.waitForTimeout(800);
+    const section = ob.locator(".analysis-section.against-official");
+    check("Map balance opens with the map against the official maps", (await section.count()) === 1 && (await ob.locator(".balance-panel .analysis-section").first().evaluate((el) => el.classList.contains("against-official"))));
+    const rows = await section.locator("tbody tr").evaluateAll((trs) => trs.map((tr) => Array.from(tr.cells).map((c) => c.textContent.trim())));
+    const labels = rows.map((r) => r[0]).join(" | ");
+    check("with crowded routes, double-route traffic, unneeded routes, the busiest stop and the hub degree", ["Crowded routes", "Double routes", "no ticket needs", "one stop", "hub degree"].every((w) => labels.includes(w)), labels);
+    check("each with this map's figure and the official range", rows.every((r) => r.length === 3 && r[1] !== "" && /\d.*–.*\d/.test(r[2])), JSON.stringify(rows));
+    check("and nothing in it is a warning", (await section.locator(".has-warning, .helper-warning, .analysis-warning-row").count()) === 0);
+    check("the hub degree advice is the official range, not a guess", !/roughly 4–6/.test(await ob.locator("body").textContent()));
+    await ob.context().close();
+  }
+
   console.log("PASS:"); ok.forEach((l) => console.log("  ✓ " + l));
   if (bad.length) { console.log("FAIL:"); bad.forEach((l) => console.log("  ✗ " + l)); }
   console.log(`\n${ok.length} passed, ${bad.length} failed`);
