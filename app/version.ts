@@ -11,6 +11,9 @@ export type Release = { version: string; date: string; title: string; changes: s
 // decided; the What's new page in the editor shows released versions only.
 export const UNRELEASED: string[] = [
   "A damaged map file opens with what can be used, and says what was left out and why; a file that holds no map at all is refused with a reason, and the map you had stays as it was.",
+  "The Rules panel has Print the rules, for the rules alone on pages of their own.",
+  "The print dialog says how to save a run as a PDF, and the file is named after the map, its version, what it holds and the date.",
+  "A page of the balance figures can go with a print run, or alone: the network, crossings, how it holds together, crowding and the routes by colour and length, as they stand at that version.",
   "Standing ticket cards have their points at the top, beside the cities, so the small map below is larger; lying cards keep the points in their corner.",
   "Start over is under Settings, on the Map page: it says what goes, offers to export the map first, asks before it does anything, and Undo brings the map back. The Clear map button at the foot of the tools is gone.",
   "In smaller windows the map shrinks to the room there is instead of running in under the Properties column, a tablet no longer scrolls sideways, and on a phone every button in the header shows.",

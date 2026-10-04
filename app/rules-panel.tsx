@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Bold, Heading, Italic, List, ListOrdered, MapPin, Minus, Quote, Route as RouteIcon, Table } from "lucide-react";
+import { Bold, Heading, Italic, List, ListOrdered, MapPin, Minus, Printer, Quote, Route as RouteIcon, Table } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import type { MapData } from "./map-data";
@@ -73,7 +73,9 @@ function insertBlock(el: HTMLTextAreaElement, block: string, selectFrom: number,
   edit(el, at, to, `${lead}${block}\n`, at + lead.length + selectFrom, at + lead.length + selectTo);
 }
 
-export function RulesPanel({ pickRef, onPicking, data, wide, onToggleWide, onClose, onChange, hover }: {
+export function RulesPanel({ pickRef, onPicking, data, wide, onToggleWide, onClose, onChange, hover, onPrint }: {
+  // Prints the rules alone, on pages of their own, with what is written now.
+  onPrint: () => void;
   pickRef: React.MutableRefObject<{ stop: (stopId: string) => boolean; cancel: () => boolean } | null>;
   onPicking: (picking: boolean) => void;
   data: MapData;
@@ -163,7 +165,7 @@ export function RulesPanel({ pickRef, onPicking, data, wide, onToggleWide, onClo
         <small>Headings with #, lists with - or 1., **bold**, *italic*, tables with |, a line across with ---, quotes with &gt;.</small>
       </div>
       <div className="rules-view">
-        <span className="rules-view-label">Preview</span>
+        <div className="rules-view-head"><span className="rules-view-label">Preview</span><Button size="sm" variant="outline" disabled={!written} onClick={() => { commit(draft); onPrint(); }}><Printer />Print the rules</Button></div>
         <div className="rules-preview">{written ? <RulesText source={draft} data={data} hover={hover} /> : <p className="helper">Nothing written yet.</p>}</div>
       </div>
     </div>

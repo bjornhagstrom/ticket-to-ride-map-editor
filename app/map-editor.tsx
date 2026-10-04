@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
 import { MapArtwork, type Tool } from "./map-artwork";
 import { AnalysisPanel, StopTicketsDialog, SuggestionsPanel, SuggestTicketsDialog, TicketsPanel, WelcomeGuide } from "./map-dialogs";
 import { TicketCoveragePanel, type CoverageSort, BackgroundImageProperties, BackgroundProperties, NoteProperties, RouteProperties, StopProperties, StylePicker } from "./map-properties";
-import { PrintDialog, PrintPages, type PrintParts } from "./map-print";
+import { PrintDialog, PrintPages, printTitle, type PrintParts } from "./map-print";
 import { ImageStage } from "./map-image";
 import { RulesPanel } from "./rules-panel";
 import { type TicketLengthsView } from "./ticket-lengths";
@@ -125,7 +125,7 @@ export function MapEditor() {
   const [printParts, setPrintParts] = useState<PrintParts>({ board: true, tickets: false, rules: true, playtest: true });
   useEffect(() => { queueMicrotask(() => { try {
     const stored = localStorage.getItem(PRINT_PARTS_KEY);
-    if (stored) { const parsed = JSON.parse(stored) as Partial<PrintParts>; setPrintParts({ board: Boolean(parsed.board), tickets: Boolean(parsed.tickets), rules: Boolean(parsed.rules), playtest: parsed.playtest !== false }); return; }
+    if (stored) { const parsed = JSON.parse(stored) as Partial<PrintParts>; setPrintParts({ board: Boolean(parsed.board), tickets: Boolean(parsed.tickets), rules: Boolean(parsed.rules), playtest: parsed.playtest !== false, balance: Boolean(parsed.balance) }); return; }
     const old = localStorage.getItem(PRINT_RULES_KEY);
     if (old === "off" || old === "board") setPrintParts({ board: true, tickets: false, rules: false, playtest: true });
     else if (old === "rules") setPrintParts({ board: false, tickets: false, rules: true, playtest: true });
@@ -153,7 +153,7 @@ export function MapEditor() {
   const [showTickets, setShowTickets] = useState(false);
   const [ticketSetId, setTicketSetId] = useState(defaultTicketSet.id);
   // "deck" is the Print deck button in the Tickets panel: just the cards, whatever is ticked in the print dialog.
-  const [printScope, setPrintScope] = useState<"map" | "deck">("map");
+  const [printScope, setPrintScope] = useState<"map" | "deck" | "rules">("map");
   const [pickTo, setPickTo] = useState<Point | null>(null);
   const [hoveredStop, setHoveredStop] = useState<string | null>(null);
   const [coverageSort, setCoverageSort] = useState<CoverageSort>({ column: "stop", descending: false });
@@ -268,8 +268,8 @@ export function MapEditor() {
   // no rules text has no rules.
   // On one page the size of the board nothing else fits: the tickets and the rules are printed apart.
   const onePageRun = printChoice.split === "page";
-  const printPartsNow: PrintParts = { board: printParts.board, tickets: printParts.tickets && ticketsHere.length > 0 && !onePageRun, rules: printParts.rules && Boolean(data.rules?.trim()) && !onePageRun, playtest: printParts.playtest };
-  const runParts: PrintParts = printScope === "deck" ? { board: false, tickets: true, rules: false, playtest: false } : printPartsNow;
+  const printPartsNow: PrintParts = { board: printParts.board, tickets: printParts.tickets && ticketsHere.length > 0 && !onePageRun, rules: printParts.rules && Boolean(data.rules?.trim()) && !onePageRun, playtest: printParts.playtest, balance: Boolean(printParts.balance) && !onePageRun };
+  const runParts: PrintParts = printScope === "deck" ? { board: false, tickets: true, rules: false, playtest: false } : printScope === "rules" ? { board: false, tickets: false, rules: true, playtest: false } : printPartsNow;
   // The map's version, worked out from a deferred copy so dragging a stop never waits for it.
   const deferredData = useDeferredValue(data);
   const versionNow = useMemo(() => versionStatus(deferredData), [deferredData]);
@@ -489,7 +489,17 @@ export function MapEditor() {
     let seen = 0;
     const wait = () => {
       seen += 1;
-      if ((seen >= frames && settled()) || performance.now() - started > 1500) { window.print(); setPrintScope("map"); return; }
+      if ((seen >= frames && settled()) || performance.now() - started > 1500) {
+        // The page's title names the saved PDF: the map, its version, what the run holds, the date.
+        const title = document.title;
+        document.title = printTitle(data, runParts, new Date());
+        const restore = () => { document.title = title; window.removeEventListener("afterprint", restore); };
+        window.addEventListener("afterprint", restore);
+        window.print();
+        restore();
+        setPrintScope("map");
+        return;
+      }
       frame = requestAnimationFrame(wait);
     };
     frame = requestAnimationFrame(wait);
@@ -755,6 +765,7 @@ export function MapEditor() {
   const exportTickets = (scope: "set" | "all") => { const { number } = issue("export"); const ids = scope === "all" ? data.ticketSets.map((set) => set.id) : [activeTicketSet.id]; downloadJson(writeMapFile("tickets", buildTicketFile(data, ids), data), `${data.name} v${number} ${scope === "all" ? "tickets" : activeTicketSet.label}`); };
   const exportTicketsCsv = (scope: "set" | "all") => { const { number } = issue("export"); downloadCsv(ticketsCsv(data, scope === "all" ? data.ticketSets.map((set) => set.id) : [activeTicketSet.id]), `${data.name} v${number} ${scope === "all" ? "tickets" : activeTicketSet.label}`); };
   const exportCsv = (text: (d: MapData) => string, what: string) => { const { number } = issue("export"); downloadCsv(text(data), `${data.name} v${number} ${what}`); };
+  const printRules = () => { issue("print"); setPrintScope("rules"); setPrintRequest((count) => count + 1); };
   const printTickets = () => { setShowTickets(false); issue("print"); setPrintScope("deck"); setPrintRequest((count) => count + 1); };
   // The board's print run: the playtest box is put on the map first if asked for and not there yet (an
   // ordinary change, so it can be undone or moved), then the run gets its number.
@@ -988,7 +999,7 @@ export function MapEditor() {
           onExport={exportTickets} onExportCsv={exportTicketsCsv} onImport={() => fileRef.current?.click()} onPrint={printTickets} onStartFrom={startTicketFrom} onSuggest={openSuggest}
           onUpdate={(ticketId, values) => change((draft) => { const ticket = draft.tickets.find((item) => item.id === ticketId); if (ticket) Object.assign(ticket, { ...values, long: values.long === false ? undefined : values.long ?? ticket.long }); return draft; })}
           onDelete={(ticketId) => { change((draft) => { draft.tickets = draft.tickets.filter((item) => item.id !== ticketId); return draft; }); setSelectedTicket((current) => current === ticketId ? null : current); }}  />}
-        {showRules && <RulesPanel pickRef={rulesPickRef} onPicking={setRulesPicking} data={data} wide={rightWidth >= RIGHT_WIDTH_WIDE} onToggleWide={() => (rightWidth >= RIGHT_WIDTH_WIDE ? resetRight() : resizeRight(RIGHT_WIDTH_WIDE))} onClose={() => setShowRules(false)} onChange={(text) => change((draft) => ({ ...draft, rules: text.trim() ? text : undefined }))} hover={{ stop: setBalanceStop, routes: (ids) => setBalanceRoutes(ids ? new Set(ids) : null) }} />}
+        {showRules && <RulesPanel onPrint={printRules} pickRef={rulesPickRef} onPicking={setRulesPicking} data={data} wide={rightWidth >= RIGHT_WIDTH_WIDE} onToggleWide={() => (rightWidth >= RIGHT_WIDTH_WIDE ? resetRight() : resizeRight(RIGHT_WIDTH_WIDE))} onClose={() => setShowRules(false)} onChange={(text) => change((draft) => ({ ...draft, rules: text.trim() ? text : undefined }))} hover={{ stop: setBalanceStop, routes: (ids) => setBalanceRoutes(ids ? new Set(ids) : null) }} />}
         {showSuggestions && <SuggestionsPanel suggestions={suggestions} onAdd={addSuggestedRoute} onHover={setHoveredSuggestion} onClose={() => { setShowSuggestions(false); setHoveredSuggestion(null); }} />}
         <div className="panel-heading"><span>{tool === "ticket" ? "Ticket coverage" : "Properties"}</span><small title={tool === "ticket" ? activeTicketSet.label : undefined}>{tool === "ticket" ? `${activeTicketSet.label} · ${ticketsHere.length} ticket${ticketsHere.length === 1 ? "" : "s"}` : imageSelected ? "Background image selected" : selectedN ? "Note selected" : selectedB ? "Background object selected" : selectedR ? "Route selected" : selectedS ? "Stop selected" : "Select an object on the map"}</small></div>
         {tool === "ticket" && <TicketCoveragePanel rows={coverageRows} deck={activeTicketSet.label} cuts={bandCuts(ticketDiameter, bandsOf(data))} onEditMix={() => openStyles({ kind: "ticket" })} sort={coverageSort} onSort={setCoverageSort} onlyUncovered={onlyUncovered} onOnlyUncovered={setOnlyUncovered} onOpen={(stopId, band) => setStopTicketView({ stopId, band })} />}

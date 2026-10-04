@@ -643,10 +643,13 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   check("the dialog says to print upright, the default, and never asks for Landscape", /portrait|upright/i.test(foot) && !/choose Landscape/i.test(foot), foot);
   check("which spells out what the percentage means", /100\s%[^.]*real size|real size[^.]*100\s%/i.test(described.description), described.description);
   check("every cell says sheets, not just a number", /\d+ sheets?/.test(described.cell), described.cell);
+  // Measured within the dialog's own content, its scrolling counted in: the dialog may scroll to show
+  // a picked cell, and that is not the table moving.
   const layout = () => page.evaluate(() => {
-    const table = document.querySelector('[role="dialog"] .print-table');
-    const box = table.getBoundingClientRect();
-    return { x: box.x, y: box.y, columns: Array.from(table.querySelectorAll("thead th")).map((th) => th.getBoundingClientRect().x) };
+    const dialog = document.querySelector('[role="dialog"]');
+    const table = dialog.querySelector(".print-table");
+    const box = table.getBoundingClientRect(), frame = dialog.getBoundingClientRect();
+    return { x: box.x - frame.x + dialog.scrollLeft, y: box.y - frame.y + dialog.scrollTop, columns: Array.from(table.querySelectorAll("thead th")).map((th) => th.getBoundingClientRect().x - frame.x + dialog.scrollLeft) };
   });
   const start = await layout();
   const moves = [];
@@ -3590,6 +3593,53 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     await op2.waitForTimeout(400);
     check("and Undo brings the map back", (await stored()).stops.length === 15);
     await op2.context().close();
+  }
+
+  // 49. Printing and PDF: the rules can be printed alone from the Rules panel; the print dialog says it
+  // saves a PDF too; a run is titled so the saved file is named after the map, its version, what it
+  // holds and the date; and a page of the balance figures can go with it, as they stood.
+  {
+    const pp = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
+    pp.on("pageerror", (e) => errors.push(String(e)));
+    await pp.goto(BASE, { waitUntil: "networkidle" });
+    await pp.getByRole("button", { name: "Load the example map" }).click();
+    await pp.waitForTimeout(600);
+    const stub = () => pp.evaluate(() => { window.__run = null; window.print = () => { const root = document.querySelector(".print-pages"); window.__run = { title: document.title, boards: root.querySelectorAll(".print-page").length, cards: root.querySelectorAll(".ticket-card").length, rules: root.querySelectorAll(".print-rules").length, balance: (root.querySelector(".print-balance") || { textContent: "" }).textContent.replace(/\s+/g, " ") }; }; });
+    const run = async () => { await pp.waitForFunction(() => window.__run !== null, null, { timeout: 5000 }); await pp.waitForTimeout(300); return pp.evaluate(() => window.__run); };
+    const today = await pp.evaluate(() => { const d = new Date(); const z = (n) => String(n).padStart(2, "0"); return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}`; });
+    // The rules alone, from the Rules panel.
+    await pp.getByRole("button", { name: "Rules", exact: true }).click();
+    await pp.waitForTimeout(400);
+    await stub();
+    await pp.locator(".rules-panel").getByRole("button", { name: "Print the rules" }).click();
+    const rulesRun = await run();
+    check("the Rules panel prints the rules alone", rulesRun.rules === 1 && rulesRun.boards === 0 && rulesRun.cards === 0, JSON.stringify(rulesRun));
+    check("titled for a file named after the map, its version, the rules and the date", rulesRun.title.startsWith("Example map · v1 · rules · ") && rulesRun.title.endsWith(today), rulesRun.title);
+    check("and the page's own title is back after the print", !/· rules ·/.test(await pp.title()), await pp.title());
+    // The print dialog: PDF, the balance page, the file name.
+    await pp.getByRole("button", { name: "Print map" }).click();
+    await pp.waitForTimeout(400);
+    const dialog = pp.getByRole("dialog", { name: "Print the map" });
+    check("the print dialog says it can save a PDF, and how", /Save as PDF/.test(await dialog.textContent()));
+    const balance = dialog.getByRole("checkbox", { name: "Print a page of the balance figures", exact: true });
+    check("it offers a page of the balance figures, not ticked unless asked for", (await balance.count()) === 1 && !(await balance.isChecked()));
+    await balance.check();
+    if (!(await dialog.getByRole("checkbox", { name: "Print the rules", exact: true }).isChecked())) await dialog.getByRole("checkbox", { name: "Print the rules", exact: true }).check();
+    await stub();
+    await dialog.getByRole("button", { name: "Print", exact: true }).click();
+    const full = await run();
+    check("a run's title names what it holds: board, rules and balance", /^Example map · v[0-9]+ · board, rules, balance · [0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(full.title), full.title);
+    check("the balance page has the figures as they stand", ["stops", "routes", "crossings", "dead end", "crowded", "Grey", "Version "].every((w) => full.balance.includes(w)), full.balance.slice(0, 400));
+    // The balance page alone is a run of its own.
+    await pp.getByRole("button", { name: "Print map" }).click();
+    await pp.waitForTimeout(400);
+    for (const name of ["Print the board", "Print the tickets", "Print the rules"]) { const box = dialog.getByRole("checkbox", { name, exact: true }); if (await box.isChecked()) await box.uncheck(); }
+    check("with only the balance page ticked, there is still something to print, and the dialog says what", await dialog.getByRole("button", { name: "Print", exact: true }).isEnabled() && /balance/i.test(await dialog.locator(".print-summary").textContent()), await dialog.locator(".print-summary").textContent());
+    await stub();
+    await dialog.getByRole("button", { name: "Print", exact: true }).click();
+    const alone = await run();
+    check("and it prints the balance page alone", alone.boards === 0 && alone.cards === 0 && alone.rules === 0 && /Map balance/.test(alone.balance), JSON.stringify({ ...alone, balance: alone.balance.slice(0, 40) }));
+    await pp.context().close();
   }
 
   console.log("PASS:"); ok.forEach((l) => console.log("  ✓ " + l));

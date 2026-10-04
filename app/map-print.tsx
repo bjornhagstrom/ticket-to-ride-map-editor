@@ -6,12 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { useId } from "react";
-import { mapFormats, ticketsInSet, type MapData, type MapFormat } from "./map-data";
+import { colorLabels, mapFormats, ticketsInSet, type MapData, type MapFormat } from "./map-data";
 import { boardOf, type Orientation } from "./board";
 import { curvedPath, isCurved, pathFromPoints, pointsFor } from "./map-geometry";
 import { MapArtwork } from "./map-artwork";
 import { RulesText } from "./rules-text";
 import { versionLabel, versionStatus, type VersionStatus } from "./map-version";
+import { colourLengthTable, crossings, networkShape } from "./map-analysis";
+import { evaluateTicketDeck } from "./ticket-suggester";
 import { CUT_MARK_GAP_MM, CUT_MARK_REACH_MM, describePlan, papers, PRINT_CAPTION_MM, PRINT_MARGIN_MM, printChoices, type PrintChoice, printPlan, type PrintPlan, type PrintProfile, sameChoice, splits, cardSheets, cardSize, cardsPerRow } from "./print-plan";
 
 // Tickets print as cut-out cards on plain paper. The same print-and-cut workflow as the board
@@ -94,7 +96,15 @@ export function TicketCards({ data, setId, perRow }: { data: MapData; setId: str
 // from printPlan, in millimetres, so the pages cannot disagree with what the dialog promised.
 // What a print run holds, in the order it is printed: the board, then the tickets as cards, then the rules.
 // `playtest`: the yellow box on the board for the version, the date played and the players.
-export type PrintParts = { board: boolean; tickets: boolean; rules: boolean; playtest: boolean };
+export type PrintParts = { board: boolean; tickets: boolean; rules: boolean; playtest: boolean; balance?: boolean };
+
+/** The page title while a run prints, which browsers use to name a saved PDF:
+ *  "Example map · v3 · board, tickets · 2026-10-05". */
+export function printTitle(data: Pick<MapData, "name" | "mapVersion">, parts: PrintParts, date: Date): string {
+  const what = [parts.board && "board", parts.tickets && "tickets", parts.rules && "rules", parts.balance && "balance"].filter(Boolean).join(", ");
+  const z = (n: number) => String(n).padStart(2, "0");
+  return [data.name.trim() || "Map", data.mapVersion ? `v${data.mapVersion.number}` : null, what || null, `${date.getFullYear()}-${z(date.getMonth() + 1)}-${z(date.getDate())}`].filter(Boolean).join(" · ");
+}
 
 // The width of the frame round a printed sheet, in mm; editor-additions.css draws it at this width.
 const FRAME_LINE_MM = 0.3;
@@ -150,11 +160,44 @@ export function PrintPages({ data, plan, parts, setId }: { data: MapData; plan: 
     {/* The rules, if asked for, on pages of their own after the board: as many as the text needs,
         flowing in the same page box as the board's pages. */}
     {parts.tickets && <TicketCards data={data} setId={setId} perRow={cardsPerRow(plan.pageMm, cardSize(data.format, format.orientation))} />}
+    {parts.balance && <PrintBalance data={data} setId={setId} />}
     {parts.rules && data.rules?.trim() && <section className="print-rules">
       <p className="print-rules-name">{data.name} · rules{data.mapVersion ? ` · version ${data.mapVersion.number}` : ""}</p>
       <RulesText source={data.rules} data={data} print />
     </section>}
   </div>;
+}
+
+// The balance figures as they stand when the run prints, on a page of their own: what the editor
+// thought of the map at this version, so a printed or saved milestone keeps that too.
+function PrintBalance({ data, setId }: { data: MapData; setId: string }) {
+  const version = versionLabel(versionStatus(data));
+  const shape = networkShape(data);
+  const crossingCount = crossings(data).length;
+  const players = data.players?.max ?? 5;
+  const report = evaluateTicketDeck(data, { setId, atTable: players });
+  const table = colourLengthTable(data);
+  const deck = ticketsInSet(data, setId);
+  const set = data.ticketSets.find((item) => item.id === setId);
+  const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+  const rows: [string, string][] = [
+    ["Network", `${plural(data.stops.length, "stop")}, ${plural(data.routes.length, "route")}, ${plural(data.routes.reduce((sum, route) => sum + route.length, 0), "wagon space")}`],
+    ["Crossings", crossingCount ? `${plural(crossingCount, "crossing")} between routes` : "no crossings"],
+    ["How it holds together", [plural(shape.deadEnds.length, "dead end"), plural(shape.bridges.length, "route that cuts the map in two", "routes that cut the map in two"), plural(shape.corners.length, "corner"), shape.unconnected.length ? plural(shape.unconnected.length, "stop with no route", "stops with no route") : null].filter(Boolean).join(", ")],
+    ["Tickets", `${plural(deck.length, "ticket")} in ${set?.label ?? "the deck"}`],
+    ["Crowded at a full table", `${plural(report.bottlenecks.length, "crowded route")} with ${players} players, the most this map is for (official maps have 8–19 at a full table)`],
+    ["Routes no ticket needs", `${Math.round(report.unusedPct)} %`],
+  ];
+  return <section className="print-balance">
+    <p className="print-rules-name">{data.name} · balance{version ? ` · ${version}` : ""}</p>
+    <h1>Map balance</h1>
+    <dl>{rows.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
+    <h2>Routes by colour and length</h2>
+    <table>
+      <thead><tr><th>Length</th>{table.colours.map((colour) => <th key={colour}>{colorLabels[colour] ?? colour}</th>)}<th>All</th></tr></thead>
+      <tbody>{table.lengths.map((length) => <tr key={length}><td>{length}</td>{table.colours.map((colour) => <td key={colour}>{table.counts.get(length)?.get(colour) ?? 0}</td>)}<td>{table.colours.reduce((sum, colour) => sum + (table.counts.get(length)?.get(colour) ?? 0), 0)}</td></tr>)}</tbody>
+    </table>
+  </section>;
 }
 
 // Printing is decided per run. Nothing chosen here is written to the map; the last choice is kept
@@ -181,15 +224,16 @@ export function PrintDialog({ open, onOpenChange, format, orientation = "landsca
   const boardIn = parts.value.board;
   // The whole board on one page the size of the board: the paper is the board's own, and nothing else fits on it.
   const onePage = current.split === "page";
-  const anything = parts.value.board || parts.value.tickets || parts.value.rules;
+  const anything = parts.value.board || parts.value.tickets || parts.value.rules || Boolean(parts.value.balance && !onePage);
   const paperLabel = papers.find((paper) => paper.id === current.paper)?.label ?? "the paper";
   const cards = cardSheets(parts.ticketCount, plan.pageMm, cardSize(format, orientation));
   // One sentence for the whole run, in the order it prints.
-  const summary = !anything ? "Nothing is ticked: tick at least one of the board, the tickets and the rules."
+  const summary = !anything ? "Nothing is ticked: tick at least one of the board, the tickets, the rules and the balance figures."
     : [
       parts.value.board ? describePlan(plan) : null,
       parts.value.tickets ? `${parts.value.board ? "Then the" : "The"} ${parts.ticketCount} ticket${parts.ticketCount === 1 ? "" : "s"} of ${parts.deckLabel} as cut-out cards, ${cards.sheets} sheet${cards.sheets === 1 ? "" : "s"} of ${paperLabel}.` : null,
       parts.value.rules ? `${parts.value.board || parts.value.tickets ? "Then the rules" : "The rules text"}, on pages of their own${parts.value.board || parts.value.tickets ? "" : ", upright on " + paperLabel + ", as many as it needs"}.` : null,
+      parts.value.balance && !onePage ? `${parts.value.board || parts.value.tickets || parts.value.rules ? "And a" : "A"} page of the balance figures, as they stand at this version.` : null,
     ].filter(Boolean).join(" ");
   return <Dialog open={open} onOpenChange={onOpenChange}>
     <DialogContent className="print-dialog">
@@ -219,6 +263,11 @@ export function PrintDialog({ open, onOpenChange, format, orientation = "landsca
               checked={parts.value.rules} onChange={(event) => parts.onChange({ ...parts.value, rules: event.target.checked })} />
             <span><strong>The rules</strong><small id="print-rules-note">{parts.rulesWritten ? "The rules text, on pages of their own." : "Nothing written yet. Open Rules in the left column to write them."}</small></span>
           </label>
+          <label className="print-option">
+            <input type="checkbox" name="print-balance" aria-label="Print a page of the balance figures" aria-describedby="print-balance-note" disabled={onePage}
+              checked={Boolean(parts.value.balance)} onChange={(event) => parts.onChange({ ...parts.value, balance: event.target.checked })} />
+            <span><strong>The balance figures</strong><small id="print-balance-note">One page: the network, crossings, how it holds together, crowding and the colours by length, as they stand at this version.</small></span>
+          </label>
           {onePage && <p className="helper">The page is the board&apos;s size, so the tickets and the rules are printed separately.</p>}
         </fieldset>
         {boardIn && <fieldset><legend>How it is split</legend>
@@ -247,6 +296,7 @@ export function PrintDialog({ open, onOpenChange, format, orientation = "landsca
         </fieldset>}
       </div>
       <p className="print-summary">{summary}</p>
+      <p className="helper print-pdf-note">To keep it as a file, choose <strong>Save as PDF</strong> as the printer in your browser&apos;s print dialog. The file is named after the map, its version, what it holds and the date.</p>
       <p className="print-version">{version.number === undefined ? "This print will be version 1. Every print and export after a change gets the next number, on every sheet, card and rules page."
         : version.changed ? `This print will be version ${version.next}: the map has changed since version ${version.number}.`
         : `Nothing has changed since version ${version.number}: this print is version ${version.number} too.`}</p>

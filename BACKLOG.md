@@ -14,11 +14,6 @@ in the same commit as the work (AGENTS.md).
 - **Deck tension as a choice**: calm, like the official maps, or tense, in Build a full deck of tickets
   and in the map's deck rules; the middle one calibrated to land inside the official range of crowded
   routes. Today's behaviour stays the default.
-- **Print the rules alone from the Rules panel**, with a button there (the print dialog can already
-  do it by unticking the board and the cards).
-- **Printing and PDF**: say in the print dialog that it saves a PDF too; give the browser a file name
-  worth keeping (map, version, what is printed, date); a page of the balance figures as they stood,
-  ticked in the print dialog, so a printed or saved milestone says what the editor thought of the map.
 - **Illustrations where words fall short** (list to be made, then drawn from the editor's own data):
   line styles, stop types, how the sheets tile the board in the print dialog, label angles.
 - **The tour video in the welcome box**, from YouTube, played only when asked (a picture with a play

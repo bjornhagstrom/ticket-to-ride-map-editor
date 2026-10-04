@@ -415,3 +415,21 @@
   /* The board stands too, so the card's height is what limits the map: it fills that, centred. */
   .ticket-card.standing .ticket-map{grid-column:1/-1;grid-row:2;height:100%;width:auto;max-width:100%;justify-self:center;align-self:stretch}
 }
+
+/* The Rules panel's preview head, with Print the rules beside it. */
+.rules-view-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.print-pdf-note { margin: .2rem 0 0; }
+/* The page of balance figures in a print run. */
+.print-balance { display: none; }
+@media print {
+  .print-balance { display: block; break-before: page; page-break-before: always; padding: 2mm; color: #24211d; font: 10pt "Segoe UI", Arial, sans-serif; }
+  .print-balance h1 { font: 700 16pt Georgia, serif; margin: 2mm 0 4mm; }
+  .print-balance h2 { font: 700 12pt Georgia, serif; margin: 6mm 0 2mm; }
+  .print-balance dl { display: grid; grid-template-columns: max-content 1fr; gap: 1.5mm 6mm; margin: 0; }
+  .print-balance dl > div { display: contents; }
+  .print-balance dt { font-weight: 600; }
+  .print-balance dd { margin: 0; }
+  .print-balance table { border-collapse: collapse; }
+  .print-balance th, .print-balance td { border: .2mm solid #b9b0a2; padding: 1mm 2mm; text-align: right; }
+  .print-balance th:first-child, .print-balance td:first-child { text-align: left; }
+}
