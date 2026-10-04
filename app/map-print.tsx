@@ -89,6 +89,9 @@ export function TicketCards({ data, setId, perRow }: { data: MapData; setId: str
 // What a print run holds, in the order it is printed: the board, then the tickets as cards, then the rules.
 export type PrintParts = { board: boolean; tickets: boolean; rules: boolean };
 
+// The width of the frame round a printed sheet, in mm; editor-additions.css draws it at this width.
+const FRAME_LINE_MM = 0.3;
+
 export function PrintPages({ data, plan, parts, setId }: { data: MapData; plan: PrintPlan; parts: PrintParts; setId: string }) {
   const format = boardOf(data);
   const full = plan.choice.split === "full";
@@ -119,7 +122,9 @@ export function PrintPages({ data, plan, parts, setId }: { data: MapData; plan: 
           <g transform={plan.turned ? `translate(${height} 0) rotate(90)` : undefined}>
             <text className="print-sheet-name" x={2.5} y={PRINT_CAPTION_MM - 2.2}>{data.name}</text>
             <text className="print-sheet-note" x={width - 2.5} y={PRINT_CAPTION_MM - 2.2} textAnchor="end">{caption(page)}</text>
-            <rect className={cn("print-sheet-art", full && "trimmed")} x={0} y={PRINT_CAPTION_MM} width={width} height={artHeight} />
+            {/* The frame's line is centred on the rect's edge: inset by half a line, so all of it is on the
+                sheet. On the edge, a printer that clips at the page box cut off its outer half. */}
+            <rect className={cn("print-sheet-art", full && "trimmed")} x={full ? 0 : FRAME_LINE_MM / 2} y={PRINT_CAPTION_MM + (full ? 0 : FRAME_LINE_MM / 2)} width={full ? width : width - FRAME_LINE_MM} height={full ? artHeight : artHeight - FRAME_LINE_MM} />
             <svg x={0} y={PRINT_CAPTION_MM} width={width} height={artHeight} viewBox={`${page.tile.x * format.width} ${page.tile.y * format.height} ${page.tile.width * format.width} ${page.tile.height * format.height}`}>
               {/* Wagons are always measured against the board the map is drawn for; printing larger or
                   smaller scales them with everything else. */}

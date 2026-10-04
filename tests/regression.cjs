@@ -414,6 +414,10 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
         pageWidthMm: box ? box.width / 96 * 25.4 : 0,
         pageHeightMm: box ? box.height / 96 * 25.4 : 0,
         wagonMm: slot ? +slot.getAttribute("width") * unitPx / 96 * 25.4 : 0,
+        // The frame round the artwork, in the sheet's millimetres: its line is centred on the rect's
+        // edge, so the rect must sit half a line inside the sheet or a printer that clips at the
+        // page box cuts that half off (the left edge went missing on a printed A4).
+        frame: (() => { const rect = first && first.querySelector(".print-sheet-art"); if (!rect) return null; const art = rect.nextElementSibling; const stroke = parseFloat(getComputedStyle(rect).strokeWidth) || 0; return { x: +rect.getAttribute("x"), y: +rect.getAttribute("y"), width: +rect.getAttribute("width"), height: +rect.getAttribute("height"), stroke, trimmed: rect.classList.contains("trimmed"), sheetWidth: +art.getAttribute("width"), top: +art.getAttribute("y"), sheetHeight: +art.getAttribute("y") + +art.getAttribute("height") }; })(),
       };
     };
   });
@@ -460,6 +464,11 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     return { ...printed, promised, summary };
   };
   const panels2x4 = await printFrom("a4", 2);
+  {
+    const f = panels2x4.frame;
+    const inside = f && f.stroke > 0 && f.x >= f.stroke / 2 - 1e-6 && f.x + f.width <= f.sheetWidth - f.stroke / 2 + 1e-6 && f.y >= f.top + f.stroke / 2 - 1e-6 && f.y + f.height <= f.sheetHeight - f.stroke / 2 + 1e-6;
+    check("the frame round the printed map lies wholly inside the sheet, its line included, so no edge is clipped", Boolean(inside), JSON.stringify(f));
+  }
   check("a 2×4 printed per panel is 8 pages", panels2x4.pages === 8, `${panels2x4.pages} pages`);
   check("and printing it left the map as it was", (await storedMap()) === mapBeforePrinting);
 
