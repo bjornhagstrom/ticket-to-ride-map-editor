@@ -23,8 +23,6 @@ in the same commit as the work (AGENTS.md).
   ticked in the print dialog, so a printed or saved milestone says what the editor thought of the map.
 - **Illustrations where words fall short** (list to be made, then drawn from the editor's own data):
   line styles, stop types, how the sheets tile the board in the print dialog, label angles.
-- **Start over**: in Settings, with a warning and a confirmation, and an offer to export first; the
-  Clear map button at the foot of the tools goes.
 - **The tour video in the welcome box**, from YouTube, played only when asked (a picture with a play
   button that loads the player on click), and a link to About.
 - **About** checked against the film and the editor as it is, with screenshots.

@@ -400,3 +400,8 @@
 @media screen and (max-width:720px){
   .header-actions{flex-wrap:wrap;overflow:visible}
 }
+
+/* Start over, last on the Map page of Settings. */
+.start-over { margin-top: 14px; padding-top: 12px; border-top: 1px solid #ddd4c6; display: grid; gap: 6px; }
+.start-over h4 { margin: 0; font-size: 14px; }
+.start-over-actions { display: flex; gap: 8px; flex-wrap: wrap; }

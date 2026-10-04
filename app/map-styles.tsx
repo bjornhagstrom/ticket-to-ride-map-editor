@@ -6,7 +6,7 @@
 import { useMemo } from "react";
 import { boardOf, orientationLabels, orientationOf, type Orientation } from "./board";
 import { BoardPreview } from "./board-preview";
-import { Plus, Trash2 } from "lucide-react";
+import { Download, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { bandCuts, mapDiameter } from "./map-analysis";
 import { DeckRulesPanel } from "./deck-rules-panel";
 import { notchedSlotPath, ovalSlotPath, tunnelSlotPath } from "./map-artwork";
@@ -56,7 +56,9 @@ const clampCount = (raw: string, fallback: number): number => {
   return Number.isFinite(number) && number >= 1 ? number : fallback;
 };
 
-export function SettingsDialog({ open, onOpenChange, target, onTarget, data, change, defaults, onChangeFormat, onChangeOrientation, exportReminder }: {
+export function SettingsDialog({ open, onOpenChange, target, onTarget, data, change, defaults, onChangeFormat, onChangeOrientation, exportReminder, onStartOver, onExport }: {
+  onStartOver: () => void;
+  onExport: () => void;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   target: StyleTarget;
@@ -227,6 +229,12 @@ export function SettingsDialog({ open, onOpenChange, target, onTarget, data, cha
             {/* Last: it belongs to this browser, not to the map. */}
             <label className="checkbox-row export-reminder-setting"><input type="checkbox" checked={exportReminder.on} onChange={(event) => exportReminder.onChange(event.target.checked)} />Remind me to export a copy now and then</label>
             <p className="helper">Your map is saved only in this browser. The reminder comes after a while of work without an export; it can be made rarer from the reminder itself, or turned off here. Kept in this browser, not in the map.</p>
+            {/* Starting over belongs to the whole map, so it sits here, last, behind a confirmation. */}
+            <div className="start-over">
+              <h4>Start over</h4>
+              <p className="helper">Clear this map away and begin again with an empty map. The map is kept only in this browser, so export it first if you want a copy.</p>
+              <div className="start-over-actions"><Button variant="outline" size="sm" onClick={onExport}><Download />Export the map first</Button><Button variant="destructive" size="sm" onClick={onStartOver}><RotateCcw />Start over…</Button></div>
+            </div>
           </div>}
 
           {kind === "defaults" && <div className="style-fields">

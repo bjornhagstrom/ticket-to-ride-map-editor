@@ -48,6 +48,8 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.waitForTimeout(600);
 
   const badges = async () => (await page.locator(".map-status span").allTextContents());
+  // Starting over is in Settings, under Map, behind a confirmation (block 48).
+  const startOver = async (p = page) => { await p.getByRole("button", { name: "Settings" }).click(); await p.waitForTimeout(300); await p.locator(".settings-nav-item", { hasText: /^Map/ }).click(); await p.getByRole("button", { name: "Start over…" }).click(); await p.waitForTimeout(300); await p.getByRole("alertdialog").getByRole("button", { name: "Start over", exact: true }).click(); await p.waitForTimeout(400); };
   // The logo: a route, two stops joined by three wagon spaces, the same everywhere it appears, and
   // no vehicle. The favicon is the same drawing.
   const logoOn = (p) => p.evaluate(() => Array.from(document.querySelectorAll("svg.route-logo")).map((svg) => ({ wagons: svg.querySelectorAll(".route-logo-wagon").length, stops: svg.querySelectorAll(".route-logo-stop").length, label: svg.getAttribute("aria-label"), header: Boolean(svg.closest(".brand, .about-head")) })));
@@ -1515,9 +1517,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   // 26. a background image reaches every edge and can cover the board
   // On a clean board: the image is drawn underneath everything, so on a busy map a click at its
   // middle lands on a route instead of on the image.
-  await page.getByRole("button", { name: "Clear map" }).click();
-  await page.waitForTimeout(300);
-  await page.getByRole("button", { name: "Continue" }).click();
+  await startOver();
   await page.waitForTimeout(500);
   await useTool("Select & move");   // the image only answers the pointer in the select tool
   const probe = path.join(os.tmpdir(), `ttr-probe-${Date.now()}.png`);
@@ -1715,9 +1715,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   check("which closes it", (await page.locator("#settings-format").count()) === 0);
 
   // On a map with nothing on it, it says what is worth doing now and what can wait.
-  await page.getByRole("button", { name: "Clear map" }).click();
-  await page.waitForTimeout(300);
-  await page.getByRole("button", { name: "Continue" }).click();
+  await startOver();
   await page.waitForTimeout(600);
   await page.getByRole("button", { name: "Settings" }).click();
   await page.waitForTimeout(500);
@@ -2142,9 +2140,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
 
   // 33h. suggested routes sit in the right column and show on the map where they would go; the
   // low-connection card lists every stop it means. A blank map with six stops has both.
-  await page.getByRole("button", { name: "Clear map" }).click();
-  await page.waitForTimeout(300);
-  await page.getByRole("button", { name: "Continue" }).click();
+  await startOver();
   await page.waitForTimeout(500);
   if (await page.locator(".settings-foot button").count()) { await page.locator(".settings-foot button").click(); await page.waitForTimeout(300); }
   await tool("Add stop").click();
@@ -2800,7 +2796,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
       ["Print", async () => { await printButton().click(); }],
       ["Settings", async () => { await page.getByRole("button", { name: "Settings" }).click(); }],
       ["Getting started", async () => { await page.getByRole("button", { name: "Help" }).click(); await page.getByRole("menuitem", { name: "Getting started" }).click(); }],
-      ["Clear map", async () => { await page.getByRole("button", { name: "Clear map" }).click(); }],
+      ["Start over", async () => { await page.getByRole("button", { name: "Settings" }).click(); await page.waitForTimeout(300); await page.locator(".settings-nav-item", { hasText: /^Map/ }).click(); await page.getByRole("button", { name: "Start over…" }).click(); }],
     ];
     for (const [label, open] of dialogs) {
       await open();
@@ -3546,6 +3542,49 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     const exportBox = await sp2.getByRole("button", { name: "Export", exact: true }).boundingBox();
     check(`${w} × ${h}: every button in the header can be seen, Export too`, exportBox && exportBox.x >= 0 && exportBox.x + exportBox.width <= w + 1, JSON.stringify(exportBox));
     await sp2.context().close();
+  }
+
+  // 48. Starting over: in Settings, under Map, not at the foot of the tools. It says what goes, offers
+  // to export first, asks before it does anything, and Undo brings the map back.
+  {
+    const op2 = await (await browser.newContext({ viewport: { width: 1500, height: 1000 }, acceptDownloads: true })).newPage();
+    op2.on("pageerror", (e) => errors.push(String(e)));
+    await op2.goto(BASE, { waitUntil: "networkidle" });
+    await op2.getByRole("button", { name: "Load the example map" }).click();
+    await op2.waitForTimeout(600);
+    const stored = () => op2.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")));
+    check("there is no Clear map button among the tools any more", (await op2.getByRole("button", { name: "Clear map" }).count()) === 0);
+    await op2.getByRole("button", { name: "Settings" }).click();
+    await op2.waitForTimeout(300);
+    await op2.locator(".settings-nav-item", { hasText: /^Map/ }).click();
+    const section = op2.locator(".start-over");
+    check("Settings, under Map, has a Start over section that says what it does", (await section.count()) === 1 && /empty map/i.test(await section.textContent()) && /export/i.test(await section.textContent()), await section.textContent().catch(() => ""));
+    check("with a way to export the map first", (await section.getByRole("button", { name: "Export the map first" }).count()) === 1);
+    await section.getByRole("button", { name: "Start over…" }).click();
+    await op2.waitForTimeout(300);
+    const confirm = op2.getByRole("alertdialog");
+    const confirmText = (await confirm.textContent()).replace(/\s+/g, " ");
+    check("it asks first, naming what goes: stops, routes, tickets, rules, notes and background", /Start over with an empty map\?/.test(confirmText) && ["stops", "routes", "tickets", "rules", "notes", "background"].every((w) => confirmText.includes(w)), confirmText);
+    const download = op2.waitForEvent("download");
+    await confirm.getByRole("button", { name: "Export first" }).click();
+    const saved = await download;
+    check("the confirmation itself can export the map first", /\.json$/.test(saved.suggestedFilename()) && (await op2.getByRole("alertdialog").count()) === 1, saved.suggestedFilename());
+    await op2.getByRole("alertdialog").getByRole("button", { name: "Cancel" }).click();
+    await op2.waitForTimeout(300);
+    check("Cancel leaves the map as it was", (await stored()).stops.length === 15);
+    await op2.getByRole("button", { name: "Settings" }).click();
+    await op2.waitForTimeout(300);
+    await op2.locator(".settings-nav-item", { hasText: /^Map/ }).click();
+    await op2.getByRole("button", { name: "Start over…" }).click();
+    await op2.waitForTimeout(300);
+    await op2.getByRole("alertdialog").getByRole("button", { name: "Start over", exact: true }).click();
+    await op2.waitForTimeout(500);
+    const fresh = await stored();
+    check("starting over leaves an empty map, with the playtest box in its corner", fresh.stops.length === 0 && fresh.routes.length === 0 && fresh.tickets.length === 0 && !fresh.rules && fresh.notes.length === 1 && fresh.notes[0].kind === "playtest" && fresh.name === "New map", JSON.stringify({ stops: fresh.stops.length, notes: fresh.notes.length, name: fresh.name }));
+    await op2.getByRole("button", { name: "Undo" }).click();
+    await op2.waitForTimeout(400);
+    check("and Undo brings the map back", (await stored()).stops.length === 15);
+    await op2.context().close();
   }
 
   console.log("PASS:"); ok.forEach((l) => console.log("  ✓ " + l));
