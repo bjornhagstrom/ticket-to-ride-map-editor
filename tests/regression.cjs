@@ -3373,6 +3373,50 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     await ctx.close();
   }
 
+  // 44. Drawing a route between two stops that already have one: it is drawn, since there can be a
+  // reason to do it that way, but the editor says so and how a parallel route is added, and offers to
+  // make it one: a lane that follows the first route's shape and length, in a colour of its own.
+  {
+    const dp = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
+    dp.on("pageerror", (e) => errors.push(String(e)));
+    await dp.goto(BASE, { waitUntil: "networkidle" });
+    await dp.getByRole("button", { name: "Load the example map" }).click();
+    await dp.waitForTimeout(600);
+    const KEY = "ttr-map";
+    const stored = () => dp.evaluate((key) => JSON.parse(localStorage.getItem(key)), KEY);
+    const tap = async (name) => { await dp.evaluate((n) => { const s = Array.from(document.querySelectorAll(".map-canvas .stop")).find((g) => Array.from(g.querySelectorAll("text, title")).some((t) => t.textContent === n)); s.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true })); s.dispatchEvent(new PointerEvent("pointerup", { bubbles: true })); }, name); await dp.waitForTimeout(250); };
+    const pair = (m, a, b) => { const ia = m.stops.find((s) => s.name === a).id, ib = m.stops.find((s) => s.name === b).id; return m.routes.filter((r) => (r.a === ia && r.b === ib) || (r.a === ib && r.b === ia)); };
+    let map = await stored();
+    const lanesBefore = pair(map, "Central", "Deepcut").length;
+    const first = pair(map, "Central", "Deepcut")[0];
+    await dp.locator('.tool-row .tool-button[aria-label="Draw route"]').click();
+    await tap("Central"); await tap("Deepcut");
+    await dp.waitForTimeout(300);
+    map = await stored();
+    check("a route between two stops that already have one is still drawn", pair(map, "Central", "Deepcut").length === lanesBefore + 1);
+    const warning = (await dp.locator("[data-sonner-toast]").allTextContents()).join(" | ");
+    check("but the editor says they already have one", /already/i.test(warning) && /Central/.test(warning) && /Deepcut/.test(warning), warning);
+    check("and how to add a parallel route instead", /Add parallel route/.test(warning), warning);
+    const instead = dp.getByRole("button", { name: "Make it a parallel route instead" });
+    check("and offers to make it one", (await instead.count()) === 1);
+    await instead.click();
+    await dp.waitForTimeout(400);
+    map = await stored();
+    const lanes = pair(map, "Central", "Deepcut");
+    const lane = lanes.at(-1);
+    check("which replaces the route just drawn with a parallel lane", lanes.length === lanesBefore + 1, String(lanes.length));
+    check("that follows the first route's length and shape, in a colour of its own", lane.length === first.length && JSON.stringify(lane.points ?? null) === JSON.stringify(first.points ?? null) && lane.type === first.type && !lanes.slice(0, -1).some((other) => other.color === lane.color), JSON.stringify({ lane, first }));
+    check("and is selected, showing the parallel lines between the stops", /Parallel lines · 2 between these stops/.test(await dp.locator(".property-form, aside").last().textContent()));
+    await dp.keyboard.press("Escape");
+    const drawTool = dp.locator('.tool-row .tool-button[aria-label="Draw route"]');
+    if ((await drawTool.getAttribute("aria-pressed")) !== "true") await drawTool.click();
+    const toastsBefore = await dp.locator("[data-sonner-toast]", { hasText: "already" }).count();
+    await tap("Westport"); await tap("Quarry");
+    await dp.waitForTimeout(300);
+    check("two stops with no route between them draw one without a word", (await dp.locator("[data-sonner-toast]", { hasText: "already" }).count()) <= toastsBefore && pair(await stored(), "Westport", "Quarry").length === 1);
+    await dp.context().close();
+  }
+
   console.log("PASS:"); ok.forEach((l) => console.log("  ✓ " + l));
   if (bad.length) { console.log("FAIL:"); bad.forEach((l) => console.log("  ✗ " + l)); }
   console.log(`\n${ok.length} passed, ${bad.length} failed`);

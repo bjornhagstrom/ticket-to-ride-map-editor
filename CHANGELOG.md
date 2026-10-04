@@ -10,6 +10,7 @@ Changes since the last release, to go into the next version.
 
 - Help on hover waits a moment before it opens, so moving the pointer across the tools no longer flashes one help box after another; resting on something still shows its help.
 - The note that everything is stored in the exported map file now sits with the figures above the map, in the same shape as they are.
+- Drawing a route between two stops that already have one still draws it, but says so, explains how to add a parallel route, and offers to turn it into one that follows the first route's shape and length.
 - Your map is kept in the browser under a new, neutral name. A map kept under the old name is picked up the first time you open the editor, so nothing is lost.
 
 ## 0.4.0 · 2026-10-03

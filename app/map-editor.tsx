@@ -499,6 +499,19 @@ export function MapEditor() {
     applyGuideChoice(kind === "blank" ? emptyMap : initialMap);
   };
 
+  const addParallelRoute = (routeId: string) => {
+    const id = `r-${Date.now()}`;
+    change((draft) => {
+      const source = draft.routes.find((item) => item.id === routeId);
+      if (!source) return draft;
+      const siblings = draft.routes.filter((item) => samePair(item, source));
+      const used = new Set(siblings.map((item) => item.color));
+      const colour = Object.keys(routeColors).find((key) => key !== "neutral" && !used.has(key)) ?? source.color;
+      draft.routes.push({ ...source, id, color: colour, points: source.points?.map((point) => ({ ...point })) });
+      return draft;
+    });
+    setSelectedRoute(id);
+  };
   const chooseStop = (id: string) => {
     if (tool === "route") {
       if (!routeStart) { setRouteStart(id); setPickTo(null); setJustDrawn(null); return; }
@@ -506,9 +519,16 @@ export function MapEditor() {
       const from = stopById(data, routeStart), to = stopById(data, id);
       const length = routeLength === "fit" ? fittingLength(from && to ? Math.hypot(from.x - to.x, from.y - to.y) : 0, scaleWidthMm) : routeLength;
       const routeId = `r-${Date.now()}`;
+      // Two stops that already have a route: it is drawn all the same, since there can be a reason for
+      // it, but a second lane is usually meant, so the editor says how to add one and offers to.
+      const existing = data.routes.find((route) => samePair(route, { a: routeStart, b: id } as Route));
       change((draft) => { draft.routes.push({ id: routeId, a: routeStart, b: id, length, type: routeType, color: routeColor, lineStyle: routeLineStyle, curved: routeCurved ? undefined : false }); return draft; });
       setRouteStart(null);
       setJustDrawn(routeId);
+      if (existing) toast.warning(`${from?.name ?? "These stops"} and ${to?.name ?? "this stop"} already have a route between them. For a double route, select it and choose Add parallel route under Properties: the new lane follows its shape and length, in a colour of its own.`, {
+        duration: 15000,
+        action: { label: "Make it a parallel route instead", onClick: () => { change((draft) => { draft.routes = draft.routes.filter((route) => route.id !== routeId); return draft; }); setJustDrawn(null); addParallelRoute(existing.id); } },
+      });
       return;
     }
     if (tool === "ticket") {
@@ -673,19 +693,6 @@ export function MapEditor() {
 
   // A classic double route: a second line between the same two stops, in a colour that pair does
   // not use yet. Both lines are drawn side by side automatically by parallelPoints.
-  const addParallelRoute = (routeId: string) => {
-    const id = `r-${Date.now()}`;
-    change((draft) => {
-      const source = draft.routes.find((item) => item.id === routeId);
-      if (!source) return draft;
-      const siblings = draft.routes.filter((item) => samePair(item, source));
-      const used = new Set(siblings.map((item) => item.color));
-      const colour = Object.keys(routeColors).find((key) => key !== "neutral" && !used.has(key)) ?? source.color;
-      draft.routes.push({ ...source, id, color: colour, points: source.points?.map((point) => ({ ...point })) });
-      return draft;
-    });
-    setSelectedRoute(id);
-  };
   // Bending one line of a double route normally has to move the other with it, or the two stop
   // being parallel the moment you shape them. Unticking the link is how you split them up.
   const bendTargets = (draft: MapData, routeId: string) => {
