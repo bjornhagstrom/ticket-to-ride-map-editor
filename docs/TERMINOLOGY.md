@@ -75,10 +75,9 @@ Words we have chosen not to use, each with the word to use instead.
 - `minimap`, use `small map`
 - `mini map`, use `small map`
 - `ticket's score`, use `points`
+- `Analyze balance`, use `Map balance`
 
 ## Open questions
 
-- **Analyze balance / Map balance.** The button says *Analyze balance*, the panel it opens *Map
-  balance*. One name for both would be clearer.
-- **Video, line 4.** "Its length is the ticket's score" uses *score* for a ticket. "Its length is what
-  the ticket is worth" keeps *score* for decks.
+None at the moment. Settled on 2026-10-04: the button and the panel are both *Map balance*, and the
+video says a ticket's length is "what the ticket is worth", keeping *score* for decks.

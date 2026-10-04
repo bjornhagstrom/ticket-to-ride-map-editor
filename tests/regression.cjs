@@ -101,7 +101,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   // How long routes are drawn against their wagons is read in the balance report; the left column
   // no longer repeats it.
   const roomSection = async () => {
-    await page.getByRole("button", { name: "Analyze balance" }).click();
+    await page.getByRole("button", { name: "Map balance", exact: true }).click();
     await page.waitForTimeout(500);
     const section = page.locator(".analysis-section", { has: page.locator("h3", { hasText: "Room per wagon" }) });
     const result = { text: await section.textContent(), warnings: await section.locator(".analysis-warning-row").count() };
@@ -204,7 +204,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   check("and the tickets panel does not list the junction as a stop no ticket reaches", !ticketsDialogText.includes(junction.name), ticketsDialogText.slice(0, 200));
   await page.keyboard.press("Escape");
   await page.waitForTimeout(300);
-  await page.getByRole("button", { name: "Analyze balance" }).click();
+  await page.getByRole("button", { name: "Map balance", exact: true }).click();
   await page.waitForTimeout(600);
   check("the balance report finds the setup fits the map", (await page.locator(".space-warning, .deck-warning").count()) === 0, await page.locator(".balance-panel").textContent().then((t) => t.slice(0, 200)));
   await page.keyboard.press("Escape");
@@ -311,7 +311,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.evaluate(() => { const g = Array.from(document.querySelectorAll(".map-canvas .stop")).find((x) => Array.from(x.querySelectorAll("text")).some((t) => t.textContent === "Pine Hill")); g.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true })); });
   await page.waitForTimeout(400);
   check("stops get their own hint box", (await page.locator(".map-hint strong").textContent()) === "Editing this stop", await page.locator(".map-hint strong").textContent());
-  await page.getByRole("button", { name: "Analyze balance" }).click();
+  await page.getByRole("button", { name: "Map balance", exact: true }).click();
   await page.waitForTimeout(500);
   const roomRows = await page.evaluate(() => {
     const h = Array.from(document.querySelectorAll(".analysis-section h3")).find((x) => x.textContent === "Room per wagon");
@@ -897,7 +897,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     check("picking a ticket lights its path on the map beside the list", (await page.locator(".map-canvas .route-group.on-ticket").count()) >= 1);
     await panel.locator(".analysis-table tbody tr").first().click();
     // One panel at a time: Map balance takes the column, and Tickets comes back when asked.
-    await page.getByRole("button", { name: "Analyze balance" }).click();
+    await page.getByRole("button", { name: "Map balance", exact: true }).click();
     await page.waitForTimeout(400);
     check("opening Map balance replaces the Tickets panel", (await page.locator(".tickets-panel").count()) === 0 && (await page.locator(".balance-panel").count()) === 1);
     await page.locator(".balance-panel").getByRole("button", { name: "Done" }).click();
@@ -1292,7 +1292,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   check("a different table is stored with the map", newTable.max === 4 && newTable.min <= 4, `${newTable.min}–${newTable.max}`);
   await page.keyboard.press("Escape");
   await page.waitForTimeout(300);
-  await page.getByRole("button", { name: "Analyze balance" }).click();
+  await page.getByRole("button", { name: "Map balance", exact: true }).click();
   await page.waitForTimeout(500);
   check("the deck is judged against that table, not a fixed five", /table of four/.test(await page.locator(".setup-balance").textContent()), (await page.locator(".setup-balance").textContent()).slice(0, 300));
   await page.keyboard.press("Escape");
@@ -1329,7 +1329,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.waitForTimeout(400);
   await page.keyboard.press("Escape");
   await page.waitForTimeout(300);
-  await page.getByRole("button", { name: "Analyze balance" }).click();
+  await page.getByRole("button", { name: "Map balance", exact: true }).click();
   await page.waitForTimeout(600);
   const setupText = await page.locator(".setup-balance").textContent();
   check("the balance report weighs the setup against the map", /wagon spaces/.test(setupText) && /player supplies/.test(setupText), setupText.slice(0, 140));
@@ -1474,7 +1474,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   }
 
   // 25. the balancing view says where the tickets crowd
-  await page.getByRole("button", { name: "Analyze balance" }).click();
+  await page.getByRole("button", { name: "Map balance", exact: true }).click();
   await page.waitForTimeout(700);
   check("the balancing view has a bottleneck section", await page.locator(".bottlenecks").isVisible());
   const tableChoice = page.locator("#bottleneck-players");
@@ -1984,7 +1984,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.waitForTimeout(700);
   check("your own set survives a reload", (await storedRules()).rules[0]?.label === "Sparse" && (await storedRules()).chosen === (await storedRules()).rules[0]?.id);
   // Map balance with the map's own rules chosen: the lengths against both references.
-  await page.getByRole("button", { name: "Analyze balance" }).click();
+  await page.getByRole("button", { name: "Map balance", exact: true }).click();
   await page.waitForTimeout(700);
   {
     const lengths = await lengthsIn(page.locator(".balance-panel"));
@@ -2097,7 +2097,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   }
   await page.keyboard.press("Escape");
   await page.waitForTimeout(300);
-  for (const [button, name] of [["Analyze balance", "balance"], [/^Tickets · /, "tickets"], ["Print map", "print"]]) {
+  for (const [button, name] of [["Map balance", "balance"], [/^Tickets · /, "tickets"], ["Print map", "print"]]) {
     await page.getByRole("button", { name: button }).click();
     await page.waitForTimeout(600);
     tooSmall.push(...(await smallText()).map((item) => `${name}: ${item}`));
@@ -2167,7 +2167,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   // The map from the previous section has stops, so the editor asks before replacing it.
   await page.getByRole("alertdialog").getByRole("button", { name: "Continue" }).click();
   await page.waitForTimeout(700);
-  await page.getByRole("button", { name: "Analyze balance" }).click();
+  await page.getByRole("button", { name: "Map balance", exact: true }).click();
   await page.waitForTimeout(700);
   const balancePanel = page.locator(".balance-panel");
   check("the balance report opens in the right column, not in a dialog", (await balancePanel.count()) === 1 && (await page.locator('[role="dialog"]').count()) === 0);
@@ -2381,14 +2381,14 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     await roomRow.dblclick();
     await page.waitForTimeout(400);
     check("a double click on a route's row picks it for editing and hands the column back", (await balancePanel.count()) === 0 && (await page.locator(".route-group.selected").count()) === 1);
-    await page.getByRole("button", { name: "Analyze balance" }).click();
+    await page.getByRole("button", { name: "Map balance", exact: true }).click();
     await page.waitForTimeout(500);
     check("and nothing stays pinned when Map balance is opened again", (await routesMarked()) === 0);
   }
   await balancePanel.getByRole("button", { name: "Done" }).click();
   await page.waitForTimeout(300);
   check("Done gives the column back to Properties", (await balancePanel.count()) === 0 && /Properties/.test(await page.locator(".panel-heading").last().textContent()));
-  await page.getByRole("button", { name: "Analyze balance" }).click();
+  await page.getByRole("button", { name: "Map balance", exact: true }).click();
   await page.waitForTimeout(400);
   await page.keyboard.press("Escape");
   await page.waitForTimeout(300);
@@ -2731,7 +2731,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   // 33b2. a panel open in the right column must not clip the print: a browser that lays the print out at
   // the window's width (Safari) would otherwise cut everything after the first screen, rules and all
   {
-    for (const [label, open, panelSel] of [["Rules", () => page.getByRole("button", { name: "Rules", exact: true }).click(), ".rules-panel"], ["Map balance", () => page.getByRole("button", { name: "Analyze balance" }).click(), ".balance-panel"], ["Tickets", () => ticketsButton.click(), ".tickets-panel"]]) {
+    for (const [label, open, panelSel] of [["Rules", () => page.getByRole("button", { name: "Rules", exact: true }).click(), ".rules-panel"], ["Map balance", () => page.getByRole("button", { name: "Map balance", exact: true }).click(), ".balance-panel"], ["Tickets", () => ticketsButton.click(), ".tickets-panel"]]) {
       await open();
       await page.waitForTimeout(500);
       await page.emulateMedia({ media: "print" });

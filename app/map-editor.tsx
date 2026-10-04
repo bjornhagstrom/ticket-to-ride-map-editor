@@ -854,7 +854,7 @@ export function MapEditor() {
           <p>Drawing and deleting routes moves it; placing stops you never connect drags the average down.</p>
         </TooltipContent></Tooltip>}
         <Button variant="outline" size="sm" className="analyze-button" onClick={() => openStyles({ kind: "map" })}><Settings2 />Settings</Button>
-        {data.stops.length > 0 && <Button variant="outline" size="sm" className="analyze-button" onClick={() => { setShowSuggestions(false); setHoveredSuggestion(null); setShowTickets(false); setShowRules(false); setShowAnalysis(true); }}><BarChart3 />Analyze balance</Button>}
+        {data.stops.length > 0 && <Button variant="outline" size="sm" className="analyze-button" onClick={() => { setShowSuggestions(false); setHoveredSuggestion(null); setShowTickets(false); setShowRules(false); setShowAnalysis(true); }}><BarChart3 />Map balance</Button>}
         <Button variant="outline" size="sm" className="analyze-button" title={ticketButtonLabel} onClick={openTickets}><TicketIcon /><span className="button-label">{ticketButtonLabel}</span></Button>
         <Button variant="outline" size="sm" className="analyze-button" onClick={openRules}><ScrollText />Rules</Button>
         {data.stops.length > 1 && <Button variant="outline" size="sm" className="analyze-button" onClick={() => { closeAnalysis(); setShowTickets(false); setShowRules(false); setShowSuggestions(true); }}><Lightbulb />Suggest routes</Button>}

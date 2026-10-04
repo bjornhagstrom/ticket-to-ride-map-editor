@@ -16,7 +16,7 @@ This file is written from `app/version.ts` by `npm run changelog`; edit the note
 - Å, ä and ö come through in a spreadsheet saved however Excel saves it, and a name typed with a different kind of å still finds its stop.
 - A reminder to export: the map lives only in this browser, so after a while of work without an export a note says so, and the header says when the map was last exported. Ask for it less often, or turn it off in Settings.
 - Point at the crossings warning to see them: the routes that cross are marked on the map and every crossing is ringed. Crossings are now found on the lines as drawn, curves included.
-- Suggest a deck is now Build a full deck of tickets, in the Tickets panel's Add a deck menu: the same as before, under a name that says what you get.
+- Two things have clearer names: Suggest a deck is now Build a full deck of tickets, under Add a deck in the Tickets panel, and the Analyze balance button is now Map balance, like the panel it opens.
 - A logo of its own: two stops joined by a route of wagon spaces, in the header, on the About pages and in the browser tab. It used to be a bus.
 - Print the whole board on one page as big as the board, at real size, for a large-format printer or to save as a PDF. The page is the board's own size, and the dialog says how big.
 - The welcome guide is shorter, covers destination tickets, the rules and spreadsheets, and says nothing about how a print is laid out.
