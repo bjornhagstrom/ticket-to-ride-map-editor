@@ -9,7 +9,10 @@ export type Release = { version: string; date: string; title: string; changes: s
 // Changes made since the last release, written as they are made, in the same plain words. They go at
 // the top of CHANGELOG.md under Unreleased, and become the notes of the next version when it is
 // decided; the What's new page in the editor shows released versions only.
-export const UNRELEASED: string[] = [];
+export const UNRELEASED: string[] = [
+  "A damaged map file opens with what can be used, and says what was left out and why; a file that holds no map at all is refused with a reason, and the map you had stays as it was.",
+  "A map kept in the browser that cannot be read is put aside untouched instead of being overwritten, and the editor starts afresh and says so.",
+];
 
 export const RELEASES: Release[] = [
   {

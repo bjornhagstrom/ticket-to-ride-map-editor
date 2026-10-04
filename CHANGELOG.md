@@ -4,6 +4,13 @@ What changed in each version of the [Ticket to Ride map editor](https://hagstrom
 
 This file is written from `app/version.ts` by `npm run changelog`; edit the notes there.
 
+## Unreleased
+
+Changes since the last release, to go into the next version.
+
+- A damaged map file opens with what can be used, and says what was left out and why; a file that holds no map at all is refused with a reason, and the map you had stays as it was.
+- A map kept in the browser that cannot be read is put aside untouched instead of being overwritten, and the editor starts afresh and says so.
+
 ## 0.4.1 · 2026-10-04
 
 **Map balance you can act on, and routes drawn with less fuss**

@@ -164,13 +164,15 @@ export function writeMapFile<T>(kind: FileKind, payload: T, data: Pick<MapData, 
 
 // Reads either an enveloped file or one of the flat files written before the envelope existed.
 export function readMapFile(raw: unknown): { kind: FileKind; version: number; payload: Record<string, unknown>; board?: { width: number; height: number } } {
-  const value = (raw ?? {}) as Record<string, unknown>;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error("This is not a map file: it holds no map, network, background or tickets.");
+  const value = raw as Record<string, unknown>;
   if (value.format === FILE_FORMAT) {
     const version = Number(value.version);
     if (!Number.isFinite(version) || version < 1) throw new Error("This file says it is a map file but does not say which version. It may be damaged.");
     if (version > FILE_VERSION) {
       throw new Error(`This file was written by a newer version of the editor (file version ${version}). This one reads up to version ${FILE_VERSION}. Update the editor, or export the file again from the version that wrote it.`);
     }
+    if (value.payload !== undefined && (!value.payload || typeof value.payload !== "object" || Array.isArray(value.payload))) throw new Error("This file says it is a map file, but what it holds is not a map. It may be damaged.");
     return {
       kind: isFileKind(value.kind) ? value.kind : "map",
       version,
@@ -195,8 +197,8 @@ const MAP_KEYS = new Set([
 ]);
 
 const unknownKeys = (value: Record<string, unknown>): Record<string, unknown> | undefined => {
-  const kept: Record<string, unknown> = {};
-  for (const [key, entry] of Object.entries(value)) if (!MAP_KEYS.has(key)) kept[key] = entry;
+  // Built from entries, so a key such as __proto__ in a file is kept as data, never as a prototype.
+  const kept = Object.fromEntries(Object.entries(value).filter(([key]) => !MAP_KEYS.has(key)));
   return Object.keys(kept).length ? kept : undefined;
 };
 
@@ -296,7 +298,110 @@ const normalizeDeckRules = (value: Partial<MapData>): Pick<MapData, "deckRules" 
   };
 };
 
-export const normalizeMap = (raw: Partial<MapData>): MapData => normalizeMapFields(mergeStylesIntoRouteTypes(migrateLegacyFormat(raw)));
+export const normalizeMap = (raw: Partial<MapData>): MapData => repairMap(raw).map;
+
+// A map read from a file or from the browser, with what cannot be used left out and said. Nothing that
+// is sound is changed, and fields a later build added to a sound stop, route or ticket stay where they
+// are. tests/corrupt-files.cjs holds the rules.
+export function repairMap(raw: unknown): { map: MapData; repairs: string[] } {
+  const repairs: string[] = [];
+  const say = (count: number, one: string, many: string) => { if (count) repairs.push(`${count} ${count === 1 ? one : many}`); };
+  const value: Record<string, unknown> = isRecord(raw) ? { ...raw } : {};
+  const number = (v: unknown): number | null => { const n = typeof v === "number" ? v : typeof v === "string" && v.trim() !== "" ? Number(v) : NaN; return Number.isFinite(n) ? n : null; };
+  const point = (p: unknown): Point | null => { if (!isRecord(p)) return null; const x = number(p.x), y = number(p.y); return x === null || y === null ? null : { ...(p as object), x, y } as Point; };
+
+  // Stops: a record with an id of its own and a place on the map.
+  const stopIds = new Set<string>();
+  let stopsLeft = 0;
+  if (Array.isArray(value.stops)) value.stops = value.stops.flatMap((entry) => {
+    const at = point(entry);
+    const id = isRecord(entry) && typeof entry.id === "string" && entry.id ? entry.id : null;
+    if (!at || !id || stopIds.has(id)) { stopsLeft++; return []; }
+    stopIds.add(id);
+    const stop = { ...(entry as object), ...at } as Stop;
+    if (typeof stop.name !== "string") stop.name = id;
+    if (typeof stop.type !== "string") stop.type = "city";
+    return [stop];
+  });
+  say(stopsLeft, "stop left out: it was not a stop, had no place on the map, or used an id already taken.", "stops left out: they were not stops, had no place on the map, or used an id already taken.");
+
+  // Routes: between two different stops the map has, at least one wagon space long.
+  const routeIds = new Set<string>();
+  let routesLeft = 0, lengthsMended = 0;
+  if (Array.isArray(value.routes)) value.routes = value.routes.flatMap((entry) => {
+    if (!isRecord(entry) || typeof entry.id !== "string" || routeIds.has(entry.id) || typeof entry.a !== "string" || typeof entry.b !== "string" || !stopIds.has(entry.a) || !stopIds.has(entry.b) || entry.a === entry.b) { routesLeft++; return []; }
+    routeIds.add(entry.id);
+    const route = { ...entry } as unknown as Route;
+    const length = number(entry.length);
+    const mended = length === null || length < 1 ? 1 : Math.round(length);
+    if (mended !== entry.length) lengthsMended++;
+    route.length = mended;
+    if (typeof route.type !== "string") route.type = "city";
+    if (typeof route.color !== "string") route.color = "neutral";
+    if (entry.points !== undefined) { const bends = Array.isArray(entry.points) ? entry.points.map(point).filter((p): p is Point => Boolean(p)) : []; if (bends.length) route.points = bends; else delete route.points; }
+    if (entry.locomotiveSlots !== undefined) { const slots = Array.isArray(entry.locomotiveSlots) ? [...new Set(entry.locomotiveSlots.filter((slot): slot is number => Number.isInteger(slot) && (slot as number) >= 0 && (slot as number) < mended))] : []; if (slots.length) route.locomotiveSlots = slots; else delete route.locomotiveSlots; }
+    return [route];
+  });
+  say(routesLeft, "route left out: it was not a route, named a stop the map does not have, or ran from a stop to itself.", "routes left out: they were not routes, named a stop the map does not have, or ran from a stop to itself.");
+  say(lengthsMended, "route length was not a whole number of at least 1 and has been set.", "route lengths were not whole numbers of at least 1 and have been set.");
+
+  // Decks, then tickets: a ticket between two different stops the map has, in a deck that exists.
+  const setIds = new Set<string>();
+  let setsLeft = 0;
+  if (Array.isArray(value.ticketSets)) value.ticketSets = value.ticketSets.flatMap((entry) => {
+    if (!isRecord(entry) || typeof entry.id !== "string" || !entry.id || setIds.has(entry.id)) { setsLeft++; return []; }
+    setIds.add(entry.id);
+    return [{ ...entry, label: typeof entry.label === "string" ? entry.label : entry.id } as TicketSet];
+  });
+  say(setsLeft, "deck left out: it had no id of its own.", "decks left out: they had no id of their own.");
+  const ticketIds = new Set<string>();
+  let ticketsLeft = 0, pointsMended = 0, moved = 0;
+  if (Array.isArray(value.tickets)) value.tickets = value.tickets.flatMap((entry) => {
+    if (!isRecord(entry) || typeof entry.id !== "string" || ticketIds.has(entry.id) || typeof entry.a !== "string" || typeof entry.b !== "string" || !stopIds.has(entry.a) || !stopIds.has(entry.b) || entry.a === entry.b) { ticketsLeft++; return []; }
+    ticketIds.add(entry.id);
+    const ticket = { ...entry } as unknown as Ticket;
+    const points = number(entry.points);
+    if (points === null) { ticket.points = 1; pointsMended++; } else ticket.points = points;
+    if (ticket.set !== undefined && !setIds.has(ticket.set)) { delete ticket.set; moved++; }
+    return [ticket];
+  });
+  say(ticketsLeft, "ticket left out: it was not a ticket, or named a stop the map does not have.", "tickets left out: they were not tickets, or named a stop the map does not have.");
+  say(pointsMended, "ticket had points that were not a number; they are 1 until set again.", "tickets had points that were not a number; they are 1 until set again.");
+  say(moved, "ticket was in a deck that does not exist and is now in the first deck.", "tickets were in a deck that does not exist and are now in the first deck.");
+
+  // Notes: a place and a size; text that is not text is emptied.
+  let notesLeft = 0, notesEmptied = 0;
+  if (Array.isArray(value.notes)) value.notes = value.notes.flatMap((entry, index) => {
+    const at = point(entry);
+    const width = isRecord(entry) ? number(entry.width) : null, height = isRecord(entry) ? number(entry.height) : null;
+    if (!at || width === null || height === null || width <= 0 || height <= 0) { notesLeft++; return []; }
+    const note = { ...(entry as object), ...at, width, height } as NoteBox;
+    if (typeof note.id !== "string" || !note.id) note.id = `note-${index}`;
+    if (typeof note.text !== "string") { note.text = ""; notesEmptied++; }
+    return [note];
+  });
+  say(notesLeft, "note left out: it had no place or size on the map.", "notes left out: they had no place or size on the map.");
+  say(notesEmptied, "note's text was not text and has been emptied.", "notes' texts were not text and have been emptied.");
+
+  // Background shapes: at least two usable points.
+  let shapesLeft = 0, pointsDropped = 0;
+  if (Array.isArray(value.background)) value.background = value.background.flatMap((entry) => {
+    if (!isRecord(entry) || !Array.isArray(entry.points)) { shapesLeft++; return []; }
+    const points = entry.points.map(point).filter((p): p is Point => Boolean(p));
+    pointsDropped += entry.points.length - points.length;
+    // A label stands on one point; a line or an area needs two at least.
+    if (points.length < (entry.type === "label" ? 1 : 2)) { shapesLeft++; return []; }
+    const shape = { ...entry, points } as unknown as BackgroundShape;
+    if (shape.labelPoint !== undefined && !point(shape.labelPoint)) delete shape.labelPoint;
+    return [shape];
+  });
+  say(shapesLeft, "background shape left out: it had too few points to draw.", "background shapes left out: they had too few points to draw.");
+  say(pointsDropped, "point of a background shape was not a point and has been dropped.", "points of background shapes were not points and have been dropped.");
+
+  const map = normalizeMapFields(mergeStylesIntoRouteTypes(migrateLegacyFormat(value as Partial<MapData>)));
+  return { map, repairs };
+}
+const isRecord = (value: unknown): value is Record<string, unknown> => Boolean(value) && typeof value === "object" && !Array.isArray(value);
 
 const normalizeMapFields = (value: Partial<MapData>): MapData => ({
   name: typeof value.name === "string" ? value.name : "Imported map",

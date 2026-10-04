@@ -3490,6 +3490,46 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     await bp.context().close();
   }
 
+  // 46. Damaged files in the editor: one that is not a map is refused and the map stays as it was; a map
+  // with damaged parts opens with what can be used and says what was left out; and a map kept in the
+  // browser that cannot be read is put aside, not overwritten, and the editor still starts.
+  {
+    const cp2 = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
+    const pageErrors = [];
+    cp2.on("pageerror", (e) => { pageErrors.push(String(e)); errors.push(String(e)); });
+    await cp2.goto(BASE, { waitUntil: "networkidle" });
+    await cp2.getByRole("button", { name: "Load the example map" }).click();
+    await cp2.waitForTimeout(600);
+    const KEY = "ttr-map";
+    const stored = () => cp2.evaluate((key) => localStorage.getItem(key), KEY);
+    const before = await stored();
+    const toasts = async () => (await cp2.locator("[data-sonner-toast]").allTextContents()).join(" | ");
+    const importText = async (name, text) => { const file = path.join(os.tmpdir(), `ttr-${Date.now()}-${name}`); fs.writeFileSync(file, text); await cp2.locator('input[type="file"][accept="application/json"]').setInputFiles(file); await cp2.waitForTimeout(700); };
+    await importText("not-json.json", "this is not json {");
+    check("a file that is not JSON is refused, with a message, and the map stays as it was", /could not be read|not a map/i.test(await toasts()) && (await stored()) === before, await toasts());
+    await importText("a-list.json", "[1, 2, 3]");
+    check("a JSON file that holds no map is refused too", /not a map/i.test(await toasts()) && (await stored()) === before, await toasts());
+    const damaged = { format: "ticket-to-ride-map", version: 3, kind: "map", payload: { name: "Mended", stops: [{ id: "a", name: "Alpha", type: "city", x: 200, y: 200 }, { id: "b", name: "Beta", type: "city", x: 600, y: 300 }, null, { id: "c", name: "Nowhere" }], routes: [{ id: "r1", a: "a", b: "b", length: 4, type: "city", color: "red" }, { id: "r2", a: "a", b: "ghost", length: 2, type: "city", color: "red" }], tickets: [], ticketSets: [{ id: "main", label: "Main deck" }], notes: [], background: [] } };
+    await importText("damaged.json", JSON.stringify(damaged));
+    const opened = JSON.parse(await stored());
+    check("a map with damaged parts opens with what can be used", opened.name === "Mended" && opened.stops.length === 2 && opened.routes.length === 1, `${opened.name}: ${opened.stops.length} stops, ${opened.routes.length} routes`);
+    check("and says what was left out", /2 stops left out/.test(await toasts()) && /1 route left out/.test(await toasts()), await toasts());
+    // A map in the browser that cannot be read: put aside, the editor starts, and it says so.
+    await cp2.evaluate((key) => localStorage.setItem(key, '{"name":"cut short","stops":[{"id":"a"'), KEY);
+    await cp2.reload({ waitUntil: "networkidle" });
+    await cp2.waitForTimeout(800);
+    const aside = await cp2.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith("ttr-map-unreadable-")).map((k) => localStorage.getItem(k)));
+    check("a map kept in the browser that cannot be read is put aside, word for word", aside.length === 1 && aside[0] === '{"name":"cut short","stops":[{"id":"a"', JSON.stringify(aside));
+    check("and the editor still starts, saying what happened", (await cp2.locator(".map-canvas").count()) === 1 && /could not be read/i.test(await toasts() + " " + (await cp2.locator('[role="dialog"]').allTextContents()).join(" ")), await toasts());
+    // A stored map with damaged parts opens mended, without an error on the page.
+    await cp2.evaluate((key) => localStorage.setItem(key, JSON.stringify({ name: "Half", stops: [{ id: "a", name: "A", type: "city", x: "NaN", y: 3 }, { id: "b", name: "B", type: "city", x: 10, y: 10 }, { id: "c", name: "C", type: "city", x: 300, y: 300 }], routes: [{ id: "r", a: "b", b: "c", length: -3, type: "city", color: "red", points: "x" }], tickets: [{ id: "t", a: "b", b: "c", points: null }], notes: [null], background: [{ id: "x" }] })), KEY);
+    const errorsBefore = pageErrors.length;
+    await cp2.reload({ waitUntil: "networkidle" });
+    await cp2.waitForTimeout(800);
+    check("a stored map with damaged parts opens mended, with no error on the page", pageErrors.length === errorsBefore && (await cp2.locator(".map-canvas .stop").count()) === 2 && (await cp2.locator(".map-canvas .route-group").count()) >= 1, `${pageErrors.length - errorsBefore} errors`);
+    await cp2.context().close();
+  }
+
   console.log("PASS:"); ok.forEach((l) => console.log("  ✓ " + l));
   if (bad.length) { console.log("FAIL:"); bad.forEach((l) => console.log("  ✗ " + l)); }
   console.log(`\n${ok.length} passed, ${bad.length} failed`);

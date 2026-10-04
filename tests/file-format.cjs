@@ -106,7 +106,8 @@ const legacyFile = (format, extra = {}) => ({
     stops: [{ id: "s1", name: "Centre", x: 550, y: 389, type: sample.stops[0].type }, { id: "s2", name: "Corner", x: 0, y: 0, type: sample.stops[0].type }],
     routes: [{ ...sample.routes[0], a: "s1", b: "s2", points: [{ x: 1100, y: 0 }] }],
     notes: [{ id: "n1", x: 100, y: 100, width: 200, height: 100, text: "note" }],
-    background: [{ id: "b1", type: "area", points: [{ x: 0, y: 778 }], labelPoint: { x: 550, y: 389 } }],
+    // Two points: a shape with fewer cannot be drawn and is left out when read (tests/corrupt-files.cjs).
+    background: [{ id: "b1", type: "area", points: [{ x: 0, y: 778 }, { x: 1100, y: 778 }], labelPoint: { x: 550, y: 389 } }],
     ...extra,
   },
 });

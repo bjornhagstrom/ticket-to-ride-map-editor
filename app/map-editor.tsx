@@ -32,7 +32,7 @@ import { ACTION_GAP_MS, countChange, EXPORT_REMINDER_KEY, exportAge, exported, f
 import { boardOf, rotateMap, type Orientation } from "./board";
 import { csvTemplate, distancesCsv, routesCsv, stopsCsv, ticketsCsv } from "./csv-export";
 import { decodeCsvBytes, readCsvImport, type CsvImport } from "./csv-import";
-import { APP_VERSION, moveLegacyStorage, cloneForHistory, cloneMap, formatTimestamp, GUIDE_SEEN_KEY, HISTORY_LIMIT, MAX_IMAGE_WARN_BYTES, normalizeBackgroundFile, normalizeMap, normalizeNetworkFile, normalizeTicketFile, buildTicketFile, readMapFile, writeMapFile, mapPayload, networkPayload, readBackgroundImage, rescaleMapToFormat, MAP_HINT_KEY, MAP_HINT_X_KEY } from "./map-storage";
+import { APP_VERSION, moveLegacyStorage, repairMap, cloneForHistory, cloneMap, formatTimestamp, GUIDE_SEEN_KEY, HISTORY_LIMIT, MAX_IMAGE_WARN_BYTES, normalizeBackgroundFile, normalizeNetworkFile, normalizeTicketFile, buildTicketFile, readMapFile, writeMapFile, mapPayload, networkPayload, readBackgroundImage, rescaleMapToFormat, MAP_HINT_KEY, MAP_HINT_X_KEY } from "./map-storage";
 import { colorLabels, defaultTicketSet, DEFAULT_PLAYERS, DEFAULT_WAGONS_PER_PLAYER, IMAGE_KEEP_ON_BOARD, type Ticket, type StopTypeStyle, type WagonStyle, ticketsInSet, type TicketSet, emptyMap, initialMap, type LineStyle, DEFAULT_END_GAP_MM, mapFormats, type BackgroundImage, type BackgroundShape, type BackgroundType, type MapData, type MapFormat, type Point, type Route, type RouteType, type RouteTypeStyle, routeColors, STORAGE_KEY, type Stop, type StopSize, stopSizeMeta, type StopSymbol, stopSymbolMeta, type StopType } from "./map-data";
 
 type MeasureResult = { from: string; to: string; distance: number; routeIds: string[] } | { from: string; to: string; unreachable: true };
@@ -214,7 +214,24 @@ export function MapEditor() {
   // same number of millimetres per map unit either way.
   const format = boardOf(data);
 
-  useEffect(() => { queueMicrotask(() => { try { moveLegacyStorage(localStorage); const stored = localStorage.getItem(STORAGE_KEY); if (stored) { setData(normalizeMap(JSON.parse(stored))); localStorage.setItem(GUIDE_SEEN_KEY, "1"); } else if (!localStorage.getItem(GUIDE_SEEN_KEY)) setShowGuide(true); } catch { /* ignore invalid local state */ } setReady(true); }); }, []);
+  useEffect(() => { queueMicrotask(() => {
+    let stored: string | null = null;
+    try { moveLegacyStorage(localStorage); stored = localStorage.getItem(STORAGE_KEY); } catch { /* storage blocked: start fresh */ }
+    if (stored) {
+      try {
+        const { map, repairs } = repairMap(JSON.parse(stored));
+        setData(map); localStorage.setItem(GUIDE_SEEN_KEY, "1");
+        if (repairs.length) toast.warning(`Your map opened, but not all of it could be used. ${repairs.join(" ")}`, { duration: 20000 });
+      } catch {
+        // A map that cannot be read at all is put aside word for word, never overwritten, so it can
+        // still be rescued; the editor starts afresh and says so.
+        try { localStorage.setItem(`${STORAGE_KEY}-unreadable-${formatTimestamp()}`, stored); } catch { /* no room: it stays where it was until the next save */ }
+        toast.error("The map kept in this browser could not be read. It has been put aside, untouched, and the editor starts afresh. Export your maps to keep copies.", { duration: 30000 });
+        if (!localStorage.getItem(GUIDE_SEEN_KEY)) setShowGuide(true);
+      }
+    } else { try { if (!localStorage.getItem(GUIDE_SEEN_KEY)) setShowGuide(true); } catch { /* storage blocked */ } }
+    setReady(true);
+  }); }, []);
   useEffect(() => { if (!ready) return; localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); const timer = window.setTimeout(() => setSaved(true), 0); return () => window.clearTimeout(timer); }, [data, ready]);
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -816,7 +833,9 @@ export function MapEditor() {
           else applyNetworkImport(stops, routes, lineStyles, routeTypeStyles, stopTypeStyles, wagonStyles, tickets);
           return;
         }
-        const incoming = normalizeMap(raw);
+        const { map: incoming, repairs } = repairMap(raw);
+        // Damaged parts are left out and said, so nothing goes missing without a word.
+        if (repairs.length) toast.warning(`The map opened, but not all of it could be used. ${repairs.join(" ")}`, { duration: 20000 });
         // An older copy of this same map would hand out numbers already on paper: say so, and suggest a name.
         const older = olderCopyWarning(data, incoming);
         if (older) toast.warning(older, { duration: 20000 });
@@ -826,7 +845,9 @@ export function MapEditor() {
         clearSelection();
       } catch (error) {
         // A file from a newer build says so in its own words; anything else is simply not ours.
-        toast.error(error instanceof Error && error.message.includes("newer version") ? error.message : "The file could not be read as a map project.");
+        // A file from a newer build, or one that holds no map, says so in its own words; a file that is
+        // not JSON at all is simply not ours.
+        toast.error(error instanceof Error && /newer version|not a map/i.test(error.message) ? error.message : "The file could not be read as a map project: it is not a map file, or it is damaged.");
       }
     };
     reader.readAsText(file);
