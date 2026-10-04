@@ -12,7 +12,7 @@ const path = require("path");
 const root = path.join(__dirname, "..");
 const out = fs.mkdtempSync(path.join(os.tmpdir(), "ttr-releases-"));
 execFileSync("npx", ["tsc", "app/version.ts", "--outDir", out, "--module", "commonjs", "--target", "es2022", "--moduleResolution", "node", "--skipLibCheck", "--lib", "es2022,dom"], { cwd: root, stdio: "inherit" });
-const { APP_VERSION, RELEASES, REPO_URL } = require(path.join(out, "version.js"));
+const { APP_VERSION, RELEASES, REPO_URL, UNRELEASED } = require(path.join(out, "version.js"));
 const pkg = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
 
 const ok = [];
@@ -42,7 +42,12 @@ check("no two releases share a version", new Set(RELEASES.map((r) => r.version))
   const file = path.join(root, "CHANGELOG.md");
   const { changelog } = require(path.join(root, "scripts", "changelog.cjs"));
   const text = fs.existsSync(file) ? fs.readFileSync(file, "utf8") : "";
-  check("CHANGELOG.md is in the repository, written from the release notes, and up to date (npm run changelog)", text !== "" && text === changelog(RELEASES, pkg.homepage), text ? "out of date" : "missing");
+  check("CHANGELOG.md is in the repository, written from the release notes, and up to date (npm run changelog)", text !== "" && text === changelog(RELEASES, pkg.homepage, UNRELEASED), text ? "out of date" : "missing");
+  // Notes are written as changes are made, not at release: until the next version is decided they are
+  // collected as unreleased, at the top of CHANGELOG.md, and held to the same standard as the rest.
+  check("changes since the last release are collected as unreleased notes", Array.isArray(UNRELEASED));
+  check("each one a sentence of plain words, naming no files, commits or tools", (UNRELEASED || []).every((c) => typeof c === "string" && c.trim().length >= 25 && c.length <= 320 && /[.!]$/.test(c.trim()) && !/\b[0-9a-f]{7,40}\b/.test(c) && !/\bapp\/|\.tsx?\b|\.cjs\b|\bAGENTS\b|\bCodex\b|\bClaude\b/.test(c)));
+  check("and CHANGELOG.md shows them first, under Unreleased, when there are any", !(UNRELEASED || []).length || (text.includes("## Unreleased") && text.indexOf("## Unreleased") < text.indexOf(`## ${RELEASES[0].version}`) && UNRELEASED.every((c) => text.includes(`- ${c}`))));
   check("it has every release under its version and date, newest first", RELEASES.every((r) => text.includes(`## ${r.version} · ${r.date}`)) && text.indexOf(`## ${RELEASES[0].version}`) < text.indexOf(`## ${RELEASES[RELEASES.length - 1].version}`));
   check("it links to the editor", text.includes(`](${pkg.homepage})`));
   check("and the README links to it", /\]\(CHANGELOG\.md\)/.test(fs.readFileSync(path.join(root, "README.md"), "utf8")));

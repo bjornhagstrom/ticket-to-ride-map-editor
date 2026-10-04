@@ -4,6 +4,14 @@ What changed in each version of the [Ticket to Ride map editor](https://hagstrom
 
 This file is written from `app/version.ts` by `npm run changelog`; edit the notes there.
 
+## Unreleased
+
+Changes since the last release, to go into the next version.
+
+- Help on hover waits a moment before it opens, so moving the pointer across the tools no longer flashes one help box after another; resting on something still shows its help.
+- The note that everything is stored in the exported map file now sits with the figures above the map, in the same shape as they are.
+- Your map is kept in the browser under a new, neutral name. A map kept under the old name is picked up the first time you open the editor, so nothing is lost.
+
 ## 0.4.0 · 2026-10-03
 
 **Spreadsheets, boards that stand, and tickets with a map**

@@ -7,7 +7,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 
-function changelog(releases, homepage) {
+function changelog(releases, homepage, unreleased = []) {
   return [
     "# What's new",
     "",
@@ -15,6 +15,8 @@ function changelog(releases, homepage) {
     "",
     "This file is written from `app/version.ts` by `npm run changelog`; edit the notes there.",
     "",
+    // Changes made since the last release, noted as they are made; they become the next version's notes.
+    ...(unreleased.length ? ["## Unreleased", "", "Changes since the last release, to go into the next version.", "", ...unreleased.map((change) => `- ${change}`), ""] : []),
     ...releases.flatMap((release) => [`## ${release.version} · ${release.date}`, "", `**${release.title}**`, "", ...release.changes.map((change) => `- ${change}`), ""]),
   ].join("\n");
 }
@@ -23,9 +25,9 @@ if (require.main === module) {
   const root = path.join(__dirname, "..");
   const out = fs.mkdtempSync(path.join(os.tmpdir(), "ttr-changelog-"));
   execFileSync("npx", ["tsc", "app/version.ts", "--outDir", out, "--module", "commonjs", "--target", "es2022", "--moduleResolution", "node", "--skipLibCheck"], { cwd: root, stdio: "inherit" });
-  const { RELEASES } = require(path.join(out, "version.js"));
+  const { RELEASES, UNRELEASED } = require(path.join(out, "version.js"));
   const { homepage } = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
-  fs.writeFileSync(path.join(root, "CHANGELOG.md"), changelog(RELEASES, homepage));
+  fs.writeFileSync(path.join(root, "CHANGELOG.md"), changelog(RELEASES, homepage, UNRELEASED));
   fs.rmSync(out, { recursive: true, force: true });
   console.log("CHANGELOG.md written");
 }

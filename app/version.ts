@@ -6,6 +6,15 @@ export const REPO_URL = "https://github.com/bjornhagstrom/ticket-to-ride-map-edi
 
 export type Release = { version: string; date: string; title: string; changes: string[] };
 
+// Changes made since the last release, written as they are made, in the same plain words. They go at
+// the top of CHANGELOG.md under Unreleased, and become the notes of the next version when it is
+// decided; the What's new page in the editor shows released versions only.
+export const UNRELEASED: string[] = [
+  "Help on hover waits a moment before it opens, so moving the pointer across the tools no longer flashes one help box after another; resting on something still shows its help.",
+  "The note that everything is stored in the exported map file now sits with the figures above the map, in the same shape as they are.",
+  "Your map is kept in the browser under a new, neutral name. A map kept under the old name is picked up the first time you open the editor, so nothing is lost.",
+];
+
 export const RELEASES: Release[] = [
   {
     version: "0.4.0",
