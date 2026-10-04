@@ -335,3 +335,6 @@
 .compare-table thead th{background:#eee7da;font-weight:700;color:#24221e}
 .compare-table tbody tr:last-child td{border-bottom:none}
 .version-label{font-size:12px;font-weight:400;color:#4f493f}
+
+/* The ticket figure above the map names the deck when there are several; a long name is cut short. */
+.map-status .ticket-count { display: inline-block; max-width: 18rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

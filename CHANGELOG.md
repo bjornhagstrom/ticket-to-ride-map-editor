@@ -15,7 +15,7 @@ This file is written from `app/version.ts` by `npm run changelog`; edit the note
 - Start a spreadsheet from a template: one each for stops, routes and tickets, under Import, with a guide to what every column means. Imported as they are, the three make a small map.
 - Å, ä and ö come through in a spreadsheet saved however Excel saves it, and a name typed with a different kind of å still finds its stop.
 - Map balance shows how the network holds together: dead ends, routes whose loss cuts the map in two, and corners reached through one or two stops, each beside what the official maps have. Edges and corners are described as character; only a route with one lane that cuts the map in two is a warning.
-- Crowded routes are set against the official maps, which have 8 to 19 at a full table, instead of being called a fault. The Tickets button now just says Tickets and how many.
+- Crowded routes are set against the official maps, which have 8 to 19 at a full table, instead of being called a fault. The Tickets button now just says Tickets; how many tickets the deck holds is shown with the other figures above the map.
 - A reminder to export: the map lives only in this browser, so after a while of work without an export a note says so, and the header says when the map was last exported. Ask for it less often, or turn it off in Settings.
 - Point at the crossings warning to see them: the routes that cross are marked on the map and every crossing is ringed. Crossings are now found on the lines as drawn, curves included.
 - Two things have clearer names: Suggest a deck is now Build a full deck of tickets, under Add a deck in the Tickets panel, and the Analyze balance button is now Map balance, like the panel it opens.

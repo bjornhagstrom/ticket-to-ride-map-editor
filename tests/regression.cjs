@@ -198,7 +198,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   check("the main deck can deal a full table", mainDeck.length >= (example.players?.max ?? 5) * (example.startingTickets ?? 3), `${mainDeck.length} for ${(example.players?.max ?? 5)} × ${example.startingTickets ?? 3}`);
   check("with long tickets among the rest", mainDeck.some((t) => t.long) && mainDeck.some((t) => !t.long));
   check("every stop but the junction is on a ticket", example.stops.filter((st) => !typeOf(st.type).junction).every((st) => mainDeck.some((t) => t.a === st.id || t.b === st.id)));
-  await page.getByRole("button", { name: /^Tickets \(\d+\)$/ }).click();
+  await page.getByRole("button", { name: "Tickets", exact: true }).click();
   await page.waitForTimeout(500);
   const ticketsDialogText = await page.locator(".tickets-panel").textContent();
   check("and the tickets panel does not list the junction as a stop no ticket reaches", !ticketsDialogText.includes(junction.name), ticketsDialogText.slice(0, 200));
@@ -849,9 +849,11 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await tool("Add ticket").click();
   await clickStop("Westport"); await clickStop("Quarry");
   await clickStop("Pine Hill"); await clickStop("Central");
-  const ticketsButton = page.getByRole("button", { name: /^Tickets \(\d+\)$/ });
+  const ticketsButton = page.getByRole("button", { name: "Tickets", exact: true });
   const mainAfter = mainBefore + 2;
-  check("tickets are added to the current deck, and the button says only how many: Tickets (n)", (await ticketsButton.textContent()).trim() === `Tickets (${mainAfter})`, await ticketsButton.textContent());
+  // How many tickets the deck holds sits with the other map figures above the map, not on the button.
+  check("tickets are added to the current deck, and the figures above the map say how many", (await badges()).some((b) => b === `${mainAfter} tickets` || b.startsWith(`${mainAfter} tickets in `)), JSON.stringify(await badges()));
+  check("the Tickets button says only Tickets", (await ticketsButton.textContent()).trim() === "Tickets", await ticketsButton.textContent());
   await ticketsButton.click();
   await page.waitForTimeout(400);
 
@@ -1197,7 +1199,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   check("Escape drops the pick", (await pendingText()) === null && (await page.locator(".pick-band").count()) === 0);
 
   // 15. a lit ticket can be switched off again, and tools let go on a second click
-  await page.getByRole("button", { name: /^Tickets \(\d+\)$/ }).click();
+  await page.getByRole("button", { name: "Tickets", exact: true }).click();
   await page.waitForTimeout(400);
   await page.locator(".analysis-row-link").first().click();
   await page.waitForTimeout(250);
@@ -1339,7 +1341,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.waitForTimeout(300);
 
   // 21. suggesting a whole deck for the map that is open
-  await page.getByRole("button", { name: /^Tickets \(\d+\)$/ }).click();
+  await page.getByRole("button", { name: "Tickets", exact: true }).click();
   await page.waitForTimeout(400);
   const decksBefore = await page.locator("#ticket-set option").count();
   // Backing out of Suggest a deck leaves the deck panel where it was, not an empty column.
@@ -1414,7 +1416,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.waitForTimeout(300);
 
   // 22. the ticket list sorts by any of its headings
-  await page.getByRole("button", { name: /^Tickets \(\d+\)$/ }).click();
+  await page.getByRole("button", { name: "Tickets", exact: true }).click();
   await page.waitForTimeout(500);
   // Pick a deck that has tickets in it.
   const withTickets = (await page.locator("#ticket-set option").allTextContents()).findIndex((label) => !/\(0\)$/.test(label));
@@ -1576,7 +1578,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
 
   // 28. a deck name long enough to break the button it is shown in
   const longName = "A deck with a really very long name that nobody would sensibly type";
-  await page.getByRole("button", { name: /^Tickets \(\d+\)$/ }).click();
+  await page.getByRole("button", { name: "Tickets", exact: true }).click();
   await page.waitForTimeout(400);
   await page.getByRole("button", { name: /Add a deck/ }).click();
   await page.waitForTimeout(250);
@@ -1592,13 +1594,24 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   check("a long deck name does not widen the tools panel", buttonBox.width <= toolsWidth + 1, `${buttonBox.width.toFixed(0)} in ${toolsWidth.toFixed(0)}`);
   check("and does not spill out of its button", buttonBox.scroll <= buttonBox.client + 1 && buttonBox.height < 40, `${buttonBox.scroll} wide in ${buttonBox.client}, ${buttonBox.height.toFixed(0)} px tall`);
   check("the whole name is still there to hover", (await longNameButton.getAttribute("title")).includes(longName));
+  {
+    // With more than one deck the figure says which deck it counts; a long name is cut short, not
+    // allowed to push the row of figures wider than the map.
+    const deckBadge = page.locator(".map-status .ticket-count");
+    const badgeText = (await deckBadge.textContent()) ?? "";
+    const fits = await page.evaluate(() => { const row = document.querySelector(".map-status"); const badge = row.querySelector(".ticket-count"); return { row: row.scrollWidth <= row.clientWidth + 1, badge: badge.scrollWidth > badge.clientWidth || badge.getBoundingClientRect().width < 320 }; });
+    const decks = (await ticketsNow()).decks.length;
+    check("with several decks, the ticket figure names the deck it counts", decks < 2 || badgeText.includes(longName.slice(0, 10)), `${decks} decks: ${badgeText}`);
+    check("and a long deck name does not widen the row of figures", fits.row && fits.badge, JSON.stringify(fits));
+    check("the whole deck name is there to hover on the figure", ((await deckBadge.getAttribute("title")) ?? "").includes(longName));
+  }
   await useTool("Add ticket");
   await page.waitForTimeout(400);
   const headingBox = await page.locator(".properties .panel-heading").evaluate((el) => ({ scroll: el.scrollWidth, client: el.clientWidth, line: el.querySelector("small").getBoundingClientRect().height }));
   check("the right panel cuts it off rather than wrapping it", headingBox.scroll <= headingBox.client + 1 && headingBox.line < 24, `${headingBox.scroll} in ${headingBox.client}, ${headingBox.line.toFixed(0)} px tall`);
 
   // 29. the deck styles are laid out so they can be compared, and nothing is too pale to read
-  await page.getByRole("button", { name: /^Tickets \(\d+\)$/ }).click();
+  await page.getByRole("button", { name: "Tickets", exact: true }).click();
   await page.waitForTimeout(400);
   await page.getByRole("button", { name: /Add a deck/ }).click();
   await page.waitForTimeout(250);
@@ -2002,7 +2015,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.waitForTimeout(300);
   // The suggester follows the map's rules: half a ticket per stop, floored at what a table of three
   // is dealt, instead of Generic's 1.1.
-  await page.getByRole("button", { name: /^Tickets \(\d+\)$/ }).click();
+  await page.getByRole("button", { name: "Tickets", exact: true }).click();
   await page.waitForTimeout(400);
   {
     const lengths = await lengthsIn(page.locator(".tickets-panel"));
@@ -2100,7 +2113,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   }
   await page.keyboard.press("Escape");
   await page.waitForTimeout(300);
-  for (const [button, name] of [["Map balance", "balance"], [/^Tickets \(\d+\)$/, "tickets"], ["Print map", "print"]]) {
+  for (const [button, name] of [["Map balance", "balance"], [/^Tickets$/, "tickets"], ["Print map", "print"]]) {
     await page.getByRole("button", { name: button }).click();
     await page.waitForTimeout(600);
     tooSmall.push(...(await smallText()).map((item) => `${name}: ${item}`));
@@ -2922,7 +2935,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     await sp.waitForTimeout(300);
 
     // The cards stand with the board, and so does their small map.
-    await sp.getByRole("button", { name: /^Tickets \(\d+\)$/ }).click();
+    await sp.getByRole("button", { name: "Tickets", exact: true }).click();
     await sp.waitForTimeout(400);
     await sp.evaluate(() => { window.__stand = null; window.print = () => { const c = document.querySelector(".print-tickets .ticket-card"); const m = c && c.querySelector("svg.ticket-map"); const r = c && c.getBoundingClientRect(); window.__stand = { w: r && r.width, h: r && r.height, viewBox: m && m.getAttribute("viewBox") }; }; });
     await sp.emulateMedia({ media: "print" });
@@ -3023,7 +3036,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     check("typing a name counts as one change, not one per key", (await state()).changes === before + 1, `${before} -> ${(await state()).changes}`);
 
     // Building a whole deck of tickets is one change.
-    await rp.getByRole("button", { name: /^Tickets \(\d+\)$/ }).click(); await rp.waitForTimeout(400);
+    await rp.getByRole("button", { name: "Tickets", exact: true }).click(); await rp.waitForTimeout(400);
     const deckBefore = (await state()).changes;
     await rp.getByRole("button", { name: /Add a deck/ }).click(); await rp.waitForTimeout(250);
     await rp.getByRole("menuitem", { name: /Build a full deck of tickets/ }).click();
