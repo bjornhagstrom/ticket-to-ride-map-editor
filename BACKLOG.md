@@ -16,8 +16,6 @@ in the same commit as the work (AGENTS.md).
   routes. Today's behaviour stays the default.
 - **Print the rules alone from the Rules panel**, with a button there (the print dialog can already
   do it by unticking the board and the cards).
-- **Points at the top of standing ticket cards**, so the small map gets the card's whole width; lying
-  cards keep the points in their corner.
 - **Printing and PDF**: say in the print dialog that it saves a PDF too; give the browser a file name
   worth keeping (map, version, what is printed, date); a page of the balance figures as they stood,
   ticked in the print dialog, so a printed or saved milestone says what the editor thought of the map.

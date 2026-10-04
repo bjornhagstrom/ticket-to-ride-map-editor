@@ -2956,7 +2956,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     // The cards stand with the board, and so does their small map.
     await sp.getByRole("button", { name: "Tickets", exact: true }).click();
     await sp.waitForTimeout(400);
-    await sp.evaluate(() => { window.__stand = null; window.print = () => { const c = document.querySelector(".print-tickets .ticket-card"); const m = c && c.querySelector("svg.ticket-map"); const r = c && c.getBoundingClientRect(); window.__stand = { w: r && r.width, h: r && r.height, viewBox: m && m.getAttribute("viewBox") }; }; });
+    await sp.evaluate(() => { window.__stand = null; window.print = () => { const c = document.querySelector(".print-tickets .ticket-card"); const m = c && c.querySelector("svg.ticket-map"); const r = c && c.getBoundingClientRect(); window.__stand = { w: r && r.width, h: r && r.height, viewBox: m && m.getAttribute("viewBox") , points: (() => { const p = c && c.querySelector(".ticket-card-points"); const b = p && p.getBoundingClientRect(); return b ? { top: b.top, bottom: b.bottom } : null; })(), map: m ? { top: m.getBoundingClientRect().top, bottom: m.getBoundingClientRect().bottom, width: m.getBoundingClientRect().width } : null, cardBottom: r ? r.bottom : 0, mmPx: 96 / 25.4, inner: r ? r.width - parseFloat(getComputedStyle(c).paddingLeft) - parseFloat(getComputedStyle(c).paddingRight) - 2 : 0 }; }; });
     await sp.emulateMedia({ media: "print" });
     await sp.evaluate(() => Array.from(document.querySelectorAll("button")).find((b) => b.textContent.includes("Print deck")).click());
     await sp.waitForFunction(() => window.__stand !== null, null, { timeout: 5000 });
@@ -2964,6 +2964,11 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     await sp.emulateMedia({ media: "screen" });
     check("on a standing board the cards stand, 45 x 62 mm", Math.abs(card.w - mm(45)) < 3 && Math.abs(card.h - mm(62)) < 3, `${(card.w / 96 * 25.4).toFixed(0)} x ${(card.h / 96 * 25.4).toFixed(0)} mm`);
     check("with the standing board as their small map", card.viewBox === "0 0 731 1100", String(card.viewBox));
+    // On a standing card the points sit at the top, beside the names, so the small map is not squeezed
+    // beside a column of its own; a lying card keeps them in its corner.
+    check("a standing card has its points at the top, above the small map", card.points && card.map && card.points.bottom <= card.map.top + 1, JSON.stringify({ points: card.points, map: card.map }));
+    check("the whole small map shows, nothing cut off at the foot", card.map && card.map.bottom <= card.cardBottom + 1, JSON.stringify({ map: card.map, cardBottom: card.cardBottom }));
+    check("and it is wider than when the points had a column of their own", card.map && card.map.width > card.inner - 11.5 * card.mmPx + 2, `${card.map && card.map.width.toFixed(0)} px against ${(card.inner - 11.5 * card.mmPx).toFixed(0)}`);
 
     // The file says it stands.
     await sp.waitForTimeout(300);

@@ -66,9 +66,12 @@ export function TicketCards({ data, setId, perRow }: { data: MapData; setId: str
           const length = from && to ? Math.hypot(to.x - from.x, to.y - from.y) : 0;
           const ux = length ? (to.x - from.x) / length : 0, uy = length ? (to.y - from.y) / length : 0;
           const gap = Math.min(RING, length / 2);
-          return <div className="ticket-card" key={ticket.id} style={{ width: `${card.width}mm`, height: `${card.height}mm` }}>
+          // A standing card has its points at the top, beside the names, so the small map is not squeezed
+          // beside a column of its own; a lying card keeps them in its corner.
+          const standing = card.height > card.width;
+          return <div className={cn("ticket-card", standing && "standing")} key={ticket.id} style={{ width: `${card.width}mm`, height: `${card.height}mm` }}>
             <p className="ticket-card-names"><span className="ticket-card-from">{name(ticket.a)}</span><span className="ticket-card-dash"> – </span><span className="ticket-card-to">{name(ticket.b)}</span></p>
-            <svg className="ticket-map" viewBox={`0 0 ${width} ${height}`} style={{ aspectRatio: `${width} / ${height}`, maxHeight: `${((card.width - 6 - 10 - 1.5) * height / width).toFixed(2)}mm` }}>
+            <svg className="ticket-map" viewBox={`0 0 ${width} ${height}`} style={{ aspectRatio: `${width} / ${height}`, ...(standing ? {} : { maxHeight: `${((card.width - 6 - 10 - 1.5) * height / width).toFixed(2)}mm` }) }}>
               <use href={`#${symbolId}`} width={width} height={height} />
               <rect className="ticket-map-frame" x={0} y={0} width={width} height={height} />
               {from && to && <line className="ticket-map-link" x1={from.x + ux * gap} y1={from.y + uy * gap} x2={to.x - ux * gap} y2={to.y - uy * gap} />}

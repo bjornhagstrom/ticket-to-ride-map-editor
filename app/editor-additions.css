@@ -405,3 +405,13 @@
 .start-over { margin-top: 14px; padding-top: 12px; border-top: 1px solid #ddd4c6; display: grid; gap: 6px; }
 .start-over h4 { margin: 0; font-size: 14px; }
 .start-over-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* A standing ticket card: names and points share the top row, and the small map has the card below,
+   wider than when the points took a column of their own. */
+@media print{
+  .ticket-card.standing{grid-template-columns:minmax(0,1fr) 10mm;grid-template-rows:auto minmax(0,1fr)}
+  .ticket-card.standing .ticket-card-names{grid-column:1;grid-row:1;align-self:center}
+  .ticket-card.standing .ticket-card-corner{grid-column:2;grid-row:1;justify-content:flex-start}
+  /* The board stands too, so the card's height is what limits the map: it fills that, centred. */
+  .ticket-card.standing .ticket-map{grid-column:1/-1;grid-row:2;height:100%;width:auto;max-width:100%;justify-self:center;align-self:stretch}
+}
