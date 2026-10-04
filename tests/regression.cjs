@@ -3330,6 +3330,29 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     await up.context().close();
   }
 
+  // 42. Help on hover waits a moment: passing over the tools on the way somewhere opens nothing, and
+  // resting on one opens its help. The note that everything is stored in the exported file is one of
+  // the figures above the map, not loose text beside them.
+  {
+    const tp = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
+    tp.on("pageerror", (e) => errors.push(String(e)));
+    await tp.goto(BASE, { waitUntil: "networkidle" });
+    await tp.getByRole("button", { name: "Load the example map" }).click();
+    await tp.waitForTimeout(600);
+    const card = tp.locator(".crossing-card.shape-card");
+    const box = await card.boundingBox();
+    await tp.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await tp.waitForTimeout(250);
+    check("passing over a card with help opens nothing at once", (await tp.locator('[role="tooltip"]').count()) === 0);
+    await tp.waitForTimeout(900);
+    check("resting on it opens its help", (await tp.locator('[role="tooltip"]').count()) > 0);
+    await tp.mouse.move(5, 500);
+    await tp.waitForTimeout(400);
+    const note = tp.locator(".map-status [data-slot=badge]", { hasText: "Everything is stored" });
+    check("the note that everything is stored in the exported file is one of the figures above the map", (await note.count()) === 1);
+    await tp.context().close();
+  }
+
   console.log("PASS:"); ok.forEach((l) => console.log("  ✓ " + l));
   if (bad.length) { console.log("FAIL:"); bad.forEach((l) => console.log("  ✗ " + l)); }
   console.log(`\n${ok.length} passed, ${bad.length} failed`);

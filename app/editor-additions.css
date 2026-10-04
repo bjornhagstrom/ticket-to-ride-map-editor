@@ -367,3 +367,6 @@
    without a stacking order Safari drew the number fields' arrows over the ticket names. */
 .analysis-table td:first-child { z-index: 1; }
 .analysis-table th:first-child { z-index: 2; }
+
+/* The note beside the figures above the map, in the same shape, quieter. */
+.map-status .map-status-note { background: rgba(255, 250, 240, .85); color: #5d554a; font-weight: 400; white-space: normal; flex-shrink: 1; min-width: 0; max-width: 15rem; line-height: 1.25; text-align: left; }
