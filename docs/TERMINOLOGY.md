@@ -44,7 +44,10 @@ The editor speaks English. Swedish equivalents are given where the work is discu
 | **Map balance** | The panel that reads the network and the deck: colours, lengths, crowding. | kartbalans |
 | **crossing** | Two routes passing over each other without meeting at a stop. | korsning |
 | **crowded route** | A route more tickets want than it can carry at a given table. | trång rutt |
-| **low-connection stop** | A stop with fewer than two neighbours. | glest ansluten hållplats |
+| **dead end** | A stop on one route only: one way in. Character, as Edinburgh is on Europe. | återvändsgränd |
+| **route that cuts the map in two** | A route whose loss splits the network. With one lane it is warned about (a single claim shuts part of the map off; no official map has one); as a double route it is described. | rutt som delar kartan |
+| **corner** | Two or more stops reached only through one or two **gates**, as Iberia is through Pamplona and Marseille. Character, not a fault. | hörn |
+| **gate** | A stop through which a corner is reached. | port |
 
 ## Printing and files
 
@@ -81,6 +84,7 @@ Words we have chosen not to use, each with the word to use instead.
 - `balance report`, use `Map balance`
 - `balance view`, use `Map balance`
 - `Name position`, use `Name on the map`
+- `low-connection`, use `dead end` (or `stop with no route`)
 
 ## Open questions
 

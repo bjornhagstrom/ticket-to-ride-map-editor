@@ -114,6 +114,13 @@ result. *Large.*
 
 ## 6. Decisions
 
+*Status, 0.4.0: the owner approved B and F, and both are built (`networkShape` in
+`app/map-analysis.ts`, the network card and the "How the network holds together" section of Map
+balance, tested in `tests/network-shape.cjs` and block 38 of the regression suite). A corner is a part
+of 2 stops up to a quarter of the map cut off by removing one or two gate stops, with at least two stops
+inside that are not dead ends and at least one that branches; measured that way, 4 of the 8 calibration
+maps have corners, 0 to 3 each. C, D, E and G are still open.*
+
 1. **Should the editor describe rather than judge?** Recommended: **yes (B)**, now. It costs little,
    corrects a bias the measurements do not support, and changes nothing a designer has built.
 2. **Should a designer be able to mark intended chokepoints and hubs (C)?** Recommended: **yes, later**,

@@ -87,15 +87,18 @@ would break.
 
 ## Uneven maps on purpose
 
-Awaiting the owner's decision; the case and the measurements are in `docs/PROPOSAL-UNEVEN-MAPS.md`.
+The case and the measurements are in `docs/PROPOSAL-UNEVEN-MAPS.md`. The owner approved the first two
+steps and they are built in 0.4.0: the crowding text is set against the official range, and Map balance
+has a section on how the network holds together, with only a single-lane route that cuts the map in two
+as a warning. Still open from step one: the official range beside the other balance figures.
 The official maps build contention in on purpose (8–19 crowded routes at a full table, mostly on double
 routes) while avoiding routes or stops that cut the board in two, and our deck score rates every
 official deck worse than our own suggestions. The steps, in the order the proposal recommends:
 
-- **Describe, don't judge** (small): every balance figure with the official range beside it, worded as a
+- **Describe, don't judge** (small, partly built): every balance figure with the official range beside it, worded as a
   fact; warnings kept only for what is rarely intended; the crowding advice rewritten as options.
-- **Fragility apart from contention** (small): bridges, cut points and dead ends on the map, with the
-  official counts.
+- **Fragility apart from contention** (small, built): dead ends, routes that cut the map in two and
+  corners reached through one or two stops, with the official counts.
 - **Deck tension as a choice** (medium): calm, official-like or tense, in Build a full deck of tickets and in the deck
   rules, its range taken from the official decks.
 - **Intended chokepoints and hubs** (medium): a route or stop marked as contested on purpose, listed as

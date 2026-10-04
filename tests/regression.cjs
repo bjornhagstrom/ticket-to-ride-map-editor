@@ -198,7 +198,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   check("the main deck can deal a full table", mainDeck.length >= (example.players?.max ?? 5) * (example.startingTickets ?? 3), `${mainDeck.length} for ${(example.players?.max ?? 5)} × ${example.startingTickets ?? 3}`);
   check("with long tickets among the rest", mainDeck.some((t) => t.long) && mainDeck.some((t) => !t.long));
   check("every stop but the junction is on a ticket", example.stops.filter((st) => !typeOf(st.type).junction).every((st) => mainDeck.some((t) => t.a === st.id || t.b === st.id)));
-  await page.getByRole("button", { name: /^Tickets · / }).click();
+  await page.getByRole("button", { name: /^Tickets \(\d+\)$/ }).click();
   await page.waitForTimeout(500);
   const ticketsDialogText = await page.locator(".tickets-panel").textContent();
   check("and the tickets panel does not list the junction as a stop no ticket reaches", !ticketsDialogText.includes(junction.name), ticketsDialogText.slice(0, 200));
@@ -849,9 +849,9 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await tool("Add ticket").click();
   await clickStop("Westport"); await clickStop("Quarry");
   await clickStop("Pine Hill"); await clickStop("Central");
-  const ticketsButton = page.getByRole("button", { name: /^Tickets · / });
+  const ticketsButton = page.getByRole("button", { name: /^Tickets \(\d+\)$/ });
   const mainAfter = mainBefore + 2;
-  check("tickets are added to the current deck", (await ticketsButton.textContent()).includes(`Tickets · ${mainAfter}`), await ticketsButton.textContent());
+  check("tickets are added to the current deck, and the button says only how many: Tickets (n)", (await ticketsButton.textContent()).trim() === `Tickets (${mainAfter})`, await ticketsButton.textContent());
   await ticketsButton.click();
   await page.waitForTimeout(400);
 
@@ -1197,7 +1197,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   check("Escape drops the pick", (await pendingText()) === null && (await page.locator(".pick-band").count()) === 0);
 
   // 15. a lit ticket can be switched off again, and tools let go on a second click
-  await page.getByRole("button", { name: /^Tickets · / }).click();
+  await page.getByRole("button", { name: /^Tickets \(\d+\)$/ }).click();
   await page.waitForTimeout(400);
   await page.locator(".analysis-row-link").first().click();
   await page.waitForTimeout(250);
@@ -1339,7 +1339,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.waitForTimeout(300);
 
   // 21. suggesting a whole deck for the map that is open
-  await page.getByRole("button", { name: /^Tickets · / }).click();
+  await page.getByRole("button", { name: /^Tickets \(\d+\)$/ }).click();
   await page.waitForTimeout(400);
   const decksBefore = await page.locator("#ticket-set option").count();
   // Backing out of Suggest a deck leaves the deck panel where it was, not an empty column.
@@ -1414,7 +1414,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.waitForTimeout(300);
 
   // 22. the ticket list sorts by any of its headings
-  await page.getByRole("button", { name: /^Tickets · / }).click();
+  await page.getByRole("button", { name: /^Tickets \(\d+\)$/ }).click();
   await page.waitForTimeout(500);
   // Pick a deck that has tickets in it.
   const withTickets = (await page.locator("#ticket-set option").allTextContents()).findIndex((label) => !/\(0\)$/.test(label));
@@ -1468,11 +1468,12 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     await page.waitForTimeout(400);
   }
 
-  // 24. a low-connection warning says which stop it means
-  const lowCard = page.locator(".crossing-card.has-warning").filter({ hasText: "low-connection" });
+  // 24. a warning about how the network holds together says which stops or routes it means
+  const lowCard = page.locator(".crossing-card.shape-card.has-warning");
   if (await lowCard.count()) {
     const lowText = (await lowCard.textContent()).replace(/\s+/g, " ");
-    check("the low-connection card names the stops it means", /· [A-Za-zÅÄÖåäö]/.test(lowText), lowText);
+    const named = ((await lowCard.locator("p").first().textContent()) || "").trim();
+    check("the network card names what it means", named.length > 2, lowText);
   }
 
   // 25. the balancing view says where the tickets crowd
@@ -1575,7 +1576,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
 
   // 28. a deck name long enough to break the button it is shown in
   const longName = "A deck with a really very long name that nobody would sensibly type";
-  await page.getByRole("button", { name: /^Tickets · / }).click();
+  await page.getByRole("button", { name: /^Tickets \(\d+\)$/ }).click();
   await page.waitForTimeout(400);
   await page.getByRole("button", { name: /Add a deck/ }).click();
   await page.waitForTimeout(250);
@@ -1597,7 +1598,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   check("the right panel cuts it off rather than wrapping it", headingBox.scroll <= headingBox.client + 1 && headingBox.line < 24, `${headingBox.scroll} in ${headingBox.client}, ${headingBox.line.toFixed(0)} px tall`);
 
   // 29. the deck styles are laid out so they can be compared, and nothing is too pale to read
-  await page.getByRole("button", { name: /^Tickets · / }).click();
+  await page.getByRole("button", { name: /^Tickets \(\d+\)$/ }).click();
   await page.waitForTimeout(400);
   await page.getByRole("button", { name: /Add a deck/ }).click();
   await page.waitForTimeout(250);
@@ -2001,7 +2002,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await page.waitForTimeout(300);
   // The suggester follows the map's rules: half a ticket per stop, floored at what a table of three
   // is dealt, instead of Generic's 1.1.
-  await page.getByRole("button", { name: /^Tickets · / }).click();
+  await page.getByRole("button", { name: /^Tickets \(\d+\)$/ }).click();
   await page.waitForTimeout(400);
   {
     const lengths = await lengthsIn(page.locator(".tickets-panel"));
@@ -2099,7 +2100,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   }
   await page.keyboard.press("Escape");
   await page.waitForTimeout(300);
-  for (const [button, name] of [["Map balance", "balance"], [/^Tickets · /, "tickets"], ["Print map", "print"]]) {
+  for (const [button, name] of [["Map balance", "balance"], [/^Tickets \(\d+\)$/, "tickets"], ["Print map", "print"]]) {
     await page.getByRole("button", { name: button }).click();
     await page.waitForTimeout(600);
     tooSmall.push(...(await smallText()).map((item) => `${name}: ${item}`));
@@ -2128,8 +2129,8 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   await tool("Select & move").click();
   const sixStops = await page.evaluate(() => JSON.parse(localStorage.getItem("orebro-map-editor-public-v2")).stops);
   check("six stops are placed", sixStops.length === 6, String(sixStops.length));
-  const lowConnectionCard = page.locator(".crossing-card", { hasText: /low-connection/ });
-  check("the card counts six low-connection stops", /6 low-connection stops/.test(await lowConnectionCard.textContent()), await lowConnectionCard.textContent());
+  const lowConnectionCard = page.locator(".crossing-card.shape-card");
+  check("the card counts six stops with no route, as a warning", /6 stops with no route/.test(await lowConnectionCard.textContent()) && (await lowConnectionCard.evaluate((el) => el.classList.contains("has-warning"))), await lowConnectionCard.textContent());
   await lowConnectionCard.hover();
   await page.waitForTimeout(400);
   const lowTip = (await page.locator('[data-slot="tooltip-content"]').textContent().catch(() => "")) || "";
@@ -2921,7 +2922,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     await sp.waitForTimeout(300);
 
     // The cards stand with the board, and so does their small map.
-    await sp.getByRole("button", { name: /^Tickets · / }).click();
+    await sp.getByRole("button", { name: /^Tickets \(\d+\)$/ }).click();
     await sp.waitForTimeout(400);
     await sp.evaluate(() => { window.__stand = null; window.print = () => { const c = document.querySelector(".print-tickets .ticket-card"); const m = c && c.querySelector("svg.ticket-map"); const r = c && c.getBoundingClientRect(); window.__stand = { w: r && r.width, h: r && r.height, viewBox: m && m.getAttribute("viewBox") }; }; });
     await sp.emulateMedia({ media: "print" });
@@ -3022,7 +3023,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     check("typing a name counts as one change, not one per key", (await state()).changes === before + 1, `${before} -> ${(await state()).changes}`);
 
     // Building a whole deck of tickets is one change.
-    await rp.getByRole("button", { name: /^Tickets · / }).click(); await rp.waitForTimeout(400);
+    await rp.getByRole("button", { name: /^Tickets \(\d+\)$/ }).click(); await rp.waitForTimeout(400);
     const deckBefore = (await state()).changes;
     await rp.getByRole("button", { name: /Add a deck/ }).click(); await rp.waitForTimeout(250);
     await rp.getByRole("menuitem", { name: /Build a full deck of tickets/ }).click();
@@ -3079,6 +3080,54 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     check("Export map from the note downloads the map, puts the note away and starts counting again", (await note.count()) === 0 && (await state()).changes === 0 && Boolean((await state()).lastExport));
     check("and the header says it was exported just now", /exported just now/i.test(await status()) && (await rp.locator(".save-state.needs-export").count()) === 0, await status());
     await rp.context().close();
+  }
+
+  // 38. How the network holds together, described rather than judged. A dead end and a corner are
+  // character, as Edinburgh and Iberia are on Europe; a route with one lane whose loss cuts the map in
+  // two is the one thing the official maps never have, and the only one warned about. Crowding is
+  // set against the official maps instead of being called a fault.
+  {
+    const np = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
+    np.on("pageerror", (e) => errors.push(String(e)));
+    await np.goto(BASE, { waitUntil: "networkidle" });
+    await np.getByRole("button", { name: "Load the example map" }).click();
+    await np.waitForTimeout(600);
+    const KEY = "orebro-map-editor-public-v2";
+    const edit = async (fn) => { await np.evaluate(([key, src]) => { const m = JSON.parse(localStorage.getItem(key)); (new Function("m", src))(m); localStorage.setItem(key, JSON.stringify(m)); }, [KEY, fn]); await np.reload({ waitUntil: "networkidle" }); await np.waitForTimeout(700); };
+    const shapeCard = np.locator(".crossing-card.shape-card");
+    check("the example map holds together: the card says so, with no warning", /Well connected/.test(await shapeCard.textContent()) && !(await shapeCard.evaluate((el) => el.classList.contains("has-warning"))));
+    // A cape behind one route with one lane.
+    await edit(`const t = m.routes[0].type; m.stops.push({ id: "cape", name: "Cape", type: "city", x: 1060, y: 120 }); m.routes.push({ id: "r-cape", a: "example-eastgate", b: "cape", length: 3, type: t, color: "red" });`);
+    const cardText = (await shapeCard.textContent()).replace(/\s+/g, " ");
+    check("a route with one lane that cuts the map in two is warned about, and named", (await shapeCard.evaluate((el) => el.classList.contains("has-warning"))) && /1 route cuts the map in two/.test(cardText) && /Eastgate–Cape/.test(cardText), cardText);
+    await np.getByRole("button", { name: "Map balance", exact: true }).click();
+    await np.waitForTimeout(700);
+    const section = np.locator(".network-shape");
+    const sectionText = (await section.textContent()).replace(/\s+/g, " ");
+    check("Map balance has a section on how the network holds together", (await section.count()) === 1 && /How the network holds together/.test(sectionText));
+    check("it lists the dead end and the route into it, with its one lane", /Cape/.test(sectionText) && /Eastgate–Cape/.test(sectionText) && /one lane/i.test(sectionText), sectionText.slice(0, 400));
+    check("and says what the official maps have", /official maps/i.test(sectionText) && /Edinburgh/.test(sectionText) && /Iberia/.test(sectionText), sectionText.slice(-400));
+    await section.locator(".shape-row", { hasText: "Eastgate–Cape" }).first().hover();
+    await np.waitForTimeout(300);
+    check("pointing at the route marks it on the map", (await np.locator('.map-canvas .route-group.on-preview[data-route-id="r-cape"]').count()) === 1);
+    const crowdHelp = (await np.locator(".analysis-section.bottlenecks").textContent()).replace(/\s+/g, " ");
+    check("the crowding advice sets the map against the official maps instead of calling it a fault", /official maps/i.test(crowdHelp) && !/nearly always a change to the map/i.test(crowdHelp), crowdHelp.slice(0, 300));
+    // A second lane: still the only way to the cape, but now a double route, as Edinburgh–London is.
+    await edit(`const t = m.routes[0].type; m.routes.push({ id: "r-cape-2", a: "example-eastgate", b: "cape", length: 3, type: t, color: "blue" });`);
+    const calm = (await shapeCard.textContent()).replace(/\s+/g, " ");
+    check("with a second lane, the dead end is described, not warned about", !(await shapeCard.evaluate((el) => el.classList.contains("has-warning"))) && /1 dead end/.test(calm) && /Cape/.test(calm), calm);
+    await np.getByRole("button", { name: "Map balance", exact: true }).click();
+    await np.waitForTimeout(700);
+    check("and Map balance calls its way in a double route", /double route/i.test(await np.locator(".network-shape").textContent()));
+    // A corner of two stops, reached only through two others.
+    await edit(`const t = m.routes[0].type; m.stops.push({ id: "nook1", name: "Nook One", type: "city", x: 700, y: 60 }, { id: "nook2", name: "Nook Two", type: "city", x: 820, y: 60 }, { id: "nook3", name: "Nook Three", type: "city", x: 760, y: 20 }); m.routes.push({ id: "r-n1", a: "nook1", b: "nook2", length: 2, type: t, color: "green" }, { id: "r-n4", a: "nook1", b: "nook3", length: 1, type: t, color: "green" }, { id: "r-n5", a: "nook2", b: "nook3", length: 1, type: t, color: "green" }, { id: "r-n2", a: "nook1", b: "example-lakeside", length: 2, type: t, color: "green" }, { id: "r-n3", a: "nook2", b: "example-northfield", length: 2, type: t, color: "green" });`);
+    await np.getByRole("button", { name: "Map balance", exact: true }).click();
+    await np.waitForTimeout(700);
+    const cornerRow = np.locator(".network-shape .shape-row", { hasText: "Nook One" });
+    const cornerText = (await cornerRow.first().textContent().catch(() => "")).replace(/\s+/g, " ");
+    check("a corner reached only through two stops is listed, with its gates", /Nook Two/.test(cornerText) && /reached only through/i.test(cornerText), cornerText);
+    check("a corner is not a warning", !(await shapeCard.evaluate((el) => el.classList.contains("has-warning"))));
+    await np.context().close();
   }
 
   console.log("PASS:"); ok.forEach((l) => console.log("  ✓ " + l));

@@ -23,7 +23,7 @@ import { type DeckCompareView } from "./deck-compare";
 import { DEFAULT_PRINT_CHOICE, isSafari, PRINT_CHOICE_KEY, PRINT_PROFILES, type PrintChoice, type PrintProfile, printPlan } from "./print-plan";
 import { useTicketSuggestion } from "./use-ticket-suggestion";
 import { SettingsDialog, type StyleTarget } from "./map-styles";
-import { bandsOf, bandCuts, mapDiameter, deckFigures, defaultStyle, deckRuleFor, TICKET_SUGGESTER, evaluateTicketDeck, suggestedDeckSize, ticketEndStopCount, type TicketStyle, autoPlaceLabels, labelledStops, setupBalance, stopCoverage, ticketBand, type TicketBand, reviewTickets, ticketPointsPerSpace, ticketCoverage, type RouteSuggestion, labelCovers, labelAngleOptions, routeSamplePoints, colourLengthTable, crossings as crossingList, buildAdjacency, networkStats, routeSpacing, shortestPath, suggestRoutes } from "./map-analysis";
+import { bandsOf, bandCuts, mapDiameter, deckFigures, defaultStyle, deckRuleFor, TICKET_SUGGESTER, evaluateTicketDeck, suggestedDeckSize, ticketEndStopCount, type TicketStyle, autoPlaceLabels, labelledStops, setupBalance, stopCoverage, ticketBand, type TicketBand, reviewTickets, ticketPointsPerSpace, ticketCoverage, type RouteSuggestion, labelCovers, labelAngleOptions, routeSamplePoints, colourLengthTable, crossings as crossingList, networkShape, SHAPE_OFFICIAL, buildAdjacency, networkStats, routeSpacing, shortestPath, suggestRoutes } from "./map-analysis";
 import { canvasPoint, canvasPointRaw, pointsFor, samePair, stopById } from "./map-geometry";
 import { REPO_URL } from "./version";
 import { RouteLogo } from "./logo";
@@ -336,8 +336,16 @@ export function MapEditor() {
   const cancelPick = () => { setTicketStart(null); setMeasureStart(null); setRouteStart(null); setHoveredStop(null); setPickTo(null); };
   const stats = useMemo(() => networkStats(data), [data]);
   const colourTable = useMemo(() => colourLengthTable(data), [data]);
-  const lowConnectionStops = useMemo(() => data.stops.filter((stop) => (stats.neighbours.get(stop.id) ?? 0) < 2), [data.stops, stats]);
   const avgHubDegree = data.stops.length ? Array.from(stats.hubDegree.values()).reduce((sum, value) => sum + value, 0) / data.stops.length : 0;
+  const shape = useMemo(() => networkShape(data), [data]);
+  const shapeCard = useMemo(() => {
+    const few = (items: string[]) => `${items.slice(0, 3).join(", ")}${items.length > 3 ? ` and ${items.length - 3} more` : ""}`;
+    const cuts = shape.bridges.filter((bridge) => bridge.lanes === 1).map((bridge) => `${bridge.a.name}–${bridge.b.name}`);
+    if (shape.unconnected.length) { const n = shape.unconnected.map((stop) => stop.name); return { warn: true, title: `${n.length} stop${n.length === 1 ? "" : "s"} with no route`, line: few(n), all: n }; }
+    if (cuts.length) return { warn: true, title: `${cuts.length} route${cuts.length === 1 ? " cuts" : "s cut"} the map in two`, line: `${few(cuts)}, with one lane`, all: cuts };
+    if (shape.deadEnds.length) { const n = shape.deadEnds.map((stop) => stop.name); return { warn: false, title: `${n.length} dead end${n.length === 1 ? "" : "s"}`, line: few(n), all: n }; }
+    return { warn: false, title: "Well connected", line: `avg hub degree ${avgHubDegree.toFixed(1)}`, all: [] as string[] };
+  }, [shape, avgHubDegree]);
   const suggestions = useMemo(() => suggestRoutes(data, stats, colourTable), [data, stats, colourTable]);
   const selectedS = data.stops.find((stop) => stop.id === selectedStop);
   // For the selected stop: is its name on a route, which bearings are clear, and which is best.
@@ -360,7 +368,7 @@ export function MapEditor() {
   })).filter((deck) => deck.tickets.length || data.ticketSets.length === 1) : [];
   const litTicket = selectedTicket ? data.tickets.find((ticket) => ticket.id === selectedTicket) : undefined;
   // A deck can be given any name at all, so the button that carries it has to be able to cut it off.
-  const ticketButtonLabel = `Tickets · ${ticketsHere.length}${data.ticketSets.length > 1 ? ` in ${activeTicketSet.label}` : ""}`;
+  const ticketButtonLabel = `Tickets (${ticketsHere.length})`;
   const startTicketFrom = (stopId: string) => { setShowTickets(false); setSelectedTicket(null); enterTool("ticket"); setTicketStart(stopId); };
   const openTicket = (ticketId: string) => { const ticket = data.tickets.find((item) => item.id === ticketId); if (!ticket) return; setTicketSetId(ticket.set ?? data.ticketSets[0].id); setSelectedTicket(ticketId); openTickets(); };
   const selectedR = data.routes.find((route) => route.id === selectedRoute);
@@ -845,17 +853,18 @@ export function MapEditor() {
           <p>Drag a stop, or add a bend point to a selected route, to pull the lines apart. Pre-built infrastructure routes are ignored here, since those are drawn as continuous lines that nobody claims.</p>
         </TooltipContent></Tooltip>
         {data.stops.length > 0 && <Tooltip><TooltipTrigger asChild>
-          {/* The card names the first few; pointing at it lists every one. */}
-          <Tooltip><TooltipTrigger asChild>{<div className={cn("crossing-card", lowConnectionStops.length && "has-warning")} tabIndex={0}><div className="crossing-icon">{lowConnectionStops.length ? <AlertTriangle /> : <Check />}</div><div><strong>{lowConnectionStops.length ? `${lowConnectionStops.length} low-connection stop${lowConnectionStops.length === 1 ? "" : "s"}` : "Well connected"}</strong><p>avg hub degree {avgHubDegree.toFixed(1)}{lowConnectionStops.length ? ` · ${lowConnectionStops.slice(0, 4).map((stop) => stop.name).join(", ")}${lowConnectionStops.length > 4 ? ` and ${lowConnectionStops.length - 4} more` : ""}` : ""}</p></div></div>}</TooltipTrigger>
-            {lowConnectionStops.length > 0 && <TooltipContent side="right" className="balance-tooltip"><strong>Fewer than two neighbours</strong><p>{lowConnectionStops.map((stop) => stop.name).join(", ")}</p></TooltipContent>}</Tooltip>
+          {/* How the network holds together. A warning only for what the official maps never have: a stop
+              with no route, or a route with one lane whose loss cuts the map in two. A dead end is described. */}
+          <div className={cn("crossing-card shape-card", shapeCard.warn && "has-warning")} tabIndex={0}><div className="crossing-icon">{shapeCard.warn ? <AlertTriangle /> : shapeCard.all.length ? <CircleDot /> : <Check />}</div><div><strong>{shapeCard.title}</strong><p>{shapeCard.line}</p></div></div>
         </TooltipTrigger><TooltipContent side="right" className="balance-tooltip">
-          <p><strong>Hub degree</strong> is a stop&apos;s direct neighbours plus the routes touching it, so a stop on two routes scores 4. Two parallel routes to the same neighbour count twice.</p>
-          <p>Aim to give every stop at least two neighbours — a stop on a single route is a dead end that one player can block off. Across a whole map, an average of roughly 4–6 gives players choices without turning the board into a mesh.</p>
-          <p>Drawing and deleting routes moves it; placing stops you never connect drags the average down.</p>
+          {shapeCard.all.length > 0 && <p><strong>{shapeCard.title}:</strong> {shapeCard.all.join(", ")}</p>}
+          <p>A stop with no route cannot be reached. A route with one lane whose loss cuts the map in two lets a single claim shut part of the map off; none of the {SHAPE_OFFICIAL.maps} official maps has one.</p>
+          <p>A dead end, or a corner reached through one or two stops, is character rather than a fault: Edinburgh in Europe is a dead end behind a double route, and {SHAPE_OFFICIAL.mapsWithCorners} of the {SHAPE_OFFICIAL.maps} official maps have corners, such as Iberia. Map balance lists them all.</p>
+          <p><strong>Hub degree</strong> is a stop&apos;s direct neighbours plus the routes touching it; across a whole map an average of roughly 4–6 gives players choices without turning the board into a mesh. This map: {avgHubDegree.toFixed(1)}.</p>
         </TooltipContent></Tooltip>}
         <Button variant="outline" size="sm" className="analyze-button" onClick={() => openStyles({ kind: "map" })}><Settings2 />Settings</Button>
         {data.stops.length > 0 && <Button variant="outline" size="sm" className="analyze-button" onClick={() => { setShowSuggestions(false); setHoveredSuggestion(null); setShowTickets(false); setShowRules(false); setShowAnalysis(true); }}><BarChart3 />Map balance</Button>}
-        <Button variant="outline" size="sm" className="analyze-button" title={ticketButtonLabel} onClick={openTickets}><TicketIcon /><span className="button-label">{ticketButtonLabel}</span></Button>
+        <Button variant="outline" size="sm" className="analyze-button" title={`${ticketButtonLabel} · ${activeTicketSet.label}`} onClick={openTickets}><TicketIcon /><span className="button-label">{ticketButtonLabel}</span></Button>
         <Button variant="outline" size="sm" className="analyze-button" onClick={openRules}><ScrollText />Rules</Button>
         {data.stops.length > 1 && <Button variant="outline" size="sm" className="analyze-button" onClick={() => { closeAnalysis(); setShowTickets(false); setShowRules(false); setShowSuggestions(true); }}><Lightbulb />Suggest routes</Button>}
         <div className="legend"><p className="eyebrow">Stop types</p>{data.stopTypeStyles.map((meta) => <button type="button" key={meta.id} className="legend-item" title={`Edit the ${meta.label} stop type`} onClick={() => openStyles({ kind: "stop", id: meta.id })}><i style={{ background: meta.fill, borderColor: meta.stroke }} />{meta.label}</button>)}</div>

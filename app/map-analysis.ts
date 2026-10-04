@@ -515,3 +515,92 @@ export function deckFigures(data: MapData, setId: string, report: TicketDeckRepo
 
 // The ticket suggester lives in its own module; re-exported here so the ticket analysis has one door.
 export { suggestTickets, evaluateTicketDeck, suggestedDeckSize, ticketEndStopCount, dealtToFullTable, defaultStyle, deckRules, deckRuleFor, TICKET_SUGGESTER, type TicketStyle, type BuiltInStyle, type DeckRule, type TicketSuggestOptions, type TicketDeckReport, type Bottleneck } from "./ticket-suggester";
+
+// How the network holds together: stops with no route, dead ends, routes whose loss cuts the map in
+// two (with how many lanes they have), and corners reached only through one or two stops. Edges and
+// corners are character on the official maps — Edinburgh behind its double route, Iberia behind
+// Pamplona and Marseille — while a route with one lane that cuts the map in two never occurs there.
+// The editor describes the first and warns only about the second (docs/PROPOSAL-UNEVEN-MAPS.md).
+export type NetworkShape = {
+  unconnected: Stop[];
+  deadEnds: Stop[];
+  bridges: { a: Stop; b: Stop; lanes: number; routeIds: string[] }[];
+  corners: { stops: Stop[]; gates: Stop[]; routeIds: string[] }[];
+};
+/** Measured on the eight calibration maps (tests/network-shape.cjs checks Europe and the USA). */
+/** Routes more tickets want than they can carry, at the largest table each official map is for. */
+export const CROWDING_OFFICIAL: [number, number] = [8, 19];
+export const SHAPE_OFFICIAL = { maps: 8, mapsWithDeadEnds: 1, mapsWithBridges: 1, singleLaneBridges: 0, mapsWithCorners: 4, cornersPerMap: [0, 3] as [number, number] };
+
+export function networkShape(data: MapData): NetworkShape {
+  const byId = new Map(data.stops.map((stop) => [stop.id, stop]));
+  const neighbours = new Map(data.stops.map((stop) => [stop.id, new Set<string>()]));
+  const lanes = new Map<string, string[]>();
+  const pair = (a: string, b: string) => (a < b ? `${a}|${b}` : `${b}|${a}`);
+  for (const route of data.routes) {
+    if (!byId.has(route.a) || !byId.has(route.b) || route.a === route.b) continue;
+    neighbours.get(route.a)!.add(route.b);
+    neighbours.get(route.b)!.add(route.a);
+    const key = pair(route.a, route.b);
+    lanes.set(key, [...(lanes.get(key) ?? []), route.id]);
+  }
+  const connected = data.stops.filter((stop) => neighbours.get(stop.id)!.size > 0).map((stop) => stop.id);
+  // The parts left when some stops, or one connection, are taken away.
+  const parts = (removed: Set<string>, cut?: [string, string]): string[][] => {
+    const seen = new Set<string>(removed);
+    const found: string[][] = [];
+    for (const start of connected) {
+      if (seen.has(start)) continue;
+      const part = [start];
+      seen.add(start);
+      for (let i = 0; i < part.length; i++) for (const next of neighbours.get(part[i])!) {
+        if (seen.has(next) || (cut && ((part[i] === cut[0] && next === cut[1]) || (part[i] === cut[1] && next === cut[0])))) continue;
+        seen.add(next);
+        part.push(next);
+      }
+      found.push(part);
+    }
+    return found;
+  };
+  const whole = parts(new Set()).length;
+  const bridges = [...lanes.entries()].filter(([key]) => parts(new Set(), key.split("|") as [string, string]).length > whole)
+    // Named as the route was drawn, from its first lane.
+    .map(([, routeIds]) => { const first = data.routes.find((route) => route.id === routeIds[0])!; return { a: byId.get(first.a)!, b: byId.get(first.b)!, lanes: routeIds.length, routeIds }; });
+  // Corners: a part of at least two stops and at most a quarter of the map, cut off when one or two
+  // stops (its gates) are taken away. Only the largest of corners nested inside each other is kept.
+  const limit = Math.floor(connected.length / 4);
+  const found = new Map<string, { stops: string[]; gates: string[] }>();
+  const consider = (gates: string[]) => {
+    for (const part of parts(new Set(gates))) {
+      if (part.length < 2 || part.length > limit) continue;
+      const key = [...part].sort().join("|");
+      const known = found.get(key);
+      if (!known || known.gates.length > gates.length) found.set(key, { stops: part, gates });
+    }
+  };
+  for (const a of connected) consider([a]);
+  for (let i = 0; i < connected.length; i++) for (let j = i + 1; j < connected.length; j++) consider([connected[i], connected[j]]);
+  const candidates = [...found.values()].sort((x, y) => y.stops.length - x.stops.length);
+  const kept: { stops: string[]; gates: string[] }[] = [];
+  for (const corner of candidates) {
+    const inside = new Set(corner.stops);
+    if (kept.some((other) => corner.stops.every((id) => other.stops.includes(id)))) continue;
+    // A dead end is already listed as such, and a corner that is only a dead end and the stop it
+    // hangs from says the same thing twice. A line of stops with nothing branching off is a long
+    // way between two gates, not a region of its own.
+    const through = [...inside].filter((id) => neighbours.get(id)!.size >= 2);
+    if (through.length < 2 || !through.some((id) => neighbours.get(id)!.size >= 3)) continue;
+    kept.push(corner);
+  }
+  const corners = kept.map((corner) => {
+    const inside = new Set(corner.stops);
+    const routeIds = data.routes.filter((route) => (inside.has(route.a) && corner.gates.includes(route.b)) || (inside.has(route.b) && corner.gates.includes(route.a))).map((route) => route.id);
+    return { stops: corner.stops.map((id) => byId.get(id)!), gates: corner.gates.map((id) => byId.get(id)!), routeIds };
+  });
+  return {
+    unconnected: data.stops.filter((stop) => neighbours.get(stop.id)!.size === 0),
+    deadEnds: data.stops.filter((stop) => neighbours.get(stop.id)!.size === 1),
+    bridges,
+    corners,
+  };
+}

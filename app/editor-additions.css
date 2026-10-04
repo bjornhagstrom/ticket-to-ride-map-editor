@@ -10,6 +10,12 @@
 .export-reminder-buttons [data-variant="ghost"]{height:26px;padding:0 6px;font-size:12.5px;text-decoration:underline;text-underline-offset:2px}
 .save-state.needs-export{color:#8a5a00}
 .save-state.needs-export svg{color:#b7791f}
+/* How the network holds together: rows like the crowded routes', a warning tint only where it is earned. */
+.network-shape h4{margin:10px 0 4px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:#5d554a}
+.shape-row{display:grid;gap:2px;width:100%;text-align:left;padding:7px 9px;border:1px solid #e3dccf;border-radius:8px;background:#fbf7ef;margin-bottom:5px;cursor:default}
+.shape-row strong{font-size:13px}.shape-row span{font-size:12px;color:#5d554a}
+.shape-row:hover,.shape-row:focus-visible{border-color:#b9ad99;background:#f4eee2;outline:none}
+.shape-row.has-warning{border-color:#e2b463;background:#fff6e5}
 /* Crossings ringed while the crossings card is pointed at: red on a white band, like a pointed stop. */
 .crossing-mark-band{fill:none;stroke:#fff;stroke-width:9px}
 .crossing-mark{fill:none;stroke:#b3261e;stroke-width:4px}

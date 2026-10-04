@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { TicketLengths, type TicketLengthsView } from "./ticket-lengths";
 import { DeckCompare, type DeckCompareView } from "./deck-compare";
-import { colourRouteIds, compareWithClassics, CLASSIC_ROUTE_MAPS, type Bottleneck, dealtToFullTable, deckRuleFor, deckRules, TICKET_SUGGESTER, type TicketDeckReport, type TicketStyle, type SetupBalance, type TicketReview, type ColourLengthTable, type NetworkStats, type RouteSpacing, type RouteSuggestion } from "./map-analysis";
+import { CROWDING_OFFICIAL, networkShape, SHAPE_OFFICIAL, colourRouteIds, compareWithClassics, CLASSIC_ROUTE_MAPS, type Bottleneck, dealtToFullTable, deckRuleFor, deckRules, TICKET_SUGGESTER, type TicketDeckReport, type TicketStyle, type SetupBalance, type TicketReview, type ColourLengthTable, type NetworkStats, type RouteSpacing, type RouteSuggestion } from "./map-analysis";
 
 export function WelcomeGuide({ open, onOpenChange, onChooseBlank, onChooseExample }: { open: boolean; onOpenChange: (open: boolean) => void; onChooseBlank: () => void; onChooseExample: () => void }) {
   // What matters, in a line or two each. How a print is laid out is for the print dialog to say.
@@ -62,15 +62,16 @@ export function AnalysisPanel({ lengthView, pinKey, onPin, bottleneckShown, onCl
         </div>
         <p className="helper">How many tickets want each route, against the lanes a player may use at that table. Only the second lane of a double route depends on the player count{players.max < 4 ? ", and on this map it never opens" : ""}.</p>
         {bottlenecks.length === 0
-          ? <p className="helper">No route is wanted by more tickets than it can carry.</p>
+          ? <p className="helper">No route is wanted by more tickets than it can carry. Official maps have {CROWDING_OFFICIAL[0]}–{CROWDING_OFFICIAL[1]} such routes at a full table: some contention is part of the game.</p>
           : <>
             <div className="bottleneck-list">{bottlenecks.slice(0, 8).map((edge) => <button type="button" key={`${edge.a}|${edge.b}`} className="bottleneck-row" onPointerEnter={() => onPreviewRoutes(edge.routeIds)} onPointerLeave={() => onPreviewRoutes(null)} aria-pressed={edge.routeIds.length === bottleneckShown.size && edge.routeIds.every((id) => bottleneckShown.has(id))} onClick={() => onShowBottleneck(edge.routeIds)}>
               <strong>{stopName(edge.a)} → {stopName(edge.b)}</strong>
               <span>{edge.length} spaces · {edge.lanesUsable} of {edge.lanes} lane{edge.lanes === 1 ? "" : "s"} usable · {edge.tickets} ticket{edge.tickets === 1 ? "" : "s"} want it</span>
             </button>)}</div>
-            <p className="helper">Many tickets need these routes. Consider making one a double route, adding a way round, or moving a ticket. The fix is nearly always a change to the map rather than to the deck. Click a row to keep its route marked, and click again to let go.</p>
+            <p className="helper">{bottlenecks.length} route{bottlenecks.length === 1 ? " is" : "s are"} wanted by more tickets than {bottlenecks.length === 1 ? "it" : "they"} can carry at this table. Official maps have {CROWDING_OFFICIAL[0]}–{CROWDING_OFFICIAL[1]} at a full table, most of them on double routes: contention is part of the game. Where a corridor is crowded on purpose, a second lane keeps it open at bigger tables; where it is not, a way round or another ticket eases it. Click a row to keep its route marked, and click again to let go.</p>
           </>}
       </div>
+      <NetworkShapeSection data={data} onPreviewRoutes={onPreviewRoutes} onPreviewStop={onPreviewStop} />
       <TicketLengths view={lengthView} />
       <div className="analysis-section setup-balance">
         <h3>Game setup against the map</h3>
@@ -431,4 +432,24 @@ export function SuggestTicketsDialog({ open, onOpenChange, data, current, sugges
 
     </DialogContent>
   </Dialog>;
+}
+
+// How the network holds together, described rather than judged: dead ends, routes whose loss cuts
+// the map in two, and corners reached only through one or two stops, each beside what the official
+// maps have. Pointing at a row marks it on the map.
+function NetworkShapeSection({ data, onPreviewRoutes, onPreviewStop }: { data: MapData; onPreviewRoutes: (routeIds: string[] | null) => void; onPreviewStop: (stopId: string | null) => void }) {
+  const shape = networkShape(data);
+  const names = (stops: { name: string }[]) => stops.map((stop) => stop.name).join(", ");
+  const and = (stops: { name: string }[]) => stops.length === 1 ? stops[0].name : `${stops.slice(0, -1).map((stop) => stop.name).join(", ")} and ${stops[stops.length - 1].name}`;
+  const leave = () => { onPreviewRoutes(null); onPreviewStop(null); };
+  const nothing = !shape.unconnected.length && !shape.deadEnds.length && !shape.bridges.length && !shape.corners.length;
+  return <div className="analysis-section network-shape">
+    <h3>How the network holds together</h3>
+    <p className="helper">Edges and corners give a map its character. Of {SHAPE_OFFICIAL.maps} official maps, {SHAPE_OFFICIAL.mapsWithCorners} have corners reached through one or two stops, such as Iberia in Europe, behind Pamplona and Marseille, and one has a dead end, Edinburgh, behind a double route. None has a route with one lane whose loss cuts the map in two: there, a single claim shuts part of the map off.</p>
+    {nothing && <p className="helper">No dead end, nothing that cuts the map in two, no corner: every part of the map can be reached more than one way.</p>}
+    {shape.unconnected.length > 0 && <div className="shape-group"><h4>Stops with no route</h4>{shape.unconnected.map((stop) => <button type="button" key={stop.id} className="shape-row has-warning" onPointerEnter={() => onPreviewStop(stop.id)} onPointerLeave={leave} onFocus={() => onPreviewStop(stop.id)} onBlur={leave}><strong>{stop.name}</strong><span>no route reaches it</span></button>)}</div>}
+    {shape.deadEnds.length > 0 && <div className="shape-group"><h4>Dead ends</h4>{shape.deadEnds.map((stop) => <button type="button" key={stop.id} className="shape-row" onPointerEnter={() => onPreviewStop(stop.id)} onPointerLeave={leave} onFocus={() => onPreviewStop(stop.id)} onBlur={leave}><strong>{stop.name}</strong><span>one way in</span></button>)}</div>}
+    {shape.bridges.length > 0 && <div className="shape-group"><h4>Routes that cut the map in two</h4>{shape.bridges.map((bridge) => <button type="button" key={bridge.routeIds.join()} className={cn("shape-row", bridge.lanes === 1 && "has-warning")} onPointerEnter={() => onPreviewRoutes(bridge.routeIds)} onPointerLeave={leave} onFocus={() => onPreviewRoutes(bridge.routeIds)} onBlur={leave}><strong>{bridge.a.name}–{bridge.b.name}</strong><span>{bridge.lanes === 1 ? "one lane: a single claim cuts off what lies beyond" : `a double route, as Edinburgh–London is: still open while one lane is free`}</span></button>)}</div>}
+    {shape.corners.length > 0 && <div className="shape-group"><h4>Corners</h4>{shape.corners.map((corner) => <button type="button" key={corner.stops.map((stop) => stop.id).join()} className="shape-row" onPointerEnter={() => onPreviewRoutes(corner.routeIds)} onPointerLeave={leave} onFocus={() => onPreviewRoutes(corner.routeIds)} onBlur={leave}><strong>{names(corner.stops)}</strong><span>reached only through {and(corner.gates)} ({corner.routeIds.length} route{corner.routeIds.length === 1 ? "" : "s"})</span></button>)}</div>}
+  </div>;
 }
