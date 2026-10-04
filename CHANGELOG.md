@@ -23,6 +23,7 @@ This file is written from `app/version.ts` by `npm run changelog`; edit the note
 - Opening an older copy of the same map, with a lower version number, warns that its numbers would repeat and suggests a new name.
 - The first print puts the whole board on one sheet of A4; the print dialog remembers what you choose after that.
 - Drawing a route, its wagon spaces can be set at once: the Draw route tool fits them to the distance between the stops, or uses a number you choose, and right after drawing, − and + on the new route (or a digit key) change them without leaving the tool.
+- A tick box among a tool's options is no longer set in capitals, and in a table that scrolls sideways the ticket names stay above the columns sliding under them.
 - A reminder to export: the map lives only in this browser, so after a while of work without an export a note says so, and the header says when the map was last exported. Ask for it less often, or turn it off in Settings.
 - Point at the crossings warning to see them: the routes that cross are marked on the map and every crossing is ringed. Crossings are now found on the lines as drawn, curves included.
 - Two things have clearer names: Suggest a deck is now Build a full deck of tickets, under Add a deck in the Tickets panel, and the Analyze balance button is now Map balance, like the panel it opens.

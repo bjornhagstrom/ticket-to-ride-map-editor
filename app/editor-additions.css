@@ -358,3 +358,12 @@
 .length-chip-button text { fill: #fffaf0; font: 700 20px "Avenir Next", "Segoe UI", Arial, sans-serif; text-anchor: middle; pointer-events: none; }
 .length-chip-button[aria-disabled="true"] { opacity: .35; cursor: default; }
 .length-chip-count { font: 700 18px "Avenir Next", "Segoe UI", Arial, sans-serif; text-anchor: middle; fill: #24211d; }
+
+/* A tick box among a tool's or an object's options reads as a sentence; only field names are set in
+   small capitals. `.tool-options label` is the more specific rule, so it is undone here. */
+.tool-options .checkbox-row, .property-form .checkbox-row, .format-control .checkbox-row { text-transform: none; letter-spacing: normal; font-size: 13px; margin: 2px 0 4px; }
+
+/* The first column of a table that scrolls sideways stays put, above the columns sliding under it:
+   without a stacking order Safari drew the number fields' arrows over the ticket names. */
+.analysis-table td:first-child { z-index: 1; }
+.analysis-table th:first-child { z-index: 2; }

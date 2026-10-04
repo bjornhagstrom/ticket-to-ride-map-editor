@@ -3308,6 +3308,28 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     await rp2.context().close();
   }
 
+  // 41. Small things seen in use: a tick box among the tool's options reads as a sentence, not in the
+  // capitals of a field name; and in a table that scrolls sideways, the ticket names stay on top of the
+  // columns sliding under them (Safari drew the points fields' arrows over the names).
+  {
+    const up = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
+    up.on("pageerror", (e) => errors.push(String(e)));
+    await up.goto(BASE, { waitUntil: "networkidle" });
+    await up.getByRole("button", { name: "Load the example map" }).click();
+    await up.waitForTimeout(600);
+    await up.locator('.tool-row .tool-button[aria-label="Draw route"]').click();
+    await up.waitForTimeout(200);
+    const tick = await up.evaluate(() => { const el = document.querySelector(".tool-options .checkbox-row"); const cs = getComputedStyle(el); return { tt: cs.textTransform, ls: cs.letterSpacing }; });
+    check("a tick box in the tool's options is written as a sentence, not in capitals", tick.tt === "none" && tick.ls === "normal", JSON.stringify(tick));
+    const fieldName = await up.evaluate(() => getComputedStyle(document.querySelector(".tool-options [data-slot=label]")).textTransform);
+    check("while the field names above it keep their small capitals", fieldName === "uppercase", fieldName);
+    await up.getByRole("button", { name: "Tickets", exact: true }).click();
+    await up.waitForTimeout(700);
+    const sticky = await up.evaluate(() => { const td = document.querySelector(".tickets-panel .analysis-table tbody td:first-child"); const th = document.querySelector(".tickets-panel .analysis-table thead th:first-child"); return { td: getComputedStyle(td).zIndex, th: getComputedStyle(th).zIndex }; });
+    check("the ticket names in a sideways-scrolling table lie above the columns that slide under them", Number(sticky.td) >= 1 && Number(sticky.th) >= 1, JSON.stringify(sticky));
+    await up.context().close();
+  }
+
   console.log("PASS:"); ok.forEach((l) => console.log("  ✓ " + l));
   if (bad.length) { console.log("FAIL:"); bad.forEach((l) => console.log("  ✗ " + l)); }
   console.log(`\n${ok.length} passed, ${bad.length} failed`);
