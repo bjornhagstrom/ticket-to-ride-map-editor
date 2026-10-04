@@ -55,6 +55,8 @@ The editor speaks English. Swedish equivalents are given where the work is discu
 | --- | --- | --- |
 | **print run** | One print from the print dialog: the board, the ticket cards and the rules, in any combination. | utskrift |
 | **sheet** | One sheet of paper in a print run. | ark |
+| **version** (of a map) | The map's running number, one series for every print and export: the same while the map is unchanged, the next after a change. Printed as *Version 8 · 4 Oct 2026* on every sheet, *v8* on every card. Not the editor's own version. | version |
+| **playtest box** | The yellow box on the board with the version, a line for the date played and the players' names on the back. | speltestruta |
 | **full size** | The board at real size, spread over as many sheets as it takes. | full storlek |
 | **export**, **import** | Saving the map to a file and opening one. The map is otherwise **saved in this browser** only. | exportera, importera |
 | **map file** | The JSON file a map is exported to. | kartfil |

@@ -2,7 +2,7 @@
 // files open, board-format rescaling, and image reading.
 import { APP_VERSION } from "./version";
 import { boardOf, rotateMap, turnBetween, turnContents, type Board } from "./board";
-import { W, BUILT_IN_DECK_RULES, type DeckRuleSet, type PlayerRange, DEFAULT_WAGONS_PER_PLAYER, DEFAULT_STARTING_TICKETS, DEFAULT_KEPT_TICKETS, defaultTicketSet, type Ticket, type TicketSet, defaultStopTypeStyles, fallbackStopTypeStyle, type StopTypeStyle, defaultWagonStyles, type WagonStyle, defaultRouteTypeStyles, type LineStyle, type RouteTypeStyle, type BackgroundImage, type BackgroundShape, type ImageCrop, mapFormats, type MapData, type MapFormat, type NoteBox, type Point, type Route, type Stop, STORAGE_KEY } from "./map-data";
+import { W, BUILT_IN_DECK_RULES, type DeckRuleSet, type PlayerRange, DEFAULT_WAGONS_PER_PLAYER, DEFAULT_STARTING_TICKETS, DEFAULT_KEPT_TICKETS, defaultTicketSet, type Ticket, type TicketSet, defaultStopTypeStyles, fallbackStopTypeStyle, type StopTypeStyle, defaultWagonStyles, type WagonStyle, defaultRouteTypeStyles, type LineStyle, type RouteTypeStyle, type BackgroundImage, type BackgroundShape, type ImageCrop, mapFormats, type MapData, type MapFormat, type MapVersion, type MapVersionEntry, type NoteBox, type Point, type Route, type Stop, STORAGE_KEY } from "./map-data";
 
 export const GUIDE_SEEN_KEY = `${STORAGE_KEY}-guide-seen`;
 export const MAX_IMAGE_WARN_BYTES = 2 * 1024 * 1024;
@@ -175,7 +175,7 @@ const MAP_KEYS = new Set([
   "name", "format", "orientation", "background", "backgroundImage", "stops", "routes", "notes",
   "lineStyles", "routeTypeStyles", "wagonStyles", "stopTypeStyles", "tickets", "ticketSets",
   "wagonsPerPlayer", "startingTickets", "keptTickets", "players", "ticketBands", "ticketMix",
-  "ticketValuation", "lanesUsableByPlayers", "endGapMm", "deckRules", "deckRule", "rules", "unknown",
+  "ticketValuation", "lanesUsableByPlayers", "endGapMm", "deckRules", "deckRule", "rules", "mapVersion", "unknown",
 ]);
 
 const unknownKeys = (value: Record<string, unknown>): Record<string, unknown> | undefined => {
@@ -309,8 +309,20 @@ const normalizeMapFields = (value: Partial<MapData>): MapData => ({
   ticketMix: value.ticketMix,
   ...normalizeDeckRules(value),
   ticketValuation: value.ticketValuation,
+  mapVersion: normalizeMapVersion(value.mapVersion),
   unknown: unknownKeys(value as Record<string, unknown>),
 });
+
+// A version record is trusted only when it makes sense: a whole number above 0 and a fingerprint.
+// Otherwise it is dropped, and the next print starts the series again at 1. Log entries that make no
+// sense are left out; anything a later build added, in the record or in an entry, is kept.
+const normalizeMapVersion = (value: unknown): MapVersion | undefined => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const record = value as Partial<MapVersion>;
+  if (!Number.isInteger(record.number) || (record.number as number) < 1 || typeof record.fingerprint !== "string" || !record.fingerprint) return undefined;
+  const issued = (Array.isArray(record.issued) ? record.issued : []).filter((entry): entry is MapVersionEntry => Boolean(entry) && typeof entry === "object" && Number.isInteger((entry as MapVersionEntry).number) && typeof (entry as MapVersionEntry).date === "string" && typeof (entry as MapVersionEntry).by === "string");
+  return { ...(record as MapVersion), issued };
+};
 
 const normalizePlayers = (value: unknown): PlayerRange | undefined => {
   const range = value as Partial<PlayerRange> | undefined;

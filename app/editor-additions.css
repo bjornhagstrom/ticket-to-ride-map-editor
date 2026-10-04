@@ -126,6 +126,9 @@
   .ticket-card{break-inside:avoid;page-break-inside:avoid;border:.25mm dashed #81786c;padding:3mm;overflow:hidden;background:white;color:#24211d}
   .ticket-card p{margin:0}
   .ticket-card-points{width:10mm;height:10mm;border:.4mm solid #24211d;border-radius:50%;font:700 11pt Georgia,serif;line-height:9.2mm;text-align:center;color:#24211d}
+  .ticket-card{position:relative}
+  .ticket-card-version{position:absolute;left:3mm;bottom:1.6mm;margin:0;font:5pt "Segoe UI",Arial,sans-serif;color:#81786c}
+  .print-sheet-version{font:400 2.65px "Segoe UI",Arial,sans-serif}
   .ticket-card-flag{font:6pt "Segoe UI",Arial,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:#24221e;text-align:center}
   .ticket-card{display:grid;grid-template-columns:minmax(0,1fr) 10mm;grid-template-rows:auto minmax(0,1fr);gap:1.2mm 1.5mm}
   .ticket-card-names{grid-column:1/-1;font:700 8.5pt Georgia,serif;line-height:1.15;overflow-wrap:anywhere}
@@ -338,3 +341,12 @@
 
 /* The ticket figure above the map names the deck when there are several; a long name is cut short. */
 .map-status .ticket-count { display: inline-block; max-width: 18rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* The playtest box: the version, a line for the date played, and the players on the back. */
+.note-box.playtest .note-box-text { display: flex; flex-direction: column; gap: 6px; }
+.note-box.playtest .playtest-version { font-weight: 700; }
+.note-box.playtest .playtest-line { display: flex; align-items: flex-end; gap: 6px; }
+.note-box.playtest .playtest-line i { flex: 1; border-bottom: 1.5px solid currentColor; height: 1.1em; }
+
+.print-suboption { margin-left: 1.6rem; }
+.print-version { font-size: .85rem; margin: .25rem 0 0; }

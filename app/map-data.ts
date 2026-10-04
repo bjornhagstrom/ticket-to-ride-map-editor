@@ -87,6 +87,9 @@ export function ticketsInSet(data: MapData, setId: string): Ticket[] {
 
 export type NoteBox = {
   id: string;
+  /** A note the editor draws itself: "playtest" is the box for the version, the date played and who
+   *  played. An older build shows it as an ordinary note with its text. */
+  kind?: "playtest";
   x: number;
   y: number;
   width: number;
@@ -120,7 +123,14 @@ export type DeckRuleSet = DeckRuleValues & { id: string; label: string; basedOn:
 /** Our sets, by the id a map chooses them with. Their values are in TICKET_SUGGESTER.styles. */
 export const BUILT_IN_DECK_RULES = ["generic", "classic", "europe"] as const;
 
-export type MapData = { name: string; format: MapFormat; orientation?: "landscape" | "portrait"; rules?: string; endGapMm?: number; background: BackgroundShape[]; stops: Stop[]; routes: Route[]; backgroundImage?: BackgroundImage; notes: NoteBox[]; lineStyles: LineStyle[]; routeTypeStyles: RouteTypeStyle[]; wagonStyles: WagonStyle[]; stopTypeStyles: StopTypeStyle[]; tickets: Ticket[]; ticketSets: TicketSet[]; wagonsPerPlayer?: number; startingTickets?: number; keptTickets?: number; players?: PlayerRange; lanesUsableByPlayers?: LaneRule; ticketBands?: TicketBands; ticketMix?: TicketMix; ticketValuation?: { longBonus?: boolean; ferryPremium?: number }; deckRules?: DeckRuleSet[]; deckRule?: string;
+/** One number handed out: when, and how the map left the editor (print, export, image). */
+export type MapVersionEntry = { number: number; date: string; by: string; [key: string]: unknown };
+/** The map's version: one series for every print and export. `fingerprint` is of the content when the
+ *  number was handed out, so a print or export of an unchanged map keeps it. Fields a later build adds
+ *  are kept. See docs/FILE-FORMAT.md. */
+export type MapVersion = { number: number; fingerprint: string; issued: MapVersionEntry[]; [key: string]: unknown };
+
+export type MapData = { name: string; mapVersion?: MapVersion; format: MapFormat; orientation?: "landscape" | "portrait"; rules?: string; endGapMm?: number; background: BackgroundShape[]; stops: Stop[]; routes: Route[]; backgroundImage?: BackgroundImage; notes: NoteBox[]; lineStyles: LineStyle[]; routeTypeStyles: RouteTypeStyle[]; wagonStyles: WagonStyle[]; stopTypeStyles: StopTypeStyle[]; tickets: Ticket[]; ticketSets: TicketSet[]; wagonsPerPlayer?: number; startingTickets?: number; keptTickets?: number; players?: PlayerRange; lanesUsableByPlayers?: LaneRule; ticketBands?: TicketBands; ticketMix?: TicketMix; ticketValuation?: { longBonus?: boolean; ferryPremium?: number }; deckRules?: DeckRuleSet[]; deckRule?: string;
   // Fields from a file this build does not know about. Kept so that opening and re-exporting a map
   // written by a newer version never quietly throws its work away.
   unknown?: Record<string, unknown> };

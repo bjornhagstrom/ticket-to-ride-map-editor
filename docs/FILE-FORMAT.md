@@ -122,6 +122,42 @@ not a way to move a whole map: the background, styles and settings are only in t
 | 3 | Wagon styles and line styles folded into route types: a type describes the whole route. A version 2 map gets one route type per combination it used, so it keeps its look. |
 | 4 | A board can stand: `orientation: "portrait"` in the map, and in network and background files, with the `board` frame standing (731 × 1100 for a 2×3). Only a standing map is written as version 4; a lying map is still written as version 3 and has no `orientation`, so every version 3 reader opens it unchanged, while one that cannot stand a board refuses a standing map rather than lays it down wrong. A version 3 file reads as lying. Content brought from a file on a board that lies or stands the other way is turned a quarter turn to fit (`tests/board.cjs`). |
 
+### The map's version number
+
+Added in 0.4.0, within versions 3 and 4: an addition, so the file version did not move. A map file may
+carry `mapVersion`:
+
+```json
+"mapVersion": {
+  "number": 8,
+  "fingerprint": "3f9a01c2",
+  "issued": [
+    { "number": 1, "date": "2026-10-04T10:00:00.000Z", "by": "print" },
+    { "number": 8, "date": "2026-10-12T18:30:00.000Z", "by": "export" }
+  ]
+}
+```
+
+- `number` is one series for every print and export (`by`: `print`, `export`, `image`). A print or export
+  gets the same number while the map is unchanged and the next one after a change.
+- `fingerprint` is opaque: a short hash of the map's content when the number was handed out, the
+  version record left out. Do not compute or compare it outside the editor; it only tells the editor
+  whether the map has changed since. A build that reads the content differently (a new default field,
+  say) may see a change once and hand out one extra number; that is allowed.
+- `issued` logs each number when it was handed out. Entries that make no sense are dropped on reading.
+- A record without a whole `number` above 0 and a `fingerprint` is dropped, and the next print starts
+  the series at 1 again. Anything a later build adds to the record or to an entry is kept.
+- A file without it (every file before 0.4.0, every version 1 file) opens as before; its first print or
+  export is version 1. An older build keeps the record untouched under rule 3, so a map edited there
+  comes back with its old number and a fingerprint that no longer matches: its next print here is the
+  next number. `tests/map-version.cjs` checks this against the build the live site runs.
+- Only `map` files carry it. Background, network and ticket files and CSV carry the number in their
+  file names only, and importing one never changes the map's number.
+
+A note may have `kind: "playtest"`: the playtest box, which the editor draws itself with the version, a
+line for the date played and where the players' names go. Its `text` says the same in words, so an
+older build, which keeps the field, shows it as an ordinary note.
+
 ### Board formats that became print choices
 
 Within version 3, `format` narrowed to the board's shape: `board-2x3` or `board-2x4`. Test sheets,

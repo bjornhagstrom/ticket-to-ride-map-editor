@@ -11,6 +11,7 @@ import { boardOf, type Orientation } from "./board";
 import { curvedPath, isCurved, pathFromPoints, pointsFor } from "./map-geometry";
 import { MapArtwork } from "./map-artwork";
 import { RulesText } from "./rules-text";
+import { versionLabel, versionStatus, type VersionStatus } from "./map-version";
 import { CUT_MARK_GAP_MM, CUT_MARK_REACH_MM, describePlan, papers, PRINT_CAPTION_MM, PRINT_MARGIN_MM, printChoices, type PrintChoice, printPlan, type PrintPlan, type PrintProfile, sameChoice, splits, cardSheets, cardSize, cardsPerRow } from "./print-plan";
 
 // Tickets print as cut-out cards on plain paper. The same print-and-cut workflow as the board
@@ -54,7 +55,7 @@ export function TicketCards({ data, setId, perRow }: { data: MapData; setId: str
   return <section className="print-tickets">
     <div className="ticket-run">
       <TicketMapSymbol data={data} id={symbolId} />
-      <div className="print-caption"><strong>{data.name}</strong><span>{set?.label} · {tickets.length} ticket{tickets.length === 1 ? "" : "s"}</span></div>
+      <div className="print-caption"><strong>{data.name}</strong><span>{set?.label} · {tickets.length} ticket{tickets.length === 1 ? "" : "s"}{data.mapVersion ? ` · version ${data.mapVersion.number}` : ""}</span></div>
       {/* Explicit rows, each a block that may not be split. Safari ignores break-inside on grid
           cells, which cut cards in half across the page break. */}
       {Array.from({ length: Math.ceil(tickets.length / perRow) }, (_, row) => tickets.slice(row * perRow, row * perRow + perRow)).map((row, index) => <div className="ticket-row" key={index}>
@@ -77,6 +78,8 @@ export function TicketCards({ data, setId, perRow }: { data: MapData; setId: str
               {ticket.long && <p className="ticket-card-flag">Long</p>}
               <p className="ticket-card-points">{ticket.points}</p>
             </div>
+            {/* Which version of the map the card was printed from: cards from several playtests mix. */}
+            {data.mapVersion && <p className="ticket-card-version">v{data.mapVersion.number}</p>}
           </div>;
         })}
       </div>)}
@@ -87,7 +90,8 @@ export function TicketCards({ data, setId, perRow }: { data: MapData; setId: str
 // The board as the chosen print run cuts it. Page size, margins and the size of every tile come
 // from printPlan, in millimetres, so the pages cannot disagree with what the dialog promised.
 // What a print run holds, in the order it is printed: the board, then the tickets as cards, then the rules.
-export type PrintParts = { board: boolean; tickets: boolean; rules: boolean };
+// `playtest`: the yellow box on the board for the version, the date played and the players.
+export type PrintParts = { board: boolean; tickets: boolean; rules: boolean; playtest: boolean };
 
 // The width of the frame round a printed sheet, in mm; editor-additions.css draws it at this width.
 const FRAME_LINE_MM = 0.3;
@@ -95,6 +99,8 @@ const FRAME_LINE_MM = 0.3;
 export function PrintPages({ data, plan, parts, setId }: { data: MapData; plan: PrintPlan; parts: PrintParts; setId: string }) {
   const format = boardOf(data);
   const full = plan.choice.split === "full";
+  // "Version 8 · 4 Oct 2026" on every sheet: the run has its number by the time it prints.
+  const version = versionLabel(versionStatus(data));
   const percent = `${Math.round(plan.scale * 100)} %`;
   const caption = (page: PrintPlan["pages"][number]) => {
     const count = plan.pages.length;
@@ -120,7 +126,7 @@ export function PrintPages({ data, plan, parts, setId }: { data: MapData; plan: 
       return <section className="print-page" key={page.index} style={plan.turned ? { width: `${height}mm`, height: `${width}mm` } : { width: `${width}mm`, height: `${height}mm` }}>
         <svg className="print-sheet" width="100%" height="100%" viewBox={plan.turned ? `0 0 ${height} ${width}` : `0 0 ${width} ${height}`} overflow="visible">
           <g transform={plan.turned ? `translate(${height} 0) rotate(90)` : undefined}>
-            <text className="print-sheet-name" x={2.5} y={PRINT_CAPTION_MM - 2.2}>{data.name}</text>
+            <text className="print-sheet-name" x={2.5} y={PRINT_CAPTION_MM - 2.2}>{data.name}{version && <tspan className="print-sheet-version">{`  ${version}`}</tspan>}</text>
             <text className="print-sheet-note" x={width - 2.5} y={PRINT_CAPTION_MM - 2.2} textAnchor="end">{caption(page)}</text>
             {/* The frame's line is centred on the rect's edge: inset by half a line, so all of it is on the
                 sheet. On the edge, a printer that clips at the page box cut off its outer half. */}
@@ -128,7 +134,7 @@ export function PrintPages({ data, plan, parts, setId }: { data: MapData; plan: 
             <svg x={0} y={PRINT_CAPTION_MM} width={width} height={artHeight} viewBox={`${page.tile.x * format.width} ${page.tile.y * format.height} ${page.tile.width * format.width} ${page.tile.height * format.height}`}>
               {/* Wagons are always measured against the board the map is drawn for; printing larger or
                   smaller scales them with everything else. */}
-              <MapArtwork data={data} scaleWidthMm={mapFormats[data.format].widthMm} print />
+              <MapArtwork data={data} scaleWidthMm={mapFormats[data.format].widthMm} print hidePlaytest={!parts.playtest} />
             </svg>
             {full && corners.map(([x, y, dx, dy]) => <g className="cut-mark" key={`${x}-${y}`}>
               <line x1={x + dx * CUT_MARK_GAP_MM} y1={y} x2={x + dx * CUT_MARK_REACH_MM} y2={y} />
@@ -142,7 +148,7 @@ export function PrintPages({ data, plan, parts, setId }: { data: MapData; plan: 
         flowing in the same page box as the board's pages. */}
     {parts.tickets && <TicketCards data={data} setId={setId} perRow={cardsPerRow(plan.pageMm, cardSize(data.format, format.orientation))} />}
     {parts.rules && data.rules?.trim() && <section className="print-rules">
-      <p className="print-rules-name">{data.name} · rules</p>
+      <p className="print-rules-name">{data.name} · rules{data.mapVersion ? ` · version ${data.mapVersion.number}` : ""}</p>
       <RulesText source={data.rules} data={data} print />
     </section>}
   </div>;
@@ -150,7 +156,8 @@ export function PrintPages({ data, plan, parts, setId }: { data: MapData; plan: 
 
 // Printing is decided per run. Nothing chosen here is written to the map; the last choice is kept
 // in this browser only, for convenience.
-export function PrintDialog({ open, onOpenChange, format, orientation = "landscape", profile, choice, onChoice, parts, onPrint }: {
+export function PrintDialog({ open, onOpenChange, format, orientation = "landscape", profile, choice, onChoice, parts, onPrint, version }: {
+  version: VersionStatus;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   format: MapFormat;
@@ -194,6 +201,11 @@ export function PrintDialog({ open, onOpenChange, format, orientation = "landsca
               checked={parts.value.board} onChange={(event) => parts.onChange({ ...parts.value, board: event.target.checked })} />
             <span><strong>The board</strong><small id="print-board-note">The map on its sheets, as chosen below.</small></span>
           </label>
+          <label className="print-option print-suboption">
+            <input type="checkbox" name="print-playtest" aria-label="Print a playtest box on the map" aria-describedby="print-playtest-note" disabled={!parts.value.board}
+              checked={parts.value.playtest} onChange={(event) => parts.onChange({ ...parts.value, playtest: event.target.checked })} />
+            <span><strong>A playtest box</strong><small id="print-playtest-note">A yellow box on the map with the version, a line for the date played, and players&apos; names on the back of the sheet. Put on the map the first time, where it covers least; move it like a note.</small></span>
+          </label>
           <label className="print-option">
             <input type="checkbox" name="print-tickets" aria-label="Print the tickets" aria-describedby="print-tickets-note" disabled={parts.ticketCount === 0 || onePage}
               checked={parts.value.tickets} onChange={(event) => parts.onChange({ ...parts.value, tickets: event.target.checked })} />
@@ -232,6 +244,9 @@ export function PrintDialog({ open, onOpenChange, format, orientation = "landsca
         </fieldset>}
       </div>
       <p className="print-summary">{summary}</p>
+      <p className="print-version">{version.number === undefined ? "This print will be version 1. Every print and export after a change gets the next number, on every sheet, card and rules page."
+        : version.changed ? `This print will be version ${version.next}: the map has changed since version ${version.number}.`
+        : `Nothing has changed since version ${version.number}: this print is version ${version.number} too.`}</p>
       {boardIn && !onePage && <><h3 id="print-table-heading" className="print-table-heading">Sheets for every choice</h3>
       <p id="print-table-note" className="print-table-note">Each cell shows how many sheets a print run takes, and its scale: how big the printed board is against the real one. 100 % is real size; 50 % is half as wide and half as tall. Pick a cell to use it.</p>
       <div className="print-table-wrap">

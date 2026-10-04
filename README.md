@@ -36,6 +36,11 @@ millimetres.
 A board lies or stands, in the standard 2×3 or the extended 2×4. Standing it up or laying it down turns
 everything on it a quarter turn without changing a single distance.
 
+Every print and export after a change gets the map's next version number, one series for all of them.
+It is on every sheet, card and rules page, so after a few playtests you can tell which sheets belong to
+which version. A yellow playtest box on the board has a line for the date you played it; write the
+players' names on the back of the sheet.
+
 The ticket cards print to be cut out, lying or standing as the board does, and each carries a small map
 of the whole board with its two stops ringed and joined by a line, as the real cards do.
 

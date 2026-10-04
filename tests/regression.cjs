@@ -384,6 +384,9 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   // 10. printing is decided per run, in a dialog behind the Print button, never in the map
   const storedMap = () => page.evaluate(() => localStorage.getItem("orebro-map-editor-public-v2"));
   const mapBeforePrinting = await storedMap();
+  // A print gives the map its version number and, if asked for, a playtest box (block 39); nothing else
+  // on the map may change.
+  const contentOf = (json) => { const m = JSON.parse(json); delete m.mapVersion; m.notes = (m.notes || []).filter((n) => n.kind !== "playtest"); return JSON.stringify(m); };
   await page.evaluate(() => {
     window.__printCalls = 0;
     window.__printed = null;
@@ -470,7 +473,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     check("the frame round the printed map lies wholly inside the sheet, its line included, so no edge is clipped", Boolean(inside), JSON.stringify(f));
   }
   check("a 2×4 printed per panel is 8 pages", panels2x4.pages === 8, `${panels2x4.pages} pages`);
-  check("and printing it left the map as it was", (await storedMap()) === mapBeforePrinting);
+  check("and printing it left the map as it was, but for its version number and playtest box", contentOf(await storedMap()) === contentOf(mapBeforePrinting));
 
   // The same questions on the standard board, where Anniversary is a choice.
   await page.getByRole("button", { name: "Settings" }).click();
@@ -559,7 +562,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   check("and the summary names the board it adds up to", /972 × 648 mm/.test(anniversary.summary), anniversary.summary);
   const tabloidSheet = await printFrom("tabloid", 1);
   check("Tabloid is declared upright in millimetres", /size:\s*279\.4mm 431\.8mm/.test(tabloidSheet.style), tabloidSheet.style);
-  check("no print choice touched the map", (await storedMap()) === mapBeforeChoices);
+  check("no print choice touched the map, but for its version number and playtest box", contentOf(await storedMap()) === contentOf(mapBeforeChoices));
   check("and the map carries no print settings", !/print-?(split|paper|choice)/i.test(await storedMap()));
 
   await page.reload({ waitUntil: "networkidle" });
@@ -682,7 +685,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     const pngFile = path.join(os.tmpdir(), `ttr-image-${Date.now()}.png`);
     await png.saveAs(pngFile);
     const bytes = fs.readFileSync(pngFile);
-    check("the picture is named after the map and is a .png", png.suggestedFilename() === `${mapName}.png`, png.suggestedFilename());
+    check("the picture is named after the map and is a .png", new RegExp(`^${mapName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} v\\d+\\.png$`).test(png.suggestedFilename()), png.suggestedFilename());
     check("and really is a PNG", bytes.subarray(0, 8).toString("hex") === "89504e470d0a1a0a");
     const pngWidth = bytes.readUInt32BE(16), pngHeight = bytes.readUInt32BE(20);
     check("it is big enough to print from, and has the board's proportions", pngWidth >= 2200 && Math.abs(pngWidth / pngHeight - viewBox[2] / viewBox[3]) < 0.01, `${pngWidth} x ${pngHeight}, board ${viewBox[2]} x ${viewBox[3]}`);
@@ -744,7 +747,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     await page.keyboard.press("Escape"); await page.keyboard.press("Escape");
     await page.waitForTimeout(200);
     const tickets = await downloadFrom(openCsvMenu, "Tickets");
-    check("the tickets come as a .csv named after the map", tickets.name.startsWith(`${slug}-tickets-`) && tickets.name.endsWith(".csv"), tickets.name);
+    check("the tickets come as a .csv named after the map", new RegExp(`^${slug}-v\\d+-tickets-`).test(tickets.name) && tickets.name.endsWith(".csv"), tickets.name);
     check("with a BOM and a header row", tickets.bom && tickets.header.includes("From") && tickets.header.includes("Points"), String(tickets.header));
     check("and a row for every ticket in every deck", tickets.rows.length === stored.tickets.length, `${tickets.rows.length} of ${stored.tickets.length}`);
     check("each named by its stops, as on the map", tickets.rows.every((r) => stored.stops.some((s) => s.name === r[tickets.header.indexOf("From")]) && stored.stops.some((s) => s.name === r[tickets.header.indexOf("To")])));
@@ -3157,6 +3160,92 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     check("a corner reached only through two stops is listed, with its gates", /Nook Two/.test(cornerText) && /reached only through/i.test(cornerText), cornerText);
     check("a corner is not a warning", !(await shapeCard.evaluate((el) => el.classList.contains("has-warning"))));
     await np.context().close();
+  }
+
+  // 39. A version number on everything printed or exported: one series for prints, files and images,
+  // moved on only when the map has changed. On every sheet, card and rules page, and in a yellow
+  // playtest box on the map with room to write the date played; the players go on the back.
+  {
+    const vp = await (await browser.newContext({ viewport: { width: 1500, height: 1000 }, acceptDownloads: true })).newPage();
+    vp.on("pageerror", (e) => errors.push(String(e)));
+    await vp.goto(BASE, { waitUntil: "networkidle" });
+    await vp.getByRole("button", { name: "Load the example map" }).click();
+    await vp.waitForTimeout(600);
+    const KEY = "orebro-map-editor-public-v2";
+    const stored = () => vp.evaluate((key) => JSON.parse(localStorage.getItem(key)), KEY);
+    const versionBadge = () => vp.locator(".map-status .map-version");
+    const stubPrint = () => vp.evaluate(() => { window.__run = null; window.print = () => { const root = document.querySelector(".print-pages"); window.__run = {
+      sheets: Array.from(root.querySelectorAll(".print-page .print-sheet-name")).map((t) => t.textContent),
+      cards: Array.from(root.querySelectorAll(".ticket-card")).map((c) => (c.querySelector(".ticket-card-version") || { textContent: "" }).textContent),
+      rules: (root.querySelector(".print-rules-name") || { textContent: "" }).textContent,
+      box: Array.from(root.querySelectorAll(".print-page .note-box.playtest")).map((b) => b.textContent.replace(/\s+/g, " ")),
+    }; }; });
+    const printDialog = () => vp.getByRole("dialog", { name: "Print the map" });
+    const part = (name) => printDialog().getByRole("checkbox", { name, exact: true });
+    const runPrint = async () => { await stubPrint(); await printDialog().getByRole("button", { name: "Print", exact: true }).click(); await vp.waitForFunction(() => window.__run !== null, null, { timeout: 5000 }); return vp.evaluate(() => window.__run); };
+    check("a map that has never been printed or exported shows no version", (await versionBadge().count()) === 0 && (await stored()).mapVersion === undefined);
+
+    await vp.getByRole("button", { name: "Print map" }).click();
+    await vp.waitForTimeout(400);
+    check("the print dialog says which version the print will be", /This print will be version 1/.test(await printDialog().textContent()));
+    check("and offers a playtest box on the map, ticked", (await part("Print a playtest box on the map").count()) === 1 && (await part("Print a playtest box on the map").isChecked()));
+    if (!(await part("Print the tickets").isChecked())) await part("Print the tickets").check();
+    if (!(await part("Print the rules").isChecked())) await part("Print the rules").check();
+    const first = await runPrint();
+    await vp.waitForTimeout(400);
+    check("every sheet of the board carries the version and its date", first.sheets.length > 0 && first.sheets.every((t) => /Version 1 · \d{1,2} [A-Z][a-z]{2} \d{4}/.test(t)), JSON.stringify(first.sheets.slice(0, 2)));
+    check("every ticket card carries it", first.cards.length > 0 && first.cards.every((t) => t.trim() === "v1"), JSON.stringify(first.cards.slice(0, 3)));
+    check("and so do the rules", /version 1/i.test(first.rules), first.rules);
+    check("the playtest box is on the board, with the version, a line for the date and the players on the back", first.box.length >= 1 && first.box.every((b) => b === first.box[0]) && /Version 1/.test(first.box[0]) && /Played/.test(first.box[0]) && /back/i.test(first.box[0]), JSON.stringify(first.box));
+    let map = await stored();
+    check("the map now has version 1, and the playtest box is a note of its own", map.mapVersion && map.mapVersion.number === 1 && map.notes.some((n) => n.kind === "playtest"), JSON.stringify(map.mapVersion));
+    check("the figures above the map show it", /^Version 1$/.test((await versionBadge().textContent()).trim()), await versionBadge().textContent());
+    const boxOnScreen = vp.locator(".map-canvas .note-box.playtest");
+    check("the playtest box is on the map on screen too, to move where it suits", (await boxOnScreen.count()) === 1 && /Version 1/.test(await boxOnScreen.textContent()));
+
+    // Undo takes the box away again, but never the number: it is on paper already.
+    await vp.getByRole("button", { name: "Undo" }).click();
+    await vp.waitForTimeout(300);
+    map = await stored();
+    check("undo takes back the playtest box but not the version number", map.mapVersion && map.mapVersion.number === 1 && !map.notes.some((n) => n.kind === "playtest"), JSON.stringify(map.mapVersion));
+    check("and the map now counts as changed since version 1", /Version 1 · changed/.test(await versionBadge().textContent()), await versionBadge().textContent());
+    await vp.getByRole("button", { name: "Redo" }).click();
+    await vp.waitForTimeout(300);
+    check("redo brings the box back, and the map is version 1 as printed", /^Version 1$/.test((await versionBadge().textContent()).trim()), await versionBadge().textContent());
+
+    await vp.getByRole("button", { name: "Print map" }).click();
+    await vp.waitForTimeout(400);
+    check("printing again unchanged says it is the same version", /version 1 too/i.test(await printDialog().textContent()), await printDialog().locator(".print-version").textContent().catch(() => ""));
+    const again = await runPrint();
+    await vp.waitForTimeout(400);
+    check("and it is", again.sheets.every((t) => /Version 1 ·/.test(t)) && (await stored()).mapVersion.number === 1 && (await stored()).notes.filter((n) => n.kind === "playtest").length === 1);
+
+    // A change, then an export: the next number in the same series.
+    await vp.evaluate((key) => { const m = JSON.parse(localStorage.getItem(key)); m.stops[0].name = "Westport Harbour"; localStorage.setItem(key, JSON.stringify(m)); }, KEY);
+    await vp.reload({ waitUntil: "networkidle" });
+    await vp.waitForTimeout(500);
+    check("after a change the figures say so, and the next print or export is version 2", /Version 1 · changed/.test(await versionBadge().textContent()) && /version 2/i.test(await versionBadge().getAttribute("title")), await versionBadge().getAttribute("title"));
+    const saveExport = async (item) => { const download = vp.waitForEvent("download"); await vp.getByRole("button", { name: "Export", exact: true }).click(); await vp.waitForTimeout(200); await vp.getByRole("menuitem", { name: item, exact: true }).click(); const d = await download; const file = path.join(os.tmpdir(), `ttr-version-${Date.now()}-${d.suggestedFilename()}`); await d.saveAs(file); return { name: d.suggestedFilename(), file }; };
+    const full = await saveExport("Full map");
+    const fullJson = JSON.parse(fs.readFileSync(full.file, "utf8"));
+    check("an export after a change is version 2: one series for prints and exports", fullJson.payload.mapVersion && fullJson.payload.mapVersion.number === 2 && fullJson.payload.mapVersion.issued.at(-1).by === "export", JSON.stringify(fullJson.payload.mapVersion));
+    check("the file's name carries the version", /-v2-/.test(full.name), full.name);
+    await vp.waitForTimeout(400);
+    check("and the figures above the map move on to it", /^Version 2$/.test((await versionBadge().textContent()).trim()), await versionBadge().textContent());
+    const network = await saveExport("Network only");
+    check("another export of the unchanged map keeps the number, in its name too", /-v2-/.test(network.name) && (await stored()).mapVersion.number === 2, network.name);
+
+    // An older copy of the same map brought back in: warned, with a new name suggested.
+    const older = JSON.parse(JSON.stringify(fullJson));
+    older.payload.mapVersion = { ...older.payload.mapVersion, number: 1, fingerprint: "00000000", issued: older.payload.mapVersion.issued.slice(0, 1) };
+    const olderFile = path.join(os.tmpdir(), `ttr-older-${Date.now()}.json`);
+    fs.writeFileSync(olderFile, JSON.stringify(older));
+    await vp.locator('input[type="file"][accept="application/json"]').setInputFiles(olderFile);
+    await vp.waitForTimeout(600);
+    const toastText = (await vp.locator("[data-sonner-toast]").allTextContents()).join(" | ");
+    check("opening an older copy of the same map warns that its numbers would repeat", /version 1/.test(toastText) && /version 2/.test(toastText), toastText);
+    check("and suggests giving it a new name", /new name/i.test(toastText) && /\(from v1\)/.test(toastText), toastText);
+    await vp.context().close();
   }
 
   console.log("PASS:"); ok.forEach((l) => console.log("  ✓ " + l));
