@@ -350,3 +350,11 @@
 
 .print-suboption { margin-left: 1.6rem; }
 .print-version { font-size: .85rem; margin: .25rem 0 0; }
+
+/* − and + on the route just drawn. */
+.length-chip rect { fill: #fffaf0; stroke: #721c24; stroke-width: 1.5; filter: drop-shadow(0 2px 4px rgba(0,0,0,.2)); }
+.length-chip-button { cursor: pointer; }
+.length-chip-button circle { fill: #721c24; }
+.length-chip-button text { fill: #fffaf0; font: 700 20px "Avenir Next", "Segoe UI", Arial, sans-serif; text-anchor: middle; pointer-events: none; }
+.length-chip-button[aria-disabled="true"] { opacity: .35; cursor: default; }
+.length-chip-count { font: 700 18px "Avenir Next", "Segoe UI", Arial, sans-serif; text-anchor: middle; fill: #24211d; }

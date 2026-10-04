@@ -7,6 +7,13 @@ import { curvedSamples, isCurved, intersects, parallelPoints, pointsFor, polylin
 
 export type RouteSpacing = { route: Route; drawnMm: number; neededMm: number; ratio: number; verdict: "short" | "long" | "ok" };
 const SPACING_SHORT = .85, SPACING_LONG = 1.35;
+/** As many real wagons (and the gaps between them, and room at the ends) as a line this long holds on
+ *  the board the map is for: what a new route gets unless a number is chosen. 1 to 8. */
+export function fittingLength(lengthUnits: number, scaleWidthMm: number): number {
+  const drawnMm = lengthUnits * scaleWidthMm / W;
+  return Math.max(1, Math.min(8, Math.floor((drawnMm - realWagon.endMargin) / (realWagon.length + realWagon.gap))));
+}
+
 export function routeSpacing(data: MapData, scaleWidthMm: number): RouteSpacing[] {
   const unitMm = scaleWidthMm / W;
   const pitchMm = realWagon.length + realWagon.gap;

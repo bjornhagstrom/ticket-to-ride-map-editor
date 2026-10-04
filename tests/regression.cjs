@@ -3213,6 +3213,14 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     await vp.getByRole("button", { name: "Redo" }).click();
     await vp.waitForTimeout(300);
     check("redo brings the box back, and the map is version 1 as printed", /^Version 1$/.test((await versionBadge().textContent()).trim()), await versionBadge().textContent());
+    await vp.evaluate((key) => { const m = JSON.parse(localStorage.getItem(key)); m.routes[0].length += 1; localStorage.setItem(key, JSON.stringify(m)); }, KEY);
+    await vp.reload({ waitUntil: "networkidle" });
+    await vp.waitForTimeout(500);
+    const changedBox = (await vp.locator(".map-canvas .note-box.playtest").textContent()).replace(/\s+/g, " ");
+    check("after a change the playtest box still shows the version on paper, with no note about the next print", /Version 1 ·/.test(changedBox) && !/next print/i.test(changedBox), changedBox);
+    await vp.evaluate((key) => { const m = JSON.parse(localStorage.getItem(key)); m.routes[0].length -= 1; localStorage.setItem(key, JSON.stringify(m)); }, KEY);
+    await vp.reload({ waitUntil: "networkidle" });
+    await vp.waitForTimeout(500);
 
     await vp.getByRole("button", { name: "Print map" }).click();
     await vp.waitForTimeout(400);
@@ -3247,6 +3255,57 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     check("opening an older copy of the same map warns that its numbers would repeat", /version 1/.test(toastText) && /version 2/.test(toastText), toastText);
     check("and suggests giving it a new name", /new name/i.test(toastText) && /\(from v1\)/.test(toastText), toastText);
     await vp.context().close();
+  }
+
+  // 40. How many wagon spaces a route has, chosen while drawing it: before, in the Draw route tool's
+  // options (fitted to the distance unless a number is chosen), and right after, with − and + on the
+  // new route or a digit key, without leaving the tool.
+  {
+    const rp2 = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
+    rp2.on("pageerror", (e) => errors.push(String(e)));
+    await rp2.goto(BASE, { waitUntil: "networkidle" });
+    await rp2.getByRole("button", { name: "Load the example map" }).click();
+    await rp2.waitForTimeout(600);
+    const KEY = "orebro-map-editor-public-v2";
+    const stored = () => rp2.evaluate((key) => JSON.parse(localStorage.getItem(key)), KEY);
+    const tap = async (name) => { await rp2.evaluate((n) => { const s = Array.from(document.querySelectorAll(".map-canvas .stop")).find((g) => Array.from(g.querySelectorAll("text, title")).some((t) => t.textContent === n)); s.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true })); s.dispatchEvent(new PointerEvent("pointerup", { bubbles: true })); }, name); await rp2.waitForTimeout(250); };
+    await rp2.locator('.tool-row .tool-button[aria-label="Draw route"]').click();
+    await rp2.waitForTimeout(200);
+    const lengthChoice = rp2.getByLabel("Wagon spaces for new routes");
+    check("the Draw route tool lets the wagon spaces be chosen before drawing, fitted to the distance by default", (await lengthChoice.count()) === 1 && (await lengthChoice.inputValue()) === "fit");
+    const before = (await stored()).routes.length;
+    await tap("Millbrook"); await tap("Fernside");
+    let map = await stored();
+    const route = map.routes.at(-1);
+    const a = map.stops.find((s) => s.name === "Millbrook"), b = map.stops.find((s) => s.name === "Fernside");
+    // As many real wagons (20 mm, 5.5 mm apart, 15 mm to spare) as the straight line holds on a 790 mm board.
+    const fits = Math.max(1, Math.min(8, Math.floor((Math.hypot(a.x - b.x, a.y - b.y) * 790 / 1100 - 15) / 25.5)));
+    check("a new route gets as many wagon spaces as fit between its stops", map.routes.length === before + 1 && route.length === fits, `${route.length}, expected ${fits}`);
+    const chip = rp2.locator(".map-canvas .length-chip");
+    check("and right away offers − and + on the map to change them", (await chip.count()) === 1 && (await chip.textContent()).includes(String(fits)));
+    await rp2.getByRole("button", { name: "More wagon spaces" }).click();
+    await rp2.waitForTimeout(200);
+    check("+ adds a wagon space", (await stored()).routes.at(-1).length === fits + 1);
+    await rp2.getByRole("button", { name: "Fewer wagon spaces" }).click();
+    await rp2.getByRole("button", { name: "Fewer wagon spaces" }).click();
+    await rp2.waitForTimeout(200);
+    check("− takes one away", (await stored()).routes.at(-1).length === fits - 1);
+    await rp2.keyboard.press("4");
+    await rp2.waitForTimeout(200);
+    check("a digit key sets the number straight away", (await stored()).routes.at(-1).length === 4 && (await chip.textContent()).includes("4"));
+    check("still in the Draw route tool, ready for the next route", (await rp2.locator('.tool-row .tool-button[aria-label="Draw route"]').getAttribute("aria-pressed")) === "true");
+    await rp2.keyboard.press("Escape");
+    await rp2.waitForTimeout(200);
+    check("Escape puts the − and + away", (await chip.count()) === 0);
+    await lengthChoice.selectOption("5");
+    await tap("Lakeside"); await tap("Deepcut");
+    map = await stored();
+    check("a number chosen in the tool's options is what the next route gets", map.routes.at(-1).length === 5 && map.routes.length === before + 2, String(map.routes.at(-1).length));
+    await tap("Westport");
+    await rp2.waitForTimeout(200);
+    check("starting the next route puts the − and + of the last one away", (await chip.count()) === 0);
+    await rp2.keyboard.press("Escape");
+    await rp2.context().close();
   }
 
   console.log("PASS:"); ok.forEach((l) => console.log("  ✓ " + l));
