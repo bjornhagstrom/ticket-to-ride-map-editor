@@ -113,7 +113,21 @@ export type TicketSuggestOptions = {
   keep: string[];
   steps: number;
   setId?: string;
+  // How much the deck sends tickets through the same corridors: calm spreads them out (today's
+  // behaviour), official lands where the official decks do, tense crowds them. The map's own choice
+  // (deckTension) is used when none is given.
+  tension?: DeckTension;
 };
+export type DeckTension = "calm" | "official" | "tense";
+// The weight on uneven traffic per lane for each tension, calibrated on the eight official maps
+// (tests/deck-tension.cjs): official lands inside their range of crowded routes at a full table.
+export const TENSION_LOAD_WEIGHT: Record<DeckTension, number> = { calm: 2, official: 0, tense: -1 };
+/** The three, as they are offered. */
+export const TENSION_CHOICES: { id: DeckTension; label: string; note: string }[] = [
+  { id: "calm", label: "Calm", note: "Tickets spread out over the map, so few routes are fought over." },
+  { id: "official", label: "Like the official maps", note: "Tickets crowd a few corridors about as much as on the official maps." },
+  { id: "tense", label: "Tense", note: "Tickets crowd the same corridors, as on the tensest official maps: expect fights." },
+];
 
 export type Bottleneck = {
   a: string; b: string; length: number; lanes: number; lanesUsable: number;
@@ -496,7 +510,9 @@ class DeckState {
     this.hardSum += sign * Math.max(0, candidate.locos - TICKET_SUGGESTER.maxLocos);
   }
 
-  score(style: DeckRule, wantRegular: number, mix: TicketMix | null): number {
+  // loadWeight: how hard uneven traffic per lane counts against a deck. The deck's tension sets it
+  // when a deck is built; judging a deck always uses the fixed weight, so scores stay comparable.
+  score(style: DeckRule, wantRegular: number, mix: TicketMix | null, loadWeight: number = TICKET_SUGGESTER.weights.load): number {
     const w = TICKET_SUGGESTER.weights;
     const model = this.model;
     // A map that states its own short/medium/long mix is aimed at that, over the whole deck. One
@@ -566,7 +582,7 @@ class DeckState {
     const unusedPenalty = Math.max(0, unused - TICKET_SUGGESTER.unusedRate * model.edges.length);
 
     return w.bins * bins + w.ends * ends + w.cov * cov + w.zero * zero
-      + w.dup * dup + w.unused * unusedPenalty + w.load * variance + w.hard * this.hardSum;
+      + w.dup * dup + w.unused * unusedPenalty + loadWeight * variance + w.hard * this.hardSum;
   }
 }
 
@@ -743,6 +759,7 @@ function buildReport(model: SuggesterModel, deck: DeckState, styleName: TicketSt
 export function suggestTickets(data: MapData, options: Partial<TicketSuggestOptions> = {}): { tickets: Ticket[]; report: TicketDeckReport } {
   const resolved = resolveOptions(data, options);
   const style = deckRuleFor(data, resolved.style);
+  const loadWeight = TENSION_LOAD_WEIGHT[options.tension ?? data.deckTension ?? "calm"] ?? TICKET_SUGGESTER.weights.load;
   if (data.stops.length < 4 || data.routes.length < 3) {
     return { tickets: [], report: emptyReport("A map needs at least four stops and a few routes before a deck can be suggested.") };
   }
@@ -808,7 +825,7 @@ export function suggestTickets(data: MapData, options: Partial<TicketSuggestOpti
         tried.add(index);
         const candidate = pools[group][index];
         deck.add(candidate, group === 0);
-        const value = deck.score(style, targets[0], mix);
+        const value = deck.score(style, targets[0], mix, loadWeight);
         deck.remove(candidate, group === 0);
         if (value < bestScore) { bestScore = value; bestIndex = index; }
       }
@@ -821,7 +838,7 @@ export function suggestTickets(data: MapData, options: Partial<TicketSuggestOpti
 
   // Simulated annealing: swap a ticket for one left in the same pool, always accepting an
   // improvement and sometimes accepting a step backwards, less and less often as it cools.
-  let current = deck.score(style, targets[0], mix);
+  let current = deck.score(style, targets[0], mix, loadWeight);
   for (let step = 0; step < resolved.steps; step++) {
     const group = targets[1] && random() < .15 ? 1 : 0;
     if (groups[group].length <= locked[group] || !pools[group].length) continue;
@@ -831,7 +848,7 @@ export function suggestTickets(data: MapData, options: Partial<TicketSuggestOpti
     const regular = group === 0;
     deck.remove(outgoing, regular);
     deck.add(incoming, regular);
-    const next = deck.score(style, targets[0], mix);
+    const next = deck.score(style, targets[0], mix, loadWeight);
     const temperature = 5 * (1 - step / resolved.steps) + .01;
     if (next < current || random() < Math.exp((current - next) / temperature)) {
       groups[group][outIndex] = incoming;

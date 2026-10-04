@@ -8,9 +8,6 @@ in the same commit as the work (AGENTS.md).
 - **Intended chokepoints and hubs**: a route marked *contested on purpose*, a stop marked *hub*, in
   Properties. Map balance lists them as intended instead of among the crowded, and Build a full deck
   of tickets keeps sending tickets through them. Stored in the map file as an addition.
-- **Deck tension as a choice**: calm, like the official maps, or tense, in Build a full deck of tickets
-  and in the map's deck rules; the middle one calibrated to land inside the official range of crowded
-  routes. Today's behaviour stays the default.
 - **Illustrations where words fall short** (list to be made, then drawn from the editor's own data):
   line styles, stop types, how the sheets tile the board in the print dialog, label angles.
 - **The tour video in the welcome box**, from YouTube, played only when asked (a picture with a play
@@ -51,6 +48,6 @@ in the same commit as the work (AGENTS.md).
 
 ## The case for uneven maps
 
-`docs/PROPOSAL-UNEVEN-MAPS.md` has the measurements. Built: every balance figure beside the official range (Against the official maps), crowding set against it,
+`docs/PROPOSAL-UNEVEN-MAPS.md` has the measurements. Built: a deck's tension (calm, like the official maps, tense), every balance figure beside the official range (Against the official maps), crowding set against it,
 and how the network holds together (dead ends, routes that cut the map in two, corners), with buttons
 for what it warns of. The rest is above.

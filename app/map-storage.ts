@@ -193,7 +193,7 @@ const MAP_KEYS = new Set([
   "name", "format", "orientation", "background", "backgroundImage", "stops", "routes", "notes",
   "lineStyles", "routeTypeStyles", "wagonStyles", "stopTypeStyles", "tickets", "ticketSets",
   "wagonsPerPlayer", "startingTickets", "keptTickets", "players", "ticketBands", "ticketMix",
-  "ticketValuation", "lanesUsableByPlayers", "endGapMm", "deckRules", "deckRule", "rules", "mapVersion", "unknown",
+  "ticketValuation", "lanesUsableByPlayers", "endGapMm", "deckRules", "deckRule", "deckTension", "rules", "mapVersion", "unknown",
 ]);
 
 const unknownKeys = (value: Record<string, unknown>): Record<string, unknown> | undefined => {
@@ -431,6 +431,8 @@ const normalizeMapFields = (value: Partial<MapData>): MapData => ({
   ...normalizeDeckRules(value),
   ticketValuation: value.ticketValuation,
   mapVersion: normalizeMapVersion(value.mapVersion),
+  // How tense a full deck built for this map is: one of three, or nothing (calm, as it always was).
+  deckTension: value.deckTension === "calm" || value.deckTension === "official" || value.deckTension === "tense" ? value.deckTension : undefined,
   unknown: unknownKeys(value as Record<string, unknown>),
 });
 

@@ -43,6 +43,11 @@ check("a map file reads back as a map", readBack.kind === "map" && readBack.vers
 const reloaded = storage.normalizeMap(readBack.payload);
 check("a map survives a round trip", reloaded.stops.length === sample.stops.length && reloaded.routes.length === sample.routes.length && reloaded.name === sample.name,
   `${reloaded.stops.length} stops, ${reloaded.routes.length} routes`);
+{
+  const tense = storage.normalizeMap({ ...JSON.parse(JSON.stringify(sample)), deckTension: "tense" });
+  const back = storage.normalizeMap(storage.readMapFile(JSON.parse(JSON.stringify(storage.writeMapFile("map", storage.mapPayload(tense), tense)))).payload);
+  check("a map's deck tension is written and read back", back.deckTension === "tense" && !(back.unknown && back.unknown.deckTension), String(back.deckTension));
+}
 check("its settings survive too", reloaded.wagonsPerPlayer === sample.wagonsPerPlayer && reloaded.startingTickets === sample.startingTickets);
 
 // ---------------------------------------------------------------- files we wrote before the envelope

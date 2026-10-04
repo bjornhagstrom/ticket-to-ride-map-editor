@@ -521,7 +521,7 @@ export function deckFigures(data: MapData, setId: string, report: TicketDeckRepo
 }
 
 // The ticket suggester lives in its own module; re-exported here so the ticket analysis has one door.
-export { suggestTickets, evaluateTicketDeck, suggestedDeckSize, ticketEndStopCount, dealtToFullTable, defaultStyle, deckRules, deckRuleFor, TICKET_SUGGESTER, type TicketStyle, type BuiltInStyle, type DeckRule, type TicketSuggestOptions, type TicketDeckReport, type Bottleneck } from "./ticket-suggester";
+export { TENSION_CHOICES, type DeckTension, suggestTickets, evaluateTicketDeck, suggestedDeckSize, ticketEndStopCount, dealtToFullTable, defaultStyle, deckRules, deckRuleFor, TICKET_SUGGESTER, type TicketStyle, type BuiltInStyle, type DeckRule, type TicketSuggestOptions, type TicketDeckReport, type Bottleneck } from "./ticket-suggester";
 
 // How the network holds together: stops with no route, dead ends, routes whose loss cuts the map in
 // two (with how many lanes they have), and corners reached only through one or two stops. Edges and

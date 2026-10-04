@@ -3664,6 +3664,44 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     await ob.context().close();
   }
 
+  // 51. A deck's tension: calm (as it always was), like the official maps, or tense. Chosen when a full
+  // deck is built, and set for the map in its deck rules, which the build then starts from.
+  {
+    const tp2 = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
+    tp2.on("pageerror", (e) => errors.push(String(e)));
+    await tp2.goto(BASE, { waitUntil: "networkidle" });
+    await tp2.getByRole("button", { name: "Load the example map" }).click();
+    await tp2.waitForTimeout(600);
+    const openBuild = async () => { await tp2.getByRole("button", { name: "Tickets", exact: true }).click(); await tp2.waitForTimeout(400); await tp2.getByRole("button", { name: /Add a deck/ }).click(); await tp2.waitForTimeout(250); await tp2.getByRole("menuitem", { name: /Build a full deck of tickets/ }).click(); await tp2.waitForSelector(".suggest-dialog", { timeout: 20000 }); await tp2.waitForTimeout(400); };
+    await openBuild();
+    const tension = (name) => tp2.locator(".suggest-dialog").getByRole("radio", { name, exact: true });
+    check("Build a full deck of tickets asks how tense: calm, like the official maps, or tense", (await tension("Calm").count()) === 1 && (await tension("Like the official maps").count()) === 1 && (await tension("Tense").count()) === 1);
+    check("calm, as it always was, unless the map says otherwise", await tension("Calm").isChecked());
+    const dialogText = (await tp2.locator(".suggest-dialog").textContent()).replace(/\s+/g, " ");
+    check("each says what it does", /spread/i.test(dialogText) && /official/i.test(dialogText) && /crowd/i.test(dialogText), dialogText.slice(0, 200));
+    await tension("Tense").check();
+    await tp2.waitForFunction(() => { const row = [...document.querySelectorAll(".suggest-table tbody tr")].find((tr) => tr.children[0].textContent.trim() === "Score"); return row && row.children[2].textContent.trim() !== "—"; }, null, { timeout: 30000 });
+    check("choosing one builds the deck again", await tension("Tense").isChecked());
+    await tp2.keyboard.press("Escape");
+    await tp2.waitForTimeout(400);
+    // The map's own choice, in its deck rules.
+    await tp2.getByRole("button", { name: "Settings" }).click();
+    await tp2.waitForTimeout(400);
+    await tp2.locator(".settings-nav-item", { hasText: /deck rules/i }).click();
+    await tp2.waitForTimeout(400);
+    const mapTension = (name) => tp2.locator(".deck-tension-choice").getByRole("radio", { name, exact: true });
+    check("the deck rules have the map's own tension", (await mapTension("Like the official maps").count()) === 1 && await mapTension("Calm").isChecked());
+    await mapTension("Like the official maps").check();
+    await tp2.waitForTimeout(300);
+    check("which is kept in the map", (await tp2.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")).deckTension)) === "official");
+    await tp2.keyboard.press("Escape");
+    await tp2.waitForTimeout(400);
+    await tp2.keyboard.press("Escape");
+    await openBuild();
+    check("and a full deck starts from it", await tension("Like the official maps").isChecked());
+    await tp2.context().close();
+  }
+
   console.log("PASS:"); ok.forEach((l) => console.log("  ✓ " + l));
   if (bad.length) { console.log("FAIL:"); bad.forEach((l) => console.log("  ✗ " + l)); }
   console.log(`\n${ok.length} passed, ${bad.length} failed`);

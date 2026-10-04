@@ -24,7 +24,7 @@ import { type DeckCompareView } from "./deck-compare";
 import { DEFAULT_PRINT_CHOICE, isSafari, PRINT_CHOICE_KEY, PRINT_PROFILES, type PrintChoice, type PrintProfile, printPlan } from "./print-plan";
 import { useTicketSuggestion } from "./use-ticket-suggestion";
 import { SettingsDialog, type StyleTarget } from "./map-styles";
-import { BALANCE_OFFICIAL, fittingLength, bandsOf, bandCuts, mapDiameter, deckFigures, defaultStyle, deckRuleFor, TICKET_SUGGESTER, evaluateTicketDeck, suggestedDeckSize, ticketEndStopCount, type TicketStyle, autoPlaceLabels, labelledStops, setupBalance, stopCoverage, ticketBand, type TicketBand, reviewTickets, ticketPointsPerSpace, ticketCoverage, type RouteSuggestion, labelCovers, labelAngleOptions, routeSamplePoints, colourLengthTable, crossings as crossingList, networkShape, SHAPE_OFFICIAL, buildAdjacency, networkStats, routeSpacing, shortestPath, suggestRoutes } from "./map-analysis";
+import { type DeckTension, BALANCE_OFFICIAL, fittingLength, bandsOf, bandCuts, mapDiameter, deckFigures, defaultStyle, deckRuleFor, TICKET_SUGGESTER, evaluateTicketDeck, suggestedDeckSize, ticketEndStopCount, type TicketStyle, autoPlaceLabels, labelledStops, setupBalance, stopCoverage, ticketBand, type TicketBand, reviewTickets, ticketPointsPerSpace, ticketCoverage, type RouteSuggestion, labelCovers, labelAngleOptions, routeSamplePoints, colourLengthTable, crossings as crossingList, networkShape, SHAPE_OFFICIAL, buildAdjacency, networkStats, routeSpacing, shortestPath, suggestRoutes } from "./map-analysis";
 import { canvasPoint, canvasPointRaw, pointsFor, samePair, stopById } from "./map-geometry";
 import { REPO_URL } from "./version";
 import { RouteLogo } from "./logo";
@@ -163,6 +163,8 @@ export function MapEditor() {
   const [bottleneckTable, setBottleneckTable] = useState<number | null>(null);
   const [bottleneckRoutes, setBottleneckRoutes] = useState<Set<string>>(new Set());
   const [suggestStyle, setSuggestStyle] = useState<TicketStyle | null>(null);
+  // How tense a deck built now is: the map's own choice unless picked in the dialog.
+  const [suggestTension, setSuggestTension] = useState<DeckTension | null>(null);
   const [suggestSize, setSuggestSize] = useState<number | null>(null);
   const [suggestKeep, setSuggestKeep] = useState(false);
   const [suggestSeed, setSuggestSeed] = useState(1);
@@ -314,6 +316,7 @@ export function MapEditor() {
   }, [data, suggestChoice]);
   const { suggestion, busy: suggestBusy } = useTicketSuggestion(showSuggest, data, {
     style: suggestChoice,
+    tension: suggestTension ?? data.deckTension ?? "calm",
     seed: suggestSeed,
     deckSize: suggestSize ?? suggestDefaultSize,
     setId: activeTicketSet.id,
@@ -337,7 +340,7 @@ export function MapEditor() {
     toast.success(`${suggestion.tickets.length} tickets built into ${mode === "replace" ? activeTicketSet.label : label}.`);
   };
   // The Tickets panel stays under the dialog, so backing out leaves it as it was.
-  const openSuggest = () => { setSuggestStyle(null); setSuggestSize(null); setSuggestSeed(1); setSuggestName(""); setShowSuggest(true); };
+  const openSuggest = () => { setSuggestTension(null); setSuggestStyle(null); setSuggestSize(null); setSuggestSeed(1); setSuggestName(""); setShowSuggest(true); };
   // The tickets behind one number in the coverage panel.
   const viewedStopTickets = useMemo(() => {
     if (!stopTicketView) return [];
@@ -1020,6 +1023,7 @@ export function MapEditor() {
       onOpen={(ticketId) => { setStopTicketView(null); openTicket(ticketId); }} />
     <SuggestTicketsDialog open={showSuggest} onOpenChange={setShowSuggest} data={data} current={currentDeckReport} suggestion={suggestion}
       style={suggestChoice} onStyle={(value) => { setSuggestStyle(value); setSuggestSize(null); }}
+      tension={suggestTension ?? data.deckTension ?? "calm"} onTension={setSuggestTension}
       wagons={data.wagonsPerPlayer ?? DEFAULT_WAGONS_PER_PLAYER} onWagons={(value) => change((draft) => { draft.wagonsPerPlayer = value; return draft; })}
       deckSize={suggestSize ?? suggestDefaultSize} onDeckSize={setSuggestSize}
       keepExisting={suggestKeep} onKeepExisting={setSuggestKeep}

@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { deckRuleFor, deckRules, defaultStyle, type DeckRule, TICKET_SUGGESTER } from "./map-analysis";
+import { TENSION_CHOICES, deckRuleFor, deckRules, defaultStyle, type DeckRule, TICKET_SUGGESTER } from "./map-analysis";
 import type { DeckRuleSet, MapData } from "./map-data";
 
 // Short enough to sit on one line above a field; how far a ticket reaches, as a share of reach.
@@ -66,6 +66,14 @@ export function DeckRulesPanel({ data, change }: { data: MapData; change: (fn: (
       {rules.map((rule) => <label key={rule.id} className={cn("deck-rule-choice", rule.id === chosen.id && "chosen")}>
         <input type="radio" name="deck-rule" aria-label={rule.label} checked={rule.id === chosen.id} onChange={() => choose(rule.id)} />
         <span><strong>{rule.label}</strong><small>{rule.custom ? "this map's own" : "ours, fixed"}</small></span>
+      </label>)}
+    </fieldset>
+    {/* How tense a full deck built for this map is; Build a full deck of tickets starts from it. */}
+    <fieldset className="tension-choice deck-tension-choice">
+      <legend>How tense a full deck of tickets is</legend>
+      {TENSION_CHOICES.map((choice) => <label key={choice.id} className={cn("tension-option", choice.id === (data.deckTension ?? "calm") && "chosen")}>
+        <input type="radio" name="map-tension" aria-label={choice.label} checked={choice.id === (data.deckTension ?? "calm")} onChange={() => change((draft) => { draft.deckTension = choice.id === "calm" ? undefined : choice.id; return draft; })} />
+        <span><strong>{choice.label}</strong><small>{choice.note}</small></span>
       </label>)}
     </fieldset>
     {data.deckRule === undefined && <p className="helper deck-rule-default">Nothing chosen yet, so a full deck of tickets is built on {chosen.label}, because {why}. Choose a set to fix it for this map.</p>}

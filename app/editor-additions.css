@@ -433,3 +433,12 @@
   .print-balance th, .print-balance td { border: .2mm solid #b9b0a2; padding: 1mm 2mm; text-align: right; }
   .print-balance th:first-child, .print-balance td:first-child { text-align: left; }
 }
+
+/* How tense a full deck is: three choices, in Build a full deck of tickets and in the deck rules. */
+.tension-choice { border: 0; padding: 0; margin: 10px 0 4px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.tension-choice legend { font-weight: 600; font-size: 13px; margin-bottom: 6px; }
+.tension-option { display: flex; gap: 8px; align-items: flex-start; padding: 8px 10px; border: 1px solid #ddd4c6; border-radius: 8px; background: #fffaf0; cursor: pointer; }
+.tension-option.chosen { border-color: #721c24; box-shadow: 0 0 0 1px #721c24 inset; }
+.tension-option span { display: grid; gap: 2px; }
+.tension-option small { color: #5d554a; font-size: 12px; line-height: 1.35; }
+@media (max-width: 720px) { .tension-choice { grid-template-columns: 1fr; } }

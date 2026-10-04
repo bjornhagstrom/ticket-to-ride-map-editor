@@ -158,6 +158,12 @@ A note may have `kind: "playtest"`: the playtest box, which the editor draws its
 line for the date played and where the players' names go. Its `text` says the same in words, so an
 older build, which keeps the field, shows it as an ordinary note.
 
+### A deck's tension
+
+Added after 0.4.1: an addition. A map may carry `deckTension`: `"official"` or `"tense"`. Without it a
+full deck is built calm, as it always was, so `"calm"` is not written. Any other value is left out when
+read. An older build keeps the field untouched (rule 3) and builds calm decks.
+
 ### Board formats that became print choices
 
 Within version 3, `format` narrowed to the board's shape: `board-2x3` or `board-2x4`. Test sheets,

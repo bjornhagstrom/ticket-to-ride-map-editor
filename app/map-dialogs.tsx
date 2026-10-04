@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { TicketLengths, type TicketLengthsView } from "./ticket-lengths";
 import { DeckCompare, type DeckCompareView } from "./deck-compare";
-import { BALANCE_OFFICIAL, CROWDING_OFFICIAL, networkShape, SHAPE_OFFICIAL, colourRouteIds, compareWithClassics, CLASSIC_ROUTE_MAPS, type Bottleneck, dealtToFullTable, deckRuleFor, deckRules, TICKET_SUGGESTER, type TicketDeckReport, type TicketStyle, type SetupBalance, type TicketReview, type ColourLengthTable, type NetworkStats, type RouteSpacing, type RouteSuggestion } from "./map-analysis";
+import { TENSION_CHOICES, type DeckTension, BALANCE_OFFICIAL, CROWDING_OFFICIAL, networkShape, SHAPE_OFFICIAL, colourRouteIds, compareWithClassics, CLASSIC_ROUTE_MAPS, type Bottleneck, dealtToFullTable, deckRuleFor, deckRules, TICKET_SUGGESTER, type TicketDeckReport, type TicketStyle, type SetupBalance, type TicketReview, type ColourLengthTable, type NetworkStats, type RouteSpacing, type RouteSuggestion } from "./map-analysis";
 
 export function WelcomeGuide({ open, onOpenChange, onChooseBlank, onChooseExample }: { open: boolean; onOpenChange: (open: boolean) => void; onChooseBlank: () => void; onChooseExample: () => void }) {
   // What matters, in a line or two each. How a print is laid out is for the print dialog to say.
@@ -316,7 +316,7 @@ export function StopTicketsDialog({ open, onOpenChange, stopName, band, tickets,
 }
 
 // Build a full deck of tickets for the map that is open, then let the person edit it as ordinary tickets.
-export function SuggestTicketsDialog({ open, onOpenChange, data, current, suggestion, style, onStyle, wagons, onWagons, deckSize, onDeckSize, keepExisting, onKeepExisting, busy, deckName, onDeckName, currentDeck, onShuffle, onApply }: {
+export function SuggestTicketsDialog({ tension, onTension, open, onOpenChange, data, current, suggestion, style, onStyle, wagons, onWagons, deckSize, onDeckSize, keepExisting, onKeepExisting, busy, deckName, onDeckName, currentDeck, onShuffle, onApply }: { tension: DeckTension; onTension: (tension: DeckTension) => void;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   data: MapData;
@@ -390,6 +390,13 @@ export function SuggestTicketsDialog({ open, onOpenChange, data, current, sugges
           </button>;
         })}</div>
       </div>
+      <fieldset className="tension-choice">
+        <legend>How tense</legend>
+        {TENSION_CHOICES.map((choice) => <label key={choice.id} className={cn("tension-option", choice.id === tension && "chosen")}>
+          <input type="radio" name="suggest-tension" aria-label={choice.label} checked={choice.id === tension} onChange={() => onTension(choice.id)} />
+          <span><strong>{choice.label}</strong><small>{choice.note}</small></span>
+        </label>)}
+      </fieldset>
       <p className="helper">{busy ? "Working out a deck… " : ""} The wagon count is this map&apos;s own setting and changing it here changes it there. A player&apos;s reach is {report?.reach ?? current.reach} wagon spaces, from {rule.lengthCap} × {wagons} wagons.</p>
       {deckSize < needed && <div className="helper helper-warning deck-size-warning" role="status">
         <span>Too few to deal a full table: {needed} tickets are dealt at the start ({tableWord(data.players?.max ?? 5)} players, {data.startingTickets ?? 3} each), and this deck has {deckSize}. It is allowed. Official decks have {TICKET_SUGGESTER.official.perStop[0]}–{TICKET_SUGGESTER.official.perStop[1]} tickets per stop.</span>
