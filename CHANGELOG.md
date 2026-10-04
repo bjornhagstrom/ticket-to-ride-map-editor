@@ -4,18 +4,18 @@ What changed in each version of the [Ticket to Ride map editor](https://hagstrom
 
 This file is written from `app/version.ts` by `npm run changelog`; edit the notes there.
 
-## Unreleased
+## 0.4.1 · 2026-10-04
 
-Changes since the last release, to go into the next version.
+**Map balance you can act on, and routes drawn with less fuss**
 
-- Help on hover waits a moment before it opens, so moving the pointer across the tools no longer flashes one help box after another; resting on something still shows its help.
-- The note that everything is stored in the exported map file now sits with the figures above the map, in the same shape as they are.
-- Drawing a route between two stops that already have one still draws it, but says so, explains how to add a parallel route, and offers to turn it into one that follows the first route's shape and length.
 - Map balance can be expanded like the Tickets and Rules panels, and each route's room per wagon is marked OK, Too short or Roomy in a colour of its own.
 - What the network section warns of comes with something to do: a button adds a second lane to a route that cuts the map in two, and another selects a stop no route reaches.
+- Drawing a route between two stops that already have one still draws it, but says so, explains how to add a parallel route, and offers to turn it into one that follows the first route's shape and length.
+- A new map starts with the playtest box in its top right corner, and printing puts it there on other maps too when the corner is free.
 - A full deck of tickets is built on Generic, the average of the official maps, unless the map has chosen other rules; that goes for the example map too.
 - The deck rules say ticket lengths in words, as how many of the tickets reach how far across the map, and explain the extra points some rules give the longest tickets.
-- A new map starts with the playtest box in its top right corner, and printing puts it there on other maps too when the corner is free.
+- Help on hover waits a moment before it opens, so moving the pointer across the tools no longer flashes one help box after another; resting on something still shows its help.
+- The note that everything is stored in the exported map file now sits with the figures above the map, in the same shape as they are.
 - Your map is kept in the browser under a new, neutral name. A map kept under the old name is picked up the first time you open the editor, so nothing is lost.
 
 ## 0.4.0 · 2026-10-03

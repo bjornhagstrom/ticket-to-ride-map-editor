@@ -2849,11 +2849,14 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     check("it lists the releases, newest first, each with its version and date", (await releases.count()) >= 2 && (await releases.first().locator("h2").textContent()).includes(pkgVersion) && /\d{4}-\d{2}-\d{2}/.test(await releases.first().locator("time").textContent()));
     check("each with what changed, in a list that shows its bullets", (await releases.first().locator("li").count()) >= 1 && (await releases.first().locator("ul").evaluate((el) => getComputedStyle(el).listStyleType)) === "disc");
     check("and a way back to the editor", (await other.getByRole("link", { name: /Back to the editor/ }).count()) >= 1);
-    // The newest release leads with what it brings: spreadsheets, boards that stand, tickets with a map.
-    const newestTitle = await releases.first().locator(".release-title").textContent();
-    const newestFirst = (await releases.first().locator("li").allTextContents()).slice(0, 3).join(" ");
-    check("the newest release is named after what it brings", /spreadsheet/i.test(newestTitle) && /stand/i.test(newestTitle) && /ticket/i.test(newestTitle), newestTitle);
-    check("and its list starts with those, not with the small things", /spreadsheet/i.test(newestFirst) && /stand/i.test(newestFirst) && /small map/i.test(newestFirst), newestFirst);
+    // A release leads with what it brings. 0.4.0: spreadsheets, boards that stand, tickets with a map;
+    // 0.4.1: map balance to act on, and routes drawn with less fuss.
+    const release = (version) => releases.filter({ has: other.locator("h2", { hasText: version }) }).first();
+    const titleOf = async (version) => (await release(version).locator(".release-title").textContent()) ?? "";
+    const firstOf = async (version) => (await release(version).locator("li").allTextContents()).slice(0, 3).join(" ");
+    check("0.4.0 is named after what it brings", /spreadsheet/i.test(await titleOf("0.4.0")) && /stand/i.test(await titleOf("0.4.0")) && /ticket/i.test(await titleOf("0.4.0")), await titleOf("0.4.0"));
+    check("and its list starts with those, not with the small things", /spreadsheet/i.test(await firstOf("0.4.0")) && /stand/i.test(await firstOf("0.4.0")) && /small map/i.test(await firstOf("0.4.0")), await firstOf("0.4.0"));
+    check("0.4.1 is named after what it brings and starts with it: map balance to act on, and routes", /map balance/i.test(await titleOf("0.4.1")) && /route/i.test(await titleOf("0.4.1")) && /Map balance/.test(await firstOf("0.4.1")) && /route/i.test(await firstOf("0.4.1")), await firstOf("0.4.1"));
     await other.goto(BASE + "about/", { waitUntil: "networkidle" });
     const aboutText = await other.locator("body").textContent();
     check("the About page tells of boards that stand, of ticket cards with a small map, and of spreadsheets", /stand/.test(aboutText) && /small map/.test(aboutText) && /spreadsheet/i.test(aboutText));
