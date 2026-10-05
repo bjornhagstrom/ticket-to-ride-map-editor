@@ -3822,6 +3822,25 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     await wctx.close();
   }
 
+  // 56. On a computer each column scrolls on its own: editing a stop with a tall Properties panel never
+  // scrolls the page, so the map stays in view.
+  for (const [w, h] of [[1500, 1000], [1280, 720]]) {
+    const cs = await (await browser.newContext({ viewport: { width: w, height: h } })).newPage();
+    cs.on("pageerror", (e) => errors.push(String(e)));
+    await cs.goto(BASE, { waitUntil: "networkidle" });
+    await cs.getByRole("button", { name: "Load the example map" }).click();
+    await cs.waitForTimeout(600);
+    await cs.evaluate(() => { const s = Array.from(document.querySelectorAll(".map-canvas .stop")).find((g) => Array.from(g.querySelectorAll("text, title")).some((t) => t.textContent === "Central")); s.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true })); s.dispatchEvent(new PointerEvent("pointerup", { bubbles: true })); });
+    await cs.waitForTimeout(400);
+    await cs.getByRole("button", { name: "Delete stop" }).scrollIntoViewIfNeeded();
+    await cs.waitForTimeout(200);
+    const m = await cs.evaluate(() => ({ pageScroll: window.scrollY, docHeight: document.documentElement.scrollHeight, viewport: window.innerHeight, mapTop: document.querySelector(".map-canvas").getBoundingClientRect().top, propsScrolls: (() => { const p = document.querySelector("aside.properties"); return p.scrollHeight > p.clientHeight ? p.scrollTop > 0 : true; })() }));
+    check(`${w} × ${h}: reaching the foot of a tall Properties panel does not scroll the page`, m.pageScroll === 0 && m.docHeight <= m.viewport + 1, JSON.stringify(m));
+    check(`${w} × ${h}: the map stays in view meanwhile`, m.mapTop >= 0 && m.mapTop < m.viewport / 2, JSON.stringify(m));
+    check(`${w} × ${h}: the panel scrolls by itself instead`, m.propsScrolls, JSON.stringify(m));
+    await cs.context().close();
+  }
+
   console.log("PASS:"); ok.forEach((l) => console.log("  ✓ " + l));
   if (bad.length) { console.log("FAIL:"); bad.forEach((l) => console.log("  ✗ " + l)); }
   console.log(`\n${ok.length} passed, ${bad.length} failed`);

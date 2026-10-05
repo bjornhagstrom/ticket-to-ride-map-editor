@@ -6,9 +6,6 @@ in the same commit as the work (AGENTS.md).
 ## Agreed and next
 
 
-- **The columns scroll on their own**: on a computer a tall Tools or Properties column makes the whole
-  page scroll, and the map scrolls out of view while a stop or a route is being edited. Each column
-  should scroll by itself, with the map staying in view.
 
 ## Waiting
 

@@ -465,3 +465,16 @@
 .tour-video-note { position: absolute; left: 10px; bottom: 8px; padding: 2px 8px; border-radius: 999px; background: rgba(36, 33, 29, .78); color: #fffaf0; font-size: 12px; }
 .guide-more { margin: 2px 0 0; }
 .guide-more a { color: #721c24; text-decoration: underline; text-underline-offset: 2px; }
+
+/* On a computer the editor fills the window and each column scrolls on its own, so editing a stop or a
+   route in a tall Properties panel never scrolls the map out of view. (Before, only an expanded Map
+   balance did this.) Tablets and phones keep the page scrolling as a whole. */
+@media screen and (min-width:1051px){
+  .app-shell{height:100vh;min-height:0;overflow:hidden}
+  .workspace{min-height:0}
+  .workspace>.tools-panel,.workspace>.properties{overflow-y:auto;min-height:0}
+  .workspace>.tools-panel>*{flex-shrink:0}
+}
+/* The note at the end of the figures above the map needs room: in a narrower window it would be
+   squeezed into a sliver, or wrap over the map's corner, so it is left out there. */
+@media (max-width:1439px){ .map-status .map-status-note { display: none; } }
