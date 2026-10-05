@@ -48,6 +48,10 @@ export default function About() {
         <img src="/ttr/images/about-editor.jpg" width={1600} height={900} alt="The editor with its example map: stops, coloured routes, a lake and a river, with the tools on the left" />
         <figcaption>The editor with its example map. The tools are on the left, the map in the middle, and what you select is edited on the right.</figcaption>
       </figure>
+      <p>
+        There is <a href="https://youtu.be/AS7XWDRvOEE" target="_blank" rel="noopener noreferrer">a tour of the editor in 80 seconds</a> on
+        YouTube, from drawing a map to playing it on paper.
+      </p>
     </section>
 
     <section>

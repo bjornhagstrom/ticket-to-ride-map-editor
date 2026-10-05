@@ -3796,6 +3796,32 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     await ab.context().close();
   }
 
+  // 55. The tour video in the welcome box: a picture with a play button until it is asked for, so
+  // nothing is loaded from YouTube for someone who does not watch; then the player, from
+  // youtube-nocookie.com. And a way to About, to read more. (YouTube is answered locally here.)
+  {
+    const wctx = await browser.newContext({ viewport: { width: 1300, height: 1000 } });
+    const external = [];
+    await wctx.route(/youtube|ytimg|googlevideo/, (route) => { external.push(route.request().url()); route.fulfill({ status: 200, contentType: "text/html", body: "<html><body>player</body></html>" }); });
+    const wp = await wctx.newPage();
+    wp.on("pageerror", (e) => errors.push(String(e)));
+    await wp.goto(BASE, { waitUntil: "networkidle" });
+    await wp.waitForTimeout(500);
+    const guide = wp.getByRole("dialog", { name: "Welcome to the map editor" });
+    const facade = guide.locator(".tour-video");
+    check("the welcome box shows the tour video as a picture with a play button", (await facade.count()) === 1 && (await facade.getByRole("button", { name: /Play the tour/ }).count()) === 1);
+    const poster = await facade.locator("img").evaluate((img) => ({ src: img.getAttribute("src"), w: img.naturalWidth }));
+    check("the picture is the editor's own, loaded from this site", poster.w > 0 && poster.src.startsWith("/ttr/"), JSON.stringify(poster));
+    check("and nothing is loaded from YouTube before it is asked for", external.length === 0 && (await guide.locator("iframe").count()) === 0, JSON.stringify(external));
+    await facade.getByRole("button", { name: /Play the tour/ }).click();
+    await wp.waitForTimeout(500);
+    const src = await guide.locator(".tour-video iframe").getAttribute("src").catch(() => "");
+    check("asked for, the player comes from youtube-nocookie.com and starts", /^https:\/\/www\.youtube-nocookie\.com\/embed\/AS7XWDRvOEE\?/.test(src) && /autoplay=1/.test(src), src);
+    const about = guide.getByRole("link", { name: /About/ });
+    check("the welcome box links to About, to read more", (await about.count()) === 1 && /about\/?$/.test(await about.getAttribute("href")), await about.getAttribute("href").catch(() => ""));
+    await wctx.close();
+  }
+
   console.log("PASS:"); ok.forEach((l) => console.log("  ✓ " + l));
   if (bad.length) { console.log("FAIL:"); bad.forEach((l) => console.log("  ✗ " + l)); }
   console.log(`\n${ok.length} passed, ${bad.length} failed`);

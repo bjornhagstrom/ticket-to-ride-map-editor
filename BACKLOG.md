@@ -5,8 +5,6 @@ in the same commit as the work (AGENTS.md).
 
 ## Agreed and next
 
-- **The tour video in the welcome box**, from YouTube, played only when asked (a picture with a play
-  button that loads the player on click), and a link to About.
 
 - **The columns scroll on their own**: on a computer a tall Tools or Properties column makes the whole
   page scroll, and the map scrolls out of view while a stop or a route is being edited. Each column

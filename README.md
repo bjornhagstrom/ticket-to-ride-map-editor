@@ -1,7 +1,8 @@
 # Ticket to Ride Map Editor
 
 **[Open the editor at hagstrom.nu/ttr](https://hagstrom.nu/ttr/)**: it runs in the browser, there is
-nothing to install, and the map you work on stays in your browser. [What's new](CHANGELOG.md)
+nothing to install, and the map you work on stays in your browser. [What's new](CHANGELOG.md) ·
+[A tour in 80 seconds](https://youtu.be/AS7XWDRvOEE)
 
 A workshop for Ticket to Ride maps that do not exist yet. Draw a board, place the stops, connect them
 with routes, work out a deck of destination tickets, and print it all to play on paper.

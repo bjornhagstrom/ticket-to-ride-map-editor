@@ -11,6 +11,7 @@ export type Release = { version: string; date: string; title: string; changes: s
 // decided; the What's new page in the editor shows released versions only.
 export const UNRELEASED: string[] = [
   "A damaged map file opens with what can be used, and says what was left out and why; a file that holds no map at all is refused with a reason, and the map you had stays as it was.",
+  "The welcome box has the tour of the editor in 80 seconds, which loads from YouTube only when you press play, and a link to About.",
   "About tells the whole loop, from drawing to printing again with the next version number, and shows the editor, the ticket cards and Map balance as they are now.",
   "Settings show a stop type as the map draws it, beside its settings, and the print dialog draws how the sheets of a run divide the board.",
   "A stop can be marked a hub on purpose and a route contested on purpose, in Properties. A full deck of tickets then sends more tickets to the hub and through the route, and Map balance lists such a route as crowded on purpose.",

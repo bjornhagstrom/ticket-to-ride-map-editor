@@ -2,7 +2,7 @@
 
 // The modal surfaces: the first-visit guide, the balance report and the route suggestions.
 import { useEffect, useState } from "react";
-import { ChevronDown, Copy, FileSpreadsheet, Download, FileStack, Sparkles, Layers3, Pencil, Plus, Printer, Save, ScrollText, Ticket as TicketIcon, Trash2, Upload } from "lucide-react";
+import { Play, ChevronDown, Copy, FileSpreadsheet, Download, FileStack, Sparkles, Layers3, Pencil, Plus, Printer, Save, ScrollText, Ticket as TicketIcon, Trash2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -14,6 +14,24 @@ import { Label } from "@/components/ui/label";
 import { TicketLengths, type TicketLengthsView } from "./ticket-lengths";
 import { DeckCompare, type DeckCompareView } from "./deck-compare";
 import { TENSION_CHOICES, type DeckTension, BALANCE_OFFICIAL, CROWDING_OFFICIAL, networkShape, SHAPE_OFFICIAL, colourRouteIds, compareWithClassics, CLASSIC_ROUTE_MAPS, type Bottleneck, dealtToFullTable, deckRuleFor, deckRules, TICKET_SUGGESTER, type TicketDeckReport, type TicketStyle, type SetupBalance, type TicketReview, type ColourLengthTable, type NetworkStats, type RouteSpacing, type RouteSuggestion } from "./map-analysis";
+
+// The tour on YouTube, as a picture with a play button until someone asks for it: nothing is loaded
+// from YouTube before then, so no cookie is set and no script runs for anyone who does not watch. The
+// player comes from youtube-nocookie.com and starts at once, since playing is what was asked.
+const TOUR_VIDEO_ID = "AS7XWDRvOEE";
+export const TOUR_VIDEO_URL = `https://youtu.be/${TOUR_VIDEO_ID}`;
+function TourVideo() {
+  const [playing, setPlaying] = useState(false);
+  return <div className="tour-video">
+    {playing
+      ? <iframe src={`https://www.youtube-nocookie.com/embed/${TOUR_VIDEO_ID}?autoplay=1&rel=0`} title="A tour of the map editor" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowFullScreen />
+      : <button type="button" className="tour-video-play" aria-label="Play the tour of the editor, 80 seconds, from YouTube" onClick={() => setPlaying(true)}>
+        <img src="/ttr/images/tour-poster.jpg" width={960} height={540} alt="" />
+        <span className="tour-video-button"><Play /></span>
+        <span className="tour-video-note">A tour in 80 seconds · plays from YouTube</span>
+      </button>}
+  </div>;
+}
 
 export function WelcomeGuide({ open, onOpenChange, onChooseBlank, onChooseExample }: { open: boolean; onOpenChange: (open: boolean) => void; onChooseBlank: () => void; onChooseExample: () => void }) {
   // What matters, in a line or two each. How a print is laid out is for the print dialog to say.
@@ -28,7 +46,9 @@ export function WelcomeGuide({ open, onOpenChange, onChooseBlank, onChooseExampl
   return <Dialog open={open} onOpenChange={onOpenChange}>
     <DialogContent className="welcome-guide">
       <DialogHeader><DialogTitle>Welcome to the map editor</DialogTitle><DialogDescription>This tool is for testing and developing new maps and expansions for Ticket to Ride. Design a custom map, then print it and play with pens instead of plastic trains.</DialogDescription></DialogHeader>
+      <TourVideo />
       <ol className="guide-steps">{steps.map((step) => <li key={step.title}><span className="guide-step-icon">{step.icon}</span><div><strong>{step.title}</strong><p>{step.text}</p></div></li>)}</ol>
+      <p className="helper guide-more">More about what it is for, and where its numbers come from, on the <a href="./about">About page</a>.</p>
       <DialogFooter>
         <Button variant="outline" onClick={onChooseExample}><Pencil />Load the example map</Button>
         <Button onClick={onChooseBlank}>Start with a blank map</Button>
