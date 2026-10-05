@@ -18,11 +18,10 @@ in the same commit as the work (AGENTS.md).
 - **Playtest results**: which routes were claimed on the marked-up sheet and which tickets were made,
   entered after a game and set against the predicted crowding, per map version. A printed playtest
   sheet (date, players, scores, tickets made and missed, notes) could be its paper half. Large.
-- **The next video** (the tour stays as it is: a new upload would get a new address and break the links
-  to it). An end card of 10–15 seconds, so YouTube's end screen (subscribe, another video) covers
-  nothing; the address in the picture and high in the description, and in a pinned comment. Links to
-  the site from the end screen itself need the YouTube Partner Program, which is far off; short videos
-  per feature that point to each other are what the end screen's video element is for.
+- **Short videos on reading the editor**, later: how to read Map balance (crowding, how the network
+  holds together, the official ranges), building a deck and its tension, printing and playtesting.
+  Each a few minutes, pointing to the others; an end card long enough for YouTube's end screen, the
+  address in the picture and high in the description. The tour itself stays as it is.
 - **Map collaboration** (accounts, shared maps, versions, live editing): waits; the editor stays
   without a backend for now. Notes on what a first version would hold are in the git history of this
   file.
