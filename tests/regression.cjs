@@ -3840,8 +3840,20 @@ const pdfOf = (page, options) => (webkitRun ? Promise.resolve(Buffer.from("")) :
     const poster = await facade.locator("img").evaluate((img) => ({ src: img.getAttribute("src"), w: img.naturalWidth }));
     check("the picture is the editor's own, loaded from this site", poster.w > 0 && poster.src.startsWith("/ttr/"), JSON.stringify(poster));
     check("and nothing is loaded from YouTube before it is asked for", external.length === 0 && (await guide.locator("iframe").count()) === 0, JSON.stringify(external));
+    // Wanting it is enough to warm the connection (the pointer coming near), still without a request to YouTube.
+    const preconnects = () => wp.evaluate(() => Array.from(document.querySelectorAll('link[rel="preconnect"]')).map((l) => l.href));
+    check("nothing is warmed up when the box opens, only when the pointer comes near the picture", !(await preconnects()).some((h) => /youtube/.test(h)));
+    await facade.getByRole("button", { name: /Play the tour/ }).hover();
+    check("when it does, the connection to youtube-nocookie.com is warmed up, without a request", (await preconnects()).some((h) => /^https:\/\/www\.youtube-nocookie\.com\/?$/.test(h)) && external.length === 0, JSON.stringify({ links: await preconnects(), external }));
+    await wctx.unroute(/youtube|ytimg|googlevideo/);
+    await wctx.route(/youtube|ytimg|googlevideo/, async (route) => { external.push(route.request().url()); await new Promise((r) => setTimeout(r, 1200)); route.fulfill({ status: 200, contentType: "text/html", body: "<html><body>player</body></html>" }); });
     await facade.getByRole("button", { name: /Play the tour/ }).click();
-    await wp.waitForTimeout(500);
+    await wp.waitForTimeout(300);
+    const waiting = await facade.evaluate((el) => ({ busy: el.getAttribute("aria-busy"), note: el.textContent, posterShown: !!el.querySelector("img") && el.querySelector("img").getBoundingClientRect().width > 0, frameHidden: getComputedStyle(el.querySelector("iframe")).opacity === "0" }));
+    check("at the click the picture stays, saying the player is loading, instead of an empty box", waiting.busy === "true" && /Loading/i.test(waiting.note) && waiting.posterShown && waiting.frameHidden, JSON.stringify(waiting));
+    await wp.waitForTimeout(1800);
+    const ready = await facade.evaluate((el) => ({ busy: el.getAttribute("aria-busy"), frameShown: getComputedStyle(el.querySelector("iframe")).opacity === "1", poster: !!el.querySelector("img") }));
+    check("once the player has loaded it replaces the picture", ready.busy !== "true" && ready.frameShown && !ready.poster, JSON.stringify(ready));
     const src = await guide.locator(".tour-video iframe").getAttribute("src").catch(() => "");
     check("asked for, the player comes from youtube-nocookie.com and starts", /^https:\/\/www\.youtube-nocookie\.com\/embed\/AS7XWDRvOEE\?/.test(src) && /autoplay=1/.test(src), src);
     const about = guide.getByRole("link", { name: /About/ });

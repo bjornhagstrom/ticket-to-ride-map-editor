@@ -17,19 +17,29 @@ import { TENSION_CHOICES, type DeckTension, BALANCE_OFFICIAL, CROWDING_OFFICIAL,
 
 // The tour on YouTube, as a picture with a play button until someone asks for it: nothing is loaded
 // from YouTube before then, so no cookie is set and no script runs for anyone who does not watch. The
-// player comes from youtube-nocookie.com and starts at once, since playing is what was asked.
+// player comes from youtube-nocookie.com and starts at once, since playing is what was asked (Safari
+// does not allow that for an embedded player: there its own play button waits, after the picture).
 const TOUR_VIDEO_ID = "AS7XWDRvOEE";
 export const TOUR_VIDEO_URL = `https://youtu.be/${TOUR_VIDEO_ID}`;
 function TourVideo() {
-  const [playing, setPlaying] = useState(false);
-  return <div className="tour-video">
-    {playing
-      ? <iframe src={`https://www.youtube-nocookie.com/embed/${TOUR_VIDEO_ID}?autoplay=1&rel=0`} title="A tour of the map editor" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowFullScreen />
-      : <button type="button" className="tour-video-play" aria-label="Play the tour of the editor, 80 seconds, from YouTube" onClick={() => setPlaying(true)}>
-        <img src="/ttr/images/tour-poster.jpg" width={960} height={540} alt="" />
-        <span className="tour-video-button"><Play /></span>
-        <span className="tour-video-note">A tour in 80 seconds · plays from YouTube</span>
-      </button>}
+  const [asked, setAsked] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  // Wanting it (the pointer on the picture; not focus, which the dialog gives the button by itself) warms up the connection to the player's host, so the
+  // click has less to wait for. A preconnect sends no cookie and loads nothing.
+  const warmUp = () => {
+    if (document.querySelector('link[rel="preconnect"][href="https://www.youtube-nocookie.com"]')) return;
+    const link = document.createElement("link");
+    link.rel = "preconnect";
+    link.href = "https://www.youtube-nocookie.com";
+    document.head.appendChild(link);
+  };
+  return <div className="tour-video" aria-busy={asked && !loaded}>
+    {asked && <iframe className={loaded ? "is-loaded" : undefined} src={`https://www.youtube-nocookie.com/embed/${TOUR_VIDEO_ID}?autoplay=1&rel=0`} title="A tour of the map editor" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowFullScreen onLoad={() => setLoaded(true)} />}
+    {!loaded && <button type="button" className="tour-video-play" disabled={asked} aria-label="Play the tour of the editor, 80 seconds, from YouTube" onPointerEnter={warmUp} onClick={() => setAsked(true)}>
+      <img src="/ttr/images/tour-poster.jpg" width={960} height={540} alt="" />
+      {!asked && <span className="tour-video-button"><Play /></span>}
+      <span className="tour-video-note">{asked ? "Loading the player…" : "A tour in 80 seconds · plays from YouTube"}</span>
+    </button>}
   </div>;
 }
 
@@ -303,7 +313,7 @@ export function TicketsPanel({ compare, onHoverTicket, lengthView, wide, onToggl
       </div>
 
       <div className="analysis-section">
-        <h3>Stops no ticket names</h3>
+        <h3>Stops with no ticket names</h3>
         {uncovered.length ? <>
           <p className="helper">{uncovered.length} of {coverage.length}. Nothing sends a player there — pick one to start a ticket from it.</p>
           <div className="uncovered-stops">{uncovered.map((entry) => <button type="button" key={entry.stop.id} className="uncovered-stop" onClick={() => onStartFrom(entry.stop.id)}>{entry.stop.name}</button>)}</div>

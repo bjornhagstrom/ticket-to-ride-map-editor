@@ -9,7 +9,10 @@ export type Release = { version: string; date: string; title: string; changes: s
 // Changes made since the last release, written as they are made, in the same plain words. They go at
 // the top of CHANGELOG.md under Unreleased, and become the notes of the next version when it is
 // decided; the What's new page in the editor shows released versions only.
-export const UNRELEASED: string[] = [];
+export const UNRELEASED: string[] = [
+  "The tour video in the welcome box starts loading as soon as you point at it, and shows a note while the player loads instead of an empty box. (Safari does not let a video start by itself: there, press play once more in the player.)",
+  "In Map balance, \"Stops no ticket names\" now reads \"Stops with no ticket names\".",
+];
 
 export const RELEASES: Release[] = [
   {

@@ -4,6 +4,13 @@ What changed in each version of the [Ticket to Ride map editor](https://hagstrom
 
 This file is written from `app/version.ts` by `npm run changelog`; edit the notes there.
 
+## Unreleased
+
+Changes since the last release, to go into the next version.
+
+- The tour video in the welcome box starts loading as soon as you point at it, and shows a note while the player loads instead of an empty box. (Safari does not let a video start by itself: there, press play once more in the player.)
+- In Map balance, "Stops no ticket names" now reads "Stops with no ticket names".
+
 ## 1.0.0 · 2026-10-05
 
 **Version 1.0: the map against the official maps, decks calm or tense, and printing for playtests**

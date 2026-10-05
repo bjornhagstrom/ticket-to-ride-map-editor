@@ -33,7 +33,7 @@ const groups: { title: string; rows: Row[] }[] = [
     ...BIN_LABELS.map((label, index): Row => ({ id: `bin-${index}`, label: `Reach ${label}`, get: (f) => f.bins?.[index] ?? null, unit: "%" })),
   ] },
   { title: "How it lies on the map", rows: [
-    { id: "uncovered", label: "Stops no ticket names", get: (f) => f.uncovered },
+    { id: "uncovered", label: "Stops with no ticket names", get: (f) => f.uncovered },
     { id: "crowded", label: "Crowded routes", get: (f) => f.crowded },
     { id: "duplicates", label: "Duplicate pairs", get: (f) => f.duplicates },
     { id: "unused", label: "Routes no ticket uses", get: (f) => f.unusedPct, unit: "%" },
