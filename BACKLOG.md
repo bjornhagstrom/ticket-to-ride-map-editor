@@ -5,7 +5,8 @@ in the same commit as the work (AGENTS.md).
 
 ## Agreed and next
 
-
+Nothing waiting to be built: the next release, 1.0, gathers what is under Unreleased in
+CHANGELOG.md.
 
 ## Waiting
 
