@@ -24,6 +24,29 @@ created in `out/`. Check that `out/index.html` exists before uploading.
 The `/ttr` base path is defined in `next.config.ts`. Changing the public path requires updating both
 `basePath` and `assetPrefix` (and the two icon links in `app/layout.tsx`), followed by a fresh build.
 
+## Before every release
+
+The site is in use and has been announced, so a release is tested more than a commit is:
+
+```bash
+npm test                                   # type check, lint, unit suites, production build into out/
+npm run dev &                              # then, with the dev server at localhost:3000/ttr/:
+node tests/regression.cjs                  # the regression suite in Chromium
+
+# the production build, served under /ttr as on the server
+mkdir -p /tmp/ttr-serve && ln -sfn "$PWD/out" /tmp/ttr-serve/ttr
+(cd /tmp/ttr-serve && python3 -m http.server 4173 &)
+TTR_URL=http://localhost:4173/ttr/ node tests/regression.cjs
+npx playwright install webkit              # once
+TTR_BROWSER=webkit TTR_URL=http://localhost:4173/ttr/ node tests/regression.cjs
+```
+
+In WebKit a few checks are Chromium's own and are skipped, each listed with its reason at the end of
+the run (Safari gets a print profile of its own; only Chromium saves a PDF). Then walk through the
+production build by hand: the welcome box and its video, the example map, drawing, tickets and a full
+deck, Map balance, the print dialog with every part, export and import of a map file, Start over.
+Only then, and with the owner's go, publish.
+
 ## Safe publication procedure
 
 1. Build locally and stop if the type check, a test or the build fails.

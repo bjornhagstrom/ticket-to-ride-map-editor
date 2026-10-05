@@ -478,3 +478,7 @@
 /* The note at the end of the figures above the map needs room: in a narrower window it would be
    squeezed into a sliver, or wrap over the map's corner, so it is left out there. */
 @media (max-width:1439px){ .map-status .map-status-note { display: none; } }
+
+/* The hint over the map is not text to select: dragging a stop's name across it selected its words in
+   Safari. The map itself is unselectable already. */
+.map-hint, .map-hint-slot { -webkit-user-select: none; user-select: none; }

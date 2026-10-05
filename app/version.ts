@@ -9,25 +9,32 @@ export type Release = { version: string; date: string; title: string; changes: s
 // Changes made since the last release, written as they are made, in the same plain words. They go at
 // the top of CHANGELOG.md under Unreleased, and become the notes of the next version when it is
 // decided; the What's new page in the editor shows released versions only.
-export const UNRELEASED: string[] = [
-  "A damaged map file opens with what can be used, and says what was left out and why; a file that holds no map at all is refused with a reason, and the map you had stays as it was.",
-  "On a computer each column scrolls on its own, so the map stays in view while you edit a stop or a route in a tall Properties panel.",
-  "The welcome box has the tour of the editor in 80 seconds, which loads from YouTube only when you press play, and a link to About.",
-  "About tells the whole loop, from drawing to printing again with the next version number, and shows the editor, the ticket cards and Map balance as they are now.",
-  "Settings show a stop type as the map draws it, beside its settings, and the print dialog draws how the sheets of a run divide the board.",
-  "A stop can be marked a hub on purpose and a route contested on purpose, in Properties. A full deck of tickets then sends more tickets to the hub and through the route, and Map balance lists such a route as crowded on purpose.",
-  "A full deck of tickets can be calm, like the official maps, or tense: chosen when it is built, and set for the map in its deck rules. Like the official maps crowds its busiest corridor about as hard as the official decks do; tense, like the tensest of them.",
-  "Map balance opens with the map against the official maps: crowded routes at a full table, the ticket traffic on double routes against single ones, routes no ticket needs, the busiest stop and the average hub degree, each beside what the eight official maps measure.",
-  "The Rules panel has Print the rules, for the rules alone on pages of their own.",
-  "The print dialog says how to save a run as a PDF, and the file is named after the map, its version, what it holds and the date.",
-  "A page of the balance figures can go with a print run, or alone: the network, crossings, how it holds together, crowding and the routes by colour and length, as they stand at that version.",
-  "Standing ticket cards have their points at the top, beside the cities, so the small map below is larger; lying cards keep the points in their corner.",
-  "Start over is under Settings, on the Map page: it says what goes, offers to export the map first, asks before it does anything, and Undo brings the map back. The Clear map button at the foot of the tools is gone.",
-  "In smaller windows the map shrinks to the room there is instead of running in under the Properties column, a tablet no longer scrolls sideways, and on a phone every button in the header shows.",
-  "A map kept in the browser that cannot be read is put aside untouched instead of being overwritten, and the editor starts afresh and says so.",
-];
+export const UNRELEASED: string[] = [];
 
 export const RELEASES: Release[] = [
+  {
+    version: "1.0.0",
+    date: "2026-10-05",
+    title: "Version 1.0: the map against the official maps, decks calm or tense, and printing for playtests",
+    changes: [
+      "Map balance opens with the map against the official maps: crowded routes at a full table, the ticket traffic on double routes against single ones, routes no ticket needs, the busiest stop and the average hub degree, each beside what the eight official maps measure.",
+      "A full deck of tickets can be calm, like the official maps, or tense: chosen when it is built, and set for the map in its deck rules. Like the official maps crowds its busiest corridor about as hard as the official decks do; tense, like the tensest of them.",
+      "A stop can be marked a hub on purpose and a route contested on purpose, in Properties. A full deck of tickets then sends more tickets to the hub and through the route, and Map balance lists such a route as crowded on purpose.",
+      "The welcome box has the tour of the editor in 80 seconds, which loads from YouTube only when you press play, and a link to About.",
+      "A page of the balance figures can go with a print run, or alone: the network, crossings, how it holds together, crowding and the routes by colour and length, as they stand at that version.",
+      "The print dialog says how to save a run as a PDF, and the file is named after the map, its version, what it holds and the date.",
+      "The Rules panel has Print the rules, for the rules alone on pages of their own.",
+      "A damaged map file opens with what can be used, and says what was left out and why; a file that holds no map at all is refused with a reason, and the map you had stays as it was.",
+      "A map kept in the browser that cannot be read is put aside untouched instead of being overwritten, and the editor starts afresh and says so.",
+      "Start over is under Settings, on the Map page: it says what goes, offers to export the map first, asks before it does anything, and Undo brings the map back. The Clear map button at the foot of the tools is gone.",
+      "On a computer each column scrolls on its own, so the map stays in view while you edit a stop or a route in a tall Properties panel.",
+      "In smaller windows the map shrinks to the room there is instead of running in under the Properties column, a tablet no longer scrolls sideways, and on a phone every button in the header shows.",
+      "Standing ticket cards have their points at the top, beside the cities, so the small map below is larger; lying cards keep the points in their corner.",
+      "Settings show a stop type as the map draws it, beside its settings, and the print dialog draws how the sheets of a run divide the board.",
+      "In Safari, dragging a stop's name across the map no longer selects the text of the panels and hints around it.",
+      "About tells the whole loop, from drawing to printing again with the next version number, and shows the editor, the ticket cards and Map balance as they are now.",
+    ],
+  },
   {
     version: "0.4.1",
     date: "2026-10-04",

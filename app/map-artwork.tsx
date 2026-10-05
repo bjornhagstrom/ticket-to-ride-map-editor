@@ -207,6 +207,6 @@ export function StopLabel({ stop, radius, boardWidth, onGrab }: { stop: Stop; ra
   const rad = angle * Math.PI / 180, distance = radius + 9;
   const push = labelPush(angle);
   return <text x={Math.cos(rad) * distance} y={Math.sin(rad) * distance} dy="0.35em" textAnchor="middle"
-    className={onGrab ? "stop-label-handle" : undefined} onPointerDown={onGrab ? (event) => { event.stopPropagation(); onGrab(event.shiftKey); } : undefined}
+    className={onGrab ? "stop-label-handle" : undefined} onPointerDown={onGrab ? (event) => { event.stopPropagation(); event.preventDefault(); onGrab(event.shiftKey); } : undefined}
     style={{ transformBox: "fill-box", transform: `translate(${(push.x * 50).toFixed(2)}%, ${(push.y * 50).toFixed(2)}%)` }}>{stop.name}</text>;
 }

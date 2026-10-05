@@ -15,10 +15,36 @@ const path = require("path");
 
 const ok = [];
 const bad = [];
-const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${detail ? " — " + detail : ""}`); };
+// TTR_BROWSER=webkit runs the suite in Safari's engine. A few checks are Chromium's own and are skipped
+// there, each named here with its reason: the editor gives Safari a print profile of its own (Safari
+// ignores @page margins, so full size takes 12 sheets of A4, not 9), and only Chromium saves a PDF.
+const webkitRun = process.env.TTR_BROWSER === "webkit";
+const CHROMIUM_ONLY = [
+  [/^while Chrome keeps 9$/, "Chrome's own sheet count"],
+  [/^and hears nothing about Safari$/, "Safari is told about its print profile, as it should be"],
+  [/is 9 sheets of A4 at full size/, "Safari's profile makes it 12"],
+  [/prints the 9 sheets its cell promises/, "a PDF count, and Safari's profile makes it 12"],
+  [/^and marks to trim at on every sheet$/, "counted for 9 sheets"],
+  [/upright page box that fits A4 less its margins/, "Safari's page box is smaller by its own margins"],
+  [/with the browser's own margins is still 9 sheets/, "a PDF count"],
+  [/^and per panel it is still 6$/, "a PDF count"],
+  [/sheet count in the summary is the number of pages the browser prints/, "a PDF count"],
+  [/these rules take one page, and the cards the sheets their summary promised/, "a PDF count"],
+  [/^saved as a PDF it is a single page$/, "reads the PDF"],
+  [/read from the PDF itself/, "reads the PDF"],
+];
+const skipped = [];
+const check = (label, pass, detail = "") => {
+  const chromiumOnly = webkitRun && CHROMIUM_ONLY.find(([pattern]) => pattern.test(label));
+  if (chromiumOnly) { skipped.push(`${label} (${chromiumOnly[1]})`); return; }
+  (pass ? ok : bad).push(`${label}${detail ? " — " + detail : ""}`);
+};
+// Only Chromium saves a PDF; in WebKit the checks that read one are skipped (CHROMIUM_ONLY).
+const pdfOf = (page, options) => (webkitRun ? Promise.resolve(Buffer.from("")) : page.pdf(options));
 
 (async () => {
-  const browser = await chromium.launch();
+  // TTR_BROWSER=webkit runs the same suite in Safari's engine (AGENTS.md: before every deploy).
+  const browser = await (process.env.TTR_BROWSER === "webkit" ? require("playwright").webkit : chromium).launch();
   const page = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
   const errors = [];
   page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
@@ -590,7 +616,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     await page.waitForTimeout(300);
     await page.emulateMedia({ media: "print" });
     const margins = await page.addStyleTag({ content: "@media print{@page{margin:8mm!important}}" });
-    const pdf = await page.pdf({ format: "A4", landscape, printBackground: true });
+    const pdf = await pdfOf(page, { format: "A4", landscape, printBackground: true });
     await margins.evaluate((el) => el.remove());
     await page.emulateMedia({ media: "screen" });
     await page.waitForTimeout(300);
@@ -639,7 +665,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   });
   check("the sheet table has a heading of its own", /^H[2-4] \S/.test(described.heading), described.heading);
   check("and a description of what its numbers are", /sheets?/i.test(described.description) && /%/.test(described.description), described.description);
-  const foot = await printDialog().locator(".print-dialog-foot").textContent();
+  const foot = await printDialog().locator(".print-dialog-foot:not(.print-safari-note)").textContent();
   check("the dialog says to print upright, the default, and never asks for Landscape", /portrait|upright/i.test(foot) && !/choose Landscape/i.test(foot), foot);
   check("which spells out what the percentage means", /100\s%[^.]*real size|real size[^.]*100\s%/i.test(described.description), described.description);
   check("every cell says sheets, not just a number", /\d+ sheets?/.test(described.cell), described.cell);
@@ -1838,6 +1864,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
   };
   const beforeDrag = await storedCentral();
   await dragName(37, { release: false });
+  await page.waitForTimeout(150);  // the map is stored after the move is drawn; WebKit takes a moment longer
   // The name box is pushed out by half its width but only part of its height, so its centre points
   // flatter than the angle; the angle itself is what the map stores as it goes.
   const midDrag = (await storedCentral()).labelAngle;
@@ -2619,7 +2646,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     check("with the board only, the summary is about the board alone", !/rules|ticket/i.test(await printDialog().locator(".print-summary").textContent()));
     await printDialog().getByRole("button", { name: "Cancel" }).click();
     await page.waitForTimeout(300);
-    const pagesOf = async () => { await page.emulateMedia({ media: "print" }); const pdf = await page.pdf({ format: "A4", printBackground: true }); await page.emulateMedia({ media: "screen" }); return (pdf.toString("latin1").match(/\/Type\s*\/Page[^s]/g) || []).length; };
+    const pagesOf = async () => { await page.emulateMedia({ media: "print" }); const pdf = await pdfOf(page, { format: "A4", printBackground: true }); await page.emulateMedia({ media: "screen" }); return (pdf.toString("latin1").match(/\/Type\s*\/Page[^s]/g) || []).length; };
     const tree = () => page.evaluate(() => { const root = document.querySelector(".print-pages"); return { order: Array.from(root.children).map((el) => (el.matches("style") ? "style" : el.classList.contains("print-page") ? "board" : el.classList.contains("print-tickets") ? "tickets" : el.classList.contains("print-rules") ? "rules" : "other")).filter((x, i, all) => x !== "style" && x !== all[i - 1]), boards: document.querySelectorAll(".print-pages .print-page").length, cards: document.querySelectorAll(".print-pages .ticket-card").length, rules: document.querySelectorAll(".print-pages .print-rules").length, text: (document.querySelector(".print-pages .print-rules") || { textContent: "" }).textContent, missing: document.querySelectorAll(".print-pages .print-rules .missing").length, style: Array.from(document.querySelectorAll(".print-pages style")).map((el) => el.textContent).join(" ") }; });
     const run = async (board, tickets, rules) => { await printButton().click(); await page.waitForTimeout(350); await choosePrintParts(board, tickets, rules); await printDialog().getByRole("button", { name: "Cancel" }).click(); await page.waitForTimeout(300); };
     const deckSize = await page.evaluate(() => { const m = JSON.parse(localStorage.getItem("ttr-map")); const first = m.ticketSets[0].id; const active = (m.ticketSets.find((x) => x.label === document.querySelector("#ticket-set")?.selectedOptions?.[0]?.textContent?.replace(/ \(\d+\)$/, "")) || m.ticketSets[0]).id; return m.tickets.filter((t) => (t.set ?? first) === active).length; });
@@ -2695,7 +2722,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
     check("on a page declared as 810 × 553 mm", /size:\s*810mm 553mm/.test(wholeBoard.style), wholeBoard.style);
     await page.emulateMedia({ media: "print" });
     const sheetBox = await page.evaluate(() => { const r = document.querySelector(".print-pages .print-page").getBoundingClientRect(); return { w: r.width / 96 * 25.4, h: r.height / 96 * 25.4 }; });
-    const pdfWhole = await page.pdf({ preferCSSPageSize: true, printBackground: true });
+    const pdfWhole = await pdfOf(page, { preferCSSPageSize: true, printBackground: true });
     await page.emulateMedia({ media: "screen" });
     const pdfText = pdfWhole.toString("latin1");
     const mediaBox = /\/MediaBox\s*\[\s*0\s+0\s+([\d.]+)\s+([\d.]+)\s*\]/.exec(pdfText);
@@ -3843,6 +3870,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
 
   console.log("PASS:"); ok.forEach((l) => console.log("  ✓ " + l));
   if (bad.length) { console.log("FAIL:"); bad.forEach((l) => console.log("  ✗ " + l)); }
+  if (skipped.length) { console.log("SKIPPED in WebKit (Chromium only):"); skipped.forEach((l) => console.log("  - " + l)); }
   console.log(`\n${ok.length} passed, ${bad.length} failed`);
   console.log("CONSOLE ERRORS:", errors.length ? JSON.stringify(errors.slice(0, 5)) : "none");
   await browser.close();
