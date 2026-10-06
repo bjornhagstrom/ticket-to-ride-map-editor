@@ -1,7 +1,7 @@
 # Testing: what runs when
 
-Status: **plan**, agreed in outline with the owner on 2026-10-06. Nothing below is built yet except
-what the measurements describe. The aim is that ordinary development gets an answer in about a
+Status: **plan**, agreed with the owner on 2026-10-06. Steps 1 and 2 are built (marked below); the rest
+is not. The aim is that ordinary development gets an answer in about a
 minute, a merge into `main` in two to three minutes, and the full set only where it matters:
 before a release.
 
@@ -24,9 +24,10 @@ Where the regression time goes:
 
 - **Fixed sleeps are over half of it.** 516 `waitForTimeout` calls add up to 205 s of the 385 s. Section
   33 alone sleeps 54 s and takes 106 s.
-- **Most sections are independent.** 23 of the 56 sections (1, 33, 35–56) open a browser context of
-  their own and need nothing from the others: 260 s. The other 33 (2–32 and 34) share one page and
-  run as a chain, each starting from what the one before left: 125 s.
+- **Most sections are independent, but the long ones are in the chain.** Sections 35–56 each open a
+  browser of their own and run alone (checked on 2026-10-06: each passes by itself): about 155 s. Sections
+  1–34 share one page and run as a chain, each starting from what the one before left: about 230 s,
+  of which section 33 (the route types in Settings) is 106 s.
 - The unit suites that take long (`deck-tension`, `ticket-calibration`, `balance-official`) only matter
   when the ticket suggester or the balance figures change.
 
@@ -65,13 +66,14 @@ the idea, not the contract.
 
 Each step stands on its own and can be stopped after any of them.
 
-1. **`npm run test:quick`.** A script that runs `typecheck`, `lint` and the fast unit suites (everything
-   except `deck-tension`, `ticket-calibration` and `balance-official`), and prints its own time.
-   `npm test` keeps running everything. About 30 minutes of work; saves about a minute per run.
-2. **Pick sections.** `TTR_ONLY=51,52 node tests/regression.cjs` runs only those sections (plus 1, the
-   welcome box, which the chain needs). Sections 35–56 and 33 can run alone today; the chain
-   (2–32, 34) runs as one unit or not at all, since each part starts from what the last left. A
-   section named but unable to run alone says so instead of failing in a confusing way.
+1. **`npm run test:quick`. Built.** Runs `typecheck`, `lint` and the fast unit suites (everything
+   except `deck-tension`, `ticket-calibration` and `balance-official`), with the time of each: 19 s
+   in all. `--with-calibration` adds the three slow ones; `npm test` runs everything.
+2. **Pick sections. Built.** `TTR_ONLY=51,52 node tests/regression.cjs` (ranges too: `36-40`) runs
+   only those sections: section 51 alone takes 8 s. Sections 35–56 run alone. Sections 1–34 are a chain
+   and naming any of them runs all of them; the final line says the run was partial, so a partial run
+   is never mistaken for the whole suite. All 22 independent sections were run alone, six at a time, in
+   39 s.
 3. **Waits instead of sleeps.** Replace each `waitForTimeout(n)` by waiting for what the next line
    needs (`expect`-style waits on a selector, a stored value or a network idle), section by section,
    starting with 33 (54 s of sleeping), 12, 37, 10 and 45. Where nothing can be waited for, the time
@@ -79,8 +81,9 @@ Each step stands on its own and can be stopped after any of them.
    speed does not buy flakiness. Likely saving: 205 s of sleeping down to about 60 s.
 4. **Shard the regression.** `TTR_SHARD=1/4` runs a quarter of the independent sections; the chain is
    one shard of its own. A small runner (`npm run test:regression:parallel`) starts the shards at once
-   against one server and sums the result. Four workers bring the Chromium run to about two minutes;
-   with step 3, about one.
+   against one server and sums the result. The chain is the long pole (about 230 s), so first split
+   section 33 (106 s) out of it by giving it a page of its own; then the shards finish in about two
+   minutes, and with step 3 in about one.
 5. **One command for each tier.** `npm run test:quick`, `npm run test:merge`, `npm run test:release`,
    each printing what it ran, what it left out and why, and how long it took. `test:release` runs
    Chromium (dev), Chromium (production build) and WebKit side by side and refuses to say "green"

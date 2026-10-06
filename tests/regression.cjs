@@ -42,6 +42,23 @@ const check = (label, pass, detail = "") => {
 // Only Chromium saves a PDF; in WebKit the checks that read one are skipped (CHROMIUM_ONLY).
 const pdfOf = (page, options) => (webkitRun ? Promise.resolve(Buffer.from("")) : page.pdf(options));
 
+// TTR_ONLY=51,52 or TTR_ONLY=36-40 runs only those sections (docs/TESTING.md). Sections 1 to 34 share
+// one page and each starts from what the one before left, so naming any of them runs all of them as a
+// chain; sections 35 and up each open a browser of their own and run alone. A partial run says so.
+const only = (() => {
+  if (!process.env.TTR_ONLY) return null;
+  const wanted = new Set();
+  for (const part of process.env.TTR_ONLY.split(",").map((x) => x.trim()).filter(Boolean)) {
+    const range = /^(\d+)-(\d+)$/.exec(part);
+    if (range) for (let n = Number(range[1]); n <= Number(range[2]); n++) wanted.add(n);
+    else if (/^\d+$/.test(part)) wanted.add(Number(part));
+    else { console.error(`TTR_ONLY: "${part}" is not a section number or a range`); process.exit(2); }
+  }
+  return wanted;
+})();
+const wants = (n) => !only || only.has(n);
+const runChain = !only || [...only].some((n) => n >= 1 && n <= 34);
+
 (async () => {
   // TTR_BROWSER=webkit runs the same suite in Safari's engine (AGENTS.md: before every deploy).
   const browser = await (process.env.TTR_BROWSER === "webkit" ? require("playwright").webkit : chromium).launch();
@@ -52,6 +69,9 @@ const pdfOf = (page, options) => (webkitRun ? Promise.resolve(Buffer.from("")) :
 
   await page.goto(BASE, { waitUntil: "networkidle" });
 
+  // Millimetres to CSS pixels, for the sections that measure a print; sections of their own use it too.
+  const mm = (value) => value / 25.4 * 96;
+  if (runChain) {
   // 1. welcome guide
   check("welcome guide appears", await page.getByRole("button", { name: "Load the example map" }).isVisible());
   {
@@ -1093,7 +1113,6 @@ const pdfOf = (page, options) => (webkitRun ? Promise.resolve(Buffer.from("")) :
   await page.evaluate(() => Array.from(document.querySelectorAll("button")).find((b) => b.textContent.includes("Print deck")).click());
   await page.waitForFunction(() => window.__print !== null, null, { timeout: 5000 });
   const printed = await page.evaluate(() => window.__print);
-  const mm = (value) => value / 25.4 * 96;
   check("ticket printing lays out one card per ticket", printed.cards === mainAfter, `${printed.cards} cards for ${mainAfter} tickets`);
   // No fixed sheet box any more: the browser paginates, so only the card size is ours to check.
   check("ticket cards are 62 x 45 mm, lying as the board lies, cut from a run the browser paginates", Math.abs(printed.card.width - mm(62)) < 3 && Math.abs(printed.card.height - mm(45)) < 4, `${(printed.card.width / 96 * 25.4).toFixed(0)} x ${(printed.card.height / 96 * 25.4).toFixed(0)} mm`);
@@ -2913,9 +2932,10 @@ const pdfOf = (page, options) => (webkitRun ? Promise.resolve(Buffer.from("")) :
   check("a map saved as an A4 test sheet opens as a standard board", (await badges())[0] === "Standard board 2×3", (await badges())[0]);
   check("with everything on it", /\d+ stops/.test((await badges())[2]), (await badges())[2]);
 
+  } // end of the chain, sections 1 to 34
   // 35. a board that stands: chosen in Settings beside the format, everything on it turned a quarter
   // turn, the canvas, the print, the cards and the file all standing with it. In a window of its own.
-  {
+  if (wants(35)) {
     const sp = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
     sp.on("pageerror", (e) => errors.push(String(e)));
     await sp.goto(BASE, { waitUntil: "networkidle" });
@@ -3027,7 +3047,7 @@ const pdfOf = (page, options) => (webkitRun ? Promise.resolve(Buffer.from("")) :
 
   // 36. Crossings, pointed at: the card marks every route that crosses another, rings each place where
   // two cross, and lets go when the pointer leaves. A route straight across the example map makes some.
-  {
+  if (wants(36)) {
     const cp = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
     cp.on("pageerror", (e) => errors.push(String(e)));
     await cp.goto(BASE, { waitUntil: "networkidle" });
@@ -3069,7 +3089,7 @@ const pdfOf = (page, options) => (webkitRun ? Promise.resolve(Buffer.from("")) :
   // export a note says so. "Later" waits another while, "Remind me less often" waits longer each time
   // and in the end offers to stop; Settings turns it back on. Work is counted in actions: building a
   // whole deck of tickets is one, a burst of typing is one.
-  {
+  if (wants(37)) {
     const rp = await (await browser.newContext({ viewport: { width: 1500, height: 1000 }, acceptDownloads: true })).newPage();
     rp.on("pageerror", (e) => errors.push(String(e)));
     await rp.goto(BASE, { waitUntil: "networkidle" });
@@ -3156,7 +3176,7 @@ const pdfOf = (page, options) => (webkitRun ? Promise.resolve(Buffer.from("")) :
   // character, as Edinburgh and Iberia are on Europe; a route with one lane whose loss cuts the map in
   // two is the one thing the official maps never have, and the only one warned about. Crowding is
   // set against the official maps instead of being called a fault.
-  {
+  if (wants(38)) {
     const np = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
     np.on("pageerror", (e) => errors.push(String(e)));
     await np.goto(BASE, { waitUntil: "networkidle" });
@@ -3203,7 +3223,7 @@ const pdfOf = (page, options) => (webkitRun ? Promise.resolve(Buffer.from("")) :
   // 39. A version number on everything printed or exported: one series for prints, files and images,
   // moved on only when the map has changed. On every sheet, card and rules page, and in a yellow
   // playtest box on the map with room to write the date played; the players go on the back.
-  {
+  if (wants(39)) {
     const vp = await (await browser.newContext({ viewport: { width: 1500, height: 1000 }, acceptDownloads: true })).newPage();
     vp.on("pageerror", (e) => errors.push(String(e)));
     await vp.goto(BASE, { waitUntil: "networkidle" });
@@ -3297,7 +3317,7 @@ const pdfOf = (page, options) => (webkitRun ? Promise.resolve(Buffer.from("")) :
   // 40. How many wagon spaces a route has, chosen while drawing it: before, in the Draw route tool's
   // options (fitted to the distance unless a number is chosen), and right after, with − and + on the
   // new route or a digit key, without leaving the tool.
-  {
+  if (wants(40)) {
     const rp2 = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
     rp2.on("pageerror", (e) => errors.push(String(e)));
     await rp2.goto(BASE, { waitUntil: "networkidle" });
@@ -3348,7 +3368,7 @@ const pdfOf = (page, options) => (webkitRun ? Promise.resolve(Buffer.from("")) :
   // 41. Small things seen in use: a tick box among the tool's options reads as a sentence, not in the
   // capitals of a field name; and in a table that scrolls sideways, the ticket names stay on top of the
   // columns sliding under them (Safari drew the points fields' arrows over the names).
-  {
+  if (wants(41)) {
     const up = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
     up.on("pageerror", (e) => errors.push(String(e)));
     await up.goto(BASE, { waitUntil: "networkidle" });
@@ -3370,7 +3390,7 @@ const pdfOf = (page, options) => (webkitRun ? Promise.resolve(Buffer.from("")) :
   // 42. Help on hover waits a moment: passing over the tools on the way somewhere opens nothing, and
   // resting on one opens its help. The note that everything is stored in the exported file is one of
   // the figures above the map, not loose text beside them.
-  {
+  if (wants(42)) {
     const tp = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
     tp.on("pageerror", (e) => errors.push(String(e)));
     await tp.goto(BASE, { waitUntil: "networkidle" });
@@ -3393,7 +3413,7 @@ const pdfOf = (page, options) => (webkitRun ? Promise.resolve(Buffer.from("")) :
   // 43. The map is kept in the browser under a neutral name, ttr-map. A map kept under the old name,
   // orebro-map-editor-public-v2, by 0.4.0 and earlier, opens as it was, and so do the settings kept
   // beside it; the old copy is left where it was, so an older build still finds it.
-  {
+  if (wants(43)) {
     const ctx = await browser.newContext({ viewport: { width: 1500, height: 1000 } });
     const old = { name: "Kept under the old name", format: "board-2x3", background: [], stops: [{ id: "a", name: "Alpha", type: "city", x: 200, y: 200 }, { id: "b", name: "Beta", type: "city", x: 600, y: 300 }], routes: [{ id: "r1", a: "a", b: "b", length: 4, type: "city", color: "red" }], notes: [], tickets: [], ticketSets: [{ id: "main", label: "Main deck" }] };
     await ctx.addInitScript((map) => { if (sessionStorage.getItem("seeded")) return; sessionStorage.setItem("seeded", "1"); localStorage.clear(); localStorage.setItem("orebro-map-editor-public-v2", JSON.stringify(map)); localStorage.setItem("orebro-map-editor-public-v2-guide-seen", "1"); }, old);
@@ -3413,7 +3433,7 @@ const pdfOf = (page, options) => (webkitRun ? Promise.resolve(Buffer.from("")) :
   // 44. Drawing a route between two stops that already have one: it is drawn, since there can be a
   // reason to do it that way, but the editor says so and how a parallel route is added, and offers to
   // make it one: a lane that follows the first route's shape and length, in a colour of its own.
-  {
+  if (wants(44)) {
     const dp = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
     dp.on("pageerror", (e) => errors.push(String(e)));
     await dp.goto(BASE, { waitUntil: "networkidle" });
@@ -3458,7 +3478,7 @@ const pdfOf = (page, options) => (webkitRun ? Promise.resolve(Buffer.from("")) :
   // route's room per wagon is marked as fine, too short or roomy; and what the network section warns
   // of comes with something to do about it. Deck rules read in plain words, Generic is the default,
   // and a new map starts with the playtest box in its top right corner.
-  {
+  if (wants(45)) {
     const bp = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
     bp.on("pageerror", (e) => errors.push(String(e)));
     await bp.goto(BASE, { waitUntil: "networkidle" });
@@ -3527,7 +3547,7 @@ const pdfOf = (page, options) => (webkitRun ? Promise.resolve(Buffer.from("")) :
   // 46. Damaged files in the editor: one that is not a map is refused and the map stays as it was; a map
   // with damaged parts opens with what can be used and says what was left out; and a map kept in the
   // browser that cannot be read is put aside, not overwritten, and the editor still starts.
-  {
+  if (wants(46)) {
     const cp2 = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
     const pageErrors = [];
     cp2.on("pageerror", (e) => { pageErrors.push(String(e)); errors.push(String(e)); });
@@ -3567,7 +3587,7 @@ const pdfOf = (page, options) => (webkitRun ? Promise.resolve(Buffer.from("")) :
   // 47. Smaller windows: at 1280 × 720 the map stays clear of the Properties column; on a tablet the
   // page never scrolls sideways; on a phone the header's buttons all show, and the map pans inside its
   // own area (it keeps a width where a finger can hit a wagon space) without the page scrolling.
-  for (const [w, h, mobile] of [[1280, 720, false], [1024, 768, false], [768, 1024, true], [390, 844, true]]) {
+  if (wants(47)) for (const [w, h, mobile] of [[1280, 720, false], [1024, 768, false], [768, 1024, true], [390, 844, true]]) {
     const sp2 = await (await browser.newContext({ viewport: { width: w, height: h }, isMobile: mobile, hasTouch: mobile })).newPage();
     sp2.on("pageerror", (e) => errors.push(String(e)));
     await sp2.goto(BASE, { waitUntil: "networkidle" });
@@ -3584,7 +3604,7 @@ const pdfOf = (page, options) => (webkitRun ? Promise.resolve(Buffer.from("")) :
 
   // 48. Starting over: in Settings, under Map, not at the foot of the tools. It says what goes, offers
   // to export first, asks before it does anything, and Undo brings the map back.
-  {
+  if (wants(48)) {
     const op2 = await (await browser.newContext({ viewport: { width: 1500, height: 1000 }, acceptDownloads: true })).newPage();
     op2.on("pageerror", (e) => errors.push(String(e)));
     await op2.goto(BASE, { waitUntil: "networkidle" });
@@ -3628,7 +3648,7 @@ const pdfOf = (page, options) => (webkitRun ? Promise.resolve(Buffer.from("")) :
   // 49. Printing and PDF: the rules can be printed alone from the Rules panel; the print dialog says it
   // saves a PDF too; a run is titled so the saved file is named after the map, its version, what it
   // holds and the date; and a page of the balance figures can go with it, as they stood.
-  {
+  if (wants(49)) {
     const pp = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
     pp.on("pageerror", (e) => errors.push(String(e)));
     await pp.goto(BASE, { waitUntil: "networkidle" });
@@ -3675,7 +3695,7 @@ const pdfOf = (page, options) => (webkitRun ? Promise.resolve(Buffer.from("")) :
   // 50. Every balance figure beside the official range, as a fact: crowded routes at a full table,
   // traffic on double routes against single ones, routes no ticket needs, most tickets on one stop,
   // and the average hub degree.
-  {
+  if (wants(50)) {
     const ob = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
     ob.on("pageerror", (e) => errors.push(String(e)));
     await ob.goto(BASE, { waitUntil: "networkidle" });
@@ -3699,7 +3719,7 @@ const pdfOf = (page, options) => (webkitRun ? Promise.resolve(Buffer.from("")) :
   // 51. A deck's tension: a slider from calm through like the official maps to tense, 50 unless the map
   // says otherwise. Chosen when a full deck is built, and set for the map in its deck rules, which the
   // build then starts from. It is stored as a number from 0 to 100.
-  {
+  if (wants(51)) {
     const tp2 = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
     tp2.on("pageerror", (e) => errors.push(String(e)));
     await tp2.goto(BASE, { waitUntil: "networkidle" });
@@ -3772,7 +3792,7 @@ const pdfOf = (page, options) => (webkitRun ? Promise.resolve(Buffer.from("")) :
 
   // 52. Intended chokepoints and hubs: marked in Properties, kept in the map, and listed in Map balance
   // as on purpose instead of among the crowded routes.
-  {
+  if (wants(52)) {
     const ip = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
     ip.on("pageerror", (e) => errors.push(String(e)));
     await ip.goto(BASE, { waitUntil: "networkidle" });
@@ -3811,7 +3831,7 @@ const pdfOf = (page, options) => (webkitRun ? Promise.resolve(Buffer.from("")) :
 
   // 53. Pictures where words fall short, drawn from the editor's own data: a stop type as the map draws
   // it, beside its settings; and in the print dialog, how the sheets divide the board.
-  {
+  if (wants(53)) {
     const il = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
     il.on("pageerror", (e) => errors.push(String(e)));
     await il.goto(BASE, { waitUntil: "networkidle" });
@@ -3848,7 +3868,7 @@ const pdfOf = (page, options) => (webkitRun ? Promise.resolve(Buffer.from("")) :
   // 54. About tells the whole loop the film does — draw, build a deck, check the balance, print, play
   // with highlighters, revise and print again with the next version number — with pictures of the
   // editor as it is.
-  {
+  if (wants(54)) {
     const ab = await (await browser.newContext({ viewport: { width: 1300, height: 1000 } })).newPage();
     ab.on("pageerror", (e) => errors.push(String(e)));
     await ab.goto(BASE + "about/", { waitUntil: "networkidle" });
@@ -3865,7 +3885,7 @@ const pdfOf = (page, options) => (webkitRun ? Promise.resolve(Buffer.from("")) :
   // 55. The tour video in the welcome box: a picture with a play button until it is asked for, so
   // nothing is loaded from YouTube for someone who does not watch; then the player, from
   // youtube-nocookie.com. And a way to About, to read more. (YouTube is answered locally here.)
-  {
+  if (wants(55)) {
     const wctx = await browser.newContext({ viewport: { width: 1300, height: 1000 } });
     const external = [];
     await wctx.route(/youtube|ytimg|googlevideo/, (route) => { external.push(route.request().url()); route.fulfill({ status: 200, contentType: "text/html", body: "<html><body>player</body></html>" }); });
@@ -3902,7 +3922,7 @@ const pdfOf = (page, options) => (webkitRun ? Promise.resolve(Buffer.from("")) :
 
   // 56. On a computer each column scrolls on its own: editing a stop with a tall Properties panel never
   // scrolls the page, so the map stays in view.
-  for (const [w, h] of [[1500, 1000], [1280, 720]]) {
+  if (wants(56)) for (const [w, h] of [[1500, 1000], [1280, 720]]) {
     const cs = await (await browser.newContext({ viewport: { width: w, height: h } })).newPage();
     cs.on("pageerror", (e) => errors.push(String(e)));
     await cs.goto(BASE, { waitUntil: "networkidle" });
@@ -3923,6 +3943,7 @@ const pdfOf = (page, options) => (webkitRun ? Promise.resolve(Buffer.from("")) :
   if (bad.length) { console.log("FAIL:"); bad.forEach((l) => console.log("  ✗ " + l)); }
   if (skipped.length) { console.log("SKIPPED in WebKit (Chromium only):"); skipped.forEach((l) => console.log("  - " + l)); }
   console.log(`\n${ok.length} passed, ${bad.length} failed`);
+  if (only) console.log(`PARTIAL RUN (TTR_ONLY=${process.env.TTR_ONLY}): ${runChain ? "sections 1 to 34 as a chain, " : ""}sections ${[...only].filter((n) => n >= 35).sort((a, b) => a - b).join(", ") || "none beyond the chain"}. Not the whole suite.`);
   console.log("CONSOLE ERRORS:", errors.length ? JSON.stringify(errors.slice(0, 5)) : "none");
   await browser.close();
   process.exit(bad.length ? 1 : 0);
