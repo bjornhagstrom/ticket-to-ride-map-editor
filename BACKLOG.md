@@ -5,14 +5,10 @@ in the same commit as the work (AGENTS.md).
 
 ## Agreed and next
 
-The next release, 1.0, gathers what is under Unreleased in CHANGELOG.md.
+1.0 is prepared in `main` and waits for the owner's go to be pushed and deployed (its notes are in CHANGELOG.md).
 
 - **Faster testing**: three tiers (quick while working, merge before `main`, release before any push or
-  deploy), built in six steps. The plan and the measurements are in `docs/TESTING.md`.
-- **Export to ttr-map-generator** (the open source Python tool, later in the production chain): first
-  its three text files (locations, paths, tasks), then its JSON graph with positions, tried by loading
-  the file in their program. Agreed 2026-10-06; an addition to what the editor writes, not a change to
-  our own format.
+  deploy), built in six steps. Steps 1 and 2 are built (`npm run test:quick`, `TTR_ONLY=…`); next are the waits instead of sleeps, sharding, one command per tier and the impact map. The plan and the measurements are in `docs/TESTING.md`.
 
 ## Waiting
 
@@ -32,6 +28,7 @@ The next release, 1.0, gathers what is under Unreleased in CHANGELOG.md.
 
 ## Smaller follow-ups
 
+- **ttr-map-generator, by eye**: open a graph made by `make_graph.py` in the tool's own window and see that the map is the right way up (y is read from matplotlib's default). Built and checked with the tool's own code; the picture is the one thing not seen. Fix in `positionsJson` if it is upside down.
 - Tickets to countries or groups of stops, as Switzerland has, are not modelled.
 - **Names after a turn.** A name left to place itself is placed again after the board turns, and some
   then sit on a route; Move names clear fixes it in one click. Doing that as part of the turn would

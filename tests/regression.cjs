@@ -3983,6 +3983,30 @@ const runChain = !only || [...only].some((n) => n >= 1 && n <= 34);
     await xp.context().close();
   }
 
+  // 58. Export for ttr-map-generator: Export has a choice for it, which saves one zip, and says what the
+  // tool has no place for. (What is inside the zip is checked in tests/ttr-map-generator.cjs, with the
+  // tool's own code.)
+  if (wants(58)) {
+    const gp = await (await browser.newContext({ viewport: { width: 1500, height: 1000 }, acceptDownloads: true })).newPage();
+    gp.on("pageerror", (e) => errors.push(String(e)));
+    await gp.goto(BASE, { waitUntil: "networkidle" });
+    await gp.getByRole("button", { name: "Load the example map" }).click();
+    await gp.waitForTimeout(600);
+    await gp.getByRole("button", { name: "Export", exact: true }).click();
+    const item = gp.getByRole("menuitem", { name: /ttr-map-generator/ });
+    check("Export has a choice for ttr-map-generator, saved as a zip", (await item.count()) === 1 && /zip/i.test(await item.textContent()));
+    const saved = gp.waitForEvent("download");
+    await item.click();
+    const download = await saved;
+    check("it saves a zip named for the map, its version and the tool", /ttr-map-generator.*\.zip$/.test(download.suggestedFilename()) && /example-map/.test(download.suggestedFilename()), download.suggestedFilename());
+    const bytes = fs.readFileSync(await download.path());
+    check("which is a zip, with the six files in it", bytes.length > 500 && bytes[0] === 0x50 && bytes[1] === 0x4b && ["locations.txt", "paths.txt", "tasks.txt", "positions.json", "make_graph.py", "README.txt"].every((name) => bytes.includes(Buffer.from(name))), `${bytes.length} bytes`);
+    await gp.waitForTimeout(400);
+    const message = (await gp.locator("[data-sonner-toast]").first().textContent().catch(() => "")) || "";
+    check("and says what the tool has no place for", /ttr-map-generator/.test(message) && /Ticket points and decks are not carried over/.test(message) && !/Positions are not carried over/.test(message), message.slice(0, 240));
+    await gp.context().close();
+  }
+
   console.log("PASS:"); ok.forEach((l) => console.log("  ✓ " + l));
   if (bad.length) { console.log("FAIL:"); bad.forEach((l) => console.log("  ✗ " + l)); }
   if (skipped.length) { console.log("SKIPPED in WebKit (Chromium only):"); skipped.forEach((l) => console.log("  - " + l)); }

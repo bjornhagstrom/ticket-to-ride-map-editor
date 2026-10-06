@@ -13,6 +13,7 @@ This file is written from `app/version.ts` by `npm run changelog`; edit the note
 - A stop can be marked a hub on purpose and a route contested on purpose, in Properties. A full deck of tickets then sends more tickets to the hub and through the route, and Map balance lists such a route as crowded on purpose.
 - The welcome box has the tour of the editor in 80 seconds, which loads from YouTube only when you press play (it starts warming up when you point at it), and a link to About.
 - Beside the clean example map there is an example map with problems on purpose, a route that crosses another and a dead end, so you can see how the warnings look before you draw your own.
+- Export has For ttr-map-generator, a zip with the map's places, routes and tickets in the text files of that open source tool, where the places are, and a script that makes its own graph file of them.
 - The example map is for the standard two to five players, and both of its ticket decks have 15 tickets, enough to deal a full table.
 - A page of the balance figures can go with a print run, or alone: the network, crossings, how it holds together, crowding and the routes by colour and length, as they stand at that version.
 - The print dialog says how to save a run as a PDF, and the file is named after the map, its version, what it holds and the date.

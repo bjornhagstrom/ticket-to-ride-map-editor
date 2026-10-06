@@ -189,3 +189,9 @@ enlarged, and centred on the nearest board — and `docs/MAP-FORMAT.md` lists wh
 When version 4 comes, a reader will migrate a version 3 file to it in one named step, with a test
 that reads a real version 3 file and checks the result. `tests/file-format.cjs` is where those tests
 live.
+
+## Files for other tools
+
+The editor writes, and does not read, a zip for ttr-map-generator (Export → For ttr-map-generator): see
+`docs/TTR-MAP-GENERATOR.md`. It is an addition to what the editor writes and changes nothing in the map,
+network, background or ticket files.
