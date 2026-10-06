@@ -95,6 +95,10 @@ not a way to move a whole map: the background, styles and settings are only in t
    either of them destroying what the other added. This is the property that makes the format safe
    to share before it has settled.
 4. **A file carries what it refers to.** No file points at a style it does not include.
+5. **A file with nothing of a map in it is refused.** A JSON file that holds none of `stops`, `routes`,
+   `tickets`, `ticketSets`, `background`, `backgroundImage`, `notes`, `rules` or the style lists (a
+   `package.json`, another tool's graph) is not a map, a network, a background or a set of tickets. The reader
+   says so and the map that is open stays as it was; it is never opened as an empty map.
 
 ## What you can rely on
 

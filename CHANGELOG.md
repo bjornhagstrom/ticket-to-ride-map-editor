@@ -9,12 +9,13 @@ This file is written from `app/version.ts` by `npm run changelog`; edit the note
 **Version 1.0: the map against the official maps, decks calm or tense, and printing for playtests**
 
 - Map balance opens with the map against the official maps: crowded routes at a full table as a share of all routes, the ticket traffic on double routes against single ones, routes no ticket needs, the busiest stop and the average hub degree, each beside what the eight official maps measure.
-- How tense a full deck of tickets is can be set on a slider from calm through like the official maps (the default) to tense, when the deck is built and for the map in its deck rules, with what each place means beside the official decks. Calm is a little calmer, and tense a little tenser, than any official map.
+- How tense a full deck of tickets is can be set on a slider, from calm through like the official maps (the default) to tense, in Build a full deck and in the map's deck rules; the choice is kept with the map, and each place says what it means beside the official decks.
 - A stop can be marked a hub on purpose and a route contested on purpose, in Properties. A full deck of tickets then sends more tickets to the hub and through the route, and Map balance lists such a route as crowded on purpose.
 - The welcome box has the tour of the editor in 80 seconds, which loads from YouTube only when you press play (it starts warming up when you point at it), and a link to About.
 - Beside the clean example map there is an example map with problems on purpose, a route that crosses another and a dead end, so you can see how the warnings look before you draw your own.
 - Export has For ttr-map-generator, a zip with the map's places, routes and tickets in the text files of that open source tool, where the places are, and a script that makes its own graph file of them.
-- The example map is for the standard two to five players, and both of its ticket decks have 15 tickets, enough to deal a full table.
+- The example map is for the standard two to five players, its rules have a wagon table for each, and both of its ticket decks have 15 tickets, enough to deal a full table.
+- Deleting a stop also deletes the tickets that name it, in every deck: the question says how many, and Undo brings them back.
 - A page of the balance figures can go with a print run, or alone: the network, crossings, how it holds together, crowding and the routes by colour and length, as they stand at that version.
 - The print dialog says how to save a run as a PDF, and the file is named after the map, its version, what it holds and the date.
 - The Rules panel has Print the rules, for the rules alone on pages of their own.

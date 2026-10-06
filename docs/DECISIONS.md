@@ -163,3 +163,19 @@ index list, which doubled the duplicate count on every map but read plausibly on
 
 **Would change it.** Nothing. Where a check fails, the first question is which side is wrong — the
 feature or the expectation — and the answer is stated either way.
+
+## The tour video warms up when it is pointed at
+
+**Chosen.** Pointing at the picture of the tour video in the welcome box adds a `preconnect` to
+youtube-nocookie.com, so that the video starts at once when play is pressed. Nothing is loaded and no cookie
+is set before play; the connection itself (DNS and the TLS handshake) does show the visitor's address to
+Google. Decided by the owner on 2026-10-06, after the code review pointed out that it goes against the
+letter of `docs/REVIEW.md` item 3.
+
+**Why.** The video is the first thing a new visitor may press, and a few seconds' wait for it to start is
+what a visitor remembers. The release notes say that it warms up when pointed at.
+
+**Would change it.** A wish, from anyone who uses the editor, to have nothing at all leave the page before
+play, or a visitor count that shows that the wait is not noticed. Removing it is one line in
+`app/map-dialogs.tsx`.
+

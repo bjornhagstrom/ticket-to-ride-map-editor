@@ -92,7 +92,7 @@ In this order, most important first. Each is a question with a concrete way to l
    (`tests/file-format.cjs`). Look for a field whose meaning changed quietly, a default that changed for old
    files, and a file an older build would now corrupt on a round trip.
 3. **Privacy and the outside.** Nothing is loaded from, or sent to, another site before someone asks for
-   it (the tour video loads from YouTube only on play); no cookies, no analytics, no account names, hosts,
+   it (the tour video loads from YouTube only on play; the one exception, a connection opened when the picture is pointed at, is the owner's decision of 2026-10-06 in `docs/DECISIONS.md`); no cookies, no analytics, no account names, hosts,
    ports or keys in the repository or in `out/`; no names from the private reference data in `out/`
    (`docs/DEPLOYMENT.md`, "Safe publication procedure", step 2). Nothing in the code or the scripts
    publishes, pushes or messages anyone.

@@ -3704,6 +3704,8 @@ const sectionStart = (n) => {
     check("a file that is not JSON is refused, with a message, and the map stays as it was", /could not be read|not a map/i.test(await toasts()) && (await stored()) === before, await toasts());
     await importText("a-list.json", "[1, 2, 3]");
     check("a JSON file that holds no map is refused too, with its own reason", /holds no map, network, background or tickets/i.test(await toasts()) && (await stored()) === before, await toasts());
+    await importText("another-tool.json", JSON.stringify({ name: "some-package", version: "1.0.0", nodes: [], links: [] }));
+    check("a JSON file with none of a map's parts is refused too, and the map stays as it was", /holds no map, network, background or tickets/i.test(await toasts()) && (await stored()) === before, await toasts());
     const damaged = { format: "ticket-to-ride-map", version: 3, kind: "map", payload: { name: "Mended", stops: [{ id: "a", name: "Alpha", type: "city", x: 200, y: 200 }, { id: "b", name: "Beta", type: "city", x: 600, y: 300 }, null, { id: "c", name: "Nowhere" }], routes: [{ id: "r1", a: "a", b: "b", length: 4, type: "city", color: "red" }, { id: "r2", a: "a", b: "ghost", length: 2, type: "city", color: "red" }], tickets: [], ticketSets: [{ id: "main", label: "Main deck" }], notes: [], background: [] } };
     await importText("damaged.json", JSON.stringify(damaged));
     const opened = JSON.parse(await stored());
@@ -3912,6 +3914,7 @@ const sectionStart = (n) => {
     const rebuilt = () => tp2.waitForFunction(() => { const row = [...document.querySelectorAll(".suggest-table tbody tr")].find((tr) => tr.children[0].textContent.trim() === "Score"); return row && row.children[2].textContent.trim() !== "—"; }, null, { timeout: 30000 });
     check("Build a full deck of tickets asks how tense, on a slider from 0 to 100", (await slider.count()) === 1 && (await slider.getAttribute("min")) === "0" && (await slider.getAttribute("max")) === "100");
     check("like the official maps (50), unless the map says otherwise", (await slider.inputValue()) === "50" && (await preset("Like the official maps").getAttribute("aria-pressed")) === "true");
+    check("and the map holds no tension until one is chosen", (await tp2.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")).deckTension)) === undefined);
     check("the three named places are buttons beside it", (await preset("Calm").count()) === 1 && (await preset("Tense").count()) === 1);
     let text = (await description()).replace(/\s+/g, " ");
     check("it says what the place means, with figures to compare with the official decks", /Like the official maps/.test(text) && /tickets per lane/.test(text) && /official decks/.test(text), text.slice(0, 260));
@@ -3941,6 +3944,7 @@ const sectionStart = (n) => {
     await preset("Tense").click();
     await rebuilt();
     check("choosing one builds the deck again", (await slider.inputValue()) === "100" && (await preset("Tense").getAttribute("aria-pressed")) === "true");
+    check("and the choice is kept with the map, so it is not lost when the dialog closes", (await tp2.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")).deckTension)) === 100);
     await tp2.keyboard.press("Escape");
     await tp2.waitForTimeout(400);
     // The map's own choice, in its deck rules.
@@ -3949,8 +3953,7 @@ const sectionStart = (n) => {
     await tp2.locator(".settings-nav-item", { hasText: /deck rules/i }).click();
     await tp2.waitForTimeout(400);
     const mapSlider = tp2.locator(".deck-tension-choice").getByRole("slider", { name: /Tension/ });
-    check("the deck rules have the map's own tension, like the official maps until chosen", (await mapSlider.count()) === 1 && (await mapSlider.inputValue()) === "50");
-    check("and the map holds no tension until one is chosen", (await tp2.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")).deckTension)) === undefined);
+    check("the deck rules have the map's own tension, which is what was chosen in Build a full deck", (await mapSlider.count()) === 1 && (await mapSlider.inputValue()) === "100");
     await mapSlider.focus();
     await tp2.keyboard.press("End");
     await tp2.waitForTimeout(300);
@@ -4191,6 +4194,55 @@ const sectionStart = (n) => {
     const message = (await gp.locator("[data-sonner-toast]").first().textContent().catch(() => "")) || "";
     check("and says what the tool has no place for", /ttr-map-generator/.test(message) && /Ticket points and decks are not carried over/.test(message) && !/Positions are not carried over/.test(message), message.slice(0, 240));
     await gp.context().close();
+  }
+
+  // 59. Deleting a stop takes its tickets with it, in every deck, says so on screen and can be undone
+  // (found in the 1.0 review: tickets to a stop that is gone were left in the map and then reported as
+  // damage the next time it was opened).
+  if (wants(59)) {
+  sectionStart(59);
+    const dp = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
+    dp.on("pageerror", (e) => errors.push(String(e)));
+    await dp.goto(BASE, { waitUntil: "networkidle" });
+    await dp.getByRole("button", { name: "Load the example map" }).click();
+    await dp.waitForTimeout(600);
+    const mapNow = () => dp.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")));
+    const before = await mapNow();
+    const westport = before.stops.find((s) => s.name === "Westport");
+    const named = (m) => m.tickets.filter((t) => t.a === westport.id || t.b === westport.id).length;
+    check("the example has tickets to Westport, in more than one deck", named(before) >= 2 && new Set(before.tickets.filter((t) => t.a === westport.id || t.b === westport.id).map((t) => t.set)).size >= 2, `${named(before)} tickets`);
+    await dp.evaluate(() => { const s = Array.from(document.querySelectorAll(".map-canvas .stop")).find((g) => Array.from(g.querySelectorAll("text, title")).some((t) => t.textContent === "Westport")); s.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true })); s.dispatchEvent(new PointerEvent("pointerup", { bubbles: true })); });
+    await dp.waitForTimeout(400);
+    await dp.getByRole("button", { name: "Delete stop" }).click();
+    await dp.waitForTimeout(400);
+    const asked = (await dp.getByRole("alertdialog").textContent()) || "";
+    check("the question says the tickets go too, in every deck, and that Undo brings them back", new RegExp(`${named(before)} tickets? that names? it, in every deck`).test(asked) && /Undo brings them back/.test(asked), asked.slice(0, 200));
+    await dp.getByRole("alertdialog").getByRole("button", { name: "Continue" }).click();
+    await dp.waitForTimeout(500);
+    const after = await mapNow();
+    check("deleting the stop takes every ticket that names it, and nothing else", named(after) === 0 && after.tickets.length === before.tickets.length - named(before), `${before.tickets.length} tickets before, ${after.tickets.length} after`);
+    const note = (await dp.locator("[data-sonner-toast]").allTextContents()).join(" | ");
+    check("and says so on screen, with how many", new RegExp(`Westport is deleted, with ${named(before)} tickets? that named it`).test(note), note);
+    // Reopened, the map is whole: nothing is reported as damaged.
+    await dp.reload({ waitUntil: "networkidle" });
+    await dp.waitForTimeout(800);
+    check("opened again, the map is not reported as damaged", !/could not be used|left out/i.test((await dp.locator("[data-sonner-toast]").allTextContents()).join(" ")));
+    // Undo, from the notice.
+    await dp.evaluate(() => { const s = Array.from(document.querySelectorAll(".map-canvas .stop")).find((g) => Array.from(g.querySelectorAll("text, title")).some((t) => t.textContent === "Millbrook")); s.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true })); s.dispatchEvent(new PointerEvent("pointerup", { bubbles: true })); });
+    await dp.waitForTimeout(400);
+    const millbrookTickets = (await mapNow()).tickets.filter((t) => { const id = after.stops.find((s) => s.name === "Millbrook").id; return t.a === id || t.b === id; }).length;
+    await dp.getByRole("button", { name: "Delete stop" }).click();
+    await dp.waitForTimeout(400);
+    await dp.getByRole("alertdialog").getByRole("button", { name: "Continue" }).click();
+    await dp.waitForTimeout(500);
+    const toast = dp.locator("[data-sonner-toast]").filter({ hasText: /Millbrook is deleted/ });
+    check("the notice offers Undo", (await toast.getByRole("button", { name: "Undo" }).count()) === 1 && millbrookTickets >= 1, `${millbrookTickets} tickets`);
+    const mid = await mapNow();
+    await toast.getByRole("button", { name: "Undo" }).click();
+    await dp.waitForTimeout(500);
+    const back = await mapNow();
+    check("and Undo brings the stop, its routes and its tickets back", back.stops.length === mid.stops.length + 1 && back.tickets.length === mid.tickets.length + millbrookTickets && back.routes.length > mid.routes.length, `${mid.tickets.length} -> ${back.tickets.length} tickets`);
+    await dp.context().close();
   }
 
   if (sectionOpen) sectionTimes[sectionOpen.n] = Math.round((Date.now() - sectionOpen.at) / 100) / 10;

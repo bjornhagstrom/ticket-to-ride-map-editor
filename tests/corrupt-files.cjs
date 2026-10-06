@@ -32,6 +32,10 @@ for (const [label, raw] of [["nothing", null], ["a number", 42], ["a text", "hel
   const read = attempt(() => storage.readMapFile(raw));
   check(`a file holding ${label} is refused, with a reason a person can read`, Boolean(read.error) && /map file|not a map|could not/i.test(String(read.error.message)), read.error ? read.error.message : "accepted");
 }
+for (const [label, raw] of [["an object with none of a map's parts", { hello: "world", name: "package" }], ["an envelope with nothing in it", { format: "ticket-to-ride-map", version: 3, kind: "map" }], ["an empty object", {}]]) {
+  const read = attempt(() => storage.readMapFile(raw));
+  check(`${label} is refused, so it cannot take the place of the open map`, Boolean(read.error) && /not a map/i.test(String(read.error.message)), read.error ? read.error.message : "accepted");
+}
 const badPayload = attempt(() => storage.readMapFile({ format: "ticket-to-ride-map", version: 3, kind: "map", payload: "not an object" }));
 check("an envelope whose content is not a map is refused, not opened empty", Boolean(badPayload.error), badPayload.error ? badPayload.error.message : "accepted");
 

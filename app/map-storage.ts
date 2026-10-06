@@ -162,9 +162,16 @@ export function writeMapFile<T>(kind: FileKind, payload: T, data: Pick<MapData, 
   };
 }
 
+// What a file must hold at least one of to be a map, a network, a background or tickets. A JSON file with
+// none of them (a package.json, another tool's graph) is not ours, and is refused rather than opened as an
+// empty map that would take the place of the one being edited.
+const CONTENT_KEYS = ["stops", "routes", "tickets", "ticketSets", "background", "backgroundImage", "notes", "rules", "lineStyles", "routeTypeStyles", "wagonStyles", "stopTypeStyles"];
+const NOT_A_MAP = "This is not a map file: it holds no map, network, background or tickets.";
+const holdsContent = (payload: Record<string, unknown>) => CONTENT_KEYS.some((key) => payload[key] !== undefined);
+
 // Reads either an enveloped file or one of the flat files written before the envelope existed.
 export function readMapFile(raw: unknown): { kind: FileKind; version: number; payload: Record<string, unknown>; board?: { width: number; height: number } } {
-  if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error("This is not a map file: it holds no map, network, background or tickets.");
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error(NOT_A_MAP);
   const value = raw as Record<string, unknown>;
   if (value.format === FILE_FORMAT) {
     const version = Number(value.version);
@@ -173,6 +180,7 @@ export function readMapFile(raw: unknown): { kind: FileKind; version: number; pa
       throw new Error(`This file was written by a newer version of the editor (file version ${version}). This one reads up to version ${FILE_VERSION}. Update the editor, or export the file again from the version that wrote it.`);
     }
     if (value.payload !== undefined && (!value.payload || typeof value.payload !== "object" || Array.isArray(value.payload))) throw new Error("This file says it is a map file, but what it holds is not a map. It may be damaged.");
+    if (!holdsContent((value.payload ?? {}) as Record<string, unknown>)) throw new Error(NOT_A_MAP);
     return {
       kind: isFileKind(value.kind) ? value.kind : "map",
       version,
@@ -182,6 +190,7 @@ export function readMapFile(raw: unknown): { kind: FileKind; version: number; pa
   }
   // Version 1: the payload was the file, with `kind` mixed in beside the data.
   const { kind, ...payload } = value;
+  if (!holdsContent(payload)) throw new Error(NOT_A_MAP);
   return { kind: isFileKind(kind) ? kind : "map", version: 1, payload: payload as Record<string, unknown> };
 }
 

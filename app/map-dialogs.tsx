@@ -424,7 +424,7 @@ export function SuggestTicketsDialog({ tension, onTension, open, onOpenChange, d
         })}</div>
       </div>
       <TensionSlider legend="How tense" name="suggest-tension" value={tension} onChange={onTension} />
-      <p className="helper">{busy ? "Working out a deck… " : ""} The wagon count is this map&apos;s own setting and changing it here changes it there. A player&apos;s reach is {report?.reach ?? current.reach} wagon spaces, from {rule.lengthCap} × {wagons} wagons.</p>
+      <p className="helper">{busy ? "Working out a deck… " : ""} The wagon count and the tension are this map&apos;s own settings, and changing them here changes them there. A player&apos;s reach is {report?.reach ?? current.reach} wagon spaces, from {rule.lengthCap} × {wagons} wagons.</p>
       {deckSize < needed && <div className="helper helper-warning deck-size-warning" role="status">
         <span>Too few to deal a full table: {needed} tickets are dealt at the start ({tableWord(data.players?.max ?? 5)} players, {data.startingTickets ?? 3} each), and this deck has {deckSize}. It is allowed. Official decks have {TICKET_SUGGESTER.official.perStop[0]}–{TICKET_SUGGESTER.official.perStop[1]} tickets per stop.</span>
         <Button size="sm" variant="outline" onClick={() => onDeckSize(needed)}>Use {needed}</Button>
