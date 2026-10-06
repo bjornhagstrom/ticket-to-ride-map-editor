@@ -1,0 +1,12 @@
+{
+  "_comment": "What ttr-reviewer must find in the planted files (docs/REVIEW.md, Testing the reviewer). BLOCKERs must all be found; at least five of the six; the decoy must not be reported.",
+  "seeds": [
+    { "id": "S1", "file": "seed-file-reader.ts", "rule": 2, "severity": "BLOCKER", "what": "the field deckTension is read under a new name, tensionLevel, so every file that has the field loses it, and a missing one now reads as 0 (calm) instead of like the official maps; no FILE-FORMAT.md change, no test, no owner check" },
+    { "id": "S2", "file": "seed-analytics.ts", "rule": 3, "severity": "BLOCKER", "what": "sends the map's name and size to a third party when a map is opened" },
+    { "id": "S3", "file": "seed-units.ts", "rule": 1, "severity": "BLOCKER", "what": "takes centimetres but divides by the board width in millimetres: 10 cm on a 790 mm board gives 13.9 units, not 139" },
+    { "id": "S4", "file": "seed-crowded.ts", "rule": 4, "severity": "SHOULD", "what": ">= counts a route with as many tickets as lanes, which the doc comment says is not crowded; the test repeats the same >= and expects 2, so it passes" },
+    { "id": "S5", "file": "seed-label.tsx", "rule": 5, "severity": "SHOULD", "what": "a visible button label with no release note and no test (a reviewer who notes that nothing wires the button into a screen yet, and so names the missing note as a NOTE, has found it)" },
+    { "id": "S6", "file": "seed-hint.css", "rule": 6, "severity": "SHOULD", "what": "#9a9086 on the cream panel is about 3:1, under the 7:1 the project holds" }
+  ],
+  "decoy": { "file": "seed-clean.ts", "what": "correct and idiomatic; roundPosition and lastOf are fine, and must not be reported" }
+}
