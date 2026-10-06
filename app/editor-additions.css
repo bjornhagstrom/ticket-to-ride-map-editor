@@ -435,13 +435,16 @@
 }
 
 /* How tense a full deck is: three choices, in Build a full deck of tickets and in the deck rules. */
-.tension-choice { border: 0; padding: 0; margin: 10px 0 4px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-.tension-choice legend { font-weight: 600; font-size: 13px; margin-bottom: 6px; }
-.tension-option { display: flex; gap: 8px; align-items: flex-start; padding: 8px 10px; border: 1px solid #ddd4c6; border-radius: 8px; background: #fffaf0; cursor: pointer; }
-.tension-option.chosen { border-color: #721c24; box-shadow: 0 0 0 1px #721c24 inset; }
-.tension-option span { display: grid; gap: 2px; }
-.tension-option small { color: #5d554a; font-size: 12px; line-height: 1.35; }
-@media (max-width: 720px) { .tension-choice { grid-template-columns: 1fr; } }
+.tension-slider { border: 0; padding: 0; margin: 10px 0 4px; display: grid; gap: 8px; }
+.tension-slider legend { font-weight: 600; font-size: 13px; margin-bottom: 6px; }
+.tension-slider-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto 2.6em; gap: 10px; align-items: center; font-size: 12px; color: #433c33; }
+.tension-slider-row input[type="range"] { width: 100%; accent-color: #721c24; cursor: pointer; }
+.tension-slider-value { font-weight: 600; font-size: 14px; color: #2d2a26; text-align: right; font-variant-numeric: tabular-nums; }
+.tension-presets { display: flex; flex-wrap: wrap; gap: 8px; }
+.tension-preset { padding: 5px 12px; border: 1px solid #ddd4c6; border-radius: 999px; background: #fffaf0; font-size: 13px; cursor: pointer; }
+.tension-preset.chosen { border-color: #721c24; box-shadow: 0 0 0 1px #721c24 inset; }
+.tension-description { margin: 0; color: #433c33; font-size: 12.5px; line-height: 1.45; }
+.tension-description strong { color: #2d2a26; }
 
 /* A route crowded on purpose, in Map balance. */
 .on-purpose-tag { margin-left: 6px; padding: 0 6px; border-radius: 999px; background: #e6eedb; color: #2f5a2a; font-style: normal; font-size: 12px; font-weight: 600; }

@@ -3695,8 +3695,9 @@ const pdfOf = (page, options) => (webkitRun ? Promise.resolve(Buffer.from("")) :
     await ob.context().close();
   }
 
-  // 51. A deck's tension: calm (as it always was), like the official maps, or tense. Chosen when a full
-  // deck is built, and set for the map in its deck rules, which the build then starts from.
+  // 51. A deck's tension: a slider from calm through like the official maps to tense, 50 unless the map
+  // says otherwise. Chosen when a full deck is built, and set for the map in its deck rules, which the
+  // build then starts from. It is stored as a number from 0 to 100.
   {
     const tp2 = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
     tp2.on("pageerror", (e) => errors.push(String(e)));
@@ -3705,14 +3706,41 @@ const pdfOf = (page, options) => (webkitRun ? Promise.resolve(Buffer.from("")) :
     await tp2.waitForTimeout(600);
     const openBuild = async () => { await tp2.getByRole("button", { name: "Tickets", exact: true }).click(); await tp2.waitForTimeout(400); await tp2.getByRole("button", { name: /Add a deck/ }).click(); await tp2.waitForTimeout(250); await tp2.getByRole("menuitem", { name: /Build a full deck of tickets/ }).click(); await tp2.waitForSelector(".suggest-dialog", { timeout: 20000 }); await tp2.waitForTimeout(400); };
     await openBuild();
-    const tension = (name) => tp2.locator(".suggest-dialog").getByRole("radio", { name, exact: true });
-    check("Build a full deck of tickets asks how tense: calm, like the official maps, or tense", (await tension("Calm").count()) === 1 && (await tension("Like the official maps").count()) === 1 && (await tension("Tense").count()) === 1);
-    check("calm, as it always was, unless the map says otherwise", await tension("Calm").isChecked());
-    const dialogText = (await tp2.locator(".suggest-dialog").textContent()).replace(/\s+/g, " ");
-    check("each says what it does", /spread/i.test(dialogText) && /official/i.test(dialogText) && /crowd/i.test(dialogText), dialogText.slice(0, 200));
-    await tension("Tense").check();
-    await tp2.waitForFunction(() => { const row = [...document.querySelectorAll(".suggest-table tbody tr")].find((tr) => tr.children[0].textContent.trim() === "Score"); return row && row.children[2].textContent.trim() !== "—"; }, null, { timeout: 30000 });
-    check("choosing one builds the deck again", await tension("Tense").isChecked());
+    const slider = tp2.locator(".suggest-dialog").getByRole("slider", { name: /Tension/ });
+    const preset = (name) => tp2.locator(".suggest-dialog").getByRole("button", { name, exact: true });
+    const description = () => tp2.locator(".suggest-dialog .tension-description").textContent();
+    const rebuilt = () => tp2.waitForFunction(() => { const row = [...document.querySelectorAll(".suggest-table tbody tr")].find((tr) => tr.children[0].textContent.trim() === "Score"); return row && row.children[2].textContent.trim() !== "—"; }, null, { timeout: 30000 });
+    check("Build a full deck of tickets asks how tense, on a slider from 0 to 100", (await slider.count()) === 1 && (await slider.getAttribute("min")) === "0" && (await slider.getAttribute("max")) === "100");
+    check("like the official maps (50), unless the map says otherwise", (await slider.inputValue()) === "50" && (await preset("Like the official maps").getAttribute("aria-pressed")) === "true");
+    check("the three named places are buttons beside it", (await preset("Calm").count()) === 1 && (await preset("Tense").count()) === 1);
+    let text = (await description()).replace(/\s+/g, " ");
+    check("it says what the place means, with figures to compare with the official decks", /Like the official maps/.test(text) && /tickets per lane/.test(text) && /official decks/.test(text), text.slice(0, 260));
+    // Calm: a little calmer than the calmest official map.
+    await slider.focus();
+    await tp2.keyboard.press("Home");
+    await rebuilt();
+    text = (await description()).replace(/\s+/g, " ");
+    check("the lowest end is calm, said to be a little calmer than the calmest official map", (await slider.inputValue()) === "0" && /^Calm\./.test(text) && /calmer than the calmest official/.test(text), text.slice(0, 200));
+    // A place between: clicking the slider where a person would.
+    const box = await slider.boundingBox();
+    await tp2.mouse.click(box.x + box.width * 0.75, box.y + box.height / 2);
+    await rebuilt();
+    const between = Number(await slider.inputValue());
+    text = (await description()).replace(/\s+/g, " ");
+    check("a place in between is a value in between, described as between like the official maps and tense", between >= 65 && between <= 85 && /^Between like the official maps and tense\./.test(text), `${between} ${text.slice(0, 120)}`);
+    check("with figures that lie between the two ends", (() => { const top = Number((/about (\d+) tickets per lane/.exec(text) || [])[1]); return top > 7 && top < 17; })(), text.slice(0, 300));
+    // The extreme: a little tenser than the tensest.
+    await slider.focus();
+    await tp2.keyboard.press("End");
+    await rebuilt();
+    text = (await description()).replace(/\s+/g, " ");
+    check("the top end is tense, said to be a little tenser than the tensest official map", (await slider.inputValue()) === "100" && /^Tense\./.test(text) && /tenser than the tensest official/.test(text), text.slice(0, 200));
+    await preset("Calm").click();
+    await rebuilt();
+    check("a named place sets the slider", (await slider.inputValue()) === "0" && (await preset("Calm").getAttribute("aria-pressed")) === "true");
+    await preset("Tense").click();
+    await rebuilt();
+    check("choosing one builds the deck again", (await slider.inputValue()) === "100" && (await preset("Tense").getAttribute("aria-pressed")) === "true");
     await tp2.keyboard.press("Escape");
     await tp2.waitForTimeout(400);
     // The map's own choice, in its deck rules.
@@ -3720,16 +3748,24 @@ const pdfOf = (page, options) => (webkitRun ? Promise.resolve(Buffer.from("")) :
     await tp2.waitForTimeout(400);
     await tp2.locator(".settings-nav-item", { hasText: /deck rules/i }).click();
     await tp2.waitForTimeout(400);
-    const mapTension = (name) => tp2.locator(".deck-tension-choice").getByRole("radio", { name, exact: true });
-    check("the deck rules have the map's own tension", (await mapTension("Like the official maps").count()) === 1 && await mapTension("Calm").isChecked());
-    await mapTension("Like the official maps").check();
+    const mapSlider = tp2.locator(".deck-tension-choice").getByRole("slider", { name: /Tension/ });
+    check("the deck rules have the map's own tension, like the official maps until chosen", (await mapSlider.count()) === 1 && (await mapSlider.inputValue()) === "50");
+    check("and the map holds no tension until one is chosen", (await tp2.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")).deckTension)) === undefined);
+    await mapSlider.focus();
+    await tp2.keyboard.press("End");
     await tp2.waitForTimeout(300);
-    check("which is kept in the map", (await tp2.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")).deckTension)) === "official");
+    check("which is kept in the map as a number", (await tp2.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")).deckTension)) === 100);
+    await tp2.locator(".deck-tension-choice").getByRole("button", { name: "Like the official maps", exact: true }).click();
+    await tp2.waitForTimeout(300);
+    check("and stays in the map even at 50, a choice made on purpose", (await tp2.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")).deckTension)) === 50);
+    await mapSlider.focus();
+    await tp2.keyboard.press("Home");
+    await tp2.waitForTimeout(300);
     await tp2.keyboard.press("Escape");
     await tp2.waitForTimeout(400);
     await tp2.keyboard.press("Escape");
     await openBuild();
-    check("and a full deck starts from it", await tension("Like the official maps").isChecked());
+    check("and a full deck starts from it", (await slider.inputValue()) === "0");
     await tp2.context().close();
   }
 

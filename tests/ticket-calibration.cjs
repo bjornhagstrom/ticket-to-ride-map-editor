@@ -136,7 +136,7 @@ for (const source of calibrationMaps) {
   const style = styleFor(source.id);
   const official = officialScores[source.id];
   for (const seed of [1, 2]) {
-    const { tickets, report } = suggestTickets(map, { style, seed });
+    const { tickets, report } = suggestTickets(map, { style, seed, tension: 0 });
     check(`${source.id}: seed ${seed} scores under 5`, report.score < 5, report.score.toFixed(1));
     check(`${source.id}: seed ${seed} scores better than the official deck`, report.score < official.score,
       `${report.score.toFixed(1)} against ${official.score.toFixed(1)}`);
@@ -165,7 +165,7 @@ for (const source of calibrationMaps) {
     .filter((value) => value !== null)
     .sort((a, b) => a - b);
   const randomMedian = randoms.length ? (randoms[4] + randoms[5]) / 2 : null;
-  const suggested = [1, 2].map((seed) => suggestTickets(map, { style, seed }).report.loadRatio);
+  const suggested = [1, 2].map((seed) => suggestTickets(map, { style, seed, tension: 0 }).report.loadRatio);
   loadRatios[source.id] = { official: official.loadRatio, randomMedian, suggested };
   const show = (value) => (value === null || value === undefined ? "  —" : value.toFixed(2));
   console.log(`  ${source.id.padEnd(16)}${show(official.loadRatio).padStart(9)}${String(publishedRatio[source.id]).padStart(11)}${show(randomMedian).padStart(9)}${show(suggested[0]).padStart(8)}${show(suggested[1]).padStart(8)}`);
@@ -233,11 +233,14 @@ check("evaluating an empty deck does not throw", evaluateTicketDeck({ ...usa, ti
 // ---------------------------------------------------------------- the table in §2b
 console.log("\nMetrics against docs/TICKET-SUGGESTER.md §2b (Python reference in brackets):");
 // The §2b table as it stands now: load weighted 2, and the reference data's own train counts.
+// The calibration here is of calm decks (tension 0), the objective docs/TICKET-SUGGESTER.md §2b describes: a
+// deck built like the official maps (the default since 1.0) crowds corridors on purpose and so scores worse
+// on evenness. tests/deck-tension.cjs holds what the other places on the scale do.
 const published = { usa: [10.2, 1.8], nordic: [26.1, 3.0], india: [25.5, 4.0], oldwest: [14.9, 1.85], poland: [9.4, 1.95], northernlights: [34.5, 3.55], switzerland: [30.1, 3.05], europe: [4.1, 1.95] };
 console.log(`  ${"map".padEnd(16)}${"official".padStart(9)}${"published".padStart(11)}${"suggested".padStart(11)}${"published".padStart(11)}`);
 for (const source of calibrationMaps) {
   const style = styleFor(source.id);
-  const suggested = suggestTickets(built.get(source.id), { style, seed: 1 }).report.score;
+  const suggested = suggestTickets(built.get(source.id), { style, seed: 1, tension: 0 }).report.score;
   const [pubOfficial, pubSuggested] = published[source.id];
   console.log(`  ${source.id.padEnd(16)}${officialScores[source.id].score.toFixed(1).padStart(9)}${String(pubOfficial).padStart(11)}${suggested.toFixed(1).padStart(11)}${String(pubSuggested).padStart(11)}`);
 }

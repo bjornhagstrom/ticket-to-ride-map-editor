@@ -36,6 +36,13 @@ const plainThrough = average((seed) => through(base, suggestTickets(base, { seed
 const markedThrough = average((seed) => through(marked, suggestTickets(marked, { seed }).tickets, chosen.id));
 check("a route contested on purpose gets more tickets through it in a built deck", markedThrough > plainThrough, `${markedThrough.toFixed(2)} against ${plainThrough.toFixed(2)} on average`);
 
+// The pull does not depend on the deck's tension: at calm, like the official maps and tense alike.
+for (const tension of [0, 50, 100]) {
+  const plain = average((seed) => through(base, suggestTickets(base, { seed, tension }).tickets, chosen.id));
+  const pulled = average((seed) => through(marked, suggestTickets(marked, { seed, tension }).tickets, chosen.id));
+  check(`a route contested on purpose gets more tickets through it at tension ${tension}`, pulled > plain, `${pulled.toFixed(2)} against ${plain.toFixed(2)} on average`);
+}
+
 // A stop that is a hub on purpose.
 const hubStop = base.stops.find((s) => s.name === "Central");
 const hubbed = clone(base); hubbed.stops.find((s) => s.id === hubStop.id).hub = true;
@@ -44,7 +51,7 @@ const hubAt = average((seed) => at(suggestTickets(hubbed, { seed }).tickets, hub
 check("a hub on purpose is allowed more tickets than another stop would get", hubAt > plainAt, `${hubAt.toFixed(2)} against ${plainAt.toFixed(2)} on average`);
 
 // The crowding report says which crowded routes are on purpose.
-const deck = clone(marked); deck.tickets = suggestTickets(marked, { seed: 1, tension: "tense" }).tickets.map((t) => ({ ...t, set: "main" }));
+const deck = clone(marked); deck.tickets = suggestTickets(marked, { seed: 1, tension: 100 }).tickets.map((t) => ({ ...t, set: "main" }));
 const report = evaluateTicketDeck(deck, { setId: "main", atTable: 2 });
 check("every crowded route says whether it is crowded on purpose", report.bottlenecks.length > 0 && report.bottlenecks.every((b) => typeof b.onPurpose === "boolean"), `${report.bottlenecks.length} crowded`);
 check("and only a marked one is", report.bottlenecks.filter((b) => b.onPurpose).every((b) => b.routeIds.includes(chosen.id)));

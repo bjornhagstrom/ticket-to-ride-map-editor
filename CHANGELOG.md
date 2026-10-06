@@ -8,6 +8,7 @@ This file is written from `app/version.ts` by `npm run changelog`; edit the note
 
 Changes since the last release, to go into the next version.
 
+- How tense a full deck of tickets is can be set on a slider from calm to tense, not only in three steps, with what each place means beside the official decks. Calm is now a little calmer, and tense a little tenser, than any official map.
 - Map balance sets crowded routes against the official maps as a share of all routes (10–17 % on the official maps), since a count grows with the size of the map. The printed balance page says the same.
 - The tour video in the welcome box starts loading as soon as you point at it, and shows a note while the player loads instead of an empty box. In Safari, which does not let a video start by itself, press play once more in the player.
 - In Map balance, "Stops no ticket names" now reads "Stops with no ticket names".

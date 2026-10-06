@@ -33,7 +33,7 @@ import { boardOf, rotateMap, type Orientation } from "./board";
 import { csvTemplate, distancesCsv, routesCsv, stopsCsv, ticketsCsv } from "./csv-export";
 import { decodeCsvBytes, readCsvImport, type CsvImport } from "./csv-import";
 import { APP_VERSION, moveLegacyStorage, repairMap, cloneForHistory, cloneMap, formatTimestamp, GUIDE_SEEN_KEY, HISTORY_LIMIT, MAX_IMAGE_WARN_BYTES, normalizeBackgroundFile, normalizeNetworkFile, normalizeTicketFile, buildTicketFile, readMapFile, writeMapFile, mapPayload, networkPayload, readBackgroundImage, rescaleMapToFormat, MAP_HINT_KEY, MAP_HINT_X_KEY } from "./map-storage";
-import { colorLabels, defaultTicketSet, DEFAULT_PLAYERS, DEFAULT_WAGONS_PER_PLAYER, IMAGE_KEEP_ON_BOARD, type Ticket, type StopTypeStyle, type WagonStyle, ticketsInSet, type TicketSet, emptyMap, initialMap, type LineStyle, DEFAULT_END_GAP_MM, mapFormats, type BackgroundImage, type BackgroundShape, type BackgroundType, type MapData, type MapFormat, type Point, type Route, type RouteType, type RouteTypeStyle, routeColors, STORAGE_KEY, type Stop, type StopSize, stopSizeMeta, type StopSymbol, stopSymbolMeta, type StopType } from "./map-data";
+import { tensionOf, colorLabels, defaultTicketSet, DEFAULT_PLAYERS, DEFAULT_WAGONS_PER_PLAYER, IMAGE_KEEP_ON_BOARD, type Ticket, type StopTypeStyle, type WagonStyle, ticketsInSet, type TicketSet, emptyMap, initialMap, type LineStyle, DEFAULT_END_GAP_MM, mapFormats, type BackgroundImage, type BackgroundShape, type BackgroundType, type MapData, type MapFormat, type Point, type Route, type RouteType, type RouteTypeStyle, routeColors, STORAGE_KEY, type Stop, type StopSize, stopSizeMeta, type StopSymbol, stopSymbolMeta, type StopType } from "./map-data";
 
 type MeasureResult = { from: string; to: string; distance: number; routeIds: string[] } | { from: string; to: string; unreachable: true };
 type Danger = "reset" | "delete" | "load-blank" | "load-example" | "import-background" | "import-network" | "import-image" | "import-csv" | null;
@@ -316,7 +316,7 @@ export function MapEditor() {
   }, [data, suggestChoice]);
   const { suggestion, busy: suggestBusy } = useTicketSuggestion(showSuggest, data, {
     style: suggestChoice,
-    tension: suggestTension ?? data.deckTension ?? "calm",
+    tension: suggestTension ?? tensionOf(data),
     seed: suggestSeed,
     deckSize: suggestSize ?? suggestDefaultSize,
     setId: activeTicketSet.id,
@@ -1023,7 +1023,7 @@ export function MapEditor() {
       onOpen={(ticketId) => { setStopTicketView(null); openTicket(ticketId); }} />
     <SuggestTicketsDialog open={showSuggest} onOpenChange={setShowSuggest} data={data} current={currentDeckReport} suggestion={suggestion}
       style={suggestChoice} onStyle={(value) => { setSuggestStyle(value); setSuggestSize(null); }}
-      tension={suggestTension ?? data.deckTension ?? "calm"} onTension={setSuggestTension}
+      tension={suggestTension ?? tensionOf(data)} onTension={setSuggestTension}
       wagons={data.wagonsPerPlayer ?? DEFAULT_WAGONS_PER_PLAYER} onWagons={(value) => change((draft) => { draft.wagonsPerPlayer = value; return draft; })}
       deckSize={suggestSize ?? suggestDefaultSize} onDeckSize={setSuggestSize}
       keepExisting={suggestKeep} onKeepExisting={setSuggestKeep}

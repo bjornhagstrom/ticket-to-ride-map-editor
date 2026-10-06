@@ -130,7 +130,7 @@ export type MapVersionEntry = { number: number; date: string; by: string; [key: 
  *  are kept. See docs/FILE-FORMAT.md. */
 export type MapVersion = { number: number; fingerprint: string; issued: MapVersionEntry[]; [key: string]: unknown };
 
-export type MapData = { name: string; mapVersion?: MapVersion; deckTension?: "calm" | "official" | "tense"; format: MapFormat; orientation?: "landscape" | "portrait"; rules?: string; endGapMm?: number; background: BackgroundShape[]; stops: Stop[]; routes: Route[]; backgroundImage?: BackgroundImage; notes: NoteBox[]; lineStyles: LineStyle[]; routeTypeStyles: RouteTypeStyle[]; wagonStyles: WagonStyle[]; stopTypeStyles: StopTypeStyle[]; tickets: Ticket[]; ticketSets: TicketSet[]; wagonsPerPlayer?: number; startingTickets?: number; keptTickets?: number; players?: PlayerRange; lanesUsableByPlayers?: LaneRule; ticketBands?: TicketBands; ticketMix?: TicketMix; ticketValuation?: { longBonus?: boolean; ferryPremium?: number }; deckRules?: DeckRuleSet[]; deckRule?: string;
+export type MapData = { name: string; mapVersion?: MapVersion; deckTension?: number; format: MapFormat; orientation?: "landscape" | "portrait"; rules?: string; endGapMm?: number; background: BackgroundShape[]; stops: Stop[]; routes: Route[]; backgroundImage?: BackgroundImage; notes: NoteBox[]; lineStyles: LineStyle[]; routeTypeStyles: RouteTypeStyle[]; wagonStyles: WagonStyle[]; stopTypeStyles: StopTypeStyle[]; tickets: Ticket[]; ticketSets: TicketSet[]; wagonsPerPlayer?: number; startingTickets?: number; keptTickets?: number; players?: PlayerRange; lanesUsableByPlayers?: LaneRule; ticketBands?: TicketBands; ticketMix?: TicketMix; ticketValuation?: { longBonus?: boolean; ferryPremium?: number }; deckRules?: DeckRuleSet[]; deckRule?: string;
   // Fields from a file this build does not know about. Kept so that opening and re-exporting a map
   // written by a newer version never quietly throws its work away.
   unknown?: Record<string, unknown> };
@@ -200,6 +200,23 @@ export const IMAGE_KEEP_ON_BOARD = 30;
 export const DEFAULT_WAGONS_PER_PLAYER = 45;
 export const DEFAULT_STARTING_TICKETS = 3;
 export const DEFAULT_KEPT_TICKETS = 2;
+
+// How tense a full deck of tickets built for the map is, from 0 (calm: tickets spread out) through 50
+// (like the official maps) to 100 (tense: tickets crowd the same corridors). A map that has not chosen
+// is read as 50. The three words an earlier development build wrote ("calm", "official", "tense") still
+// read, as 0, 50 and 100.
+export const TENSION_CALM = 0;
+export const DEFAULT_TENSION = 50;
+export const TENSION_TENSE = 100;
+export function normalizeTension(value: unknown): number | undefined {
+  if (value === "calm") return TENSION_CALM;
+  if (value === "official") return DEFAULT_TENSION;
+  if (value === "tense") return TENSION_TENSE;
+  if (typeof value !== "number" || !Number.isFinite(value)) return undefined;
+  return Math.min(TENSION_TENSE, Math.max(TENSION_CALM, Math.round(value)));
+}
+/** The tension a map builds its decks with: its own choice, or like the official maps. */
+export const tensionOf = (data: { deckTension?: number }): number => normalizeTension(data.deckTension) ?? DEFAULT_TENSION;
 
 // How many players the map is built for. It decides how big a deck has to be to deal from, and
 // whether the second lane of a double route is ever in play: the standard rule opens it only from

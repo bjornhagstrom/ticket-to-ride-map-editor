@@ -165,9 +165,17 @@ the same two stops is marked together). Only `true` is kept when read. Older bui
 
 ### A deck's tension
 
-Added after 0.4.1: an addition. A map may carry `deckTension`: `"official"` or `"tense"`. Without it a
-full deck is built calm, as it always was, so `"calm"` is not written. Any other value is left out when
-read. An older build keeps the field untouched (rule 3) and builds calm decks.
+Added after 0.4.1: an addition. A map may carry `deckTension`, a whole number from 0 (calm) through 50
+(like the official maps) to 100 (tense): how tickets crowd the same corridors when a full deck is built
+for the map. It is written as soon as someone has chosen a place on the slider, 50 included, so that a
+choice made on purpose never turns into a silent default. Without it, a map is read as 50: a file made
+by 0.4.1 or before has none, and builds decks like the official maps from now on (tickets already in the
+file are not touched). A number outside 0 to 100 is brought to the nearest end, a fraction is rounded.
+The words `"calm"`, `"official"` and `"tense"`, which a development build wrote before 1.0, read as 0, 50
+and 100; they were never in a release. Anything else is left out when read. An older build keeps the
+field untouched (rule 3) and builds its own decks as it did, so a round trip through 0.4.1 keeps the
+number. The field is a number so that the scale can grow: the measured places on it (and what they mean)
+live in the editor, not in the file.
 
 ### Board formats that became print choices
 

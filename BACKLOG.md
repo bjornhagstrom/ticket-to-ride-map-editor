@@ -49,6 +49,6 @@ CHANGELOG.md.
 
 ## The case for uneven maps
 
-`docs/PROPOSAL-UNEVEN-MAPS.md` has the measurements. Built: hubs and routes contested on purpose, a deck's tension (calm, like the official maps, tense), every balance figure beside the official range (Against the official maps), crowding set against it,
+`docs/PROPOSAL-UNEVEN-MAPS.md` has the measurements. Built: hubs and routes contested on purpose, a deck's tension (a slider from calm through like the official maps to tense), every balance figure beside the official range (Against the official maps), crowding set against it,
 and how the network holds together (dead ends, routes that cut the map in two, corners), with buttons
 for what it warns of. The rest is above.

@@ -6,7 +6,7 @@
 // scripts/ticket-suggester-reference.py is the Python original this was ported from. The two use
 // different random number generators, so they agree on the metrics, not on the ticket lists.
 import { valueTicket, type TicketPath } from "./ticket-valuation";
-import { DEFAULT_STARTING_TICKETS, DEFAULT_TICKET_BANDS, DEFAULT_WAGONS_PER_PLAYER, DEFAULT_PLAYERS, lanesUsableAt, type LaneRule, type MapData, type Ticket, type TicketBands, type TicketMix, ticketsInSet } from "./map-data";
+import { DEFAULT_STARTING_TICKETS, DEFAULT_TENSION, TENSION_CALM, TENSION_TENSE, tensionOf, DEFAULT_TICKET_BANDS, DEFAULT_WAGONS_PER_PLAYER, DEFAULT_PLAYERS, lanesUsableAt, type LaneRule, type MapData, type Ticket, type TicketBands, type TicketMix, ticketsInSet } from "./map-data";
 
 /** Our three sets of deck rules. */
 export type BuiltInStyle = "generic" | "classic" | "europe";
@@ -117,21 +117,54 @@ export type TicketSuggestOptions = {
   keep: string[];
   steps: number;
   setId?: string;
-  // How much the deck sends tickets through the same corridors: calm spreads them out (today's
-  // behaviour), official lands where the official decks do, tense crowds them. The map's own choice
-  // (deckTension) is used when none is given.
+  // How much the deck sends tickets through the same corridors, from 0 (calm: spread out) through 50
+  // (lands where the official decks do) to 100 (tense: crowds them). The map's own choice
+  // (deckTension) is used when none is given, and like the official maps when it has none.
   tension?: DeckTension;
 };
-export type DeckTension = "calm" | "official" | "tense";
-// The weight on uneven traffic per lane for each tension, calibrated on the eight official maps
-// (tests/deck-tension.cjs): official lands inside their range of crowded routes at a full table.
-export const TENSION_LOAD_WEIGHT: Record<DeckTension, number> = { calm: 2, official: 0, tense: -1 };
-/** The three, as they are offered. */
-export const TENSION_CHOICES: { id: DeckTension; label: string; note: string }[] = [
-  { id: "calm", label: "Calm", note: "Tickets spread out over the map, so few routes are fought over." },
-  { id: "official", label: "Like the official maps", note: "Tickets crowd a few corridors about as much as on the official maps." },
-  { id: "tense", label: "Tense", note: "Tickets crowd the same corridors, as on the tensest official maps: expect fights." },
+export type DeckTension = number;
+// What a tension asks of a deck, calibrated on the eight official maps (tests/deck-tension.cjs). Two
+// terms, each falling in two straight stretches, so a deck is a little calmer than the calmest official
+// map at 0 and a little tenser than the tensest at 100:
+//  - the weight on uneven traffic per lane: 2 at calm, 0 like the official maps, -1.75 at tense (a
+//    negative weight rewards crowding the corridors);
+//  - a weight on the busiest route's traffic per lane, from 2 at calm to 0 at the middle and above it,
+//    which pushes the busiest route below what spreading alone reaches.
+export const TENSION_TENSEST_WEIGHT = -1.75;
+export function tensionWeight(level: number): number {
+  const at = Math.min(TENSION_TENSE, Math.max(TENSION_CALM, level));
+  return at <= DEFAULT_TENSION ? 2 * (DEFAULT_TENSION - at) / DEFAULT_TENSION : TENSION_TENSEST_WEIGHT * (at - DEFAULT_TENSION) / (TENSION_TENSE - DEFAULT_TENSION);
+}
+export function tensionPeakWeight(level: number): number {
+  const at = Math.min(TENSION_TENSE, Math.max(TENSION_CALM, level));
+  return at >= DEFAULT_TENSION ? 0 : 2 * (DEFAULT_TENSION - at) / DEFAULT_TENSION;
+}
+/** What building at the end points and in the middle gives, measured on the eight official maps (tests/deck-tension.cjs
+ *  measures them again): the tickets per lane on the busiest route, and the share of routes no ticket needs. */
+export const TENSION_EXPECTED: Record<number, { top: number; unused: number }> = { 0: { top: 3.5, unused: 10.8 }, 50: { top: 7.1, unused: 14.7 }, 100: { top: 17.1, unused: 18.5 } };
+/** What the official decks themselves have: the busiest route (lowest, highest, average) and routes no ticket needs (average). */
+export const TENSION_OFFICIAL = { top: [3.7, 15.2] as [number, number], topMean: 6.6, unusedMean: 14.5 };
+/** The named places on the scale, as buttons beside the slider. */
+export const TENSION_CHOICES: { level: number; label: string; note: string }[] = [
+  { level: TENSION_CALM, label: "Calm", note: "Tickets spread out over the map, so few routes are fought over." },
+  { level: DEFAULT_TENSION, label: "Like the official maps", note: "Tickets crowd a few corridors about as much as on the official maps." },
+  { level: TENSION_TENSE, label: "Tense", note: "Tickets crowd the same corridors, as on the tensest official maps: expect fights." },
 ];
+/** What a place on the scale means, in words and in figures: an estimate, read between the three measured places. */
+export function tensionDescription(level: number): { name: string; text: string } {
+  const at = Math.min(TENSION_TENSE, Math.max(TENSION_CALM, Math.round(level)));
+  const [from, to] = at <= DEFAULT_TENSION ? [TENSION_CALM, DEFAULT_TENSION] : [DEFAULT_TENSION, TENSION_TENSE];
+  const share = (at - from) / (to - from);
+  const top = TENSION_EXPECTED[from].top + share * (TENSION_EXPECTED[to].top - TENSION_EXPECTED[from].top);
+  const unused = TENSION_EXPECTED[from].unused + share * (TENSION_EXPECTED[to].unused - TENSION_EXPECTED[from].unused);
+  const name = at <= 5 ? "Calm" : at >= 95 ? "Tense" : at >= 45 && at <= 55 ? "Like the official maps" : at < 50 ? "Between calm and like the official maps" : "Between like the official maps and tense";
+  const kind = at <= 5 ? "Tickets spread out over the map, so few routes are fought over: a little calmer than the calmest official map."
+    : at >= 95 ? "Tickets crowd the same corridors, a little tenser than the tensest official map: expect fights over the key routes, and some routes nobody needs."
+    : at >= 45 && at <= 55 ? "Tickets crowd a few corridors about as much as on the official maps."
+    : at < 50 ? "Tickets are spread out, with a little more crowding the nearer you come to the official maps."
+    : "Tickets crowd the corridors more the nearer you come to tense, with more routes nobody needs.";
+  return { name, text: `${kind} Expect the busiest route to be wanted by about ${Math.round(top)} tickets per lane (the official decks: ${Math.round(TENSION_OFFICIAL.top[0])}–${Math.round(TENSION_OFFICIAL.top[1])}, ${Math.round(TENSION_OFFICIAL.topMean)} on average) and about ${Math.round(unused)} % of the routes to be needed by no ticket (official decks: ${Math.round(TENSION_OFFICIAL.unusedMean)} % on average). An estimate from the eight official maps; your map may differ.` };
+}
 
 export type Bottleneck = {
   a: string; b: string; length: number; lanes: number; lanesUsable: number;
@@ -524,7 +557,7 @@ class DeckState {
 
   // loadWeight: how hard uneven traffic per lane counts against a deck. The deck's tension sets it
   // when a deck is built; judging a deck always uses the fixed weight, so scores stay comparable.
-  score(style: DeckRule, wantRegular: number, mix: TicketMix | null, loadWeight: number = TICKET_SUGGESTER.weights.load): number {
+  score(style: DeckRule, wantRegular: number, mix: TicketMix | null, loadWeight: number = TICKET_SUGGESTER.weights.load, peakWeight = 0): number {
     const w = TICKET_SUGGESTER.weights;
     const model = this.model;
     // A map that states its own short/medium/long mix is aimed at that, over the whole deck. One
@@ -584,25 +617,28 @@ class DeckState {
 
     // Uneven traffic per lane counts against a deck, except on a route contested on purpose: there it is
     // the point, so those edges are left out of the spread and pull a little traffic towards them.
-    let unused = 0, loadSum = 0, spread = 0, pulled = 0;
+    let unused = 0, loadSum = 0, spread = 0, pulled = 0, peakLane = 0;
     const perLane = new Float64Array(model.edges.length);
     for (let i = 0; i < model.edges.length; i++) {
       if (this.edgeLoad[i] <= 1e-9) unused += 1;
       perLane[i] = this.edgeLoad[i] / model.lanesAtLargestTable[i];
       if (model.contested[i]) { pulled += perLane[i]; continue; }
       loadSum += perLane[i]; spread += 1;
+      if (perLane[i] > peakLane) peakLane = perLane[i];
     }
     const mean = spread ? loadSum / spread : 0;
     let variance = 0;
     for (let i = 0; i < model.edges.length; i++) if (!model.contested[i]) variance += (perLane[i] - mean) ** 2;
     variance = spread ? variance / spread : 0;
-    variance -= TICKET_SUGGESTER.contestedPull * pulled / Math.max(1, model.edges.length);
+    // A contested route draws tickets through it whatever the deck's tension: the pull does not scale with
+    // the weight on uneven traffic, which is 0 like the official maps and negative at tense.
+    const contestedPulled = TICKET_SUGGESTER.contestedPull * pulled / Math.max(1, model.edges.length);
     // A hub on purpose draws tickets to it, the way a contested route draws them through.
     cov -= TICKET_SUGGESTER.hubPull * hubbed;
     const unusedPenalty = Math.max(0, unused - TICKET_SUGGESTER.unusedRate * model.edges.length);
 
     return w.bins * bins + w.ends * ends + w.cov * cov + w.zero * zero
-      + w.dup * dup + w.unused * unusedPenalty + loadWeight * variance + w.hard * this.hardSum;
+      + w.dup * dup + w.unused * unusedPenalty + loadWeight * variance + peakWeight * peakLane - w.load * contestedPulled + w.hard * this.hardSum;
   }
 }
 
@@ -780,7 +816,9 @@ function buildReport(model: SuggesterModel, deck: DeckState, styleName: TicketSt
 export function suggestTickets(data: MapData, options: Partial<TicketSuggestOptions> = {}): { tickets: Ticket[]; report: TicketDeckReport } {
   const resolved = resolveOptions(data, options);
   const style = deckRuleFor(data, resolved.style);
-  const loadWeight = TENSION_LOAD_WEIGHT[options.tension ?? data.deckTension ?? "calm"] ?? TICKET_SUGGESTER.weights.load;
+  const tension = options.tension ?? tensionOf(data);
+  const loadWeight = tensionWeight(tension);
+  const peakWeight = tensionPeakWeight(tension);
   if (data.stops.length < 4 || data.routes.length < 3) {
     return { tickets: [], report: emptyReport("A map needs at least four stops and a few routes before a deck can be suggested.") };
   }
@@ -846,7 +884,7 @@ export function suggestTickets(data: MapData, options: Partial<TicketSuggestOpti
         tried.add(index);
         const candidate = pools[group][index];
         deck.add(candidate, group === 0);
-        const value = deck.score(style, targets[0], mix, loadWeight);
+        const value = deck.score(style, targets[0], mix, loadWeight, peakWeight);
         deck.remove(candidate, group === 0);
         if (value < bestScore) { bestScore = value; bestIndex = index; }
       }
@@ -859,7 +897,7 @@ export function suggestTickets(data: MapData, options: Partial<TicketSuggestOpti
 
   // Simulated annealing: swap a ticket for one left in the same pool, always accepting an
   // improvement and sometimes accepting a step backwards, less and less often as it cools.
-  let current = deck.score(style, targets[0], mix, loadWeight);
+  let current = deck.score(style, targets[0], mix, loadWeight, peakWeight);
   for (let step = 0; step < resolved.steps; step++) {
     const group = targets[1] && random() < .15 ? 1 : 0;
     if (groups[group].length <= locked[group] || !pools[group].length) continue;
@@ -869,7 +907,7 @@ export function suggestTickets(data: MapData, options: Partial<TicketSuggestOpti
     const regular = group === 0;
     deck.remove(outgoing, regular);
     deck.add(incoming, regular);
-    const next = deck.score(style, targets[0], mix, loadWeight);
+    const next = deck.score(style, targets[0], mix, loadWeight, peakWeight);
     const temperature = 5 * (1 - step / resolved.steps) + .01;
     if (next < current || random() < Math.exp((current - next) / temperature)) {
       groups[group][outIndex] = incoming;

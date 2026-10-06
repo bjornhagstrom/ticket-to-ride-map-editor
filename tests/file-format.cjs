@@ -44,9 +44,20 @@ const reloaded = storage.normalizeMap(readBack.payload);
 check("a map survives a round trip", reloaded.stops.length === sample.stops.length && reloaded.routes.length === sample.routes.length && reloaded.name === sample.name,
   `${reloaded.stops.length} stops, ${reloaded.routes.length} routes`);
 {
-  const tense = storage.normalizeMap({ ...JSON.parse(JSON.stringify(sample)), deckTension: "tense" });
-  const back = storage.normalizeMap(storage.readMapFile(JSON.parse(JSON.stringify(storage.writeMapFile("map", storage.mapPayload(tense), tense)))).payload);
-  check("a map's deck tension is written and read back", back.deckTension === "tense" && !(back.unknown && back.unknown.deckTension), String(back.deckTension));
+  // A deck's tension is a number from 0 (calm) to 100 (tense), 50 being like the official maps. The
+  // three words an earlier development build wrote still read, as 0, 50 and 100.
+  const { tensionOf, DEFAULT_TENSION } = require(path.join(out, "map-data.js"));
+  const read = (value) => storage.normalizeMap({ ...JSON.parse(JSON.stringify(sample)), deckTension: value }).deckTension;
+  check("the three words an earlier build wrote read as 0, 50 and 100", read("calm") === 0 && read("official") === 50 && read("tense") === 100, JSON.stringify([read("calm"), read("official"), read("tense")]));
+  check("a number is kept as a whole number from 0 to 100", read(30) === 30 && read(62.4) === 62 && read(250) === 100 && read(-3) === 0, JSON.stringify([read(30), read(62.4), read(250), read(-3)]));
+  check("anything else is left out", [read("furious"), read(NaN), read(null), read(true), read({})].every((value) => value === undefined));
+  const set = storage.normalizeMap({ ...JSON.parse(JSON.stringify(sample)), deckTension: 37 });
+  const back = storage.normalizeMap(storage.readMapFile(JSON.parse(JSON.stringify(storage.writeMapFile("map", storage.mapPayload(set), set)))).payload);
+  check("a map's deck tension is written as a number and read back", back.deckTension === 37 && !(back.unknown && back.unknown.deckTension), String(back.deckTension));
+  const even = storage.normalizeMap({ ...JSON.parse(JSON.stringify(sample)), deckTension: 50 });
+  const evenBack = storage.normalizeMap(storage.readMapFile(JSON.parse(JSON.stringify(storage.writeMapFile("map", storage.mapPayload(even), even)))).payload);
+  check("one chosen on purpose at 50 stays in the file, so it never turns into a silent default", evenBack.deckTension === 50, String(evenBack.deckTension));
+  check("a map from 0.4.1 or before, with no tension, has none and is read as like the official maps", sample.deckTension === undefined && tensionOf(sample) === DEFAULT_TENSION && DEFAULT_TENSION === 50);
 }
 check("its settings survive too", reloaded.wagonsPerPlayer === sample.wagonsPerPlayer && reloaded.startingTickets === sample.startingTickets);
 

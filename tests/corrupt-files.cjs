@@ -81,7 +81,8 @@ check("an envelope whose content is not a map is refused, not opened empty", Boo
   check("a top-level field of the wrong type is read as empty, not as a crash", Array.isArray(map.stops) && map.stops.length === 0 && map.routes.length === 0 && map.tickets.length === 0 && map.notes.length === 0 && map.background.length === 0 && map.ticketSets.length === 1);
   check("a name that is not text becomes a name", typeof map.name === "string" && map.name.length > 0, String(map.name));
   const tension = storage.repairMap({ stops: [], deckTension: "furious" }).map;
-  check("a deck tension that is not one of the three is left out", tension.deckTension === undefined, String(tension.deckTension));
+  check("a deck tension that is neither a number nor one of the three words is left out", tension.deckTension === undefined, String(tension.deckTension));
+  check("one outside 0 to 100 is brought to the nearest end", storage.repairMap({ stops: [], deckTension: 400 }).map.deckTension === 100 && storage.repairMap({ stops: [], deckTension: -20 }).map.deckTension === 0);
   check("settings that are not numbers take the defaults", Number.isInteger(map.wagonsPerPlayer) && map.wagonsPerPlayer > 0);
 }
 

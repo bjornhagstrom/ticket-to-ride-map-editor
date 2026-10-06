@@ -48,7 +48,7 @@ The editor speaks English. Swedish equivalents are given where the work is discu
 | **route that cuts the map in two** | A route whose loss splits the network. With one lane it is warned about (a single claim shuts part of the map off; no official map has one); as a double route it is described. | rutt som delar kartan |
 | **corner** | Two or more stops reached only through one or two **gates**, as Iberia is through Pamplona and Marseille. Character, not a fault. | hörn |
 | **gate** | A stop through which a corner is reached. | port |
-| **tension** (of a deck) | How much a full deck of tickets sends players through the same corridors: **calm**, **like the official maps**, or **tense**. | spänning |
+| **tension** (of a deck) | How much a full deck of tickets sends players through the same corridors: a scale from 0 to 100 with three named places: **calm** (0, a little calmer than the calmest official map), **like the official maps** (50, the default) and **tense** (100, a little tenser than the tensest). | spänning |
 | **hub on purpose**, **contested on purpose** | A stop many tickets may name, and a route tickets may crowd, as the designer marks them; a full deck is built to keep them so. | avsiktlig knutpunkt, avsiktligt omstridd |
 
 ## Printing and files

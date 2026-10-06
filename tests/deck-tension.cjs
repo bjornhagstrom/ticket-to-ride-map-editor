@@ -12,12 +12,15 @@ const root = path.join(__dirname, "..");
 const referencePath = process.env.TTR_REFERENCE_DATA || path.join(root, "..", "ttr-reference-data", "ttr-reference-maps.json");
 const out = fs.mkdtempSync(path.join(os.tmpdir(), "ttr-tension-"));
 execFileSync(path.join(root, "node_modules", ".bin", "tsc"), ["app/ticket-suggester.ts", "app/map-data.ts", "--outDir", out, "--module", "commonjs", "--target", "es2022", "--moduleResolution", "node", "--skipLibCheck"], { cwd: root, stdio: "inherit" });
-const { suggestTickets, evaluateTicketDeck, TENSION_LOAD_WEIGHT } = require(path.join(out, "ticket-suggester.js"));
+const { suggestTickets, evaluateTicketDeck, tensionWeight, tensionPeakWeight, TENSION_EXPECTED, TENSION_OFFICIAL } = require(path.join(out, "ticket-suggester.js"));
 
 const ok = [];
 const bad = [];
 const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${detail ? " — " + detail : ""}`); };
-check("three tensions: calm, official, tense, each with its weight", TENSION_LOAD_WEIGHT && ["calm", "official", "tense"].every((t) => typeof TENSION_LOAD_WEIGHT[t] === "number"), JSON.stringify(TENSION_LOAD_WEIGHT));
+check("a tension from 0 to 100 has a weight on uneven traffic: 2 for calm, 0 for like the official maps, -1.75 for tense", tensionWeight(0) === 2 && tensionWeight(50) === 0 && tensionWeight(100) === -1.75, JSON.stringify([tensionWeight(0), tensionWeight(50), tensionWeight(100)]));
+check("and a weight on the busiest route, 2 at calm, none from the middle up", tensionPeakWeight(0) === 2 && tensionPeakWeight(25) === 1 && tensionPeakWeight(50) === 0 && tensionPeakWeight(100) === 0, JSON.stringify([0, 25, 50, 100].map(tensionPeakWeight)));
+check("and it falls steadily between them", [0, 10, 25, 40, 50, 60, 75, 90, 100].every((level, i, all) => i === 0 || tensionWeight(level) < tensionWeight(all[i - 1])));
+check("outside the scale it stops at the ends", tensionWeight(-30) === 2 && tensionWeight(180) === -1.75 && tensionPeakWeight(-30) === 2);
 
 if (!fs.existsSync(referencePath)) {
   console.log(`Reference data not found at ${referencePath}: the calibration of tension is skipped.`);
@@ -72,16 +75,22 @@ const buildMap = (source) => {
     return { top: report.bottlenecks.length ? Math.max(...report.bottlenecks.map((b) => b.ratio)) : 0, unused: report.unusedPct };
   };
   const mean = (rows, key) => rows.reduce((sum, row) => sum + row[key], 0) / rows.length;
-  const built = (tension) => maps.flatMap(([id, map]) => [1, 2].map((seed) => measure(map, suggestTickets(map, { style: id === "europe" ? "europe" : "generic", seed, ...(tension ? { tension } : {}) }).tickets)));
+  const built = (tension) => maps.flatMap(([id, map]) => [1, 2, 3].map((seed) => measure(map, suggestTickets(map, { style: id === "europe" ? "europe" : "generic", seed, ...(tension === null ? {} : { tension }) }).tickets)));
   const official = maps.map(([, map]) => measure(map, map.tickets));
-  const calm = built("calm"), like = built("official"), tense = built("tense"), plain = built(null);
-  const [o, c, l, t] = [official, calm, like, tense].map((rows) => ({ top: mean(rows, "top"), unused: mean(rows, "unused") }));
-  console.log("busiest route, tickets per lane: official", o.top.toFixed(1), "calm", c.top.toFixed(1), "like the official maps", l.top.toFixed(1), "tense", t.top.toFixed(1), "| unused %: official", o.unused.toFixed(1), "calm", c.unused.toFixed(1), "like", l.unused.toFixed(1), "tense", t.unused.toFixed(1));
-  check("calm crowds the busiest route least, tense most, like the official maps in between", c.top < l.top && l.top < t.top, `${c.top.toFixed(1)} < ${l.top.toFixed(1)} < ${t.top.toFixed(1)}`);
-  check("like the official maps lands near the official decks: the busiest route within a third of theirs", Math.abs(l.top - o.top) <= o.top / 3, `${l.top.toFixed(1)} against ${o.top.toFixed(1)}`);
-  check("and leaves about as many routes unneeded, within 3 points", Math.abs(l.unused - o.unused) <= 3, `${l.unused.toFixed(1)} % against ${o.unused.toFixed(1)} %`);
-  check("tense stays within what the tensest official maps do", t.top <= Math.max(...official.map((r) => r.top)), `${t.top.toFixed(1)} against at most ${Math.max(...official.map((r) => r.top)).toFixed(1)}`);
-  check("with no tension asked for, a deck is calm, as it always was", JSON.stringify(plain) === JSON.stringify(calm));
+  const levels = [0, 25, 50, 75, 100];
+  const rows = levels.map((level) => { const r = built(level); return { level, top: mean(r, "top"), unused: mean(r, "unused") }; });
+  const o = { top: mean(official, "top"), unused: mean(official, "unused") };
+  console.log("busiest route, tickets per lane: official", o.top.toFixed(1), "| by tension", rows.map((r) => `${r.level}: ${r.top.toFixed(1)}`).join(", "), "| unused %: official", o.unused.toFixed(1), "| by tension", rows.map((r) => `${r.level}: ${r.unused.toFixed(1)}`).join(", "));
+  check("the busiest route is more crowded at every step from calm to tense", rows.every((r, i) => i === 0 || r.top > rows[i - 1].top), rows.map((r) => r.top.toFixed(1)).join(" < "));
+  check("and more routes are left unneeded at every step", rows.every((r, i) => i === 0 || r.unused > rows[i - 1].unused), rows.map((r) => r.unused.toFixed(1)).join(" < "));
+  check("like the official maps (50) lands near the official decks: the busiest route within a third of theirs", Math.abs(rows[2].top - o.top) <= o.top / 3, `${rows[2].top.toFixed(1)} against ${o.top.toFixed(1)}`);
+  check("and leaves about as many routes unneeded, within 3 points", Math.abs(rows[2].unused - o.unused) <= 3, `${rows[2].unused.toFixed(1)} % against ${o.unused.toFixed(1)} %`);
+  const lowest = Math.min(...official.map((r) => r.top)), highest = Math.max(...official.map((r) => r.top));
+  check("calm (0) is a little calmer than the calmest official deck, on average: its busiest route is no busier", rows[0].top <= lowest, `${rows[0].top.toFixed(1)} against ${lowest.toFixed(1)}`);
+  check("tense (100) is a little tenser than the tensest official deck, on average, but not wildly: up to a third over", rows[4].top > highest && rows[4].top <= highest * 4 / 3, `${rows[4].top.toFixed(1)} against ${highest.toFixed(1)}`);
+  check("the official figures the editor quotes are what the eight decks measure", Math.abs(TENSION_OFFICIAL.top[0] - lowest) < 0.1 && Math.abs(TENSION_OFFICIAL.top[1] - highest) < 0.1 && Math.abs(TENSION_OFFICIAL.topMean - o.top) < 0.1 && Math.abs(TENSION_OFFICIAL.unusedMean - o.unused) < 0.1, JSON.stringify(TENSION_OFFICIAL));
+  check("the figures the editor quotes under the slider are what is measured, within one", [0, 50, 100].every((level, k) => { const r = rows[[0, 2, 4][k]]; return Math.abs(TENSION_EXPECTED[level].top - r.top) <= 1 && Math.abs(TENSION_EXPECTED[level].unused - r.unused) <= 1; }), JSON.stringify(TENSION_EXPECTED));
+  check("with no tension asked for, a deck is like the official maps", JSON.stringify(built(null)) === JSON.stringify(built(50)));
 }
 
 for (const line of ok) console.log(`  ok    ${line}`);
