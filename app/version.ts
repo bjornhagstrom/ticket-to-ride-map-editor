@@ -10,6 +10,7 @@ export type Release = { version: string; date: string; title: string; changes: s
 // the top of CHANGELOG.md under Unreleased, and become the notes of the next version when it is
 // decided; the What's new page in the editor shows released versions only.
 export const UNRELEASED: string[] = [
+  "The example map is now for the standard two to five players, and both of its ticket decks have 15 tickets, enough to deal a full table. The pictures on the About page show it as it is.",
   "How tense a full deck of tickets is can be set on a slider from calm to tense, not only in three steps, with what each place means beside the official decks. Calm is now a little calmer, and tense a little tenser, than any official map.",
   "Map balance sets crowded routes against the official maps as a share of all routes (10–17 % on the official maps), since a count grows with the size of the map. The printed balance page says the same.",
   "The tour video in the welcome box starts loading as soon as you point at it, and shows a note while the player loads instead of an empty box. In Safari, which does not let a video start by itself, press play once more in the player.",

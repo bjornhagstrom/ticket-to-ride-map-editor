@@ -224,6 +224,7 @@ const pdfOf = (page, options) => (webkitRun ? Promise.resolve(Buffer.from("")) :
   check("two ticket decks to compare", decks.length === 2 && decks.every((deck) => deck.tickets.length > 0), decks.map((d) => `${d.set.label} ${d.tickets.length}`).join(", "));
   const mainDeck = decks[0].tickets;
   check("the main deck can deal a full table", mainDeck.length >= (example.players?.max ?? 5) * (example.startingTickets ?? 3), `${mainDeck.length} for ${(example.players?.max ?? 5)} × ${example.startingTickets ?? 3}`);
+  check("and so can the other deck: a full table of the standard two to five players is dealt from either", decks.every((deck) => deck.tickets.length >= 5 * (example.startingTickets ?? 3)) && example.players === undefined, decks.map((d) => `${d.set.label} ${d.tickets.length}`).join(", "));
   check("with long tickets among the rest", mainDeck.some((t) => t.long) && mainDeck.some((t) => !t.long));
   check("every stop but the junction is on a ticket", example.stops.filter((st) => !typeOf(st.type).junction).every((st) => mainDeck.some((t) => t.a === st.id || t.b === st.id)));
   await page.getByRole("button", { name: "Tickets", exact: true }).click();
@@ -1330,7 +1331,7 @@ const pdfOf = (page, options) => (webkitRun ? Promise.resolve(Buffer.from("")) :
   await page.waitForTimeout(500);
   check("Settings carries the game setup", await page.locator("#settings-wagons").isVisible() && await page.locator("#settings-starting-tickets").isVisible());
   // The example map is built for two or three; Settings shows the map's own range, not a default.
-  check("including how many players the map is for", await page.locator("#settings-players-min").isVisible() && (await page.locator("#settings-players-min").inputValue()) === "2" && (await page.locator("#settings-players-max").inputValue()) === "3", `${await page.locator("#settings-players-min").inputValue()}–${await page.locator("#settings-players-max").inputValue()}`);
+  check("including how many players the map is for", await page.locator("#settings-players-min").isVisible() && (await page.locator("#settings-players-min").inputValue()) === "2" && (await page.locator("#settings-players-max").inputValue()) === "5", `${await page.locator("#settings-players-min").inputValue()}–${await page.locator("#settings-players-max").inputValue()}`);
   await page.locator("#settings-players-max").fill("4");
   await page.locator("#settings-players-max").blur();
   await page.waitForTimeout(400);

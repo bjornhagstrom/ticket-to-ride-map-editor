@@ -398,9 +398,9 @@ ${routePointsTable()}
   ],
   wagonStyles: defaultWagonStyles.map((style) => ({ ...style })),
   stopTypeStyles: defaultStopTypeStyles.map((style) => ({ ...style })),
-  // Two or three players, and a wagon count that leaves the table about three and a half supplies of
-  // room. Both decks can deal three players three tickets each.
-  players: { min: 2, max: 3 },
+  // The standard two to five players (none is stated, so DEFAULT_PLAYERS holds), and a wagon count that
+  // leaves the board about three and a half supplies of room. Both decks can deal five players three
+  // tickets each.
   wagonsPerPlayer: 28,
   startingTickets: DEFAULT_STARTING_TICKETS,
   keptTickets: DEFAULT_KEPT_TICKETS,
@@ -426,6 +426,17 @@ ${routePointsTable()}
     { id: "example-ticket-17", a: "example-fernside", b: "example-northfield", points: 21, long: true, set: "example-long" },
     { id: "example-ticket-18", a: "example-lakeside", b: "example-brickworks", points: 20, long: true, set: "example-long" },
     { id: "example-ticket-19", a: "example-westport", b: "example-quarry", points: 26, long: true, set: "example-long" },
+    { id: "example-ticket-20", a: "example-harbour", b: "example-brickworks", points: 10, set: "main" },
+    { id: "example-ticket-21", a: "example-central", b: "example-northfield", points: 10, set: "main" },
+    { id: "example-ticket-22", a: "example-old-town", b: "example-gull-island", points: 11, set: "main" },
+    { id: "example-ticket-23", a: "example-pine-hill", b: "example-lakeside", points: 12, set: "main" },
+    { id: "example-ticket-24", a: "example-pine-hill", b: "example-eastgate", points: 20, long: true, set: "main" },
+    { id: "example-ticket-25", a: "example-harbour", b: "example-deepcut", points: 11, set: "example-long" },
+    { id: "example-ticket-26", a: "example-lakeside", b: "example-millbrook", points: 10, set: "example-long" },
+    { id: "example-ticket-27", a: "example-eastgate", b: "example-gull-island", points: 11, set: "example-long" },
+    { id: "example-ticket-28", a: "example-central", b: "example-old-town", points: 10, set: "example-long" },
+    { id: "example-ticket-29", a: "example-harbour", b: "example-millbrook", points: 20, long: true, set: "example-long" },
+    { id: "example-ticket-30", a: "example-northfield", b: "example-brickworks", points: 20, long: true, set: "example-long" },
   ],
   background: [
     { id: "example-lake", type: "area", label: "Lake", labelPoint: { x: 745, y: 350 }, points: [{ x: 630, y: 222 }, { x: 668, y: 190 }, { x: 735, y: 205 }, { x: 812, y: 248 }, { x: 848, y: 300 }, { x: 878, y: 372 }, { x: 900, y: 452 }, { x: 868, y: 478 }, { x: 815, y: 462 }, { x: 760, y: 440 }, { x: 700, y: 415 }, { x: 655, y: 380 }, { x: 625, y: 325 }, { x: 618, y: 270 }], fill: "#b8ddea", stroke: "#4f8394", opacity: 0.65, strokeWidth: 3, locked: true },
