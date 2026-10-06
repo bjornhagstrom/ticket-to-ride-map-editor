@@ -9,13 +9,7 @@ export type Release = { version: string; date: string; title: string; changes: s
 // Changes made since the last release, written as they are made, in the same plain words. They go at
 // the top of CHANGELOG.md under Unreleased, and become the notes of the next version when it is
 // decided; the What's new page in the editor shows released versions only.
-export const UNRELEASED: string[] = [
-  "The example map is now for the standard two to five players, and both of its ticket decks have 15 tickets, enough to deal a full table. The pictures on the About page show it as it is.",
-  "How tense a full deck of tickets is can be set on a slider from calm to tense, not only in three steps, with what each place means beside the official decks. Calm is now a little calmer, and tense a little tenser, than any official map.",
-  "Map balance sets crowded routes against the official maps as a share of all routes (10–17 % on the official maps), since a count grows with the size of the map. The printed balance page says the same.",
-  "The tour video in the welcome box starts loading as soon as you point at it, and shows a note while the player loads instead of an empty box. In Safari, which does not let a video start by itself, press play once more in the player.",
-  "In Map balance, \"Stops no ticket names\" now reads \"Stops with no ticket names\".",
-];
+export const UNRELEASED: string[] = [];
 
 export const RELEASES: Release[] = [
   {
@@ -23,10 +17,11 @@ export const RELEASES: Release[] = [
     date: "2026-10-05",
     title: "Version 1.0: the map against the official maps, decks calm or tense, and printing for playtests",
     changes: [
-      "Map balance opens with the map against the official maps: crowded routes at a full table, the ticket traffic on double routes against single ones, routes no ticket needs, the busiest stop and the average hub degree, each beside what the eight official maps measure.",
-      "A full deck of tickets can be calm, like the official maps, or tense: chosen when it is built, and set for the map in its deck rules. Like the official maps crowds its busiest corridor about as hard as the official decks do; tense, like the tensest of them.",
+      "Map balance opens with the map against the official maps: crowded routes at a full table as a share of all routes, the ticket traffic on double routes against single ones, routes no ticket needs, the busiest stop and the average hub degree, each beside what the eight official maps measure.",
+      "How tense a full deck of tickets is can be set on a slider from calm through like the official maps (the default) to tense, when the deck is built and for the map in its deck rules, with what each place means beside the official decks. Calm is a little calmer, and tense a little tenser, than any official map.",
       "A stop can be marked a hub on purpose and a route contested on purpose, in Properties. A full deck of tickets then sends more tickets to the hub and through the route, and Map balance lists such a route as crowded on purpose.",
-      "The welcome box has the tour of the editor in 80 seconds, which loads from YouTube only when you press play, and a link to About.",
+      "The welcome box has the tour of the editor in 80 seconds, which loads from YouTube only when you press play (it starts warming up when you point at it), and a link to About.",
+      "The example map is for the standard two to five players, and both of its ticket decks have 15 tickets, enough to deal a full table.",
       "A page of the balance figures can go with a print run, or alone: the network, crossings, how it holds together, crowding and the routes by colour and length, as they stand at that version.",
       "The print dialog says how to save a run as a PDF, and the file is named after the map, its version, what it holds and the date.",
       "The Rules panel has Print the rules, for the rules alone on pages of their own.",
