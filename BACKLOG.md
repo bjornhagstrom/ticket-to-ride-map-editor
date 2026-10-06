@@ -7,7 +7,7 @@ in the same commit as the work (AGENTS.md).
 
 1.0 is prepared in `main` and waits for the owner's go to be pushed and deployed (its notes are in CHANGELOG.md).
 
-- **Code review agent** (`ttr-reviewer`, `docs/REVIEW.md`): defined and its read-only hook tested; the seeded trial (`node scripts/review-seeds.cjs`) is to be run when the agent is first available as a subagent, and the first full review is of 1.0.
+- **Code review of 1.0**: `ttr-reviewer` is working (the seeded trial met the bar; the first full review is in `docs/REVIEW.md`, Trials). Fixed from it: a stored map that cannot be read is no longer overwritten when the copy cannot be made, Print the rules is never on board-sized pages, three contrast and layout faults, and test faults (the parallel runner counts its sections itself, WebKit no longer counts two empty PDF checks as passes, a few checks that could pass on the wrong thing). **Waits for the owner:** tickets left behind by a deleted stop, a file with no map fields, `repairMap` in `docs/FILE-FORMAT.md`, the example rules for 4 and 5 players, the 1.0 date, the video preconnect, and the smaller items listed in the review hand-over.
 - **Faster testing**: three tiers (quick while working, merge before `main`, release before any push or
   deploy), built in six steps. Steps 1 and 2 are built (`npm run test:quick`, `TTR_ONLY=…`); next are the waits instead of sleeps, sharding, one command per tier and the impact map. The plan and the measurements are in `docs/TESTING.md`.
 

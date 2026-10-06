@@ -216,6 +216,7 @@ export function MapEditor() {
   // The board as it lies or stands; wagons are always measured against the lying board's width, the
   // same number of millimetres per map unit either way.
   const format = boardOf(data);
+  const holdSaveRef = useRef(false);
 
   useEffect(() => { queueMicrotask(() => {
     let stored: string | null = null;
@@ -228,14 +229,20 @@ export function MapEditor() {
       } catch {
         // A map that cannot be read at all is put aside word for word, never overwritten, so it can
         // still be rescued; the editor starts afresh and says so.
-        try { localStorage.setItem(`${STORAGE_KEY}-unreadable-${formatTimestamp()}`, stored); } catch { /* no room: it stays where it was until the next save */ }
-        toast.error("The map kept in this browser could not be read. It has been put aside, untouched, and the editor starts afresh. Export your maps to keep copies.", { duration: 30000 });
+        let putAside = true;
+        try { localStorage.setItem(`${STORAGE_KEY}-unreadable-${formatTimestamp()}`, stored); } catch { putAside = false; }
+        // With no room for the copy the original must stay where it is: nothing is saved until the person
+        // changes the map, so the empty map does not replace it at once.
+        if (!putAside) holdSaveRef.current = true;
+        toast.error(putAside
+          ? "The map kept in this browser could not be read. It has been put aside, untouched, and the editor starts afresh. Export your maps to keep copies."
+          : "The map kept in this browser could not be read, and there is no room to put a copy aside. It is left where it is and stays until you change something on the map; the editor starts afresh. Free some room, or reload to try again.", { duration: 30000 });
         if (!localStorage.getItem(GUIDE_SEEN_KEY)) setShowGuide(true);
       }
     } else { try { if (!localStorage.getItem(GUIDE_SEEN_KEY)) setShowGuide(true); } catch { /* storage blocked */ } }
     setReady(true);
   }); }, []);
-  useEffect(() => { if (!ready) return; localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); const timer = window.setTimeout(() => setSaved(true), 0); return () => window.clearTimeout(timer); }, [data, ready]);
+  useEffect(() => { if (!ready) return; if (holdSaveRef.current) { if (data === emptyMap) return; holdSaveRef.current = false; } localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); const timer = window.setTimeout(() => setSaved(true), 0); return () => window.clearTimeout(timer); }, [data, ready]);
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (lengthKeyRef.current(event)) return;
@@ -272,6 +279,7 @@ export function MapEditor() {
   // On one page the size of the board nothing else fits: the tickets and the rules are printed apart.
   const onePageRun = printChoice.split === "page";
   const printPartsNow: PrintParts = { board: printParts.board, tickets: printParts.tickets && ticketsHere.length > 0 && !onePageRun, rules: printParts.rules && Boolean(data.rules?.trim()) && !onePageRun, playtest: printParts.playtest, balance: Boolean(printParts.balance) && !onePageRun };
+  // The rules or the deck alone are never printed on a page the size of the board (that choice is for the board).
   const runParts: PrintParts = printScope === "deck" ? { board: false, tickets: true, rules: false, playtest: false } : printScope === "rules" ? { board: false, tickets: false, rules: true, playtest: false } : printPartsNow;
   // The map's version, worked out from a deferred copy so dragging a stop never waits for it.
   const deferredData = useDeferredValue(data);
@@ -1035,7 +1043,7 @@ export function MapEditor() {
       onShuffle={() => setSuggestSeed((seed) => seed + 1)} onApply={(mode) => applySuggestion(mode, `ts-${Date.now()}`)} />
     <WelcomeGuide open={showGuide} onOpenChange={(open) => !open && dismissGuide()} onChooseBlank={() => chooseFromGuide("blank")} onChooseExample={() => chooseFromGuide("example")} onChooseProblems={() => chooseFromGuide("problems")} />
     <SettingsDialog onStartOver={() => { setShowStyles(false); setDanger("reset"); }} onExport={exportMap} open={showStyles} onOpenChange={setShowStyles} target={styleTarget} onTarget={setStyleTarget} data={data} change={change} onChangeFormat={changeFormat} onChangeOrientation={changeOrientation} exportReminder={{ on: !reminder.off, onChange: (on) => setReminder((r) => (on ? turnOn(r) : stopReminding(r))) }} defaults={{ stopType, setStopType, stopSize, setStopSize: (value) => setStopSize(value as StopSize), routeType, setRouteType, routeColor, setRouteColor, routeCurved, setRouteCurved, routeLineStyle, setRouteLineStyle, linkParallel, setLinkParallel }} />
-    <PrintPages data={data} plan={printPlan(data.format, printChoice, printProfile, format.orientation)} parts={runParts} setId={activeTicketSet.id} />
+    <PrintPages data={data} plan={printPlan(data.format, printScope !== "map" && printChoice.split === "page" ? { ...printChoice, split: "panel" } : printChoice, printProfile, format.orientation)} parts={runParts} setId={activeTicketSet.id} />
     {makingImage && <ImageStage data={data} onDone={saveImage} onFail={() => setMakingImage(false)} />}
     <PrintDialog open={showPrint} onOpenChange={setShowPrint} format={data.format} orientation={format.orientation} profile={printProfile} choice={printChoice} onChoice={choosePrint} parts={{ value: printPartsNow, onChange: choosePrintParts, rulesWritten: Boolean(data.rules?.trim()), ticketCount: ticketsHere.length, deckLabel: activeTicketSet.label }} version={versionNow} onPrint={printRun} />
   </main></TooltipProvider>;

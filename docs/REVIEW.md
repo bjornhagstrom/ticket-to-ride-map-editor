@@ -186,6 +186,17 @@ adding the seed's exact words to it.
   The bar was met: 3 of 3 BLOCKERs, 6 of 6 seeds (S5 partly), decoy not reported. 50,547 tokens, 53 seconds
   for a 47-line diff.
 
+- **2026-10-06, second trial** (`ttr-reviewer` itself, on `opus`). 7 findings from 75 up. S1 to S4 and S6 found
+  with correct traces; the decoy and the wording of the label left alone. S5 missed: the reviewer said no
+  release note was due since nothing wires the button into a screen, and did not name it as a NOTE. 3 of 3
+  BLOCKERs and 5 of 6 seeds, so the bar was met. 47,000 tokens, 85 seconds.
+- **2026-10-06, the first full review (1.0)**, five reviewers in parallel (logic and files, screens, the
+  regression suite, other tests and scripts, documents). One BLOCKER (a stored map that cannot be read was
+  overwritten when there was no room to put a copy aside, while the message said it was safe), upheld by a
+  second run that tried to refute it. Two findings were made independently by two reviewers (tickets left
+  behind by a deleted stop are reported as damage; a file with no map fields is not refused). About 15
+  SHOULD and a dozen uncertain. 40 to 65 minutes of agent time in all.
+
 ## Sources
 
 - Claude Code documentation: [Create custom subagents](https://code.claude.com/docs/en/sub-agents) (tools,

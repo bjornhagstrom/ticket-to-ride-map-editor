@@ -286,6 +286,7 @@
 .analysis-table.colour-table th,.analysis-table.colour-table td{padding-left:6px;padding-right:6px}
 .analysis-table.colour-table th:first-child,.analysis-table.colour-table td:first-child,.analysis-table.classic-table th:first-child,.analysis-table.classic-table td:first-child{min-width:0;width:1%}
 .analysis-table.classic-table td:first-child{white-space:normal}
+.analysis-table.official-table th:first-child,.analysis-table.official-table td:first-child{min-width:0;width:1%;white-space:normal}
 .balance-panel tr.pinned td,.balance-panel td.pinned{background:#f4d9d3!important;font-weight:700}
 .balance-panel .bottleneck-row[aria-pressed="true"]{background:#f4d9d3;border-color:#b3261e}
 
@@ -447,7 +448,7 @@
 .tension-description strong { color: #2d2a26; }
 
 /* A route crowded on purpose, in Map balance. */
-.on-purpose-tag { margin-left: 6px; padding: 0 6px; border-radius: 999px; background: #e6eedb; color: #2f5a2a; font-style: normal; font-size: 12px; font-weight: 600; }
+.on-purpose-tag { margin-left: 6px; padding: 0 6px; border-radius: 999px; background: #e6eedb; color: #24481f; font-style: normal; font-size: 12px; font-weight: 600; }
 
 /* A stop type as the map draws it, in Settings. */
 .stop-type-preview { display: block; width: 100%; max-width: 260px; height: auto; border: 1px solid #ddd4c6; border-radius: 8px; background: #f7f1e5; margin-bottom: 8px; }

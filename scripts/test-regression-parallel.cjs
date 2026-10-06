@@ -31,7 +31,9 @@ if (flag("--fast")) for (const [key, value] of Object.entries(FAST)) if (!proces
 
 const timesFile = path.join(root, "tests", "section-times.json");
 const known = fs.existsSync(timesFile) ? JSON.parse(fs.readFileSync(timesFile, "utf8")).sections : {};
-const SECTIONS = 58;
+// The number of sections is read from the suite itself, so a section added later is run too, not skipped
+// without a word.
+const SECTIONS = Math.max(...[...fs.readFileSync(path.join(root, "tests", "regression.cjs"), "utf8").matchAll(/wants\((\d+)\)/g)].map((m) => Number(m[1])));
 const chain = [...Array(32).keys()].map((i) => i + 1).concat([34]);
 const alone = [33, ...Array.from({ length: SECTIONS - 34 }, (_, i) => 35 + i)];
 const weight = (n) => Number(known[n] ?? 10);

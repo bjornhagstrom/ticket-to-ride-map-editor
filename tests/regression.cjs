@@ -32,6 +32,8 @@ const CHROMIUM_ONLY = [
   [/these rules take one page, and the cards the sheets their summary promised/, "a PDF count"],
   [/^saved as a PDF it is a single page$/, "reads the PDF"],
   [/read from the PDF itself/, "reads the PDF"],
+  [/^and the pages are the sum of the three on their own/, "a PDF count: with no PDF every count is 0 and the sum holds for nothing"],
+  [/^and the pages are the board's plus the rules'$/, "a PDF count, as above"],
 ];
 const skipped = [];
 const check = (label, pass, detail = "") => {
@@ -1390,13 +1392,19 @@ const sectionStart = (n) => {
   await page.getByRole("button", { name: "Settings" }).click();
   await page.waitForTimeout(500);
   check("Settings carries the game setup", await page.locator("#settings-wagons").isVisible() && await page.locator("#settings-starting-tickets").isVisible());
-  // The example map is built for two or three; Settings shows the map's own range, not a default.
+  // The example map is for the standard two to five players, which is also the default range: so below, a
+  // 4 that is stored must be read back from the map, or Settings could be showing the default.
   check("including how many players the map is for", await page.locator("#settings-players-min").isVisible() && (await page.locator("#settings-players-min").inputValue()) === "2" && (await page.locator("#settings-players-max").inputValue()) === "5", `${await page.locator("#settings-players-min").inputValue()}–${await page.locator("#settings-players-max").inputValue()}`);
   await page.locator("#settings-players-max").fill("4");
   await page.locator("#settings-players-max").blur();
   await page.waitForTimeout(400);
   const newTable = await page.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")).players);
   check("a different table is stored with the map", newTable.max === 4 && newTable.min <= 4, `${newTable.min}–${newTable.max}`);
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(300);
+  await page.getByRole("button", { name: "Settings" }).click();
+  await page.waitForTimeout(400);
+  check("and Settings shows it again when reopened, not the default range", (await page.locator("#settings-players-max").inputValue()) === "4", await page.locator("#settings-players-max").inputValue());
   await page.keyboard.press("Escape");
   await page.waitForTimeout(300);
   await page.getByRole("button", { name: "Map balance", exact: true }).click();
@@ -3695,7 +3703,7 @@ const sectionStart = (n) => {
     await importText("not-json.json", "this is not json {");
     check("a file that is not JSON is refused, with a message, and the map stays as it was", /could not be read|not a map/i.test(await toasts()) && (await stored()) === before, await toasts());
     await importText("a-list.json", "[1, 2, 3]");
-    check("a JSON file that holds no map is refused too", /not a map/i.test(await toasts()) && (await stored()) === before, await toasts());
+    check("a JSON file that holds no map is refused too, with its own reason", /holds no map, network, background or tickets/i.test(await toasts()) && (await stored()) === before, await toasts());
     const damaged = { format: "ticket-to-ride-map", version: 3, kind: "map", payload: { name: "Mended", stops: [{ id: "a", name: "Alpha", type: "city", x: 200, y: 200 }, { id: "b", name: "Beta", type: "city", x: 600, y: 300 }, null, { id: "c", name: "Nowhere" }], routes: [{ id: "r1", a: "a", b: "b", length: 4, type: "city", color: "red" }, { id: "r2", a: "a", b: "ghost", length: 2, type: "city", color: "red" }], tickets: [], ticketSets: [{ id: "main", label: "Main deck" }], notes: [], background: [] } };
     await importText("damaged.json", JSON.stringify(damaged));
     const opened = JSON.parse(await stored());
@@ -3708,6 +3716,22 @@ const sectionStart = (n) => {
     const aside = await cp2.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith("ttr-map-unreadable-")).map((k) => localStorage.getItem(k)));
     check("a map kept in the browser that cannot be read is put aside, word for word", aside.length === 1 && aside[0] === '{"name":"cut short","stops":[{"id":"a"', JSON.stringify(aside));
     check("and the editor still starts, saying what happened", (await cp2.locator(".map-canvas").count()) === 1 && /could not be read/i.test(await toasts() + " " + (await cp2.locator('[role="dialog"]').allTextContents()).join(" ")), await toasts());
+    // When there is no room to put the unreadable map aside, it must not be overwritten at once either
+    // (found in the 1.0 review): the copy is made to fail, and the original has to be where it was.
+    const cut = '{"name":"cut short, no room","stops":[{"id":"a"';
+    await cp2.evaluate(([key, text]) => {
+      Object.keys(localStorage).filter((k) => k.startsWith("ttr-map-unreadable-")).forEach((k) => localStorage.removeItem(k));
+      localStorage.setItem(key, text); sessionStorage.setItem("failcopy", "1");
+    }, [KEY, cut]);
+    await cp2.addInitScript(() => {
+      const set = Storage.prototype.setItem;
+      Storage.prototype.setItem = function (k, v) { if (sessionStorage.getItem("failcopy") && String(k).includes("-unreadable-")) throw new DOMException("full", "QuotaExceededError"); return set.call(this, k, v); };
+    });
+    await cp2.reload({ waitUntil: "networkidle" });
+    await cp2.waitForTimeout(800);
+    check("with no room to put an unreadable map aside, it stays where it was and the editor still starts", (await stored()) === cut && (await cp2.locator(".map-canvas").count()) === 1, String(await stored()).slice(0, 60));
+    check("and says it was not put aside", /no room to put a copy aside/i.test(await toasts()), await toasts());
+    await cp2.evaluate(() => sessionStorage.removeItem("failcopy"));
     // A stored map with damaged parts opens mended, without an error on the page.
     await cp2.evaluate((key) => localStorage.setItem(key, JSON.stringify({ name: "Half", stops: [{ id: "a", name: "A", type: "city", x: "NaN", y: 3 }, { id: "b", name: "B", type: "city", x: 10, y: 10 }, { id: "c", name: "C", type: "city", x: 300, y: 300 }], routes: [{ id: "r", a: "b", b: "c", length: -3, type: "city", color: "red", points: "x" }], tickets: [{ id: "t", a: "b", b: "c", points: null }], notes: [null], background: [{ id: "x" }] })), KEY);
     const errorsBefore = pageErrors.length;
@@ -3720,8 +3744,8 @@ const sectionStart = (n) => {
   // 47. Smaller windows: at 1280 × 720 the map stays clear of the Properties column; on a tablet the
   // page never scrolls sideways; on a phone the header's buttons all show, and the map pans inside its
   // own area (it keeps a width where a finger can hit a wagon space) without the page scrolling.
+  if (wants(47)) sectionStart(47);
   if (wants(47)) for (const [w, h, mobile] of [[1280, 720, false], [1024, 768, false], [768, 1024, true], [390, 844, true]]) {
-  sectionStart(47);
     const sp2 = await (await browser.newContext({ viewport: { width: w, height: h }, isMobile: mobile, hasTouch: mobile })).newPage();
     sp2.on("pageerror", (e) => errors.push(String(e)));
     await sp2.goto(BASE, { waitUntil: "networkidle" });
@@ -3802,6 +3826,23 @@ const sectionStart = (n) => {
     check("the Rules panel prints the rules alone", rulesRun.rules === 1 && rulesRun.boards === 0 && rulesRun.cards === 0, JSON.stringify(rulesRun));
     check("titled for a file named after the map, its version, the rules and the date", rulesRun.title.startsWith("Example map · v1 · rules · ") && rulesRun.title.endsWith(today), rulesRun.title);
     check("and the page's own title is back after the print", !/· rules ·/.test(await pp.title()), await pp.title());
+    // The last choice being "one page the size of the board" must not make the rules print on pages that
+    // big (found in the 1.0 review).
+    await pp.getByRole("button", { name: "Print map" }).click();
+    await pp.waitForTimeout(400);
+    await pp.getByRole("dialog", { name: "Print the map" }).getByRole("radio", { name: "One page, real size", exact: true }).check();
+    await pp.getByRole("dialog", { name: "Print the map" }).getByRole("button", { name: "Cancel" }).click();
+    await pp.waitForTimeout(300);
+    await pp.evaluate(() => { window.__run = null; window.print = () => { window.__run = { style: [...document.querySelectorAll(".print-pages style")].map((e) => e.textContent).join(" ") }; }; });
+    await pp.locator(".rules-panel").getByRole("button", { name: "Print the rules" }).click();
+    const bigRun = await run();
+    check("the rules are not printed on pages the size of the board, whatever the last choice was", !/810mm|790mm/.test(bigRun.style) && /size:\s*\d+mm \d+mm/.test(bigRun.style), bigRun.style.slice(0, 200));
+    await pp.getByRole("button", { name: "Print map" }).click();
+    await pp.waitForTimeout(400);
+    await pp.getByRole("dialog", { name: "Print the map" }).getByRole("radio", { name: "One sheet per panel of the game board", exact: true }).check();
+    await pp.getByRole("dialog", { name: "Print the map" }).getByRole("button", { name: "Cancel" }).click();
+    await pp.waitForTimeout(300);
+    await stub();
     // The print dialog: PDF, the balance page, the file name.
     await pp.getByRole("button", { name: "Print map" }).click();
     await pp.waitForTimeout(400);
@@ -4064,8 +4105,8 @@ const sectionStart = (n) => {
 
   // 56. On a computer each column scrolls on its own: editing a stop with a tall Properties panel never
   // scrolls the page, so the map stays in view.
+  if (wants(56)) sectionStart(56);
   if (wants(56)) for (const [w, h] of [[1500, 1000], [1280, 720]]) {
-  sectionStart(56);
     const cs = await (await browser.newContext({ viewport: { width: w, height: h } })).newPage();
     cs.on("pageerror", (e) => errors.push(String(e)));
     await cs.goto(BASE, { waitUntil: "networkidle" });
