@@ -5,8 +5,14 @@ in the same commit as the work (AGENTS.md).
 
 ## Agreed and next
 
-Nothing waiting to be built: the next release, 1.0, gathers what is under Unreleased in
-CHANGELOG.md.
+The next release, 1.0, gathers what is under Unreleased in CHANGELOG.md.
+
+- **Faster testing**: three tiers (quick while working, merge before `main`, release before any push or
+  deploy), built in six steps. The plan and the measurements are in `docs/TESTING.md`.
+- **Export to ttr-map-generator** (the open source Python tool, later in the production chain): first
+  its three text files (locations, paths, tasks), then its JSON graph with positions, tried by loading
+  the file in their program. Agreed 2026-10-06; an addition to what the editor writes, not a change to
+  our own format.
 
 ## Waiting
 
