@@ -867,9 +867,11 @@ const sectionStart = (n) => {
     const after = await page.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")));
     const sameStops = stored.stops.every((s) => after.stops.some((t) => t.name === s.name && Math.abs(t.x - s.x) <= .5 && Math.abs(t.y - s.y) <= .5));
     check("the map comes back from its own spreadsheets: every stop in its place, every route", after.stops.length === stored.stops.length && sameStops && after.routes.length === stored.routes.length, `${after.stops.length} stops, ${after.routes.length} routes`);
-    check("the tickets arrive as new decks beside the old ones", after.ticketSets.length === stored.ticketSets.length * 2 && after.tickets.length === stored.tickets.length * 2, `${after.ticketSets.length} decks, ${after.tickets.length} tickets`);
+    // The spreadsheet's stops have ids of their own, so the old decks' tickets name stops that are gone:
+    // they are removed (with a notice), and the new decks hold the tickets that came.
+    check("the tickets arrive as new decks, and the old ones, which named stops that are gone, are removed", after.ticketSets.length === stored.ticketSets.length * 2 && after.tickets.length === stored.tickets.length && after.tickets.every((t) => after.stops.some((s) => s.id === t.a) && after.stops.some((s) => s.id === t.b)), `${after.ticketSets.length} decks, ${after.tickets.length} tickets`);
     const toastText = (await page.locator("[data-sonner-toast]").allTextContents()).join(" | ");
-    check("and the editor says what it read", /stops/.test(toastText) && /routes/.test(toastText) && /tickets/.test(toastText), toastText);
+    check("and the editor says what it read, and how many old tickets it removed", /stops/.test(toastText) && /routes/.test(toastText) && /tickets/.test(toastText) && new RegExp(`${stored.tickets.length} tickets in your decks named stops that are not in the spreadsheet`).test(toastText), toastText);
     // The templates: downloaded from the same menu, named for what they hold, and good enough to import
     // as they are.
     const openTemplates = async () => { await page.getByRole("button", { name: "Import", exact: true }).click(); await page.waitForTimeout(250); await page.getByRole("menuitem", { name: "Spreadsheet (CSV)" }).click(); await page.waitForTimeout(250); };
@@ -4243,6 +4245,34 @@ const sectionStart = (n) => {
     const back = await mapNow();
     check("and Undo brings the stop, its routes and its tickets back", back.stops.length === mid.stops.length + 1 && back.tickets.length === mid.tickets.length + millbrookTickets && back.routes.length > mid.routes.length, `${mid.tickets.length} -> ${back.tickets.length} tickets`);
     await dp.context().close();
+  }
+
+  // 60. A network imported over the stops takes the tickets that named stops it does not have, says how
+  // many, and Undo brings them back (found in the 1.0 review).
+  if (wants(60)) {
+  sectionStart(60);
+    const np = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
+    np.on("pageerror", (e) => errors.push(String(e)));
+    await np.goto(BASE, { waitUntil: "networkidle" });
+    await np.getByRole("button", { name: "Load the example map" }).click();
+    await np.waitForTimeout(600);
+    const mapNow = () => np.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")));
+    const before = await mapNow();
+    const network = { format: "ticket-to-ride-map", version: 3, kind: "network", payload: { stops: [{ id: "n-a", name: "Alpha", type: "city", x: 200, y: 200 }, { id: "n-b", name: "Beta", type: "city", x: 600, y: 300 }], routes: [{ id: "n-r", a: "n-a", b: "n-b", length: 3, type: "city", color: "red" }] } };
+    const file = path.join(os.tmpdir(), `ttr-${Date.now()}-network.json`); fs.writeFileSync(file, JSON.stringify(network));
+    await np.locator('input[type="file"][accept="application/json"]').setInputFiles(file);
+    await np.waitForTimeout(600);
+    await np.getByRole("alertdialog").getByRole("button", { name: "Continue" }).click();
+    await np.waitForTimeout(600);
+    const after = await mapNow();
+    check("the network replaces the stops and routes", after.stops.length === 2 && after.routes.length === 1);
+    check("and the tickets that named the old stops are gone from every deck", after.tickets.length === 0 && before.tickets.length > 10, `${before.tickets.length} before, ${after.tickets.length} after`);
+    const said = (await np.locator("[data-sonner-toast]").allTextContents()).join(" | ");
+    check("the editor says how many, and that Undo brings them back", new RegExp(`${before.tickets.length} tickets in your decks named stops that are not in the imported network`).test(said) && /Undo brings them back/.test(said), said);
+    await np.reload({ waitUntil: "networkidle" });
+    await np.waitForTimeout(800);
+    check("opened again, the map is not reported as damaged", !/could not be used|left out/i.test((await np.locator("[data-sonner-toast]").allTextContents()).join(" ")));
+    await np.context().close();
   }
 
   if (sectionOpen) sectionTimes[sectionOpen.n] = Math.round((Date.now() - sectionOpen.at) / 100) / 10;

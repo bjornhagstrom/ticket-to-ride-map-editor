@@ -70,19 +70,22 @@ export const TICKET_SUGGESTER = {
       periphery: "point" as "relative" | "point",
     },
   },
-  // What the official decks actually measure, for the dialog to show beside each number.
+  // What the official decks actually measure, for the dialog to show beside each number. The four that
+  // are measured on a deck (tickets per stop, most on one stop, near-duplicates, routes no ticket uses) are
+  // the lowest and highest of all eight maps; tests/balance-official.cjs measures them again, and they
+  // are the same as the ones Map balance shows (BALANCE_OFFICIAL).
   official: {
     lengthCap: [.33, .60] as [number, number],
-    maxPerStop: [4, 10] as [number, number],
-    perStop: [.83, .98] as [number, number],
-    dupPct: [.3, 1.6] as [number, number],
+    maxPerStop: [4, 9] as [number, number],
+    perStop: [.83, 1.49] as [number, number],
+    dupPct: [.3, 3.4] as [number, number],
     // Where the official decks end their tickets, measured from each map's average stop on a scale
     // from the middle (0) to the edge (1): long tickets further out, short ones mostly a little in.
     // Aggregated from the reference data with evaluateTicketDeck; they vary far less this way than as
     // distances from the middle, which run from 0.36 (Nordic) to 0.62 (USA) for long tickets.
     longEnds: [["USA", .21], ["India", .21], ["Europe", .20], ["Polska", .17], ["Switzerland", .16], ["Northern Lights", .11], ["Old West", .09], ["Nordic", .06]] as [string, number][],
     shortEnds: [["Northern Lights", .02], ["USA", -.03], ["India", -.06], ["Old West", -.06], ["Europe", -.07], ["Nordic", -.08], ["Switzerland", -.08], ["Polska", -.10]] as [string, number][],
-    unusedPct: [14, 27] as [number, number],
+    unusedPct: [7, 21] as [number, number],
   },
   // `load` was 0.5 when the targets were first fitted, which left suggestions spreading their
   // tickets more evenly over the map than the official decks do: they run the busy corridors along

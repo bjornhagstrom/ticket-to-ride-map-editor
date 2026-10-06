@@ -262,7 +262,7 @@ Maps that do not follow the shortest path must never be used to tune targets or 
   - trains per player
   - the resulting deck size, with an override
   - a choice between "Keep existing tickets" and "Replace all"
-- The preview shows the report for the current deck and the suggestion side by side. Each metric shows the official range next to it (§1), for example "Near-duplicates 1.1 % (official 0.3–1.6 %)". There are two buttons: **Apply** and **Shuffle** (seed + 1). There is no Cancel button. A run is fast enough that nothing needs stopping, and closing the dialog the normal way (close icon, Esc or clicking outside) discards the suggestion.
+- The preview shows the report for the current deck and the suggestion side by side. Each metric shows the official range next to it (§1), for example "Near-duplicates 1.1 % (official 0.3–3.4 %)". There are two buttons: **Apply** and **Shuffle** (seed + 1). There is no Cancel button. A run is fast enough that nothing needs stopping, and closing the dialog the normal way (close icon, Esc or clicking outside) discards the suggestion.
 - Applied tickets are ordinary tickets. The existing review verdicts apply to them.
 - The Balancing view can shade routes by `load / lanes`, mark unused routes, and flag hard tickets.
 

@@ -814,15 +814,25 @@ export function MapEditor() {
         wagonStyles: mergeStyles(draft.wagonStyles ?? [], wagonStyles) };
       // Tickets that came with the network go into the deck being worked on.
       if (tickets.length) next.tickets = [...draft.tickets.filter((ticket) => (ticket.set ?? draft.ticketSets[0].id) !== activeTicketSet.id), ...tickets.map((ticket) => ({ ...ticket, set: activeTicketSet.id }))];
+      // Tickets to a stop the new network does not have cannot be played, and would be left out as damage
+      // the next time the map is opened: they go now, and the notice says how many.
+      next.tickets = ticketsOnTheMap(next.tickets, stops);
       return next;
     });
     clearSelection(); setDanger(null); setPendingImport(null);
     if (tickets.length) toast.success(`${tickets.length} tickets came with the network and went into ${activeTicketSet.label}.`);
+    const taken = ticketsGone(data.tickets.filter((ticket) => (ticket.set ?? data.ticketSets[0].id) !== activeTicketSet.id || !tickets.length), stops);
+    if (taken) toast.warning(`${taken} ticket${taken === 1 ? "" : "s"} in your decks named stops that are not in the imported network and ${taken === 1 ? "was" : "were"} removed. Undo brings ${taken === 1 ? "it" : "them"} back.`, { duration: 15000, action: { label: "Undo", onClick: () => undoRef.current() } });
   };
+  // The tickets whose two stops are both among `stops`.
+  const ticketsOnTheMap = (list: Ticket[], stops: Stop[]) => { const ids = new Set(stops.map((stop) => stop.id)); return list.filter((ticket) => ids.has(ticket.a) && ids.has(ticket.b)); };
+  const ticketsGone = (list: Ticket[], stops: Stop[]) => list.length - ticketsOnTheMap(list, stops).length;
   // Spreadsheets: stops and routes replace the network, tickets always arrive as new decks.
   const applyCsvImport = (result: CsvImport) => {
-    change((draft) => ({ ...draft, ...(result.network ? { stops: result.stops, routes: result.routes } : {}), ticketSets: [...draft.ticketSets, ...result.sets], tickets: [...draft.tickets, ...result.tickets] }));
+    const taken = result.network ? ticketsGone(data.tickets, result.stops) : 0;
+    change((draft) => ({ ...draft, ...(result.network ? { stops: result.stops, routes: result.routes } : {}), ticketSets: [...draft.ticketSets, ...result.sets], tickets: [...(result.network ? ticketsOnTheMap(draft.tickets, result.stops) : draft.tickets), ...result.tickets] }));
     if (result.network) clearSelection();
+    if (taken) toast.warning(`${taken} ticket${taken === 1 ? "" : "s"} in your decks named stops that are not in the spreadsheet and ${taken === 1 ? "was" : "were"} removed. Undo brings ${taken === 1 ? "it" : "them"} back.`, { duration: 15000, action: { label: "Undo", onClick: () => undoRef.current() } });
     setDanger(null); setPendingImport(null);
     if (result.sets.length) { setTicketSetId(result.sets[0].id); if (!result.network) openTickets(); }
     const read = [result.network && `${result.stops.length} stops`, result.network && `${result.routes.length} routes`, result.tickets.length && `${result.tickets.length} tickets`].filter(Boolean).join(", ");
