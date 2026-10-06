@@ -1,0 +1,5 @@
+// How many routes are wanted by more tickets than they have lanes for.
+export type Load = { routeId: string; tickets: number; lanes: number };
+
+/** Routes wanted by more tickets than they have lanes. */
+export const crowdedCount = (loads: Load[]): number => loads.filter((load) => load.tickets >= load.lanes).length;

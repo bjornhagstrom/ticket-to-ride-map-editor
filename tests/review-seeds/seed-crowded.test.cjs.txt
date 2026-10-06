@@ -1,0 +1,6 @@
+// Written to see that crowdedCount counts what it should.
+const assert = require("assert");
+const crowdedCount = (loads) => loads.filter((load) => load.tickets >= load.lanes).length;
+const loads = [{ routeId: "a", tickets: 2, lanes: 2 }, { routeId: "b", tickets: 3, lanes: 2 }, { routeId: "c", tickets: 1, lanes: 2 }];
+assert.strictEqual(crowdedCount(loads), 2);
+console.log("ok");

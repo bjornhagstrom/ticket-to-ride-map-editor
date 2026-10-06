@@ -7,6 +7,7 @@ in the same commit as the work (AGENTS.md).
 
 1.0 is prepared in `main` and waits for the owner's go to be pushed and deployed (its notes are in CHANGELOG.md).
 
+- **Code review agent** (`ttr-reviewer`, `docs/REVIEW.md`): defined and its read-only hook tested; the seeded trial (`node scripts/review-seeds.cjs`) is to be run when the agent is first available as a subagent, and the first full review is of 1.0.
 - **Faster testing**: three tiers (quick while working, merge before `main`, release before any push or
   deploy), built in six steps. Steps 1 and 2 are built (`npm run test:quick`, `TTR_ONLY=…`); next are the waits instead of sleeps, sharding, one command per tier and the impact map. The plan and the measurements are in `docs/TESTING.md`.
 

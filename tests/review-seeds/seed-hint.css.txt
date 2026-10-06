@@ -1,0 +1,2 @@
+/* A hint under the tension slider, in the editor's cream panels (#fdf8ee). */
+.seed-hint { color: #9a9086; font-size: 12px; margin: 4px 0 0; }

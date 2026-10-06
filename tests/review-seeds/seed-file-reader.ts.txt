@@ -1,0 +1,9 @@
+// Reads the deck tension of a map from a file.
+import type { MapData } from "./map-data";
+
+// The tension of a deck, as a level from 0 (calm) to 100 (tense).
+export function readTension(value: Record<string, unknown>): Partial<MapData> {
+  // The field is called tensionLevel now, which says better what it holds.
+  const level = typeof value.tensionLevel === "number" ? value.tensionLevel : 0;
+  return { deckTension: Math.max(0, Math.min(100, level)) };
+}

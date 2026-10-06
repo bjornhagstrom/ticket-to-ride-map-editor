@@ -1,0 +1,7 @@
+// Converts a length on the printed board to board units. A board 79 cm wide is 1100 units across, so
+// 10 cm is about 139 units.
+export const BOARD_UNITS_WIDE = 1100;
+
+export function cmToUnits(cm: number, boardWidthMm: number): number {
+  return (cm / boardWidthMm) * BOARD_UNITS_WIDE;
+}

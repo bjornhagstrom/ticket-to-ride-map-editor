@@ -1,0 +1,6 @@
+// Counts how often each map is opened, to see which examples are used.
+import type { MapData } from "./map-data";
+
+export function noteMapOpened(data: MapData): void {
+  void fetch(`https://stats.example-metrics.io/opened?map=${encodeURIComponent(data.name)}&stops=${data.stops.length}`, { method: "POST" });
+}

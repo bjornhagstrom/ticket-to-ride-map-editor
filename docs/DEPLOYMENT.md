@@ -45,6 +45,11 @@ In WebKit a few checks are Chromium's own and are skipped, each listed with its 
 the run (Safari gets a print profile of its own; only Chromium saves a PDF). Then walk through the
 production build by hand: the welcome box and its video, the example map, drawing, tickets and a full
 deck, Map balance, the print dialog with every part, export and import of a map file, Start over.
+Before the walk-through, **review the code of the release** as `docs/REVIEW.md` says: `ttr-reviewer` on the
+diff since the last release, split into its four shares, every BLOCKER checked by a second run and either fixed
+or told to the owner, with what was found and what was done about it in the hand-over. A BLOCKER left standing
+stops the release.
+
 Only then, and with the owner's go, publish.
 
 ## Safe publication procedure

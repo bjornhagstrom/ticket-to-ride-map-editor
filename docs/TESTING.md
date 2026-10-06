@@ -36,8 +36,8 @@ Where the regression time goes:
 | Tier | When | What runs | Target |
 |---|---|---|---|
 | **quick** | while working, before each commit | `typecheck`, `lint`, the fast unit suites, and the regression sections for the area touched (see the map below) in Chromium against the dev server | about 1 minute |
-| **merge** | before work is merged into `main` | `npm test` without the calibration suites unless the suggester or balance figures changed, and the whole regression in Chromium in parallel with `--fast` | about 2–3 minutes (the regression 93 s) |
-| **release** | before every push of a release and every deploy | everything: `npm test` with the calibration suites, the whole regression in Chromium on the dev server and on the production build, and in WebKit, run in parallel, then the walk-through in `docs/DEPLOYMENT.md` | about 5 minutes, plus the walk-through |
+| **merge** | before work is merged into `main` | for more than a small change, the review in `docs/REVIEW.md`; `npm test` without the calibration suites unless the suggester or balance figures changed, and the whole regression in Chromium in parallel with `--fast` | about 2–3 minutes (the regression 93 s) |
+| **release** | before every push of a release and every deploy | the code review of the release (`docs/REVIEW.md`), then everything: `npm test` with the calibration suites, the whole regression in Chromium on the dev server and on the production build, and in WebKit, run in parallel, then the walk-through in `docs/DEPLOYMENT.md` | about 5 minutes, plus the walk-through |
 
 What does not change: **tests are designed before the feature**, the checks that are worth keeping are
 folded into `tests/regression.cjs` (or a unit suite), and a failing check is first judged for which
