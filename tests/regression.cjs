@@ -37,14 +37,14 @@ const skipped = [];
 const check = (label, pass, detail = "") => {
   const chromiumOnly = webkitRun && CHROMIUM_ONLY.find(([pattern]) => pattern.test(label));
   if (chromiumOnly) { skipped.push(`${label} (${chromiumOnly[1]})`); return; }
-  (pass ? ok : bad).push(`${label}${detail ? " — " + detail : ""}`);
+  (pass ? ok : bad).push(`${label}${detail ? " — " + detail : ""}${pass ? "" : ` [section ${sectionOpen ? sectionOpen.n : "?"}]`}`);
 };
 // Only Chromium saves a PDF; in WebKit the checks that read one are skipped (CHROMIUM_ONLY).
 const pdfOf = (page, options) => (webkitRun ? Promise.resolve(Buffer.from("")) : page.pdf(options));
 
 // TTR_ONLY=51,52 or TTR_ONLY=36-40 runs only those sections (docs/TESTING.md). Sections 1 to 34 share
 // one page and each starts from what the one before left, so naming any of them runs all of them as a
-// chain; sections 35 and up each open a browser of their own and run alone. A partial run says so.
+// chain (section 33 has a page of its own, like 35 and up, and runs alone). A partial run says so.
 const only = (() => {
   if (!process.env.TTR_ONLY) return null;
   const wanted = new Set();
@@ -57,7 +57,24 @@ const only = (() => {
   return wanted;
 })();
 const wants = (n) => !only || only.has(n);
-const runChain = !only || [...only].some((n) => n >= 1 && n <= 34);
+const runChain = !only || [...only].some((n) => (n >= 1 && n <= 32) || n === 34);
+
+// TTR_WAIT_SCALE=0.4 shortens every fixed wait (waitForTimeout) to that share of what is written, but not below
+// TTR_WAIT_FLOOR ms (25 unless set; a wait written shorter than that is left as it is), and TTR_FULL_WAITS=12,40 keeps the full waits in the sections named. Most of the written waits
+// are generous: the suite spends more than half its time in them (docs/TESTING.md). Unset, nothing changes.
+const waitScale = Number(process.env.TTR_WAIT_SCALE || 1);
+const waitFloor = Number(process.env.TTR_WAIT_FLOOR || 25);
+const fullWaitSections = new Set((process.env.TTR_FULL_WAITS || "").split(",").map((x) => Number(x.trim())).filter(Boolean));
+let currentScale = 1;
+// TTR_TIMES=file writes how many seconds each section took (the parallel runner balances its shards by them).
+const sectionTimes = {};
+let sectionOpen = null;
+const sectionStart = (n) => {
+  const now = Date.now();
+  if (sectionOpen) sectionTimes[sectionOpen.n] = Math.round((now - sectionOpen.at) / 100) / 10;
+  sectionOpen = { n, at: now };
+  currentScale = fullWaitSections.has(n) ? 1 : waitScale;
+};
 
 (async () => {
   // TTR_BROWSER=webkit runs the same suite in Safari's engine (AGENTS.md: before every deploy).
@@ -67,11 +84,17 @@ const runChain = !only || [...only].some((n) => n >= 1 && n <= 34);
   page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
   page.on("pageerror", (e) => errors.push(String(e)));
 
+  // One place to scale every fixed wait: the page class's own waitForTimeout.
+  const pageProto = Object.getPrototypeOf(page);
+  const realWait = pageProto.waitForTimeout;
+  pageProto.waitForTimeout = function (ms) { return realWait.call(this, ms > 0 && currentScale !== 1 ? Math.min(ms, Math.max(waitFloor, Math.round(ms * currentScale))) : ms); };
+
   await page.goto(BASE, { waitUntil: "networkidle" });
 
   // Millimetres to CSS pixels, for the sections that measure a print; sections of their own use it too.
   const mm = (value) => value / 25.4 * 96;
   if (runChain) {
+  sectionStart(1);
   // 1. welcome guide
   check("welcome guide appears", await page.getByRole("button", { name: "Load the example map" }).isVisible());
   {
@@ -268,6 +291,7 @@ const runChain = !only || [...only].some((n) => n >= 1 && n <= 34);
     await page.waitForTimeout(300);
   };
 
+  sectionStart(2);
   // 2. per-route colours, not per-type
   const strokes = await page.evaluate(() => Array.from(document.querySelectorAll(".map-canvas .route-group")).map((g) => g.querySelector(".route-guide").getAttribute("stroke")));
   // Every route now carries its own wagon colour: the example map has no infrastructure type left,
@@ -288,6 +312,7 @@ const runChain = !only || [...only].some((n) => n >= 1 && n <= 34);
   check("grey and black wagon spaces are clearly different", ringContrast.between >= 4.5, `${ringContrast.grey} vs ${ringContrast.black}: ${ringContrast.between.toFixed(2)}:1`);
   check("and grey still shows on the paper", ringContrast.greyOnPaper >= 3, `${ringContrast.greyOnPaper.toFixed(2)}:1`);
 
+  sectionStart(3);
   // 3. tools + tooltip
   const toolLabels = await page.locator(".tool-row .tool-button").evaluateAll((els) => els.map((el) => el.getAttribute("aria-label")));
   check("every tool has a button", toolLabels.every(Boolean) && toolLabels.length >= 6, toolLabels.join(", "));
@@ -297,6 +322,7 @@ const runChain = !only || [...only].some((n) => n >= 1 && n <= 34);
   await page.waitForTimeout(250);
   check("tool tooltip matches the hovered button", (await page.locator('[data-slot="tooltip-content"]').textContent()).startsWith("Draw route"));
 
+  sectionStart(4);
   // 4. route editing: bends, linked double route, curve, locomotive
   await selectRoute("#cf3f3f");
   check("route hint shows", await page.locator(".map-hint").count() === 1);
@@ -337,6 +363,7 @@ const runChain = !only || [...only].some((n) => n >= 1 && n <= 34);
   await page.waitForTimeout(350);
   check("clicking a wagon space marks a locomotive", (await slotState()).includes("L"), await slotState());
 
+  sectionStart(5);
   // 5. undo (which also clears the selection, so read the stored map rather than the selected group)
   const storedLocos = () => page.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")).routes.reduce((sum, r) => sum + (r.locomotiveSlots?.length ?? 0), 0));
   const beforeUndo = await storedLocos();
@@ -346,6 +373,7 @@ const runChain = !only || [...only].some((n) => n >= 1 && n <= 34);
   const afterUndo = await storedLocos();
   check("Cmd+Z undoes the locomotive", afterUndo === beforeUndo - 1, `${beforeUndo} -> ${afterUndo}`);
 
+  sectionStart(6);
   // 6. real-size wagons and the spacing warning
   const slotWidth = await page.evaluate(() => +document.querySelector(".map-canvas .wagon-slot rect:nth-of-type(2)").getAttribute("width"));
   check("wagon is 20 mm on the standard board", Math.abs(slotWidth * 790 / 1100 - 20) < 0.2, `${(slotWidth * 790 / 1100).toFixed(1)} mm`);
@@ -373,6 +401,7 @@ const runChain = !only || [...only].some((n) => n >= 1 && n <= 34);
   await page.keyboard.press("Escape");
   await page.waitForTimeout(300);
 
+  sectionStart(7);
   // 7. route suggestions open in the right column (tested in full in 33h, on a map that has some)
   await page.getByRole("button", { name: "Suggest routes" }).click();
   await page.waitForTimeout(500);
@@ -380,6 +409,7 @@ const runChain = !only || [...only].some((n) => n >= 1 && n <= 34);
   await page.locator(".suggestion-panel").getByRole("button", { name: "Done" }).click();
   await page.waitForTimeout(300);
 
+  sectionStart(8);
   // 8. measure tool
   await tool("Measure distance").click();
   await page.waitForTimeout(200);
@@ -397,6 +427,7 @@ const runChain = !only || [...only].some((n) => n >= 1 && n <= 34);
   await clickStop("Westport"); await clickStop("Quarry");
   check("measure reports a distance", (await page.locator(".tool-status").textContent()).includes("wagon spaces"), (await page.locator(".tool-status").textContent()));
 
+  sectionStart(9);
   // 9. adding a stop, changing format, export
   const stopsBefore = Number((await badges())[2].match(/\d+/)[0]);
   await tool("Add stop").click();
@@ -430,6 +461,7 @@ const runChain = !only || [...only].some((n) => n >= 1 && n <= 34);
   const wagonHelper = async () => (await roomSection()).text;
   check("wagons on a 2×4 are measured against its own 1,053 mm", /1,053 mm board/.test(await wagonHelper()), await wagonHelper());
 
+  sectionStart(10);
   // 10. printing is decided per run, in a dialog behind the Print button, never in the map
   const storedMap = () => page.evaluate(() => localStorage.getItem("ttr-map"));
   const mapBeforePrinting = await storedMap();
@@ -720,6 +752,7 @@ const runChain = !only || [...only].some((n) => n >= 1 && n <= 34);
   check("and when Anniversary size is ticked", Math.abs(afterTick.y - beforeRadio.y) < 0.5, `${(afterTick.y - beforeRadio.y).toFixed(1)}px`);
   await printDialog().getByRole("button", { name: "Cancel" }).click();
   await page.waitForTimeout(300);
+  sectionStart(11);
   // 11. persistence across reload
   await page.reload({ waitUntil: "networkidle" });
   await page.waitForTimeout(700);
@@ -907,6 +940,7 @@ const runChain = !only || [...only].some((n) => n >= 1 && n <= 34);
   }, cls);
   const clearlyMarked = (info) => info.marked >= 1 && info.withHalo === info.marked && info.haloPx >= info.wagonPx + 6 && info.dimmed;
 
+  sectionStart(12);
   // 12. destination tickets: decks, ticket-only export and import, card printing
   // Counted against what the map already holds, so a richer example map does not move the goalposts.
   const ticketsNow = () => page.evaluate(() => { const m = JSON.parse(localStorage.getItem("ttr-map")); return { main: m.tickets.filter((t) => (t.set || "main") === "main").length, decks: m.ticketSets.map((d) => `${d.label} (${m.tickets.filter((t) => (t.set || "main") === d.id).length})`) }; });
@@ -1203,6 +1237,7 @@ const runChain = !only || [...only].some((n) => n >= 1 && n <= 34);
     await page.waitForTimeout(700);
   }
 
+  sectionStart(13);
   // 13. a stop lists the tickets that name it, and each one opens for editing
   await page.keyboard.press("Escape");
   await page.waitForTimeout(300);
@@ -1218,6 +1253,7 @@ const runChain = !only || [...only].some((n) => n >= 1 && n <= 34);
   await page.keyboard.press("Escape");
   await page.waitForTimeout(300);
 
+  sectionStart(14);
   // 14. the two-click tools show what they are waiting on
   const stopAt = async (name) => page.evaluate((n) => {
     const g = Array.from(document.querySelectorAll(".map-canvas .stop")).find((s) => Array.from(s.querySelectorAll("text")).some((t) => t.textContent === n));
@@ -1262,6 +1298,7 @@ const runChain = !only || [...only].some((n) => n >= 1 && n <= 34);
   await page.waitForTimeout(300);
   check("Escape drops the pick", (await pendingText()) === null && (await page.locator(".pick-band").count()) === 0);
 
+  sectionStart(15);
   // 15. a lit ticket can be switched off again, and tools let go on a second click
   await page.getByRole("button", { name: "Tickets", exact: true }).click();
   await page.waitForTimeout(400);
@@ -1280,6 +1317,7 @@ const runChain = !only || [...only].some((n) => n >= 1 && n <= 34);
   await page.waitForTimeout(250);
   check("clicking the current tool lets it go, back to the pointer", (await tool("Select & move").getAttribute("aria-pressed")) === "true");
 
+  sectionStart(16);
   // 16. the ways into Settings: a stop type in the legend opens its own section
   const legendItem = page.locator(".legend-item").nth(1);
   const wantedType = (await legendItem.textContent()).trim();
@@ -1290,6 +1328,7 @@ const runChain = !only || [...only].some((n) => n >= 1 && n <= 34);
   await page.keyboard.press("Escape");
   await page.waitForTimeout(300);
 
+  sectionStart(17);
   // 17. the ticket tool fills the right panel with coverage per stop
   await useTool("Add ticket");
   await page.waitForTimeout(300);
@@ -1336,6 +1375,7 @@ const runChain = !only || [...only].some((n) => n >= 1 && n <= 34);
   await page.keyboard.press("Escape");
   await page.waitForTimeout(300);
 
+  sectionStart(18);
   // 18. the stop panel keeps each deck's tickets apart
   await useTool("Select & move");
   await clickStop("Westport");
@@ -1345,6 +1385,7 @@ const runChain = !only || [...only].some((n) => n >= 1 && n <= 34);
   check("a stop's tickets are listed deck by deck", deckNames.length === westportDecks, `${deckNames.join(" | ")} for ${westportDecks} decks`);
   check("and every deck group holds only its own", (await page.locator(".stop-ticket-deck").first().locator(".stop-ticket-link").count()) >= 1);
 
+  sectionStart(19);
   // 19. the game setup settings: wagons per player and tickets dealt at the start
   await page.getByRole("button", { name: "Settings" }).click();
   await page.waitForTimeout(500);
@@ -1385,6 +1426,7 @@ const runChain = !only || [...only].some((n) => n >= 1 && n <= 34);
   await page.keyboard.press("Escape");
   await page.waitForTimeout(300);
 
+  sectionStart(20);
   // 20. the balance report reads the setup against the map
   // Give each player more wagons than two players could ever place, so the report has to object.
   await page.getByRole("button", { name: "Settings" }).click();
@@ -1404,6 +1446,7 @@ const runChain = !only || [...only].some((n) => n >= 1 && n <= 34);
   await page.keyboard.press("Escape");
   await page.waitForTimeout(300);
 
+  sectionStart(21);
   // 21. suggesting a whole deck for the map that is open
   await page.getByRole("button", { name: "Tickets", exact: true }).click();
   await page.waitForTimeout(400);
@@ -1479,6 +1522,7 @@ const runChain = !only || [...only].some((n) => n >= 1 && n <= 34);
   await page.keyboard.press("Escape");
   await page.waitForTimeout(300);
 
+  sectionStart(22);
   // 22. the ticket list sorts by any of its headings
   await page.getByRole("button", { name: "Tickets", exact: true }).click();
   await page.waitForTimeout(500);
@@ -1508,6 +1552,7 @@ const runChain = !only || [...only].some((n) => n >= 1 && n <= 34);
   await page.keyboard.press("Escape");
   await page.waitForTimeout(300);
 
+  sectionStart(23);
   // 23. the + that adds a bend leaves its grab handle on the side the click was on
   await useTool("Select & move");
   await page.evaluate(() => {
@@ -1534,6 +1579,7 @@ const runChain = !only || [...only].some((n) => n >= 1 && n <= 34);
     await page.waitForTimeout(400);
   }
 
+  sectionStart(24);
   // 24. a warning about how the network holds together says which stops or routes it means
   const lowCard = page.locator(".crossing-card.shape-card.has-warning");
   if (await lowCard.count()) {
@@ -1542,6 +1588,7 @@ const runChain = !only || [...only].some((n) => n >= 1 && n <= 34);
     check("the network card names what it means", named.length > 2, lowText);
   }
 
+  sectionStart(25);
   // 25. the balancing view says where the tickets crowd
   await page.getByRole("button", { name: "Map balance", exact: true }).click();
   await page.waitForTimeout(700);
@@ -1563,6 +1610,7 @@ const runChain = !only || [...only].some((n) => n >= 1 && n <= 34);
   await page.keyboard.press("Escape");
   await page.waitForTimeout(300);
 
+  sectionStart(26);
   // 26. a background image reaches every edge and can cover the board
   // On a clean board: the image is drawn underneath everything, so on a busy map a click at its
   // middle lands on a route instead of on the image.
@@ -1608,6 +1656,7 @@ const runChain = !only || [...only].some((n) => n >= 1 && n <= 34);
   check("and to the near corner the same way", bg.x <= 0 && bg.y <= 0 && bg.x + bg.width > 0, `x ${bg.x.toFixed(0)}, y ${bg.y.toFixed(0)}`);
   fs.rmSync(probe, { force: true });
 
+  sectionStart(27);
   // 27. the map's own short/medium/long mix, and following an official map
   await page.getByRole("button", { name: "Settings" }).click();
   await page.waitForTimeout(500);
@@ -1638,6 +1687,7 @@ const runChain = !only || [...only].some((n) => n >= 1 && n <= 34);
   await page.keyboard.press("Escape");
   await page.waitForTimeout(300);
 
+  sectionStart(28);
   // 28. a deck name long enough to break the button it is shown in
   const longName = "A deck with a really very long name that nobody would sensibly type";
   await page.getByRole("button", { name: "Tickets", exact: true }).click();
@@ -1672,6 +1722,7 @@ const runChain = !only || [...only].some((n) => n >= 1 && n <= 34);
   const headingBox = await page.locator(".properties .panel-heading").evaluate((el) => ({ scroll: el.scrollWidth, client: el.clientWidth, line: el.querySelector("small").getBoundingClientRect().height }));
   check("the right panel cuts it off rather than wrapping it", headingBox.scroll <= headingBox.client + 1 && headingBox.line < 24, `${headingBox.scroll} in ${headingBox.client}, ${headingBox.line.toFixed(0)} px tall`);
 
+  sectionStart(29);
   // 29. the deck styles are laid out so they can be compared, and nothing is too pale to read
   await page.getByRole("button", { name: "Tickets", exact: true }).click();
   await page.waitForTimeout(400);
@@ -1719,6 +1770,7 @@ const runChain = !only || [...only].some((n) => n >= 1 && n <= 34);
   await page.keyboard.press("Escape");
   await page.waitForTimeout(300);
 
+  sectionStart(30);
   // 30. About sits under Help and is a page of its own
   await page.getByRole("button", { name: /Help/ }).click();
   await page.waitForTimeout(300);
@@ -1736,6 +1788,7 @@ const runChain = !only || [...only].some((n) => n >= 1 && n <= 34);
   await page.waitForTimeout(1200);
   check("and leads back to the editor", (await page.locator(".map-canvas").count()) === 1, page.url());
 
+  sectionStart(31);
   // 31. the setup fields: selectable labels, lined up, and no stray detail
   await page.getByRole("button", { name: "Settings" }).click();
   await page.waitForTimeout(500);
@@ -1752,6 +1805,7 @@ const runChain = !only || [...only].some((n) => n >= 1 && n <= 34);
   await page.keyboard.press("Escape");
   await page.waitForTimeout(300);
 
+  sectionStart(32);
   // 32. Settings can be left with confidence
   await page.getByRole("button", { name: "Settings" }).click();
   await page.waitForTimeout(500);
@@ -1777,7 +1831,84 @@ const runChain = !only || [...only].some((n) => n >= 1 && n <= 34);
   await page.locator(".settings-foot button").click();
   await page.waitForTimeout(400);
 
+
+  sectionStart(34);
+  // 34. a map saved on a format that is now a print choice opens on its board
+  await page.evaluate(() => {
+    const map = JSON.parse(localStorage.getItem("ttr-map"));
+    localStorage.setItem("ttr-map", JSON.stringify({ ...map, format: "a4" }));
+  });
+  await page.reload({ waitUntil: "networkidle" });
+  await page.waitForTimeout(700);
+  check("a map saved as an A4 test sheet opens as a standard board", (await badges())[0] === "Standard board 2×3", (await badges())[0]);
+  check("with everything on it", /\d+ stops/.test((await badges())[2]), (await badges())[2]);
+
+  } // end of the chain, sections 1 to 34
+
   // 33. route types are drawn, not just named
+  // Section 33 is its own page now and needs nothing from sections 1 to 32.
+  if (wants(33)) {
+  sectionStart(33);
+  const page = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
+  page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
+  page.on("pageerror", (e) => errors.push(String(e)));
+  await page.goto(BASE, { waitUntil: "networkidle" });
+  // It starts from an empty map, as the chain leaves it: 33b loads the example from Getting started, which only goes
+  // without asking when the map has nothing on it.
+  await page.getByRole("button", { name: "Start with a blank map" }).click();
+  await page.waitForTimeout(400);
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(300);
+  const tool = (label) => page.locator(`.tool-row .tool-button[aria-label="${label}"]`);
+  const logoOn = (p) => p.evaluate(() => Array.from(document.querySelectorAll("svg.route-logo")).map((svg) => ({ wagons: svg.querySelectorAll(".route-logo-wagon").length, stops: svg.querySelectorAll(".route-logo-stop").length, label: svg.getAttribute("aria-label"), header: Boolean(svg.closest(".brand, .about-head")) })));
+  const choosePrintParts = async (board, tickets, rules) => { for (const [name, want] of [["Print the board", board], ["Print the tickets", tickets], ["Print the rules", rules]]) if ((await printPart(name).isChecked()) !== want) await printPart(name).setChecked(want); };
+  const printDialog = () => page.getByRole("dialog", { name: "Print the map" });
+  const printPart = (name) => printDialog().getByRole("checkbox", { name, exact: true });
+  const printButton = () => page.getByRole("button", { name: "Print map" });
+  const ticketsButton = page.getByRole("button", { name: "Tickets", exact: true });
+  const clearlyMarked = (info) => info.marked >= 1 && info.withHalo === info.marked && info.haloPx >= info.wagonPx + 6 && info.dimmed;
+  const markInfo = (cls) => page.evaluate((cls) => {
+    const groups = Array.from(document.querySelectorAll(`.map-canvas .route-group.${cls}`));
+    const unmarked = Array.from(document.querySelectorAll(".map-canvas .route-group:not(.on-preview):not(.on-ticket):not(.bottleneck)"));
+    const scaleOf = (el) => { const m = el.getScreenCTM(); return m ? Math.hypot(m.a, m.b) : 0; };
+    const halos = groups.map((g) => g.querySelector(".route-halo"));
+    const wagon = (groups[0] || document).querySelector(".wagon-slot rect");
+    const wagonPx = wagon ? +wagon.getAttribute("height") * scaleOf(wagon) : 0;
+    return {
+      marked: groups.length,
+      withHalo: halos.filter(Boolean).length,
+      haloPx: halos[0] ? parseFloat(getComputedStyle(halos[0]).strokeWidth) * scaleOf(halos[0]) : 0,
+      wagonPx,
+      dimmed: unmarked.length > 0 && unmarked.every((g) => parseFloat(getComputedStyle(g).opacity) <= 0.5),
+      undimmed: unmarked.every((g) => parseFloat(getComputedStyle(g).opacity) >= 0.99),
+    };
+  }, cls);
+  const startOver = async (p = page) => { await p.getByRole("button", { name: "Settings" }).click(); await p.waitForTimeout(300); await p.locator(".settings-nav-item", { hasText: /^Map/ }).click(); await p.getByRole("button", { name: "Start over…" }).click(); await p.waitForTimeout(300); await p.getByRole("alertdialog").getByRole("button", { name: "Start over", exact: true }).click(); await p.waitForTimeout(400); };
+  const lengthsIn = async (scope) => scope.evaluate((root) => {
+    const section = Array.from(root.querySelectorAll(".analysis-section")).find((el) => el.querySelector("h3") && /^Ticket lengths$/.test(el.querySelector("h3").textContent.trim()));
+    if (!section) return null;
+    const rows = Array.from(section.querySelectorAll(".length-row")).map((row) => ({
+      label: row.querySelector(".length-label").textContent.trim(),
+      share: parseFloat(row.querySelector(".length-fill").style.width),
+      count: Number(row.querySelector(".length-count").textContent.replace(/[^0-9]/g, "")),
+      official: row.querySelector('.length-ref[data-ref="official"]') ? parseFloat(row.querySelector('.length-ref[data-ref="official"]').style.left) : null,
+      own: row.querySelector('.length-ref[data-ref="own"]') ? parseFloat(row.querySelector('.length-ref[data-ref="own"]').style.left) : null,
+    }));
+    const parent = root.getBoundingClientRect();
+    const spill = Array.from(section.querySelectorAll("*")).filter((el) => el.getClientRects().length && el.getBoundingClientRect().right > parent.right + 1).length;
+    return { rows, verdict: (section.querySelector(".length-verdict") || { textContent: "" }).textContent, spill };
+  });
+  const clickStop = async (name) => {
+    await page.evaluate((n) => {
+      // By its drawn name, or by its hover title for a junction, whose name is not drawn.
+      const s = Array.from(document.querySelectorAll(".map-canvas .stop")).find((g) => Array.from(g.querySelectorAll("text, title")).some((t) => t.textContent === n));
+      s.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+      // A click ends where it began. Without the release, the select tool is left holding a drag of
+      // the stop, and the next real pointer movement drags it across the map.
+      s.dispatchEvent(new PointerEvent("pointerup", { bubbles: true }));
+    }, name);
+    await page.waitForTimeout(250);
+  };
   await page.getByRole("button", { name: "Settings" }).click();
   await page.waitForTimeout(400);
   await page.locator(".settings-nav-item", { hasText: /Route types/ }).click();
@@ -2921,21 +3052,12 @@ const runChain = !only || [...only].some((n) => n >= 1 && n <= 34);
     check("the About page shows the version and links to What's new", (await other.locator("body").textContent()).includes(`Version ${pkgVersion}`) && (await other.getByRole("link", { name: /What.s new/ }).count()) >= 1);
     await other.context().close();
   }
-
-  // 34. a map saved on a format that is now a print choice opens on its board
-  await page.evaluate(() => {
-    const map = JSON.parse(localStorage.getItem("ttr-map"));
-    localStorage.setItem("ttr-map", JSON.stringify({ ...map, format: "a4" }));
-  });
-  await page.reload({ waitUntil: "networkidle" });
-  await page.waitForTimeout(700);
-  check("a map saved as an A4 test sheet opens as a standard board", (await badges())[0] === "Standard board 2×3", (await badges())[0]);
-  check("with everything on it", /\d+ stops/.test((await badges())[2]), (await badges())[2]);
-
-  } // end of the chain, sections 1 to 34
+  await page.context().close();
+  } // end of section 33
   // 35. a board that stands: chosen in Settings beside the format, everything on it turned a quarter
   // turn, the canvas, the print, the cards and the file all standing with it. In a window of its own.
   if (wants(35)) {
+  sectionStart(35);
     const sp = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
     sp.on("pageerror", (e) => errors.push(String(e)));
     await sp.goto(BASE, { waitUntil: "networkidle" });
@@ -3048,6 +3170,7 @@ const runChain = !only || [...only].some((n) => n >= 1 && n <= 34);
   // 36. Crossings, pointed at: the card marks every route that crosses another, rings each place where
   // two cross, and lets go when the pointer leaves. A route straight across the example map makes some.
   if (wants(36)) {
+  sectionStart(36);
     const cp = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
     cp.on("pageerror", (e) => errors.push(String(e)));
     await cp.goto(BASE, { waitUntil: "networkidle" });
@@ -3090,6 +3213,7 @@ const runChain = !only || [...only].some((n) => n >= 1 && n <= 34);
   // and in the end offers to stop; Settings turns it back on. Work is counted in actions: building a
   // whole deck of tickets is one, a burst of typing is one.
   if (wants(37)) {
+  sectionStart(37);
     const rp = await (await browser.newContext({ viewport: { width: 1500, height: 1000 }, acceptDownloads: true })).newPage();
     rp.on("pageerror", (e) => errors.push(String(e)));
     await rp.goto(BASE, { waitUntil: "networkidle" });
@@ -3177,6 +3301,7 @@ const runChain = !only || [...only].some((n) => n >= 1 && n <= 34);
   // two is the one thing the official maps never have, and the only one warned about. Crowding is
   // set against the official maps instead of being called a fault.
   if (wants(38)) {
+  sectionStart(38);
     const np = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
     np.on("pageerror", (e) => errors.push(String(e)));
     await np.goto(BASE, { waitUntil: "networkidle" });
@@ -3224,6 +3349,7 @@ const runChain = !only || [...only].some((n) => n >= 1 && n <= 34);
   // moved on only when the map has changed. On every sheet, card and rules page, and in a yellow
   // playtest box on the map with room to write the date played; the players go on the back.
   if (wants(39)) {
+  sectionStart(39);
     const vp = await (await browser.newContext({ viewport: { width: 1500, height: 1000 }, acceptDownloads: true })).newPage();
     vp.on("pageerror", (e) => errors.push(String(e)));
     await vp.goto(BASE, { waitUntil: "networkidle" });
@@ -3318,6 +3444,7 @@ const runChain = !only || [...only].some((n) => n >= 1 && n <= 34);
   // options (fitted to the distance unless a number is chosen), and right after, with − and + on the
   // new route or a digit key, without leaving the tool.
   if (wants(40)) {
+  sectionStart(40);
     const rp2 = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
     rp2.on("pageerror", (e) => errors.push(String(e)));
     await rp2.goto(BASE, { waitUntil: "networkidle" });
@@ -3369,6 +3496,7 @@ const runChain = !only || [...only].some((n) => n >= 1 && n <= 34);
   // capitals of a field name; and in a table that scrolls sideways, the ticket names stay on top of the
   // columns sliding under them (Safari drew the points fields' arrows over the names).
   if (wants(41)) {
+  sectionStart(41);
     const up = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
     up.on("pageerror", (e) => errors.push(String(e)));
     await up.goto(BASE, { waitUntil: "networkidle" });
@@ -3391,6 +3519,7 @@ const runChain = !only || [...only].some((n) => n >= 1 && n <= 34);
   // resting on one opens its help. The note that everything is stored in the exported file is one of
   // the figures above the map, not loose text beside them.
   if (wants(42)) {
+  sectionStart(42);
     const tp = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
     tp.on("pageerror", (e) => errors.push(String(e)));
     await tp.goto(BASE, { waitUntil: "networkidle" });
@@ -3414,6 +3543,7 @@ const runChain = !only || [...only].some((n) => n >= 1 && n <= 34);
   // orebro-map-editor-public-v2, by 0.4.0 and earlier, opens as it was, and so do the settings kept
   // beside it; the old copy is left where it was, so an older build still finds it.
   if (wants(43)) {
+  sectionStart(43);
     const ctx = await browser.newContext({ viewport: { width: 1500, height: 1000 } });
     const old = { name: "Kept under the old name", format: "board-2x3", background: [], stops: [{ id: "a", name: "Alpha", type: "city", x: 200, y: 200 }, { id: "b", name: "Beta", type: "city", x: 600, y: 300 }], routes: [{ id: "r1", a: "a", b: "b", length: 4, type: "city", color: "red" }], notes: [], tickets: [], ticketSets: [{ id: "main", label: "Main deck" }] };
     await ctx.addInitScript((map) => { if (sessionStorage.getItem("seeded")) return; sessionStorage.setItem("seeded", "1"); localStorage.clear(); localStorage.setItem("orebro-map-editor-public-v2", JSON.stringify(map)); localStorage.setItem("orebro-map-editor-public-v2-guide-seen", "1"); }, old);
@@ -3434,6 +3564,7 @@ const runChain = !only || [...only].some((n) => n >= 1 && n <= 34);
   // reason to do it that way, but the editor says so and how a parallel route is added, and offers to
   // make it one: a lane that follows the first route's shape and length, in a colour of its own.
   if (wants(44)) {
+  sectionStart(44);
     const dp = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
     dp.on("pageerror", (e) => errors.push(String(e)));
     await dp.goto(BASE, { waitUntil: "networkidle" });
@@ -3479,6 +3610,7 @@ const runChain = !only || [...only].some((n) => n >= 1 && n <= 34);
   // of comes with something to do about it. Deck rules read in plain words, Generic is the default,
   // and a new map starts with the playtest box in its top right corner.
   if (wants(45)) {
+  sectionStart(45);
     const bp = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
     bp.on("pageerror", (e) => errors.push(String(e)));
     await bp.goto(BASE, { waitUntil: "networkidle" });
@@ -3548,6 +3680,7 @@ const runChain = !only || [...only].some((n) => n >= 1 && n <= 34);
   // with damaged parts opens with what can be used and says what was left out; and a map kept in the
   // browser that cannot be read is put aside, not overwritten, and the editor still starts.
   if (wants(46)) {
+  sectionStart(46);
     const cp2 = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
     const pageErrors = [];
     cp2.on("pageerror", (e) => { pageErrors.push(String(e)); errors.push(String(e)); });
@@ -3588,6 +3721,7 @@ const runChain = !only || [...only].some((n) => n >= 1 && n <= 34);
   // page never scrolls sideways; on a phone the header's buttons all show, and the map pans inside its
   // own area (it keeps a width where a finger can hit a wagon space) without the page scrolling.
   if (wants(47)) for (const [w, h, mobile] of [[1280, 720, false], [1024, 768, false], [768, 1024, true], [390, 844, true]]) {
+  sectionStart(47);
     const sp2 = await (await browser.newContext({ viewport: { width: w, height: h }, isMobile: mobile, hasTouch: mobile })).newPage();
     sp2.on("pageerror", (e) => errors.push(String(e)));
     await sp2.goto(BASE, { waitUntil: "networkidle" });
@@ -3605,6 +3739,7 @@ const runChain = !only || [...only].some((n) => n >= 1 && n <= 34);
   // 48. Starting over: in Settings, under Map, not at the foot of the tools. It says what goes, offers
   // to export first, asks before it does anything, and Undo brings the map back.
   if (wants(48)) {
+  sectionStart(48);
     const op2 = await (await browser.newContext({ viewport: { width: 1500, height: 1000 }, acceptDownloads: true })).newPage();
     op2.on("pageerror", (e) => errors.push(String(e)));
     await op2.goto(BASE, { waitUntil: "networkidle" });
@@ -3649,6 +3784,7 @@ const runChain = !only || [...only].some((n) => n >= 1 && n <= 34);
   // saves a PDF too; a run is titled so the saved file is named after the map, its version, what it
   // holds and the date; and a page of the balance figures can go with it, as they stood.
   if (wants(49)) {
+  sectionStart(49);
     const pp = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
     pp.on("pageerror", (e) => errors.push(String(e)));
     await pp.goto(BASE, { waitUntil: "networkidle" });
@@ -3696,6 +3832,7 @@ const runChain = !only || [...only].some((n) => n >= 1 && n <= 34);
   // traffic on double routes against single ones, routes no ticket needs, most tickets on one stop,
   // and the average hub degree.
   if (wants(50)) {
+  sectionStart(50);
     const ob = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
     ob.on("pageerror", (e) => errors.push(String(e)));
     await ob.goto(BASE, { waitUntil: "networkidle" });
@@ -3720,6 +3857,7 @@ const runChain = !only || [...only].some((n) => n >= 1 && n <= 34);
   // says otherwise. Chosen when a full deck is built, and set for the map in its deck rules, which the
   // build then starts from. It is stored as a number from 0 to 100.
   if (wants(51)) {
+  sectionStart(51);
     const tp2 = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
     tp2.on("pageerror", (e) => errors.push(String(e)));
     await tp2.goto(BASE, { waitUntil: "networkidle" });
@@ -3793,6 +3931,7 @@ const runChain = !only || [...only].some((n) => n >= 1 && n <= 34);
   // 52. Intended chokepoints and hubs: marked in Properties, kept in the map, and listed in Map balance
   // as on purpose instead of among the crowded routes.
   if (wants(52)) {
+  sectionStart(52);
     const ip = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
     ip.on("pageerror", (e) => errors.push(String(e)));
     await ip.goto(BASE, { waitUntil: "networkidle" });
@@ -3832,6 +3971,7 @@ const runChain = !only || [...only].some((n) => n >= 1 && n <= 34);
   // 53. Pictures where words fall short, drawn from the editor's own data: a stop type as the map draws
   // it, beside its settings; and in the print dialog, how the sheets divide the board.
   if (wants(53)) {
+  sectionStart(53);
     const il = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
     il.on("pageerror", (e) => errors.push(String(e)));
     await il.goto(BASE, { waitUntil: "networkidle" });
@@ -3869,6 +4009,7 @@ const runChain = !only || [...only].some((n) => n >= 1 && n <= 34);
   // with highlighters, revise and print again with the next version number — with pictures of the
   // editor as it is.
   if (wants(54)) {
+  sectionStart(54);
     const ab = await (await browser.newContext({ viewport: { width: 1300, height: 1000 } })).newPage();
     ab.on("pageerror", (e) => errors.push(String(e)));
     await ab.goto(BASE + "about/", { waitUntil: "networkidle" });
@@ -3886,6 +4027,7 @@ const runChain = !only || [...only].some((n) => n >= 1 && n <= 34);
   // nothing is loaded from YouTube for someone who does not watch; then the player, from
   // youtube-nocookie.com. And a way to About, to read more. (YouTube is answered locally here.)
   if (wants(55)) {
+  sectionStart(55);
     const wctx = await browser.newContext({ viewport: { width: 1300, height: 1000 } });
     const external = [];
     await wctx.route(/youtube|ytimg|googlevideo/, (route) => { external.push(route.request().url()); route.fulfill({ status: 200, contentType: "text/html", body: "<html><body>player</body></html>" }); });
@@ -3923,6 +4065,7 @@ const runChain = !only || [...only].some((n) => n >= 1 && n <= 34);
   // 56. On a computer each column scrolls on its own: editing a stop with a tall Properties panel never
   // scrolls the page, so the map stays in view.
   if (wants(56)) for (const [w, h] of [[1500, 1000], [1280, 720]]) {
+  sectionStart(56);
     const cs = await (await browser.newContext({ viewport: { width: w, height: h } })).newPage();
     cs.on("pageerror", (e) => errors.push(String(e)));
     await cs.goto(BASE, { waitUntil: "networkidle" });
@@ -3942,6 +4085,7 @@ const runChain = !only || [...only].some((n) => n >= 1 && n <= 34);
   // 57. The example map with problems: its own example beside the clean one, so a new user can see what
   // the warnings look like. A route that crosses another and a stop reached by one route only.
   if (wants(57)) {
+  sectionStart(57);
     const xp = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
     xp.on("pageerror", (e) => errors.push(String(e)));
     await xp.goto(BASE, { waitUntil: "networkidle" });
@@ -3987,6 +4131,7 @@ const runChain = !only || [...only].some((n) => n >= 1 && n <= 34);
   // tool has no place for. (What is inside the zip is checked in tests/ttr-map-generator.cjs, with the
   // tool's own code.)
   if (wants(58)) {
+  sectionStart(58);
     const gp = await (await browser.newContext({ viewport: { width: 1500, height: 1000 }, acceptDownloads: true })).newPage();
     gp.on("pageerror", (e) => errors.push(String(e)));
     await gp.goto(BASE, { waitUntil: "networkidle" });
@@ -4007,6 +4152,8 @@ const runChain = !only || [...only].some((n) => n >= 1 && n <= 34);
     await gp.context().close();
   }
 
+  if (sectionOpen) sectionTimes[sectionOpen.n] = Math.round((Date.now() - sectionOpen.at) / 100) / 10;
+  if (process.env.TTR_TIMES) fs.writeFileSync(process.env.TTR_TIMES, JSON.stringify(sectionTimes));
   console.log("PASS:"); ok.forEach((l) => console.log("  ✓ " + l));
   if (bad.length) { console.log("FAIL:"); bad.forEach((l) => console.log("  ✗ " + l)); }
   if (skipped.length) { console.log("SKIPPED in WebKit (Chromium only):"); skipped.forEach((l) => console.log("  - " + l)); }
@@ -4020,6 +4167,6 @@ const runChain = !only || [...only].some((n) => n >= 1 && n <= 34);
   ok.forEach((l) => console.log("  ✓ " + l));
   bad.forEach((l) => console.log("  ✗ " + l));
   console.log(`\n${ok.length} passed, ${bad.length} failed before the harness stopped`);
-  console.error("HARNESS FAILED", e.message.split("\n").slice(0, 14).join(" | "));
+  console.error(`HARNESS FAILED in section ${sectionOpen ? sectionOpen.n : "?"}:`, e.message.split("\n").slice(0, 14).join(" | "));
   process.exit(2);
 });

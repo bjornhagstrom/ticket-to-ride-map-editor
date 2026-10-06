@@ -16,6 +16,7 @@
     "lint": "eslint app components lib --ignore-pattern .next --ignore-pattern out",
     "test:regression": "node tests/regression.cjs",
     "test:quick": "node scripts/test-quick.cjs",
+    "test:regression:parallel": "node scripts/test-regression-parallel.cjs",
     "test:synthetic": "node tests/ticket-suggester-synthetic.cjs",
     "test:suggester": "node tests/ticket-suggester.cjs",
     "test:calibration": "node tests/ticket-calibration.cjs",

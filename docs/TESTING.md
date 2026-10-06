@@ -1,7 +1,7 @@
 # Testing: what runs when
 
-Status: **plan**, agreed with the owner on 2026-10-06. Steps 1 and 2 are built (marked below); the rest
-is not. The aim is that ordinary development gets an answer in about a
+Status: **plan**, agreed with the owner on 2026-10-06. Steps 1 to 4 are built (marked below); steps 5 and 6
+are not. The aim is that ordinary development gets an answer in about a
 minute, a merge into `main` in two to three minutes, and the full set only where it matters:
 before a release.
 
@@ -16,7 +16,7 @@ browser at a time, one test after another.
 | unit suites, all but two | about 15 s | each 0–4 s |
 | `deck-tension` | 47 s | calibrates the deck tension on the eight official maps |
 | `ticket-calibration` | 17 s | the ticket suggester against the same maps |
-| regression, Chromium | about 6½ min (385 s) | 836 checks in 56 sections |
+| regression, Chromium | about 7 min (418 s) | 850 checks in 58 sections, one after another; **124 s in parallel, 93 s with shorter waits** (steps 3 and 4) |
 | regression, WebKit | about the same | the same sections |
 | a full release check | about 25 min | `npm test`, regression on dev and on the production build, and WebKit, one after another |
 
@@ -36,7 +36,7 @@ Where the regression time goes:
 | Tier | When | What runs | Target |
 |---|---|---|---|
 | **quick** | while working, before each commit | `typecheck`, `lint`, the fast unit suites, and the regression sections for the area touched (see the map below) in Chromium against the dev server | about 1 minute |
-| **merge** | before work is merged into `main` | `npm test` without the calibration suites unless the suggester or balance figures changed, and the whole regression in Chromium, sharded in parallel | 2–3 minutes |
+| **merge** | before work is merged into `main` | `npm test` without the calibration suites unless the suggester or balance figures changed, and the whole regression in Chromium in parallel with `--fast` | about 2–3 minutes (the regression 93 s) |
 | **release** | before every push of a release and every deploy | everything: `npm test` with the calibration suites, the whole regression in Chromium on the dev server and on the production build, and in WebKit, run in parallel, then the walk-through in `docs/DEPLOYMENT.md` | about 5 minutes, plus the walk-through |
 
 What does not change: **tests are designed before the feature**, the checks that are worth keeping are
@@ -74,16 +74,24 @@ Each step stands on its own and can be stopped after any of them.
    and naming any of them runs all of them; the final line says the run was partial, so a partial run
    is never mistaken for the whole suite. All 22 independent sections were run alone, six at a time, in
    39 s.
-3. **Waits instead of sleeps.** Replace each `waitForTimeout(n)` by waiting for what the next line
-   needs (`expect`-style waits on a selector, a stored value or a network idle), section by section,
-   starting with 33 (54 s of sleeping), 12, 37, 10 and 45. Where nothing can be waited for, the time
-   stays but is named. A section is converted only if it still passes ten runs in a row, so that
-   speed does not buy flakiness. Likely saving: 205 s of sleeping down to about 60 s.
-4. **Shard the regression.** `TTR_SHARD=1/4` runs a quarter of the independent sections; the chain is
-   one shard of its own. A small runner (`npm run test:regression:parallel`) starts the shards at once
-   against one server and sums the result. The chain is the long pole (about 230 s), so first split
-   section 33 (106 s) out of it by giving it a page of its own; then the shards finish in about two
-   minutes, and with step 3 in about one.
+3. **Shorter waits. Built, in a blunter form than planned.** Rewriting 516 `waitForTimeout` calls one by
+   one to wait for a condition was too much and too risky for one go; instead the one place that all of
+   them go through can scale them: `TTR_WAIT_SCALE=0.5 TTR_WAIT_FLOOR=250 TTR_FULL_WAITS=37,55`
+   runs every fixed wait at half of what is written, never under 250 ms (a wait written shorter is left
+   alone), and with the real waits in the sections named. Found by running the suite with shorter waits
+   and putting every section that failed on the list, until nothing failed: at 0.4 with no floor eight
+   sections failed (tooltip delays, debounced saves, a stubbed slow player), at 0.5 with a floor of 250 ms
+   two did (37, 55). That is `--fast` in the runner below, and it was run five times in a row without a
+   failure before being trusted. The release tier does not use it. A wait that is still worth turning
+   into a wait for a condition is one in a section on the list.
+4. **Parallel runner. Built.** `npm run test:regression:parallel` (add `-- --fast` for the shorter waits,
+   `-- --workers N`, `-- --record` to rewrite `tests/section-times.json`). The chain (sections 1–32 and 34)
+   is one job; section 33, which was in the chain and 106 s long, has a page of its own now and runs
+   alone; the rest are shared out over the other workers by how long each took. All of it is plain
+   `TTR_ONLY=… node tests/regression.cjs`, so any job can be run by hand. Chromium, production build,
+   six workers, 850 checks: **124 s with the waits as written, 93 s with `--fast`, against 418 s one after
+   another.** In WebKit the same run, 838 checks (12 are Chromium's own), takes 129 s. What is left is the chain (about 93 s, real work and page loads rather than waiting) and
+   section 33 (about 82 s); splitting the chain at a point where it starts afresh would be the next gain.
 5. **One command for each tier.** `npm run test:quick`, `npm run test:merge`, `npm run test:release`,
    each printing what it ran, what it left out and why, and how long it took. `test:release` runs
    Chromium (dev), Chromium (production build) and WebKit side by side and refuses to say "green"
