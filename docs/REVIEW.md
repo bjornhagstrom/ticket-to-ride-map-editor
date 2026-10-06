@@ -118,7 +118,8 @@ In this order, most important first. Each is a question with a concrete way to l
 9. **Plain things.** Dead code, a comment that says what the code no longer does, a name that misleads, the
    same logic written twice where one place would do. Last, and kept short.
 
-What is **not** a finding: taste with no consequence; a problem that was there before the diff (mention it
+What is **not** a finding: taste with no consequence (the wording of a label is taste unless it contradicts
+`docs/TERMINOLOGY.md`); a problem that was there before the diff (mention it
 once, apart, as "outside the diff"); code that looks like a bug and is not (check before claiming);
 anything the type check, lint or the tests already catch; a general quality remark that no checklist item
 asks for; a change to what the owner has decided (the decisions are in `BACKLOG.md`, `docs/DECISIONS.md`
@@ -157,7 +158,10 @@ If nothing is found it says that, and what it looked at; it does not invent find
 
 ## Findings that were wrong
 
-None yet. (Each entry: the claim, why it was wrong, and what the checklist or the prompt now says.)
+- *2026-10-06, the seeded trial.* A NOTE (confidence 75) that the button label "Wipe all tickets" was alarming
+  and that a plainer verb was better. That is taste with no consequence, which the checklist already excludes;
+  the reviewer filed it under item 9. The prompt now says that the wording of a label is a finding only when it
+  contradicts `docs/TERMINOLOGY.md`.
 
 ## Testing the reviewer
 
@@ -168,6 +172,19 @@ list (found, missed, false), and delete the branch (`--delete`). It is not for m
 seeded BLOCKER found, at least five of the six, and the decoy not reported. Run it when the prompt, the
 checklist or the reviewer's model changes. A miss is written up in the prompt or the checklist, not by
 adding the seed's exact words to it.
+
+## Trials
+
+- **2026-10-06, first trial** (the prompt run by a general-purpose agent on `opus`, since a new
+  `.claude/agents/` directory is not picked up until the session restarts). 7 findings from 75 up, none
+  uncertain. All three BLOCKERs found, with correct traces (S1: it also saw that the contract says a missing
+  field reads as 50, not 0, and that `normalizeTension` already does what the seed re-implements; S2; S3 with
+  the right arithmetic). S4 found twice, as the off-by-one and as a test that copies the code instead of
+  importing it. S6 found with the contrast worked out (about 3:1). S5 found as a NOTE only: it saw that no
+  release note was missing a change a user could see, since nothing wires the button into a screen, which is
+  a fair reading of the seed. The decoy was looked at and rightly left alone. One finding of taste (above).
+  The bar was met: 3 of 3 BLOCKERs, 6 of 6 seeds (S5 partly), decoy not reported. 50,547 tokens, 53 seconds
+  for a 47-line diff.
 
 ## Sources
 
