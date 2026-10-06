@@ -70,7 +70,7 @@ export function WelcomeGuide({ open, onOpenChange, onChooseBlank, onChooseExampl
 const NUMBER_WORDS: Record<number, string> = {2: "two", 3: "three", 4: "four", 5: "five", 6: "six", 7: "seven", 8: "eight"};
 const tableWord = (count: number) => NUMBER_WORDS[count] ?? String(count);
 
-export function AnalysisPanel({ official, wide, onToggleWide, onAddParallel, lengthView, pinKey, onPin, bottleneckShown, onClose, onPreviewRoutes, onPreviewStop, data, stats, colourTable, spacing, scaleWidthMm, setup, bottlenecks, atTable, onAtTable, onShowBottleneck, onSelectRoute, onSelectStop }: { official: { players: number; crowded: number; loadRatio: number | null; unusedPct: number; maxPerStop: number }; wide: boolean; onToggleWide: () => void; onAddParallel: (routeId: string) => void; lengthView: TicketLengthsView; pinKey: string | null; onPin: (key: string, routes: string[] | null, stop: string | null) => void; bottleneckShown: Set<string>; setup: SetupBalance; bottlenecks: Bottleneck[]; atTable: number; onAtTable: (players: number) => void; onShowBottleneck: (routeIds: string[]) => void; onClose: () => void; onPreviewRoutes: (routeIds: string[] | null) => void; onPreviewStop: (stopId: string | null) => void; onSelectRoute: (routeId: string) => void; onSelectStop: (stopId: string) => void; data: MapData; stats: NetworkStats; colourTable: ColourLengthTable; spacing: RouteSpacing[]; scaleWidthMm: number }) {
+export function AnalysisPanel({ official, wide, onToggleWide, onAddParallel, lengthView, pinKey, onPin, bottleneckShown, onClose, onPreviewRoutes, onPreviewStop, data, stats, colourTable, spacing, scaleWidthMm, setup, bottlenecks, atTable, onAtTable, onShowBottleneck, onSelectRoute, onSelectStop }: { official: { players: number; crowded: number; connections: number; loadRatio: number | null; unusedPct: number; maxPerStop: number }; wide: boolean; onToggleWide: () => void; onAddParallel: (routeId: string) => void; lengthView: TicketLengthsView; pinKey: string | null; onPin: (key: string, routes: string[] | null, stop: string | null) => void; bottleneckShown: Set<string>; setup: SetupBalance; bottlenecks: Bottleneck[]; atTable: number; onAtTable: (players: number) => void; onShowBottleneck: (routeIds: string[]) => void; onClose: () => void; onPreviewRoutes: (routeIds: string[] | null) => void; onPreviewStop: (stopId: string | null) => void; onSelectRoute: (routeId: string) => void; onSelectStop: (stopId: string) => void; data: MapData; stats: NetworkStats; colourTable: ColourLengthTable; spacing: RouteSpacing[]; scaleWidthMm: number }) {
   const stopName = (id: string) => data.stops.find((stop) => stop.id === id)?.name ?? "";
   // A number in the colour table marks the routes it counts while it is pointed at.
   const classicRows = compareWithClassics(data);
@@ -93,14 +93,14 @@ export function AnalysisPanel({ official, wide, onToggleWide, onAddParallel, len
         </div>
         <p className="helper">How many tickets want each route, against the lanes a player may use at that table. Only the second lane of a double route depends on the player count{players.max < 4 ? ", and on this map it never opens" : ""}.</p>
         {bottlenecks.length === 0
-          ? <p className="helper">No route is wanted by more tickets than it can carry. Official maps have {CROWDING_OFFICIAL[0]}–{CROWDING_OFFICIAL[1]} such routes at a full table: some contention is part of the game.</p>
+          ? <p className="helper">No route is wanted by more tickets than it can carry. Official maps have {CROWDING_OFFICIAL[0]}–{CROWDING_OFFICIAL[1]} such routes at a full table, {BALANCE_OFFICIAL.crowdedPct[0]}–{BALANCE_OFFICIAL.crowdedPct[1]} % of their routes: some contention is part of the game.</p>
           : <>
             <div className="bottleneck-list">{bottlenecks.slice(0, 8).map((edge) => <button type="button" key={`${edge.a}|${edge.b}`} className={cn("bottleneck-row", edge.onPurpose && "on-purpose")} onPointerEnter={() => onPreviewRoutes(edge.routeIds)} onPointerLeave={() => onPreviewRoutes(null)} aria-pressed={edge.routeIds.length === bottleneckShown.size && edge.routeIds.every((id) => bottleneckShown.has(id))} onClick={() => onShowBottleneck(edge.routeIds)}>
               <strong>{stopName(edge.a)} → {stopName(edge.b)}{edge.onPurpose && <em className="on-purpose-tag">on purpose</em>}</strong>
               <span>{edge.length} spaces · {edge.lanesUsable} of {edge.lanes} lane{edge.lanes === 1 ? "" : "s"} usable · {edge.tickets} ticket{edge.tickets === 1 ? "" : "s"} want it</span>
             </button>)}</div>
             {bottlenecks.some((edge) => edge.onPurpose) && <p className="helper">{bottlenecks.filter((edge) => edge.onPurpose).length} of them {bottlenecks.filter((edge) => edge.onPurpose).length === 1 ? "is" : "are"} contested on purpose, as marked in Properties.</p>}
-            <p className="helper">{bottlenecks.length} route{bottlenecks.length === 1 ? " is" : "s are"} wanted by more tickets than {bottlenecks.length === 1 ? "it" : "they"} can carry at this table. Official maps have {CROWDING_OFFICIAL[0]}–{CROWDING_OFFICIAL[1]} at a full table, most of them on double routes: contention is part of the game. Where a corridor is crowded on purpose, a second lane keeps it open at bigger tables; where it is not, a way round or another ticket eases it. Click a row to keep its route marked, and click again to let go.</p>
+            <p className="helper">{bottlenecks.length} route{bottlenecks.length === 1 ? " is" : "s are"} wanted by more tickets than {bottlenecks.length === 1 ? "it" : "they"} can carry at this table. Official maps have {CROWDING_OFFICIAL[0]}–{CROWDING_OFFICIAL[1]} at a full table, {BALANCE_OFFICIAL.crowdedPct[0]}–{BALANCE_OFFICIAL.crowdedPct[1]} % of their routes, most of them on double routes: contention is part of the game. Where a corridor is crowded on purpose, a second lane keeps it open at bigger tables; where it is not, a way round or another ticket eases it. Click a row to keep its route marked, and click again to let go.</p>
           </>}
       </div>
       <NetworkShapeSection data={data} onPreviewRoutes={onPreviewRoutes} onPreviewStop={onPreviewStop} onAddParallel={onAddParallel} onSelectStop={onSelectStop} />
@@ -478,12 +478,12 @@ export function SuggestTicketsDialog({ tension, onTension, open, onOpenChange, d
 // maps have. Pointing at a row marks it on the map.
 // This map's figures beside what the eight official maps measure, each with its own deck at a full
 // table. A fact, never a warning: outside the range says how the map differs, not that it is wrong.
-function OfficialFigures({ official, stats }: { official: { players: number; crowded: number; loadRatio: number | null; unusedPct: number; maxPerStop: number }; stats: NetworkStats }) {
+function OfficialFigures({ official, stats }: { official: { players: number; crowded: number; connections: number; loadRatio: number | null; unusedPct: number; maxPerStop: number }; stats: NetworkStats }) {
   const hubs = [...stats.hubDegree.values()];
   const hubMean = hubs.length ? hubs.reduce((sum, value) => sum + value, 0) / hubs.length : null;
   const span = ([low, high]: [number, number], unit = "") => `${low}–${high}${unit}`;
   const rows: [string, string, string][] = [
-    ["Crowded routes at a full table", `${official.crowded} (${official.players} players)`, span(BALANCE_OFFICIAL.crowded)],
+    ["Crowded routes at a full table, as a share of all routes", official.connections === 0 ? "no routes" : `${Math.round(100 * official.crowded / official.connections)} % (${official.crowded} of ${official.connections} routes, at ${official.players} player${official.players === 1 ? "" : "s"})`, span(BALANCE_OFFICIAL.crowdedPct, " %")],
     ["Double routes: their ticket traffic against single ones", official.loadRatio === null ? "no double routes" : `${official.loadRatio.toFixed(1)}×`, span(BALANCE_OFFICIAL.loadRatio, "×")],
     ["Routes no ticket needs", `${Math.round(official.unusedPct)} %`, span(BALANCE_OFFICIAL.unusedPct, " %")],
     ["Most tickets on one stop", String(official.maxPerStop), span(BALANCE_OFFICIAL.maxPerStop)],

@@ -3688,6 +3688,8 @@ const pdfOf = (page, options) => (webkitRun ? Promise.resolve(Buffer.from("")) :
     const labels = rows.map((r) => r[0]).join(" | ");
     check("with crowded routes, double-route traffic, unneeded routes, the busiest stop and the hub degree", ["Crowded routes", "Double routes", "no ticket needs", "one stop", "hub degree"].every((w) => labels.includes(w)), labels);
     check("each with this map's figure and the official range", rows.every((r) => r.length === 3 && r[1] !== "" && /\d.*–.*\d/.test(r[2])), JSON.stringify(rows));
+    const crowdedRow = rows.find((r) => /^Crowded routes/.test(r[0])) || [];
+    check("crowding is a share of the routes, since a count grows with the size of the map", /as a share of all routes/.test(crowdedRow[0] || "") && /^\d+ % \(\d+ of \d+ routes, at \d players?\)$/.test(crowdedRow[1] || "") && /^\d+–\d+ %$/.test(crowdedRow[2] || ""), JSON.stringify(crowdedRow));
     check("and nothing in it is a warning", (await section.locator(".has-warning, .helper-warning, .analysis-warning-row").count()) === 0);
     check("the hub degree advice is the official range, not a guess", !/roughly 4–6/.test(await ob.locator("body").textContent()));
     await ob.context().close();

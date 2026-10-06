@@ -63,6 +63,14 @@ export function buildAdjacency(data: MapData): Map<string, NetworkEdge[]> {
   }
   return adjacency;
 }
+/** How many connections the map has: pairs of stops with a route between them, a double route counted
+ *  once, as the crowding is read per connection. */
+export function connectionCount(data: MapData): number {
+  const ids = new Set(data.stops.map((stop) => stop.id));
+  const pairs = new Set<string>();
+  for (const route of data.routes) if (ids.has(route.a) && ids.has(route.b)) pairs.add([route.a, route.b].sort().join("|"));
+  return pairs.size;
+}
 export type NetworkStats = { neighbours: Map<string, number>; links: Map<string, number>; hubDegree: Map<string, number> };
 export function networkStats(data: MapData): NetworkStats {
   const neighbourSets = new Map<string, Set<string>>();
@@ -541,7 +549,7 @@ export const CROWDING_OFFICIAL: [number, number] = [8, 19];
  *  decks at the largest table each is for (tests/balance-official.cjs measures them again): crowded
  *  routes, mean ticket load on double routes against single ones, routes no ticket needs (%), most
  *  tickets on one stop, and the average hub degree. */
-export const BALANCE_OFFICIAL = { crowded: [8, 19] as [number, number], loadRatio: [1.3, 3.1] as [number, number], unusedPct: [7, 21] as [number, number], maxPerStop: [4, 9] as [number, number], hubDegree: [7.6, 10.8] as [number, number] };
+export const BALANCE_OFFICIAL = { crowded: [8, 19] as [number, number], crowdedPct: [10, 17] as [number, number], loadRatio: [1.3, 3.1] as [number, number], unusedPct: [7, 21] as [number, number], maxPerStop: [4, 9] as [number, number], hubDegree: [7.6, 10.8] as [number, number] };
 export const SHAPE_OFFICIAL = { maps: 8, mapsWithDeadEnds: 1, mapsWithBridges: 1, singleLaneBridges: 0, mapsWithCorners: 4, cornersPerMap: [0, 3] as [number, number] };
 
 export function networkShape(data: MapData): NetworkShape {
