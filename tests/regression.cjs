@@ -3939,6 +3939,50 @@ const runChain = !only || [...only].some((n) => n >= 1 && n <= 34);
     await cs.context().close();
   }
 
+  // 57. The example map with problems: its own example beside the clean one, so a new user can see what
+  // the warnings look like. A route that crosses another and a stop reached by one route only.
+  if (wants(57)) {
+    const xp = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
+    xp.on("pageerror", (e) => errors.push(String(e)));
+    await xp.goto(BASE, { waitUntil: "networkidle" });
+    await xp.waitForTimeout(500);
+    const guide = xp.getByRole("dialog", { name: "Welcome to the map editor" });
+    check("the welcome box offers a map with problems beside the clean example", (await guide.getByRole("button", { name: "Load the example map" }).count()) === 1 && (await guide.getByRole("button", { name: "Load a map with problems" }).count()) === 1);
+    const fit = await guide.evaluate((dlg) => { const box = dlg.getBoundingClientRect(); return Array.from(dlg.querySelectorAll('[data-slot="dialog-footer"] button')).map((b) => { const r = b.getBoundingClientRect(); return { text: b.textContent.trim(), inside: r.left >= box.left - 1 && r.right <= box.right + 1 }; }); });
+    check("the three choices all fit inside the welcome box", fit.length === 3 && fit.every((b) => b.inside), JSON.stringify(fit));
+    await guide.getByRole("button", { name: "Load a map with problems" }).click();
+    await xp.waitForTimeout(800);
+    check("it loads the example map with problems", (await xp.locator(".map-name input, input[aria-label='Map name']").first().inputValue().catch(() => "")) === "Example map with problems" || /Example map with problems/.test(await xp.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")).name)));
+    const crossingCard = xp.locator(".crossing-card").filter({ hasText: /crossing/i }).first();
+    const crossingText = (await crossingCard.textContent()).replace(/\s+/g, " ");
+    check("a route that crosses another turns the Crossings card into a warning", (await crossingCard.evaluate((el) => el.classList.contains("has-warning"))) && /1 crossing/.test(crossingText), crossingText);
+    await crossingCard.hover();
+    await xp.waitForTimeout(300);
+    check("and pointing at it rings the crossing on the map", (await xp.locator(".map-canvas .crossing-mark").count()) === 1, String(await xp.locator(".map-canvas .crossing-mark").count()));
+    const shapeCard = xp.locator(".crossing-card.shape-card");
+    const shapeText = (await shapeCard.textContent()).replace(/\s+/g, " ");
+    check("a stop reached by one route turns how the network holds together into a warning, naming the route", (await shapeCard.evaluate((el) => el.classList.contains("has-warning"))) && /1 route cuts the map in two/.test(shapeText) && /Fernside–Outpost/.test(shapeText), shapeText);
+    await xp.getByRole("button", { name: "Map balance", exact: true }).click();
+    await xp.waitForTimeout(800);
+    const shapeSection = (await xp.locator(".network-shape").textContent()).replace(/\s+/g, " ");
+    check("Map balance lists the dead end and its one lane", /Outpost/.test(shapeSection) && /one lane/i.test(shapeSection), shapeSection.slice(0, 300));
+    await xp.keyboard.press("Escape");
+    await xp.waitForTimeout(300);
+    // The map says what is wrong, in its note and in its rules.
+    check("a note on the map says what is wrong on purpose", /on purpose/.test(await xp.locator(".map-canvas").textContent()) || /on purpose/.test(await xp.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")).notes.map((n) => n.text).join(" "))));
+    // It can be chosen again from Getting started, asking first because the map has content now.
+    await xp.getByRole("button", { name: "Help" }).click();
+    await xp.getByRole("menuitem", { name: "Getting started" }).click();
+    await xp.waitForTimeout(400);
+    await xp.getByRole("dialog", { name: "Welcome to the map editor" }).getByRole("button", { name: "Load the example map" }).click();
+    await xp.waitForTimeout(400);
+    check("choosing the clean example while this one is open asks before replacing it", (await xp.getByRole("alertdialog").count()) === 1 && /Replace the current map/.test(await xp.getByRole("alertdialog").textContent()));
+    await xp.getByRole("alertdialog").getByRole("button", { name: /Replace|Load|Continue|Yes/i }).last().click();
+    await xp.waitForTimeout(800);
+    check("and the clean example is clean: no crossing, holds together", (await xp.getByText("No crossings").count()) === 1 && (await xp.getByText("Well connected").count()) === 1);
+    await xp.context().close();
+  }
+
   console.log("PASS:"); ok.forEach((l) => console.log("  ✓ " + l));
   if (bad.length) { console.log("FAIL:"); bad.forEach((l) => console.log("  ✗ " + l)); }
   if (skipped.length) { console.log("SKIPPED in WebKit (Chromium only):"); skipped.forEach((l) => console.log("  - " + l)); }

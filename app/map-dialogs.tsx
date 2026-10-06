@@ -2,7 +2,7 @@
 
 // The modal surfaces: the first-visit guide, the balance report and the route suggestions.
 import { useEffect, useState } from "react";
-import { Play, ChevronDown, Copy, FileSpreadsheet, Download, FileStack, Sparkles, Layers3, Pencil, Plus, Printer, Save, ScrollText, Ticket as TicketIcon, Trash2, Upload } from "lucide-react";
+import { AlertTriangle, Play, ChevronDown, Copy, FileSpreadsheet, Download, FileStack, Sparkles, Layers3, Pencil, Plus, Printer, Save, ScrollText, Ticket as TicketIcon, Trash2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -44,7 +44,7 @@ function TourVideo() {
   </div>;
 }
 
-export function WelcomeGuide({ open, onOpenChange, onChooseBlank, onChooseExample }: { open: boolean; onOpenChange: (open: boolean) => void; onChooseBlank: () => void; onChooseExample: () => void }) {
+export function WelcomeGuide({ open, onOpenChange, onChooseBlank, onChooseExample, onChooseProblems }: { open: boolean; onOpenChange: (open: boolean) => void; onChooseBlank: () => void; onChooseExample: () => void; onChooseProblems: () => void }) {
   // What matters, in a line or two each. How a print is laid out is for the print dialog to say.
   const steps: Array<{ icon: React.ReactNode; title: string; text: string }> = [
     { icon: <FileStack />, title: "Choose a board", text: "The standard 2×3 or the extended 2×4, lying or standing. You can change it whenever you like; everything on the map comes along." },
@@ -60,8 +60,9 @@ export function WelcomeGuide({ open, onOpenChange, onChooseBlank, onChooseExampl
       <TourVideo />
       <ol className="guide-steps">{steps.map((step) => <li key={step.title}><span className="guide-step-icon">{step.icon}</span><div><strong>{step.title}</strong><p>{step.text}</p></div></li>)}</ol>
       <p className="helper guide-more">More about what it is for, and where its numbers come from, on the <a href="./about">About page</a>.</p>
-      <DialogFooter>
+      <DialogFooter className="sm:flex-wrap">
         <Button variant="outline" onClick={onChooseExample}><Pencil />Load the example map</Button>
+        <Button variant="outline" onClick={onChooseProblems}><AlertTriangle />Load a map with problems</Button>
         <Button onClick={onChooseBlank}>Start with a blank map</Button>
       </DialogFooter>
     </DialogContent>

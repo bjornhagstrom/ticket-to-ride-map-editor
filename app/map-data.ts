@@ -484,3 +484,36 @@ ${routePointsTable()}
     { id: "example-route-32", a: "example-harbour", b: "example-quarry", length: 6, type: "city", color: "black", points: [{ x: 965, y: 525 }] },
   ],
 };
+
+// The example map with two things done wrong on purpose, so someone new can see how the editor's
+// warnings look: a route that crosses another (the Crossings card turns to a warning, and the crossing
+// is ringed on the map) and a stop reached by a single route (a dead end, under how the network holds
+// together). Built from the clean example, which stays as it is: everything there is here, plus a stop
+// and two routes. The regression suite checks both.
+const problemStop: Stop = { id: "problem-outpost", name: "Outpost", type: "city", size: "small", x: 95, y: 565, labelAngle: 90 };
+export const problemMap: MapData = {
+  ...initialMap,
+  name: "Example map with problems",
+  rules: `# Rules of the example map with problems
+
+This is the example map with two things done wrong on purpose, so that you can see what the editor says about them. In every other way it follows the standard *Ticket to Ride* rules.
+
+## What is wrong
+
+- **A route that crosses another.** [[Fernside–Deepcut]] runs over a route it does not meet at a stop. Players cannot tell which one a wagon belongs to where they cross, so Map balance counts the crossing and rings it on the map.
+- **A dead end.** [[Outpost]] is reached by [[Fernside–Outpost]] only: nothing runs on from it, so it is a corner of the map that a ticket can reach by one way alone. How the network holds together lists it.
+
+## What to do about it
+
+Move a stop or bend the route so that it no longer crosses, or let it cross at a stop. Join [[Outpost]] to a second stop, or accept the dead end if a corner like it is what you want. The warnings are not faults: they say how the map differs.
+
+*Tip: point at a card in Map balance and the map marks what it is about.*
+`,
+  notes: [{ id: "problem-note", x: 40, y: 24, width: 300, height: 150, text: "Two things are wrong on purpose here: Fernside–Deepcut crosses another route, and Outpost is a dead end, reached by one route only. Open Map balance to see how the editor says so, then fix them or leave them." }],
+  stops: [...initialMap.stops, problemStop],
+  routes: [
+    ...initialMap.routes,
+    { id: "problem-route-1", a: "example-fernside", b: "problem-outpost", length: 4, type: "city", color: "white", points: [], curved: false },
+    { id: "problem-route-2", a: "example-fernside", b: "example-deepcut", length: 8, type: "city", color: "blue", points: [], curved: false },
+  ],
+};
