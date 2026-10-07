@@ -3,8 +3,8 @@
 The editor reads stops, routes and tickets from spreadsheets saved as CSV, and writes them back out.
 This page says what goes in each column. The quickest start is the templates: one zip with a file for each
 of the three kinds below (`stops-template.csv`, `routes-template.csv`, `tickets-template.csv`) and this
-guide (`columns.md`). Get it from **Import → Spreadsheet (CSV) → Import spreadsheets… → Download templates
-(.zip)**, or from **Export → Spreadsheet (CSV) → Templates to fill in (.zip)**. Each template has the
+guide (`columns.md`). Get it from **Import → Spreadsheet (CSV) → Download templates (.zip)**, or from
+**Export → Spreadsheet (CSV) → Templates to fill in (.zip)**: the same file. Each template has the
 columns below and a few example rows. The three together make a tiny map, so you can import them as they
 are, look at the result, and then replace the rows with your own.
 

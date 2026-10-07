@@ -866,15 +866,25 @@ const sectionStart = (n) => {
     await page.getByRole("menuitem", { name: "Spreadsheet (CSV)" }).click();
     await page.waitForTimeout(250);
     const csvItems = (await page.getByRole("menu").last().getByRole("menuitem").allTextContents()).map((t) => t.trim());
-    check("Import → Spreadsheet is for importing: the one choice there opens the import, with nothing that downloads", csvItems.length === 1 && csvItems[0] === "Import spreadsheets…", csvItems.join(" | "));
+    check("Import → Spreadsheet has the import first, and then, plainly marked as a download, the templates", JSON.stringify(csvItems) === JSON.stringify(["Import spreadsheets…", "Download templates (.zip)"]), csvItems.join(" | "));
     await page.getByRole("menuitem", { name: "Import spreadsheets…" }).click();
     await page.waitForTimeout(300);
     const csvDialog = page.getByRole("dialog", { name: "Import spreadsheets" });
     check("it opens a dialog that says which files to choose, stops, routes and tickets, one or several", (await csvDialog.count()) === 1 && /stops/i.test(await csvDialog.textContent()) && /routes/i.test(await csvDialog.textContent()) && /tickets/i.test(await csvDialog.textContent()));
-    check("with a button to choose the files, one to download templates as a zip, and the column guide as a link", (await csvDialog.getByRole("button", { name: "Choose files…" }).count()) === 1 && (await csvDialog.getByRole("button", { name: "Download templates (.zip)" }).count()) === 1 && (await csvDialog.getByRole("link", { name: /Column guide/ }).count()) === 1);
+    check("with a button to choose the files and the column guide as a link, and no download in it", (await csvDialog.getByRole("button", { name: "Choose files…" }).count()) === 1 && (await csvDialog.getByRole("link", { name: /Column guide/ }).count()) === 1 && (await csvDialog.getByRole("button", { name: /Download/ }).count()) === 0);
     const guideLink = await csvDialog.getByRole("link", { name: /Column guide/ }).getAttribute("href");
     check("the column guide opens from the repository, in a new tab", guideLink === "https://github.com/bjornhagstrom/ticket-to-ride-map-editor/blob/main/docs/CSV.md" && (await csvDialog.getByRole("link", { name: /Column guide/ }).getAttribute("target")) === "_blank", String(guideLink));
-    check("and the dialog says that the templates download", /download/i.test(await csvDialog.getByRole("button", { name: "Download templates (.zip)" }).textContent()));
+    // Nothing in the dialog runs past its edge, at the usual width and at a narrow window (the buttons did).
+    const fitsDialog = () => csvDialog.evaluate((el) => { const box = el.getBoundingClientRect(); return { overflow: el.scrollWidth - el.clientWidth, outside: [...el.querySelectorAll("button, a")].filter((x) => { const r = x.getBoundingClientRect(); return r.right > box.right + 0.5 || r.left < box.left - 0.5; }).map((x) => x.textContent.trim()) }; });
+    const fitWide = await fitsDialog();
+    check("every part of the dialog is inside it: no sideways scroll, no button past the edge", fitWide.overflow <= 1 && fitWide.outside.length === 0, JSON.stringify(fitWide));
+    await page.setViewportSize({ width: 600, height: 900 });
+    await page.waitForTimeout(300);
+    const fitNarrow = await fitsDialog();
+    check("also in a window 600 wide", fitNarrow.overflow <= 1 && fitNarrow.outside.length === 0, JSON.stringify(fitNarrow));
+    await page.setViewportSize({ width: 1500, height: 1000 });
+    await page.waitForTimeout(300);
+    check("and the dialog says where the templates are", /Download templates/.test(await csvDialog.textContent()) && /Export/.test(await csvDialog.textContent()));
     const chooser = page.waitForEvent("filechooser");
     await csvDialog.getByRole("button", { name: "Choose files…" }).click();
     await (await chooser).setFiles([stops.file, routes.file, tickets.file]);
@@ -894,7 +904,7 @@ const sectionStart = (n) => {
     const zipDownload = async (open, item, pagePart = page) => {
       await open();
       const pending = pagePart.waitForEvent("download", { timeout: 10000 });
-      await (item.button ? pagePart.getByRole("dialog", { name: "Import spreadsheets" }).getByRole("button", { name: item.button }) : pagePart.getByRole("menuitem", { name: item.menuitem, exact: true })).click();
+      await pagePart.getByRole("menuitem", { name: item.menuitem, exact: true }).click();
       const done = await pending;
       const file = path.join(os.tmpdir(), `ttr-${Date.now()}-${done.suggestedFilename()}`);
       await done.saveAs(file);
@@ -912,9 +922,9 @@ const sectionStart = (n) => {
     check("each template is a .csv named for its kind, with a header and example rows", templates.every((t, i) => t.name === `${["stops", "routes", "tickets"][i]}-template.csv` && t.bom && t.header.length >= 3 && t.rows.length >= 2), templates.map((t) => `${t.name} ${t.rows.length}`).join(", "));
     await page.waitForTimeout(300);
     check("and the screen says that the zip was saved", /spreadsheet-templates\.zip/.test((await page.locator("[data-sonner-toast]").allTextContents()).join(" ")), (await page.locator("[data-sonner-toast]").allTextContents()).join(" | "));
-    const zipFromDialog = await zipDownload(() => openSpreadsheetDialog(page), { button: "Download templates (.zip)" });
-    check("the import dialog's own button gives the same zip", zipFromDialog.name === "spreadsheet-templates.zip" && JSON.stringify(zipFromDialog.entries) === JSON.stringify(zipFromExport.entries) && fs.readFileSync(path.join(zipFromDialog.dir, "stops-template.csv"), "utf8") === fs.readFileSync(path.join(zipFromExport.dir, "stops-template.csv"), "utf8"));
-    await page.keyboard.press("Escape");
+    const openImportCsvMenu = async () => { await page.getByRole("button", { name: "Import", exact: true }).click(); await page.waitForTimeout(250); await page.getByRole("menuitem", { name: "Spreadsheet (CSV)" }).click(); await page.waitForTimeout(250); };
+    const zipFromImport = await zipDownload(openImportCsvMenu, { menuitem: "Download templates (.zip)" });
+    check("the Import menu's download is the same zip as Export's: the same files, with the same contents", zipFromImport.name === "spreadsheet-templates.zip" && JSON.stringify(zipFromImport.entries) === JSON.stringify(zipFromExport.entries) && zipFromImport.entries.every((name) => fs.readFileSync(path.join(zipFromImport.dir, name), "utf8") === fs.readFileSync(path.join(zipFromExport.dir, name), "utf8")));
     await page.waitForTimeout(300);
     await page.evaluate(() => { const map = JSON.parse(localStorage.getItem("ttr-map")); localStorage.setItem("ttr-map", JSON.stringify({ ...map, stops: [], routes: [], tickets: [], ticketSets: [{ id: "main", label: "Main deck" }] })); });
     await page.reload({ waitUntil: "networkidle" });

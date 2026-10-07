@@ -498,3 +498,7 @@
 .print-split-notes div { display: grid; grid-template-columns: minmax(9em, auto) 1fr; gap: 10px; }
 .print-split-notes dt { font-weight: 700; color: #24221e; }
 .print-split-notes dd { margin: 0; }
+
+/* The import-spreadsheets dialog: its three buttons wrap rather than run past the edge, and its notes are a plain list. */
+.csv-import-actions { flex-wrap: wrap; justify-content: flex-end; }
+.csv-import-notes { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; list-style: disc; font-size: 13px; line-height: 1.5; color: #2e2a24; }
