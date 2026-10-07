@@ -156,6 +156,17 @@ export function readCsvImport(files: { name: string; text: string }[], data: Map
   };
   const find = findIn(byName, byId, ambiguous);
 
+  // Routes read without a stop file make their stops from the names. A stop the open map already has (by id,
+  // else by name) keeps its place, type and id, so that reading routes on their own does not scramble a map:
+  // a layout made from routes alone knows nothing of north, and turned Europe half way round.
+  const addKnownOrNew = (name: string, wanted: string) => {
+    const known = data.stops.find((stop) => wanted && stop.id === wanted) ?? data.stops.find((stop) => nameKey(stop.name) === nameKey(name));
+    if (!known) return addStop(name, plainStop, wanted);
+    const stop = addStop(known.name, known.type, wanted || known.id);
+    read.set(stop, { x: known.x, y: known.y, geo: false });
+    return stop;
+  };
+
   // ---- routes
   const routes: Route[] = [];
   const missing: string[] = [], colours: string[] = [], routeTypes: string[] = [];
@@ -177,7 +188,7 @@ export function readCsvImport(files: { name: string; text: string }[], data: Map
       const ends = [row[at.a], row[at.b]].map((text) => (text ?? "").trim());
       const idCells = [row[at.aId], row[at.bId]].map((text) => (text ?? "").trim());
       if (!ends[0] && !ends[1] && !idCells[0] && !idCells[1]) continue;
-      const found = ends.map((name, i) => find(idCells[i], name) ?? (sorted.stops.length || !name ? null : addStop(name, plainStop, usableId(idCells[i]))));
+      const found = ends.map((name, i) => find(idCells[i], name) ?? (sorted.stops.length || !name ? null : addKnownOrNew(name, usableId(idCells[i]))));
       if (!found[0] || !found[1]) { missingRoutes += 1; ends.forEach((name, i) => { if (!found[i] && (name || idCells[i])) missing.push(name || idCells[i]); }); continue; }
       const length = number(row[at.length]);
       if (length === null || length < 1 || !Number.isInteger(length) || found[0] === found[1]) { unusable += 1; continue; }

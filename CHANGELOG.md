@@ -15,7 +15,8 @@ This file is written from `app/version.ts` by `npm run changelog`; edit the note
 - Beside the clean example map there is an example map with problems on purpose, a route that crosses another and a dead end, so you can see how the warnings look before you draw your own.
 - Export has For ttr-map-generator, a zip with the map's places, routes and tickets in the text files of that open source tool, where the places are, and a script that makes its own graph file of them.
 - The example map is for the standard two to five players, its rules have a wagon table for each, and both of its ticket decks have 15 tickets, enough to deal a full table.
-- Deleting a stop also deletes the tickets that name it, in every deck: the question says how many, and Undo brings them back.
+- Deleting a stop also deletes the routes that end at it and the tickets that name it, in every deck: the question lists each of them, and Undo brings them all back.
+- Importing routes from a spreadsheet without its stop file leaves the stops the map already has where they are, instead of laying them out again.
 - An import that replaces the stops asks what became of the tickets in your other decks that named a stop now gone or renamed: send each old stop to a new one, remove its tickets, or undo the import.
 - Spreadsheets you export carry the stops' ids beside their names, so reading one back keeps every ticket, and two stops with the same name can be told apart.
 - A full deck built without a choice of tension now crowds the busiest routes about as much as the official maps do; 0.4.1 spread the tickets out more, which is Calm on the slider.

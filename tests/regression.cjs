@@ -3918,6 +3918,10 @@ const sectionStart = (n) => {
     const preset = (name) => tp2.locator(".suggest-dialog").getByRole("button", { name, exact: true });
     const description = () => tp2.locator(".suggest-dialog .tension-description").textContent();
     const rebuilt = () => tp2.waitForFunction(() => { const row = [...document.querySelectorAll(".suggest-table tbody tr")].find((tr) => tr.children[0].textContent.trim() === "Score"); return row && row.children[2].textContent.trim() !== "—"; }, null, { timeout: 30000 });
+    // The number beside the slider sits clear of the scroll bar of the dialog's scrolling part (it was
+    // seen hidden behind it in Safari).
+    const clear = await tp2.locator(".suggest-scroll").evaluate((box) => { const value = box.querySelector(".tension-slider-value").getBoundingClientRect(); const edge = box.getBoundingClientRect().left + box.clientWidth; return Math.round(edge - value.right); });
+    check("the number beside the slider is clear of the dialog's scroll bar", clear >= 12, `${clear} px`);
     check("Build a full deck of tickets asks how tense, on a slider from 0 to 100", (await slider.count()) === 1 && (await slider.getAttribute("min")) === "0" && (await slider.getAttribute("max")) === "100");
     check("like the official maps (50), unless the map says otherwise", (await slider.inputValue()) === "50" && (await preset("Like the official maps").getAttribute("aria-pressed")) === "true");
     check("and the map holds no tension until one is chosen", (await tp2.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")).deckTension)) === undefined);
@@ -4222,7 +4226,12 @@ const sectionStart = (n) => {
     await dp.getByRole("button", { name: "Delete stop" }).click();
     await dp.waitForTimeout(400);
     const asked = (await dp.getByRole("alertdialog").textContent()) || "";
-    check("the question says the tickets go too, in every deck, and that Undo brings them back", new RegExp(`${named(before)} tickets? that names? it, in every deck`).test(asked) && /Undo brings them back/.test(asked), asked.slice(0, 200));
+    const listed = await dp.getByRole("alertdialog").evaluate((el) => ({ bold: [...el.querySelectorAll("li strong")].map((b) => b.textContent), items: el.querySelectorAll("li").length, text: el.textContent }));
+    const westportTickets = before.tickets.filter((t) => t.a === westport.id || t.b === westport.id);
+    const westportRoutes = before.routes.filter((r) => r.a === westport.id || r.b === westport.id);
+    const nameOf = (id) => before.stops.find((s) => s.id === id).name;
+    check("the question lists, in bold, the stop, how many routes and tickets go, and each route and ticket by its stops", listed.bold.includes("The stop Westport") && listed.bold.some((b) => b === `${westportRoutes.length} ${westportRoutes.length === 1 ? "route" : "routes"}`) && listed.bold.some((b) => b === `${westportTickets.length} ${westportTickets.length === 1 ? "ticket" : "tickets"}`) && westportRoutes.every((r) => listed.bold.includes(`${nameOf(r.a)}–${nameOf(r.b)}`)) && westportTickets.every((t) => listed.bold.includes(`${nameOf(t.a)}–${nameOf(t.b)}`)), JSON.stringify(listed.bold));
+    check("with the deck and the points of each ticket, and that Undo brings it all back", before.ticketSets.every((set) => !westportTickets.some((t) => (t.set ?? before.ticketSets[0].id) === set.id) || listed.text.includes(set.label)) && /Undo brings it all back/.test(listed.text), listed.text.slice(0, 160));
     await dp.getByRole("alertdialog").getByRole("button", { name: "Continue" }).click();
     await dp.waitForTimeout(500);
     const after = await mapNow();

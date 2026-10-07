@@ -493,3 +493,10 @@
 /* The hint over the map is not text to select: dragging a stop's name across it selected its words in
    Safari. The map itself is unselectable already. */
 .map-hint, .map-hint-slot { -webkit-user-select: none; user-select: none; }
+
+/* What deleting a stop takes with it, in the question that asks first: a list, the names in bold. */
+.stop-deletion p { margin: 0 0 6px; }
+.stop-deletion ul { margin: 4px 0 8px; padding-left: 1.3em; list-style: disc; }
+.stop-deletion ul ul { margin: 2px 0 4px; list-style: circle; }
+.stop-deletion li { margin: 2px 0; }
+.stop-deletion strong { color: #24221e; }

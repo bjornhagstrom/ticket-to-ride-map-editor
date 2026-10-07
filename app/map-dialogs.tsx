@@ -555,3 +555,27 @@ export function RebindTicketsDialog({ open, groups, stops, choices, onChoice, on
     </DialogContent>
   </Dialog>;
 }
+
+// What deleting a stop takes with it, as a list: the stop, every route that ends at it and every ticket that names
+// it, in every deck, each in bold. Shown in the question that asks before the stop is deleted.
+export function StopDeletionList({ data, stopId }: { data: MapData; stopId: string }) {
+  const stop = data.stops.find((item) => item.id === stopId);
+  if (!stop) return null;
+  const name = (id: string) => data.stops.find((item) => item.id === id)?.name ?? id;
+  const routes = data.routes.filter((route) => route.a === stopId || route.b === stopId);
+  const first = data.ticketSets[0]?.id;
+  const decks = new Map(data.ticketSets.map((set) => [set.id, set.label]));
+  const tickets = data.tickets.filter((ticket) => ticket.a === stopId || ticket.b === stopId);
+  const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+  return <div className="stop-deletion">
+    <p>Deleting <strong>{stop.name}</strong> also removes everything that belongs to it:</p>
+    <ul>
+      <li><strong>The stop {stop.name}</strong></li>
+      {routes.length > 0 && <li><strong>{count(routes.length, "route", "routes")}</strong> that end{routes.length === 1 ? "s" : ""} at it:
+        <ul>{routes.map((route) => <li key={route.id}><strong>{name(route.a)}–{name(route.b)}</strong>, {route.length} {route.length === 1 ? "space" : "spaces"}, {colorLabels[route.color]?.toLowerCase() ?? route.color}</li>)}</ul></li>}
+      {tickets.length > 0 && <li><strong>{count(tickets.length, "ticket", "tickets")}</strong> that name{tickets.length === 1 ? "s" : ""} it, in every deck:
+        <ul>{tickets.map((ticket) => <li key={ticket.id}><strong>{name(ticket.a)}–{name(ticket.b)}</strong>, {ticket.points} {ticket.points === 1 ? "point" : "points"}, {decks.get(ticket.set ?? first ?? "") ?? "a deck"}</li>)}</ul></li>}
+    </ul>
+    <p>Undo brings it all back.</p>
+  </div>;
+}

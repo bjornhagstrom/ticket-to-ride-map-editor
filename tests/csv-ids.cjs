@@ -110,6 +110,26 @@ const read = (files, data = emptyMap) => imp.readCsvImport(files.map(([name, tex
   check("and its stops get ids of their own", old.stops.every((s) => /^s-/.test(s.id)));
 }
 
+// ---------------------------------------------------------------- routes without a stop file, over a map that has the stops
+// Seen on screen: a route file imported without its stop file laid the stops out from the routes, which knows
+// nothing of north, and Europe came out turned half way round. A stop the open map already has keeps its place,
+// type and id.
+{
+  const m = clone(initialMap);
+  const routesCsv = exp.routesCsv(m);
+  const names = new Map(m.stops.map((s) => [s.name, s]));
+  const byName = read([["routes.csv", routesCsv.split("\r\n").map((line, i) => { if (i === 0) return line; return line; }).join("\r\n")]], m);
+  const same = byName.stops.every((s) => { const o = names.get(s.name); return o && Math.abs(s.x - o.x) < 1 && Math.abs(s.y - o.y) < 1 && s.type === o.type && s.id === o.id; });
+  check("routes imported without a stop file leave every stop the map already has where it was, with its type and id", byName.stops.length > 0 && same && byName.placed.length === 0, `${byName.stops.length} stops, ${byName.placed.length} laid out, ${byName.warnings.join(" | ")}`);
+  const noIds = read([["routes.csv", "From,To,Length\n" + m.routes.slice(0, 3).map((r) => `${names.get(m.stops.find((s) => s.id === r.a).name) ? m.stops.find((s) => s.id === r.a).name : ""},${m.stops.find((s) => s.id === r.b).name},${r.length}`).join("\n")]], m);
+  check("also from names alone, as a hand-typed list would have them", noIds.stops.every((s) => { const o = names.get(s.name); return o && s.x === o.x && s.y === o.y && s.id === o.id; }) && noIds.placed.length === 0, `${noIds.placed.length} laid out`);
+  const strange = read([["routes.csv", "From,To,Length\nAlpha,Beta,3\n" + `${m.stops[0].name},Beta,2\n`]], m);
+  const strangePlaced = strange.stops.find((s) => s.name === m.stops[0].name);
+  check("a stop the map does not have is still laid out from the routes, as before", strange.placed.includes("Alpha") && strange.placed.includes("Beta") && !strange.placed.includes(m.stops[0].name) && strangePlaced.x === m.stops[0].x, strange.placed.join());
+  const fresh = read([["routes.csv", "From,To,Length\nAlpha,Beta,3\n"]], emptyMap);
+  check("and over an empty map nothing changes: the stops are made from the names", fresh.stops.length === 2 && fresh.placed.length === 2);
+}
+
 // ---------------------------------------------------------------- the build that was released before ids (0.4.1)
 // Real files, both ways: what 0.4.1 exports must read here as it did, and what is exported here must still
 // read in 0.4.1 (its import reads by header, so the new columns are passed over).
