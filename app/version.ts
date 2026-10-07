@@ -10,6 +10,7 @@ export type Release = { version: string; date: string; title: string; changes: s
 // the top of CHANGELOG.md under Unreleased, and become the notes of the next version when it is
 // decided; the What's new page in the editor shows released versions only.
 export const UNRELEASED: string[] = [
+  "Import → Tickets only now takes just the decks and tickets of a file, even a whole map, and leaves your stops and routes; Map project takes the whole map as before. The spreadsheet templates say on screen that they were saved.",
   "Importing a network file that carried tickets could, when stops had changed, move another deck's tickets into the deck you were working in and lose them from their own; the tickets that come with a file now get ids of their own.",
   "After the question about tickets to changed stops, Undo takes the whole import back, and the Undo in a notice does what it says or tells you that the map has changed since.",
   "Spreadsheet routes imported without their stops leave the stops the map has as they are, with their labels, symbols, sizes and marks, and two stops that share a name stay two.",

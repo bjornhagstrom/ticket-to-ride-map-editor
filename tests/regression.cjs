@@ -4416,6 +4416,62 @@ const sectionStart = (n) => {
     await np.context().close();
   }
 
+  // 61. Import → Tickets only reads the tickets of a file and nothing else: from a ticket file, or from a whole map
+  // file or a network file, whose stops and routes it leaves alone. Map project still takes a whole map. And a
+  // template says on screen that it was saved.
+  if (wants(61)) {
+  sectionStart(61);
+    const to = await (await browser.newContext({ viewport: { width: 1500, height: 1000 }, acceptDownloads: true })).newPage();
+    to.on("pageerror", (e) => errors.push(String(e)));
+    await to.goto(BASE, { waitUntil: "networkidle" });
+    await to.getByRole("button", { name: "Load the example map" }).click();
+    await to.waitForTimeout(600);
+    const mapNow = () => to.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")));
+    const before = await mapNow();
+    const [a, b] = before.stops;
+    const other = JSON.parse(JSON.stringify(before));
+    other.name = "Another map";
+    other.stops = [...other.stops, { id: "zed", name: "Zed", type: "city", x: 900, y: 650 }];
+    other.ticketSets = [{ id: "x", label: "Their deck" }];
+    other.tickets = [{ id: "o1", a: a.id, b: b.id, points: 7, set: "x" }, { id: "o2", a: a.id, b: "zed", points: 9, set: "x" }];
+    const wrap = (kind, payload) => ({ format: "ticket-to-ride-map", version: 3, kind, payload });
+    const toFile = (name, content) => { const f = path.join(os.tmpdir(), `ttr-${Date.now()}-${name}`); fs.writeFileSync(f, JSON.stringify(content)); return f; };
+    const importAs = async (item, file) => {
+      await to.getByRole("button", { name: "Import", exact: true }).click(); await to.waitForTimeout(250);
+      const chooser = to.waitForEvent("filechooser");
+      await to.getByRole("menuitem", { name: item, exact: true }).click();
+      await (await chooser).setFiles(file); await to.waitForTimeout(700);
+    };
+    await importAs("Tickets only", toFile("whole-map.json", wrap("map", other)));
+    const after = await mapNow();
+    check("Tickets only on a whole map file leaves this map as it is: its name, stops and routes", after.name === before.name && after.stops.length === before.stops.length && after.routes.length === before.routes.length, `${after.name}, ${after.stops.length} stops`);
+    check("and brings the file's deck as a new deck beside the others", after.ticketSets.length === before.ticketSets.length + 1 && after.ticketSets.some((s) => /Their deck/.test(s.label)));
+    const theirs = after.tickets.filter((t) => t.set === after.ticketSets.find((s) => /Their deck/.test(s.label)).id);
+    check("with the ticket whose stops this map has, and not the one that names a stop it has not", theirs.length === 1 && theirs[0].a === a.id && theirs[0].b === b.id && theirs[0].points === 7, JSON.stringify(theirs));
+    check("and says that one was skipped", /1 skipped/.test((await to.locator("[data-sonner-toast]").allTextContents()).join(" ")), (await to.locator("[data-sonner-toast]").allTextContents()).join(" | "));
+    await to.keyboard.press("Escape"); await to.waitForTimeout(300);
+    // A network file with tickets: its network is left alone too.
+    await importAs("Tickets only", toFile("network.json", wrap("network", { stops: other.stops, routes: other.routes, tickets: other.tickets })));
+    const net = await mapNow();
+    check("Tickets only on a network file leaves the stops and routes alone as well", net.stops.length === before.stops.length && net.routes.length === before.routes.length && net.ticketSets.length === before.ticketSets.length + 2, `${net.stops.length} stops, ${net.ticketSets.length} decks`);
+    await to.keyboard.press("Escape"); await to.waitForTimeout(300);
+    // A file with no tickets in it.
+    await importAs("Tickets only", toFile("background.json", wrap("background", { background: [{ id: "bg", type: "area", points: [{ x: 1, y: 1 }, { x: 5, y: 5 }, { x: 9, y: 1 }] }] })));
+    check("a file with no tickets in it is said to have none", /no tickets/i.test((await to.locator("[data-sonner-toast]").allTextContents()).join(" ")), (await to.locator("[data-sonner-toast]").allTextContents()).join(" | "));
+    // Map project, over a whole map file, still replaces the map.
+    await importAs("Map project", toFile("whole-map-2.json", wrap("map", other)));
+    const whole = await mapNow();
+    check("Map project takes the whole map, as before", whole.name === "Another map" && whole.stops.some((s) => s.id === "zed"), whole.name);
+    // A template says that it was saved.
+    await to.getByRole("button", { name: "Import", exact: true }).click(); await to.waitForTimeout(250);
+    await to.getByRole("menuitem", { name: "Spreadsheet (CSV)" }).click(); await to.waitForTimeout(250);
+    const saved = to.waitForEvent("download");
+    await to.getByRole("menuitem", { name: "Stops template", exact: true }).click();
+    const file = await saved; await to.waitForTimeout(400);
+    check("a template is saved with its plain name, and the screen says so", file.suggestedFilename() === "stops-template.csv" && /stops-template\.csv/.test((await to.locator("[data-sonner-toast]").allTextContents()).join(" ")), (await to.locator("[data-sonner-toast]").allTextContents()).join(" | "));
+    await to.context().close();
+  }
+
   if (sectionOpen) sectionTimes[sectionOpen.n] = Math.round((Date.now() - sectionOpen.at) / 100) / 10;
   if (process.env.TTR_TIMES) fs.writeFileSync(process.env.TTR_TIMES, JSON.stringify(sectionTimes));
   console.log("PASS:"); ok.forEach((l) => console.log("  ✓ " + l));

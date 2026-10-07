@@ -31,6 +31,11 @@ Every file has the same wrapper.
 | `board` | The frame the coordinates are in. Positions in the payload are in these units. |
 | `payload` | The content. Its shape depends on `kind`. |
 
+Which file is read as what is told by `kind`, except for **Import → Tickets only**: that reads only the decks and tickets
+of whatever file it is given (a ticket file, a whole map or a network), matches each ticket to the open map's stops by id and then by
+name, adds the decks as new decks, and leaves the stops, routes and everything else of the open map alone. **Import → Map project** reads
+the file as its `kind` says. Nothing changes in the files themselves.
+
 The payload has its own key on purpose. In version 1 the map's fields sat directly on the top
 level, which meant a new file-level field could collide with a map field of the same name.
 
