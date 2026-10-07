@@ -579,3 +579,27 @@ export function StopDeletionList({ data, stopId }: { data: MapData; stopId: stri
     <p>Undo brings it all back.</p>
   </div>;
 }
+
+// Import → Spreadsheet (CSV): says which files to choose before the file chooser opens, and offers the templates
+// (a zip) and the column guide for anyone starting from nothing.
+export function ImportSpreadsheetsDialog({ open, onOpenChange, onChoose, onDownload, guideUrl }: { open: boolean; onOpenChange: (open: boolean) => void; onChoose: () => void; onDownload: () => void; guideUrl: string }) {
+  return <Dialog open={open} onOpenChange={onOpenChange}>
+    <DialogContent className="csv-import-dialog">
+      <DialogHeader>
+        <DialogTitle>Import spreadsheets</DialogTitle>
+        <DialogDescription>Choose the spreadsheets to read, saved as CSV: a file of stops, a file of routes, a file of tickets, or any of them. Choose several at once.</DialogDescription>
+      </DialogHeader>
+      <ul className="csv-import-notes">
+        <li><strong>Stops and routes</strong> replace the stops and routes on the map; the editor asks first if it has some.</li>
+        <li><strong>Tickets</strong> arrive as new decks beside yours.</li>
+        <li>Files from this editor&apos;s own export carry ids, so reading them back keeps every stop and ticket where it was.</li>
+        <li>New to this? The templates are one zip with an example of each kind and the guide to every column.</li>
+      </ul>
+      <DialogFooter className="csv-import-actions">
+        <Button variant="outline" onClick={onDownload}><Download />Download templates (.zip)</Button>
+        <Button asChild variant="outline"><a href={guideUrl} target="_blank" rel="noopener noreferrer">Column guide ↗</a></Button>
+        <Button onClick={onChoose}><Upload />Choose files…</Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>;
+}

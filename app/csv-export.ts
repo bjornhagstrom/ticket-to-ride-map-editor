@@ -5,6 +5,8 @@
 // ties the files together when they are read back (docs/CSV.md, "Ids and names").
 import { bandsOf, buildAdjacency, mapDiameter, shortestPath, ticketBand, ticketEndStops } from "./map-analysis";
 import { colorLabels, type MapData } from "./map-data";
+import { zipOf } from "./ttr-map-generator-export";
+import { CSV_GUIDE } from "./csv-guide";
 
 type Cell = string | number | null | undefined;
 
@@ -101,3 +103,12 @@ const TEMPLATES: Record<"stops" | "routes" | "tickets", Cell[][]> = {
   ],
 };
 export const csvTemplate = (kind: keyof typeof TEMPLATES): string => toCsv(TEMPLATES[kind]);
+
+/** The three templates and the column guide (docs/CSV.md) as one zip: what a person needs to start a map in a
+ *  spreadsheet, also when the editor is not at hand. */
+export const templatesZip = (): Uint8Array => zipOf([
+  { name: "stops-template.csv", text: csvTemplate("stops") },
+  { name: "routes-template.csv", text: csvTemplate("routes") },
+  { name: "tickets-template.csv", text: csvTemplate("tickets") },
+  { name: "columns.md", text: CSV_GUIDE },
+]);

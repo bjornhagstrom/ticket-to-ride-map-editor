@@ -1,14 +1,16 @@
 # Spreadsheets: what the columns mean
 
 The editor reads stops, routes and tickets from spreadsheets saved as CSV, and writes them back out.
-This page says what goes in each column. The quickest start is a template: **Import → Spreadsheet
-(CSV) → Stops template, Routes template, Tickets template**. Each one has the columns below and a few
-example rows. The three together make a tiny map, so you can import them as they are, look at the
-result, and then replace the rows with your own.
+This page says what goes in each column. The quickest start is the templates: one zip with a file for each
+of the three kinds below (`stops-template.csv`, `routes-template.csv`, `tickets-template.csv`) and this
+guide (`columns.md`). Get it from **Import → Spreadsheet (CSV) → Import spreadsheets… → Download templates
+(.zip)**, or from **Export → Spreadsheet (CSV) → Templates to fill in (.zip)**. Each template has the
+columns below and a few example rows. The three together make a tiny map, so you can import them as they
+are, look at the result, and then replace the rows with your own.
 
 ## The three files
 
-You can import one file or several at once: choose them together in **Import spreadsheets…**.
+You can import one file or several at once: choose them together in the **Import spreadsheets…** dialog, with **Choose files…**.
 
 - **Stops and routes replace the stops and routes on the map.** If the map already has some, the
   editor asks first. Background, notes, styles and settings are kept.

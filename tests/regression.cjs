@@ -10,6 +10,7 @@ const { chromium } = require("playwright");
 // yours with TTR_URL, for example TTR_URL=http://localhost:3001/ttr/ npm run test:regression.
 const BASE = process.env.TTR_URL || "http://localhost:3000/ttr/";
 const fs = require("fs");
+const { execFileSync } = require("child_process");
 const os = require("os");
 const path = require("path");
 
@@ -94,6 +95,9 @@ const sectionStart = (n) => {
 
   // Millimetres to CSS pixels, for the sections that measure a print; sections of their own use it too.
   const mm = (value) => value / 25.4 * 96;
+  // Spreadsheets come in through a dialog of their own: Import → Spreadsheet (CSV) → Import spreadsheets…, then Choose files….
+  const openSpreadsheetDialog = async (p) => { await p.getByRole("button", { name: "Import", exact: true }).click(); await p.waitForTimeout(250); await p.getByRole("menuitem", { name: "Spreadsheet (CSV)" }).click(); await p.waitForTimeout(250); await p.getByRole("menuitem", { name: "Import spreadsheets…" }).click(); await p.waitForTimeout(300); };
+  const chooseSpreadsheets = async (p, files) => { await openSpreadsheetDialog(p); const chooser = p.waitForEvent("filechooser"); await p.getByRole("dialog", { name: "Import spreadsheets" }).getByRole("button", { name: "Choose files…" }).click(); await (await chooser).setFiles(files); await p.waitForTimeout(600); };
   // The print dialog's choices are made in its table of sheets (a cell is a paper and a way to split) and with
   // its box for one big page. These work on a dialog or a whole page.
   const SPLIT_COLUMN = { sheet: 0, panel: 1, full: 2 };
@@ -861,12 +865,18 @@ const sectionStart = (n) => {
     await page.waitForTimeout(250);
     await page.getByRole("menuitem", { name: "Spreadsheet (CSV)" }).click();
     await page.waitForTimeout(250);
-    const csvItems = await page.getByRole("menu").last().getByRole("menuitem").allTextContents();
-    check("Import has a spreadsheet menu: import, a template for each kind, and what the columns mean", ["Import spreadsheets…", "Stops template", "Routes template", "Tickets template", "What the columns mean"].every((name) => csvItems.includes(name)), csvItems.join(" | "));
-    const guideLink = await page.getByRole("menuitem", { name: "What the columns mean" }).getAttribute("href");
-    check("the column guide opens from the repository, in a new tab", guideLink === "https://github.com/bjornhagstrom/ticket-to-ride-map-editor/blob/main/docs/CSV.md" && (await page.getByRole("menuitem", { name: "What the columns mean" }).getAttribute("target")) === "_blank", String(guideLink));
-    const chooser = page.waitForEvent("filechooser");
+    const csvItems = (await page.getByRole("menu").last().getByRole("menuitem").allTextContents()).map((t) => t.trim());
+    check("Import → Spreadsheet is for importing: the one choice there opens the import, with nothing that downloads", csvItems.length === 1 && csvItems[0] === "Import spreadsheets…", csvItems.join(" | "));
     await page.getByRole("menuitem", { name: "Import spreadsheets…" }).click();
+    await page.waitForTimeout(300);
+    const csvDialog = page.getByRole("dialog", { name: "Import spreadsheets" });
+    check("it opens a dialog that says which files to choose, stops, routes and tickets, one or several", (await csvDialog.count()) === 1 && /stops/i.test(await csvDialog.textContent()) && /routes/i.test(await csvDialog.textContent()) && /tickets/i.test(await csvDialog.textContent()));
+    check("with a button to choose the files, one to download templates as a zip, and the column guide as a link", (await csvDialog.getByRole("button", { name: "Choose files…" }).count()) === 1 && (await csvDialog.getByRole("button", { name: "Download templates (.zip)" }).count()) === 1 && (await csvDialog.getByRole("link", { name: /Column guide/ }).count()) === 1);
+    const guideLink = await csvDialog.getByRole("link", { name: /Column guide/ }).getAttribute("href");
+    check("the column guide opens from the repository, in a new tab", guideLink === "https://github.com/bjornhagstrom/ticket-to-ride-map-editor/blob/main/docs/CSV.md" && (await csvDialog.getByRole("link", { name: /Column guide/ }).getAttribute("target")) === "_blank", String(guideLink));
+    check("and the dialog says that the templates download", /download/i.test(await csvDialog.getByRole("button", { name: "Download templates (.zip)" }).textContent()));
+    const chooser = page.waitForEvent("filechooser");
+    await csvDialog.getByRole("button", { name: "Choose files…" }).click();
     await (await chooser).setFiles([stops.file, routes.file, tickets.file]);
     await page.waitForTimeout(600);
     const ask = await page.getByRole("alertdialog").textContent().catch(() => "");
@@ -880,31 +890,44 @@ const sectionStart = (n) => {
     const toastText = (await page.locator("[data-sonner-toast]").allTextContents()).join(" | ");
     check("and the editor says what it read", /stops/.test(toastText) && /routes/.test(toastText) && /tickets/.test(toastText), toastText);
     check("and, since the stops came back with their own ids, asks about no ticket", (await page.getByRole("dialog", { name: "Tickets to stops that changed" }).count()) === 0);
-    // The templates: downloaded from the same menu, named for what they hold, and good enough to import
-    // as they are.
-    const openTemplates = async () => { await page.getByRole("button", { name: "Import", exact: true }).click(); await page.waitForTimeout(250); await page.getByRole("menuitem", { name: "Spreadsheet (CSV)" }).click(); await page.waitForTimeout(250); };
-    const templates = [];
-    for (const kind of ["Stops", "Routes", "Tickets"]) templates.push(await downloadFrom(openTemplates, `${kind} template`));
-    check("each template downloads as a .csv named for its kind, with a header and example rows", templates.every((t, i) => t.name === `${["stops", "routes", "tickets"][i]}-template.csv` && t.bom && t.header.length >= 3 && t.rows.length >= 2), templates.map((t) => `${t.name} ${t.rows.length}`).join(", "));
+    // The templates: one zip, from Export (and from the import dialog), with the three files and the column guide in it.
+    const zipDownload = async (open, item, pagePart = page) => {
+      await open();
+      const pending = pagePart.waitForEvent("download", { timeout: 10000 });
+      await (item.button ? pagePart.getByRole("dialog", { name: "Import spreadsheets" }).getByRole("button", { name: item.button }) : pagePart.getByRole("menuitem", { name: item.menuitem, exact: true })).click();
+      const done = await pending;
+      const file = path.join(os.tmpdir(), `ttr-${Date.now()}-${done.suggestedFilename()}`);
+      await done.saveAs(file);
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ttr-zip-"));
+      execFileSync("unzip", ["-o", "-q", file, "-d", dir]);
+      return { name: done.suggestedFilename(), file, dir, entries: fs.readdirSync(dir).sort() };
+    };
+    const zipFromExport = await zipDownload(openCsvMenu, { menuitem: "Templates to fill in (.zip)" });
+    check("Export → Spreadsheet has the templates as one zip, named for what it is", zipFromExport.name === "spreadsheet-templates.zip", zipFromExport.name);
+    check("with the three templates and the column guide in it", JSON.stringify(zipFromExport.entries) === JSON.stringify(["columns.md", "routes-template.csv", "stops-template.csv", "tickets-template.csv"]), zipFromExport.entries.join(", "));
+    const guideText = fs.readFileSync(path.join(zipFromExport.dir, "columns.md"), "utf8");
+    check("the guide in the zip is the page of the repository: what each column means, and how ids and names go together", /Spreadsheets: what the columns mean/.test(guideText) && /## Ids and names/.test(guideText) && guideText === fs.readFileSync(path.join(__dirname, "..", "docs", "CSV.md"), "utf8"));
+    check("and it does not send the reader to menus that are not there", !/Stops template|Routes template|Tickets template/.test(guideText));
+    const templates = ["stops", "routes", "tickets"].map((kind) => { const file = path.join(zipFromExport.dir, `${kind}-template.csv`); return { name: `${kind}-template.csv`, file, ...readCsv(file) }; });
+    check("each template is a .csv named for its kind, with a header and example rows", templates.every((t, i) => t.name === `${["stops", "routes", "tickets"][i]}-template.csv` && t.bom && t.header.length >= 3 && t.rows.length >= 2), templates.map((t) => `${t.name} ${t.rows.length}`).join(", "));
+    await page.waitForTimeout(300);
+    check("and the screen says that the zip was saved", /spreadsheet-templates\.zip/.test((await page.locator("[data-sonner-toast]").allTextContents()).join(" ")), (await page.locator("[data-sonner-toast]").allTextContents()).join(" | "));
+    const zipFromDialog = await zipDownload(() => openSpreadsheetDialog(page), { button: "Download templates (.zip)" });
+    check("the import dialog's own button gives the same zip", zipFromDialog.name === "spreadsheet-templates.zip" && JSON.stringify(zipFromDialog.entries) === JSON.stringify(zipFromExport.entries) && fs.readFileSync(path.join(zipFromDialog.dir, "stops-template.csv"), "utf8") === fs.readFileSync(path.join(zipFromExport.dir, "stops-template.csv"), "utf8"));
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(300);
     await page.evaluate(() => { const map = JSON.parse(localStorage.getItem("ttr-map")); localStorage.setItem("ttr-map", JSON.stringify({ ...map, stops: [], routes: [], tickets: [], ticketSets: [{ id: "main", label: "Main deck" }] })); });
     await page.reload({ waitUntil: "networkidle" });
     await page.waitForTimeout(700);
-    await openTemplates();
-    const templateChooser = page.waitForEvent("filechooser");
-    await page.getByRole("menuitem", { name: "Import spreadsheets…" }).click();
-    await (await templateChooser).setFiles(templates.map((t) => t.file));
-    await page.waitForTimeout(800);
+    await chooseSpreadsheets(page, templates.map((t) => t.file));
+    await page.waitForTimeout(200);
     const fromTemplates = await page.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")));
     const templateToast = (await page.locator("[data-sonner-toast]").allTextContents()).join(" | ");
     check("imported into an empty map, the three templates give a small working map, and nothing to warn about", fromTemplates.stops.length >= 4 && fromTemplates.routes.length >= 4 && fromTemplates.tickets.length >= 2 && !/had no position|left out|became/.test(templateToast), `${fromTemplates.stops.length} stops, ${fromTemplates.routes.length} routes | ${templateToast}`);
     // Saved from Excel on Windows as plain "CSV": semicolons and Windows-1252, not UTF-8. å, ä and ö survive.
     const excelFile = path.join(os.tmpdir(), `ttr-excel-${Date.now()}.csv`);
     fs.writeFileSync(excelFile, Buffer.from("Name;X;Y\r\nÅhus;100;100\r\nMalmö;300;300\r\nHässleholm;500;200\r\n", "latin1"));
-    await openTemplates();
-    const excelChooser = page.waitForEvent("filechooser");
-    await page.getByRole("menuitem", { name: "Import spreadsheets…" }).click();
-    await (await excelChooser).setFiles(excelFile);
-    await page.waitForTimeout(500);
+    await chooseSpreadsheets(page, excelFile);
     if (await page.getByRole("button", { name: "Continue" }).count()) { await page.getByRole("button", { name: "Continue" }).click(); await page.waitForTimeout(500); }
     const excelNames = (await page.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")))).stops.map((s) => s.name);
     check("a file Excel saved as plain CSV on Windows keeps å, ä and ö", JSON.stringify(excelNames) === JSON.stringify(["Åhus", "Malmö", "Hässleholm"]), excelNames.join(", "));
@@ -4401,12 +4424,8 @@ const sectionStart = (n) => {
     fs.writeFileSync(csvStops, `Name,Id,X,Y\nWestport,x-westport,200,200\nMillbrook,${millbrook.id},500,200\nAlpha,x-alpha,300,400\n`);
     const csvRoutes = path.join(os.tmpdir(), `ttr-${Date.now()}-routes.csv`);
     fs.writeFileSync(csvRoutes, "From,To,Length,From id,To id\nWestport,Millbrook,3,x-westport,\nMillbrook,Alpha,2,,x-alpha\n");
-    await np.getByRole("button", { name: "Import", exact: true }).click(); await np.waitForTimeout(250);
-    await np.getByRole("menuitem", { name: "Spreadsheet (CSV)" }).click(); await np.waitForTimeout(250);
-    const chooser = np.waitForEvent("filechooser");
-    await np.getByRole("menuitem", { name: "Import spreadsheets…" }).click();
-    await (await chooser).setFiles([csvStops, csvRoutes]);
-    await np.waitForTimeout(700);
+    await chooseSpreadsheets(np, [csvStops, csvRoutes]);
+    await np.waitForTimeout(100);
     await np.getByRole("alertdialog").getByRole("button", { name: "Continue" }).click();
     await np.waitForTimeout(700);
     check("a spreadsheet that replaces the stops asks about the tickets of the decks that stay", (await dialog.count()) === 1 && (await dialog.locator(".rebind-row").count()) === new Set(before.tickets.flatMap((t) => [t.a, t.b]).filter((id) => id !== millbrook.id)).size, `${await dialog.locator(".rebind-row").count()} rows`);
@@ -4418,7 +4437,7 @@ const sectionStart = (n) => {
 
   // 61. Import → Tickets only reads the tickets of a file and nothing else: from a ticket file, or from a whole map
   // file or a network file, whose stops and routes it leaves alone. Map project still takes a whole map. And a
-  // template says on screen that it was saved.
+  // template zip says on screen that it was saved (section 9).
   if (wants(61)) {
   sectionStart(61);
     const to = await (await browser.newContext({ viewport: { width: 1500, height: 1000 }, acceptDownloads: true })).newPage();
@@ -4462,13 +4481,6 @@ const sectionStart = (n) => {
     await importAs("Map project", toFile("whole-map-2.json", wrap("map", other)));
     const whole = await mapNow();
     check("Map project takes the whole map, as before", whole.name === "Another map" && whole.stops.some((s) => s.id === "zed"), whole.name);
-    // A template says that it was saved.
-    await to.getByRole("button", { name: "Import", exact: true }).click(); await to.waitForTimeout(250);
-    await to.getByRole("menuitem", { name: "Spreadsheet (CSV)" }).click(); await to.waitForTimeout(250);
-    const saved = to.waitForEvent("download");
-    await to.getByRole("menuitem", { name: "Stops template", exact: true }).click();
-    const file = await saved; await to.waitForTimeout(400);
-    check("a template is saved with its plain name, and the screen says so", file.suggestedFilename() === "stops-template.csv" && /stops-template\.csv/.test((await to.locator("[data-sonner-toast]").allTextContents()).join(" ")), (await to.locator("[data-sonner-toast]").allTextContents()).join(" | "));
     await to.context().close();
   }
 

@@ -80,7 +80,8 @@ export default function About() {
         The tickets, the routes, the stops and the distance between every two stops can go out to a
         spreadsheet, and stops, routes and tickets can come back in from one: an export of your own, or
         a list typed by hand. Stops that come without a position are laid out from the routes, ready to
-        be dragged into place.
+        be dragged into place. Starting from nothing, take the templates: one zip, under Export, with a
+        file to fill in for each kind and a guide to every column.
       </p>
     </section>
 

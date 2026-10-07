@@ -25,6 +25,7 @@
     "test:markdown": "node tests/markdown.cjs",
     "test:releases": "node tests/releases.cjs",
     "test:license": "node tests/license.cjs",
+    "csv-guide": "node scripts/csv-guide.cjs",
     "test:csv": "node tests/csv-export.cjs",
     "test:csv-import": "node tests/csv-import.cjs",
     "test:csv-ids": "node tests/csv-ids.cjs",
