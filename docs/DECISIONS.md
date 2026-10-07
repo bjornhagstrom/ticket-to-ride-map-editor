@@ -122,7 +122,8 @@ gets it at once, and a new map starts with a Junction type ready to use.
 **Chosen.** Settings offers two board shapes, `2×3` (790 × 525 mm) and `2×4` (1053 × 526 mm), and
 wagons are always measured against that board. The Print button opens a dialog that decides the
 run: one sheet, a sheet per panel or full size; A4, A3, US Letter or Tabloid; and for a 2×3, an
-Anniversary size tick that prints the larger board at full size. The choice is remembered in the
+Anniversary size that prints the larger board at full size. All of it is picked in one table of sheets,
+with a box of its own for the whole board on one big page. The choice is remembered in the
 browser, never in the map. Every page prints upright with the map turned on it, because that is what
 every browser does by default, Safari included. The arithmetic is in `docs/PRINTING.md`.
 

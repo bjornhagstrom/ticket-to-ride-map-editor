@@ -18,9 +18,14 @@ Everything else is a **print choice**, made in the dialog and kept in `localStor
 
 | Choice | Values |
 | --- | --- |
-| Split | One sheet · One sheet per panel of the game board · Full size |
+| Split | One sheet · One sheet per panel of the game board · Full size · One big page, real size |
 | Paper | A4 · A3 · US Letter · Tabloid (11 × 17 in) |
-| Supersize (2×3 only) | Anniversary size: the 972 × 648 mm board, full size only |
+| Size (2×3 only) | Standard, or Anniversary: the 972 × 648 mm board, full size only |
+
+The dialog shows the first three splits, the paper and the size as one table of sheets, a row for each
+paper and a column for each way to split (the 2×3 has two Full size columns, Standard and Anniversary);
+picking a cell picks all three. "One big page, real size" is a box of its own, since it has no paper.
+When the board is not in the run there is no table, and the paper is asked for by itself.
 
 Anniversary is the same drawing printed larger, at 972 / 790 = 1.23 ×, so wagon spaces come out at
 24.6 mm, the way the Anniversary edition's bigger trains need. There is no Anniversary 2×4.
@@ -185,8 +190,8 @@ them. So the layout is made to fit with them on.
   `.print-rules`. Each part after the first starts on a page of its own. The paper chosen in the dialog
   sets the page for all of them. The choice is kept in `localStorage` as `ttr-print-parts`; the single
   word an earlier build kept in `ttr-print-rules` (`board`, `both`, `rules`, `off`, `on`) is still read.
-  Without the board in the run, how it is split, Supersize and the sheet table are hidden and the paper
-  stays. A deck with no tickets has no cards to tick, a map with no rules text has no rules, and with
+  Without the board in the run, the sheet table and the box for one big page are hidden, and the paper
+  is asked for as a list of its own. A deck with no tickets has no cards to tick, a map with no rules text has no rules, and with
   nothing ticked Print is off. The summary says how many sheets the cards take (`cardSheets` in
   `app/print-plan.ts`), and a test checks that it is the number of pages the browser prints. The
   "Print deck" button in the Tickets panel prints just the cards, whatever is ticked.
@@ -202,20 +207,20 @@ them. So the layout is made to fit with them on.
   print than the board. Areas and lines of the background are drawn faintly; their labels, notes and a
   background image are not. Junctions get no dot. The map keeps the board's proportions and never runs
   into the points; the names sit above it and wrap rather than being cut.
-- **One page, real size** is a fourth way to split. The page is the board's own size (the board, the
+- **One page, real size** is a fourth way to split, a box of its own (the table has no cell for it). The page is the board's own size (the board, the
   caption above it and the 10 mm margin all round: 810 × 553 mm for the standard board, 1073 × 554 mm
   for the extended one), upright and not turned, at 100 %. It is for a plotter or a large-format printer,
-  or to save as a PDF. The paper chosen does not matter, so the paper, Supersize and the sheet table are
-  hidden; nothing else fits on such a page, so the tickets and the rules print apart. Safari ignores the
+  or to save as a PDF. The paper chosen does not matter, so the sheet table is hidden; nothing else fits on such a page, so the tickets and the rules print apart. Safari ignores the
   size of a page, so there the dialog says to add a custom paper size in Safari's own dialog. A test saves
   the page as a PDF and reads the size from the PDF itself.
-- **Anniversary size is one checkbox under Supersize.** There is no Standard option; an empty box is
-  the standard board. Ticking it also selects full size, and choosing one sheet or per panel clears it.
-  Picking a table cell sets or clears it too. It is never disabled: an earlier version greyed out the
-  whole choice, which left the table as the only way to pick it.
+- **Anniversary size is a column of the table**, "Full size, Anniversary", beside "Full size, Standard",
+  on the board that has it (the 2×3). Picking another column leaves it. Until 1.0 it was also a box
+  of its own under Supersize, and how the board is split and the paper were lists of their own; they
+  all said what a cell of the table says, so they went, with the box for one big page left, since a big
+  page has no paper. The table is never disabled.
 - **Nothing may move while choices change.** The table has `table-layout: fixed` and fixed column
   widths. The picked cell is marked with a border and an inset shadow, never bold, which widened it
-  and shifted the columns 3 px. Supersize is always present on a 2×3 and never comes and goes. The
+  and shifted the columns 3 px. The Anniversary column is always there on a 2×3 and never comes and goes. The
   summary always has room for two lines. Before these, the table jumped 10.6 px when full size was
   chosen.
 - **Contrast.** Small text is at least 7:1 against its background, and other text at least 4.5:1.

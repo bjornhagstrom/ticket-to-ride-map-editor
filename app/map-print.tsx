@@ -284,33 +284,23 @@ export function PrintDialog({ open, onOpenChange, format, orientation = "landsca
           </label>
           {onePage && <p className="helper">The page is the board&apos;s size, so the tickets and the rules are printed separately.</p>}
         </fieldset>
-        {boardIn && <fieldset><legend>How it is split</legend>
-          {splits.map((split) => <label key={split.id} className="print-option">
-            <input type="radio" name="print-split" value={split.id} aria-label={split.label} aria-describedby={`print-split-${split.id}`}
-              checked={current.split === split.id} onChange={() => onChoice({ ...current, split: split.id })} />
-            <span><strong>{split.label}</strong><small id={`print-split-${split.id}`}>{split.note}</small></span>
-          </label>)}
-          <PrintSplitPreview plan={plan} />
+        {boardIn && <fieldset><legend>One big page</legend>
+          <label className="print-option">
+            <input type="checkbox" name="print-big-page" aria-label="One big page, real size" aria-describedby="print-big-page-note"
+              checked={onePage} onChange={(event) => onChoice(event.target.checked ? { ...current, split: "page" } : { ...current, split: "sheet", size: "standard" })} />
+            <span><strong>One big page, real size</strong><small id="print-big-page-note">The whole board on one page as big as the board: for a large-format printer, or to save as a PDF. Without it, the sheets are chosen in the table below.</small></span>
+          </label>
         </fieldset>}
-        {!onePage && <fieldset><legend>Paper</legend>
+        {!boardIn && <fieldset><legend>Paper</legend>
           {papers.map((paper) => <label key={paper.id} className="print-option">
             <input type="radio" name="print-paper" value={paper.id} aria-label={paper.label} aria-describedby={`print-paper-${paper.id}`}
               checked={current.paper === paper.id} onChange={() => onChoice({ ...current, paper: paper.id })} />
             <span><strong>{paper.label}</strong><small id={`print-paper-${paper.id}`}>{paper.note}</small></span>
           </label>)}
         </fieldset>}
-        {/* Anniversary exists only at full size, so ticking it asks for full size too, and a run
-            that is not full size is never Anniversary. The table and the tick follow each other. */}
-        {boardIn && !onePage && anniversary && <fieldset><legend>Supersize</legend>
-          <label className="print-option">
-            <input type="checkbox" name="print-anniversary" aria-label="Anniversary size" aria-describedby="print-anniversary-note"
-              checked={current.split === "full" && current.size === "anniversary"}
-              onChange={(event) => onChoice(event.target.checked ? { ...current, split: "full", size: "anniversary" } : { ...current, size: "standard" })} />
-            <span><strong>Anniversary size</strong><small id="print-anniversary-note">{anniversary.widthMm} × {anniversary.heightMm} mm, bigger wagons too. Always printed full size.</small></span>
-          </label>
-        </fieldset>}
       </div>
       <p className="print-summary">{summary}</p>
+      {boardIn && <PrintSplitPreview plan={plan} />}
       <p className="helper print-pdf-note">To keep it as a file, choose <strong>Save as PDF</strong> as the printer in your browser&apos;s print dialog. The file is named after the map, its version, what it holds and the date.</p>
       <p className="print-version">{version.number === undefined ? "This print will be version 1. Every print and export after a change gets the next number, on every sheet, card and rules page."
         : version.changed ? `This print will be version ${version.next}: the map has changed since version ${version.number}.`
@@ -328,7 +318,11 @@ export function PrintDialog({ open, onOpenChange, format, orientation = "landsca
               onClick={() => onChoice(cell.choice)}><span>{cell.pages} sheet{cell.pages === 1 ? "" : "s"}</span> <small>{Math.round(cell.scale * 100)} %</small></button></td>)}
           </tr>)}</tbody>
         </table>
-      </div></>}
+      </div>
+      <dl className="print-split-notes">
+        {splits.filter((split) => split.id !== "page").map((split) => <div key={split.id}><dt>{split.label}</dt><dd>{split.note}</dd></div>)}
+        {anniversary && <div><dt>Full size, Anniversary</dt><dd>{anniversary.widthMm} × {anniversary.heightMm} mm, bigger wagons too. Always printed full size.</dd></div>}
+      </dl></>}
       {boardIn && !onePage && profile.id === "safari" && <p className="helper print-dialog-foot print-safari-note">In Safari the sheets are cut shorter than in other browsers. Safari’s first print layout leaves less room on the page than it shows once any setting is changed, and a full-length sheet spilled onto a second page. The counts above are Safari’s.</p>}
       {!boardIn && <p className="helper print-dialog-foot">Pages print upright (portrait), the default in every browser. The page is the paper less a margin.</p>}
       {onePage && <p className="helper print-dialog-foot print-page-note">{profile.id === "safari"

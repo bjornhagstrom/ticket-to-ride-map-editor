@@ -95,6 +95,21 @@ const sectionStart = (n) => {
 
   // Millimetres to CSS pixels, for the sections that measure a print; sections of their own use it too.
   const mm = (value) => value / 25.4 * 96;
+  // The print dialog's choices are made in its table of sheets (a cell is a paper and a way to split) and with
+  // its box for one big page. These work on a dialog or a whole page.
+  const SPLIT_COLUMN = { sheet: 0, panel: 1, full: 2 };
+  const bigPageBox = (d) => d.getByRole("checkbox", { name: "One big page, real size", exact: true });
+  const pressedCell = (d) => d.locator('.print-table button[aria-pressed="true"]');
+  const cellAt = (d, paper, column) => d.locator(`.print-table tbody tr[data-paper="${paper}"] td:nth-of-type(${column + 1}) button`);
+  const pressedPaper = (d) => pressedCell(d).evaluate((b) => b.closest("tr").dataset.paper);
+  const pressedColumn = (d) => pressedCell(d).evaluate((b) => [...b.closest("tr").querySelectorAll("td")].indexOf(b.closest("td")));
+  const leaveBigPage = async (d) => { if ((await bigPageBox(d).count()) && (await bigPageBox(d).isChecked())) await bigPageBox(d).uncheck(); };
+  const pickSplit = async (d, split) => { if (split === "page") { await bigPageBox(d).check(); return; } await leaveBigPage(d); await cellAt(d, await pressedPaper(d), SPLIT_COLUMN[split]).click(); };
+  const PAPER_LABEL = { a4: "A4", a3: "A3", letter: "US Letter", tabloid: "Tabloid" };
+  const hasTable = async (d) => (await d.locator(".print-table").count()) > 0;
+  const pickPaper = async (d, paper) => { if (!(await hasTable(d))) { await d.getByRole("radio", { name: PAPER_LABEL[paper], exact: true }).check(); return; } await leaveBigPage(d); await cellAt(d, paper, await pressedColumn(d)).click(); };
+  const splitIs = async (d, split) => split === "page" ? bigPageBox(d).isChecked() : !(await bigPageBox(d).isChecked()) && (split === "full" ? (await pressedColumn(d)) >= 2 : (await pressedColumn(d)) === SPLIT_COLUMN[split]);
+  const paperIs = async (d, paper) => !(await hasTable(d)) ? d.getByRole("radio", { name: PAPER_LABEL[paper], exact: true }).isChecked() : !(await bigPageBox(d).isChecked()) && (await pressedPaper(d)) === paper;
   if (runChain) {
   sectionStart(1);
   // 1. welcome guide
@@ -147,7 +162,7 @@ const sectionStart = (n) => {
     const safariNote = await safariPage.locator('[role="dialog"]').first().textContent();
     check("and the dialog says why", /Safari/.test(safariNote) && /first/i.test(safariNote), safariNote.slice(-400));
     // Safari ignores the size of a page, so on one page the size of the board it is told what to do instead.
-    await safariPage.getByRole("radio", { name: "One page, real size", exact: true }).check();
+    await pickSplit(safariPage, "page");
     const safariPageNote = await safariPage.locator(".print-page-note").textContent();
     check("on one page the size of the board, Safari is told to add a custom paper size of 810 × 553 mm", /custom paper size of 810 × 553 mm/.test(safariPageNote) && /Safari/.test(safariPageNote), safariPageNote);
     await safariPage.context().close();
@@ -515,14 +530,15 @@ const sectionStart = (n) => {
   await printButton().click();
   await page.waitForTimeout(400);
   check("the Print button opens a dialog rather than printing", await printDialog().isVisible() && (await page.evaluate(() => window.__printCalls)) === 0);
-  check("it offers four ways to split the board: one sheet, per panel, full size, and one page the size of the board", (await printDialog().locator('input[name="print-split"]').count()) === 4);
-  check("and four papers", (await printDialog().locator('input[name="print-paper"]').count()) === 4);
-  check("the first time, the board prints whole on one sheet of A4", (await printDialog().locator('input[name="print-split"][value="sheet"]').isChecked()) && (await printDialog().locator('input[name="print-paper"][value="a4"]').isChecked()));
-  // Anniversary is one checkbox under Supersize, not a choice between two board sizes.
-  const supersize = () => printDialog().getByRole("checkbox", { name: "Anniversary size", exact: true });
-  await printDialog().getByRole("radio", { name: "Full size" }).check();
+  const headers = (await printDialog().locator(".print-table thead th").allTextContents()).map((t) => t.trim());
+  check("its choices are in one table of sheets: a row for each paper and a column for each way to split", headers[0] === "Paper" && headers.includes("One sheet") && headers.includes("Per panel") && headers.some((h) => /^Full size/.test(h)) && (await printDialog().locator(".print-table tbody tr").count()) === 4, headers.join(" | "));
+  check("and one box for the whole board on one big page", (await bigPageBox(printDialog()).count()) === 1);
+  check("there are no separate lists for how it is split, or for the paper, or a box for Anniversary size", (await printDialog().locator('input[name="print-split"]').count()) === 0 && (await printDialog().locator('input[name="print-paper"]').count()) === 0 && (await printDialog().getByRole("checkbox", { name: "Anniversary size" }).count()) === 0);
+  check("the first time, the board prints whole on one sheet of A4", (await splitIs(printDialog(), "sheet")) && (await paperIs(printDialog(), "a4")));
+  // Anniversary is a column of the table, on the board that has it.
+  await pickSplit(printDialog(), "full");
   await page.waitForTimeout(200);
-  check("a 2×4 board has no Anniversary size to print at", (await supersize().count()) === 0 && !/Supersize/.test(await printDialog().textContent()));
+  check("a 2×4 board has no Anniversary size to print at", !/Anniversary|Supersize/.test(await printDialog().textContent()));
   const tableCells = () => printDialog().locator(".print-table tbody tr").evaluateAll((rows) => rows.map((row) => Array.from(row.querySelectorAll("td button")).map((b) => Number(b.dataset.pages))));
   const cells2x4 = await tableCells();
   check("the comparison table has a row per paper", cells2x4.length === 4, JSON.stringify(cells2x4));
@@ -577,34 +593,34 @@ const sectionStart = (n) => {
   check("and 16 of A4 at Anniversary size", cells2x3[0][3] === 16, String(cells2x3[0][3]));
   await cell("letter", 3).click();
   await page.waitForTimeout(200);
-  check("picking a cell sets the paper", await printDialog().getByRole("radio", { name: "US Letter" }).isChecked());
-  check("and the way it is split", await printDialog().getByRole("radio", { name: "Full size" }).isChecked());
+  check("picking a cell sets the paper", await paperIs(printDialog(), "letter"));
+  check("and the way it is split", await splitIs(printDialog(), "full"));
   check("and the picked cell is marked", (await cell("letter", 3).getAttribute("aria-pressed")) === "true");
   check("and the summary follows", /12 sheets of US Letter/.test(await printDialog().locator(".print-summary").textContent()), await printDialog().locator(".print-summary").textContent());
-  check("the 2×3 offers Anniversary size as one checkbox under Supersize", (await supersize().count()) === 1 && /Supersize/.test(await printDialog().locator("legend", { hasText: "Supersize" }).textContent()));
+  check("the 2×3 offers Anniversary size as a column of the table, not as a box of its own", /Anniversary/.test(await printDialog().locator(".print-table thead").textContent()) && (await printDialog().getByRole("checkbox", { name: "Anniversary size" }).count()) === 0 && !/Supersize/.test(await printDialog().textContent()));
   check("and no Standard to pick, an empty box is the standard board", (await printDialog().getByRole("radio", { name: "Standard", exact: true }).count()) === 0);
-  check("standard full size leaves it unticked", !(await supersize().isChecked()));
-  await printDialog().getByRole("radio", { name: "One sheet", exact: true }).check();
+  check("standard full size does not mark the Anniversary cell", (await cell("letter", 4).getAttribute("aria-pressed")) !== "true");
+  await pickSplit(printDialog(), "sheet");
   await page.waitForTimeout(200);
-  check("it is never greyed out, even on one sheet", await supersize().isEnabled() && (await printDialog().locator("fieldset:disabled").count()) === 0);
-  await supersize().check();
+  check("the table is never greyed out, even on one sheet", (await cell("letter", 4).isEnabled()) && (await printDialog().locator("fieldset:disabled").count()) === 0);
+  await cell("letter", 4).click();
   await page.waitForTimeout(200);
-  check("ticking it prints full size, since Anniversary only exists at full size", await printDialog().getByRole("radio", { name: "Full size" }).isChecked());
+  check("picking Anniversary prints full size, since Anniversary only exists at full size", await splitIs(printDialog(), "full"));
   check("and marks the Anniversary cell in the table", (await cell("letter", 4).getAttribute("aria-pressed")) === "true");
   check("and the summary names the bigger board", /972 × 648 mm/.test(await printDialog().locator(".print-summary").textContent()), await printDialog().locator(".print-summary").textContent());
   await cell("a4", 3).click();
   await page.waitForTimeout(200);
-  check("picking a standard cell in the table takes the tick away", !(await supersize().isChecked()));
+  check("picking a standard cell takes Anniversary away", (await cell("a4", 3).getAttribute("aria-pressed")) === "true" && (await cell("letter", 4).getAttribute("aria-pressed")) !== "true");
   await cell("a3", 4).click();
   await page.waitForTimeout(200);
-  check("picking an Anniversary cell puts it back", await supersize().isChecked());
-  await supersize().uncheck();
+  check("picking an Anniversary cell marks it", (await cell("a3", 4).getAttribute("aria-pressed")) === "true");
+  await cell("a3", 3).click();
   await page.waitForTimeout(200);
-  check("unticking it keeps full size on the standard board", await printDialog().getByRole("radio", { name: "Full size" }).isChecked() && (await cell("a3", 3).getAttribute("aria-pressed")) === "true");
-  await supersize().check();
-  await printDialog().getByRole("radio", { name: "One sheet per panel of the game board", exact: true }).check();
+  check("and going back to standard keeps full size", await splitIs(printDialog(), "full") && (await cell("a3", 3).getAttribute("aria-pressed")) === "true");
+  await cell("a3", 4).click();
+  await pickSplit(printDialog(), "panel");
   await page.waitForTimeout(200);
-  check("choosing a panel run takes the tick away too", !(await supersize().isChecked()));
+  check("choosing a panel run takes Anniversary away too", (await cell("a3", 4).getAttribute("aria-pressed")) !== "true");
   await printDialog().getByRole("button", { name: "Cancel" }).click();
   await page.waitForTimeout(300);
 
@@ -653,7 +669,7 @@ const sectionStart = (n) => {
   await page.waitForTimeout(700);
   await printButton().click();
   await page.waitForTimeout(400);
-  check("the last print choice is remembered in this browser", await printDialog().getByRole("radio", { name: "Tabloid" }).isChecked() && await printDialog().getByRole("radio", { name: "One sheet", exact: true }).isChecked());
+  check("the last print choice is remembered in this browser", await paperIs(printDialog(), "tabloid") && await splitIs(printDialog(), "sheet"));
   await printDialog().getByRole("button", { name: "Cancel" }).click();
   await page.waitForTimeout(300);
 
@@ -685,7 +701,7 @@ const sectionStart = (n) => {
   // The dialog has to be readable, say what its table means, and hold still while choices change.
   await printButton().click();
   await page.waitForTimeout(400);
-  check("a panel is offered by the game board's own name", await printDialog().getByRole("radio", { name: "One sheet per panel of the game board", exact: true }).count() === 1);
+  check("a panel is offered by the game board's own name", /One sheet per panel of the game board/.test(await printDialog().locator(".print-split-notes").textContent()));
   const contrast = await page.evaluate(() => {
     const dialog = document.querySelector('[role="dialog"]');
     const rgba = (value) => { const m = value.match(/[\d.]+/g).map(Number); return { r: m[0], g: m[1], b: m[2], a: m.length > 3 ? m[3] : 1 }; };
@@ -742,16 +758,16 @@ const sectionStart = (n) => {
     if (shift > 0.5) moves.push(`${paper}/${column}: ${shift.toFixed(1)}px`);
   }
   check("the table holds still while choices change, 72 % to 100 % included", moves.length === 0, moves.join(", "));
-  await printDialog().getByRole("radio", { name: "One sheet per panel of the game board", exact: true }).check();
+  await pickSplit(printDialog(), "panel");
   const beforeRadio = await layout();
-  await printDialog().getByRole("radio", { name: "Full size" }).check();
+  await pickSplit(printDialog(), "full");
   await page.waitForTimeout(150);
   const afterRadio = await layout();
   check("and when full size is picked", Math.abs(afterRadio.y - beforeRadio.y) < 0.5, `${(afterRadio.y - beforeRadio.y).toFixed(1)}px`);
-  await supersize().check();
+  await cell("a4", 4).click();
   await page.waitForTimeout(150);
   const afterTick = await layout();
-  check("and when Anniversary size is ticked", Math.abs(afterTick.y - beforeRadio.y) < 0.5, `${(afterTick.y - beforeRadio.y).toFixed(1)}px`);
+  check("and when Anniversary size is picked", Math.abs(afterTick.y - beforeRadio.y) < 0.5, `${(afterTick.y - beforeRadio.y).toFixed(1)}px`);
   await printDialog().getByRole("button", { name: "Cancel" }).click();
   await page.waitForTimeout(300);
   sectionStart(11);
@@ -2845,9 +2861,9 @@ const sectionStart = (n) => {
     // the dialog follows what is ticked
     await printButton().click();
     await page.waitForTimeout(400);
-    check("with the board ticked, how it is split, Supersize and the sheet table are there", (await printDialog().locator('input[name="print-split"]').count()) === 4 && (await printDialog().locator(".print-table").count()) === 1);
+    check("with the board ticked, the sheet table and the box for one big page are there, and no paper to choose apart from it", (await printDialog().locator(".print-table").count()) === 1 && (await bigPageBox(printDialog()).count()) === 1 && (await printDialog().locator('input[name="print-paper"]').count()) === 0);
     await choosePrintParts(false, true, true);
-    check("without the board they go, and the paper stays", (await printDialog().locator('input[name="print-split"]').count()) === 0 && (await printDialog().locator(".print-table").count()) === 0 && (await printDialog().locator('input[name="print-paper"]').count()) === 4);
+    check("without the board the table and the big page go, and a paper to choose takes their place", (await bigPageBox(printDialog()).count()) === 0 && (await printDialog().locator(".print-table").count()) === 0 && (await printDialog().locator('input[name="print-paper"]').count()) === 4);
     const summary = await printDialog().locator(".print-summary").textContent();
     check("the summary says how many cards, on how many sheets, and then the rules", new RegExp(`${deckSize} ticket`).test(summary) && /\d+ sheet/.test(summary) && /then the rules/i.test(summary) && !/Standard board|board/i.test(summary.replace(/cards/g, "")), summary);
     await choosePrintParts(false, false, false);
@@ -2858,23 +2874,28 @@ const sectionStart = (n) => {
     // the paper chosen sets the page for everything
     await printButton().click();
     await page.waitForTimeout(400);
-    await printDialog().getByRole("radio", { name: "A3", exact: true }).check();
+    await pickPaper(printDialog(), "a3");
     await printDialog().getByRole("button", { name: "Cancel" }).click();
     await page.waitForTimeout(300);
     check("the paper chosen sets the page the cards and the rules print on", /size:\s*297mm 420mm/.test((await tree()).style));
     await printButton().click();
     await page.waitForTimeout(400);
-    await printDialog().getByRole("radio", { name: "A4", exact: true }).check();
+    await pickPaper(printDialog(), "a4");
     // the whole board on one page the size of the board: for a large-format printer, or to save as a PDF
     await choosePrintParts(true, false, false);
-    const onePage = printDialog().getByRole("radio", { name: "One page, real size", exact: true });
-    check("the board can go on one page as big as the board", (await onePage.count()) === 1);
+    const onePage = bigPageBox(printDialog());
+    check("the board can go on one big page as big as the board", (await onePage.count()) === 1);
     await onePage.check();
     const pageSummary = await printDialog().locator(".print-summary").textContent();
     check("the dialog says what that is: one page, real size, and how big the page is", /one page/i.test(pageSummary) && /100 %/.test(pageSummary) && /810 × 553 mm/.test(pageSummary), pageSummary);
     check("and that it is for a large-format printer or a PDF", /large-format|PDF/i.test(await printDialog().textContent()));
-    check("the paper no longer matters, so it is not asked for", (await printDialog().locator('input[name="print-paper"]').count()) === 0);
+    check("the paper no longer matters, so it is not asked for, and the table of sheets steps aside", (await printDialog().locator('input[name="print-paper"]').count()) === 0 && (await printDialog().locator(".print-table").count()) === 0);
     check("the tickets and the rules cannot join it, and the dialog says they print apart", (await printPart("Print the tickets").isDisabled()) && (await printPart("Print the rules").isDisabled()) && /print(ed)? (them )?separately|apart/i.test(await printDialog().textContent()));
+    await onePage.uncheck();
+    await page.waitForTimeout(200);
+    check("taking the big page away brings the table back, on one sheet of A4 as at first", (await printDialog().locator(".print-table").count()) === 1 && (await splitIs(printDialog(), "sheet")) && (await paperIs(printDialog(), "a4")));
+    await onePage.check();
+    await page.waitForTimeout(200);
     await printDialog().getByRole("button", { name: "Cancel" }).click();
     await page.waitForTimeout(300);
     const wholeBoard = await page.evaluate(() => ({ pages: document.querySelectorAll(".print-pages .print-page").length, cards: document.querySelectorAll(".print-pages .ticket-card").length, rules: document.querySelectorAll(".print-pages .print-rules").length, style: Array.from(document.querySelectorAll(".print-pages style")).map((el) => el.textContent).join(" ") }));
@@ -2892,7 +2913,7 @@ const sectionStart = (n) => {
     check("and that page is 810 × 553 mm, the size of the board and its margin (read from the PDF itself)", Boolean(mediaBox) && Math.abs(Number(mediaBox[1]) - pts(810)) < 3 && Math.abs(Number(mediaBox[2]) - pts(553)) < 3, mediaBox ? `${mediaBox[1]} × ${mediaBox[2]} pt, wanted ${pts(810).toFixed(0)} × ${pts(553).toFixed(0)}` : "no MediaBox found");
     await printButton().click();
     await page.waitForTimeout(400);
-    await printDialog().getByRole("radio", { name: "One sheet per panel of the game board", exact: true }).check();
+    await pickSplit(printDialog(), "panel");
     await choosePrintParts(false, true, true);
     await page.evaluate(() => { window.__run = null; window.print = () => { window.__run = { cards: document.querySelectorAll(".print-pages .ticket-card").length, rules: document.querySelectorAll(".print-pages .print-rules").length, boards: document.querySelectorAll(".print-pages .print-page").length, dialogs: document.querySelectorAll('[role="dialog"]').length }; }; });
     await printDialog().getByRole("button", { name: "Print", exact: true }).click();
@@ -3127,7 +3148,7 @@ const sectionStart = (n) => {
     const dialog = sp.locator('[role="dialog"]').first();
     const a4Panels = await dialog.locator('.print-table tbody tr[data-paper="a4"] td:nth-of-type(2) button').getAttribute("data-pages");
     check("the print table counts six A4 sheets for its panels", a4Panels === "6", String(a4Panels));
-    await dialog.getByRole("radio", { name: "One sheet per panel of the game board", exact: true }).check();
+    await pickSplit(dialog, "panel");
     const summary = await dialog.locator(".print-summary").textContent();
     check("and does not say the map is turned on the page", !/turned/.test(summary) && /upright/.test(summary), summary);
     const foot = await dialog.locator(".print-dialog-foot").allTextContents();
@@ -3833,7 +3854,7 @@ const sectionStart = (n) => {
     // big (found in the 1.0 review).
     await pp.getByRole("button", { name: "Print map" }).click();
     await pp.waitForTimeout(400);
-    await pp.getByRole("dialog", { name: "Print the map" }).getByRole("radio", { name: "One page, real size", exact: true }).check();
+    await pickSplit(pp.getByRole("dialog", { name: "Print the map" }), "page");
     await pp.getByRole("dialog", { name: "Print the map" }).getByRole("button", { name: "Cancel" }).click();
     await pp.waitForTimeout(300);
     await pp.evaluate(() => { window.__run = null; window.print = () => { window.__run = { style: [...document.querySelectorAll(".print-pages style")].map((e) => e.textContent).join(" ") }; }; });
@@ -3842,7 +3863,7 @@ const sectionStart = (n) => {
     check("the rules are not printed on pages the size of the board, whatever the last choice was", !/810mm|790mm/.test(bigRun.style) && /size:\s*\d+mm \d+mm/.test(bigRun.style), bigRun.style.slice(0, 200));
     await pp.getByRole("button", { name: "Print map" }).click();
     await pp.waitForTimeout(400);
-    await pp.getByRole("dialog", { name: "Print the map" }).getByRole("radio", { name: "One sheet per panel of the game board", exact: true }).check();
+    await pickSplit(pp.getByRole("dialog", { name: "Print the map" }), "panel");
     await pp.getByRole("dialog", { name: "Print the map" }).getByRole("button", { name: "Cancel" }).click();
     await pp.waitForTimeout(300);
     await stub();
@@ -4049,10 +4070,10 @@ const sectionStart = (n) => {
     const dialog = il.getByRole("dialog", { name: "Print the map" });
     const tiles = () => dialog.locator(".print-split-preview .print-split-sheet").count();
     check("the print dialog draws how the sheets divide the board: one sheet", (await dialog.locator(".print-split-preview").count()) === 1 && (await tiles()) === 1, String(await tiles()));
-    await dialog.getByRole("radio", { name: "One sheet per panel of the game board", exact: true }).check();
+    await pickSplit(dialog, "panel");
     await il.waitForTimeout(300);
     check("one per panel: six on a standard board", (await tiles()) === 6, String(await tiles()));
-    await dialog.getByRole("radio", { name: "Full size" }).check();
+    await pickSplit(dialog, "full");
     await il.waitForTimeout(300);
     const promised = Number(await dialog.locator('.print-table tbody tr[data-paper="a4"] td button[aria-pressed="true"], .print-table tbody tr[data-paper="a4"] td button.chosen').first().getAttribute("data-pages").catch(() => "0"));
     check("full size: as many as the table says", (await tiles()) > 6 && (promised === 0 || (await tiles()) === promised), `${await tiles()} drawn, ${promised} in the table`);
