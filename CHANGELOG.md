@@ -23,7 +23,7 @@ This file is written from `app/version.ts` by `npm run changelog`; edit the note
 - Build a full deck shows the same official figures as Map balance: the lowest and highest of the eight official maps.
 - A page of the balance figures can go with a print run, or alone: the network, crossings, how it holds together, crowding and the routes by colour and length, as they stand at that version.
 - The print dialog says how to save a run as a PDF, and the file is named after the map, its version, what it holds and the date.
-- The print dialog chooses paper and sheets in one table, with a box of its own for the whole board on one big page, instead of a list for how it is split, a list for the paper and a box for Anniversary size, and it no longer repeats in words what the run comes to.
+- The print dialog chooses paper and sheets in one table, with a box of its own for the whole board on one big page, instead of a list for how it is split, a list for the paper and a box for Anniversary size, and it no longer repeats in words what the run comes to or how to set the browser's own print dialog.
 - The Rules panel has Print the rules, for the rules alone on pages of their own.
 - A damaged map file opens with what can be used, and says what was left out and why; a file that holds no map at all is refused with a reason, and the map you had stays as it was.
 - A map kept in the browser that cannot be read is put aside untouched instead of being overwritten, and the editor starts afresh and says so.

@@ -192,7 +192,9 @@ them. So the layout is made to fit with them on.
   word an earlier build kept in `ttr-print-rules` (`board`, `both`, `rules`, `off`, `on`) is still read.
   Without the board in the run, the sheet table and the box for one big page are hidden, and the paper
   is asked for as a list of its own. A deck with no tickets has no cards to tick, a map with no rules text has no rules, and with
-  nothing ticked Print is off. The dialog has no paragraph telling what the run comes to: it
+  nothing ticked Print is off. The dialog has no foot note about the browser's own print dialog either. It used to say: leave it on Portrait
+  (the default), print at 100 % because "fit to page" undoes the sizes, and the same dialog saves a PDF. The
+  owner took it out to save room; the advice still holds, for anyone who asks. The dialog has no paragraph telling what the run comes to: it
   counted pages of the board only, and a person sees the result in the browser's own print preview. The
   "Print deck" button in the Tickets panel prints just the cards, whatever is ticked.
 - **A standing board** (Settings → Orientation) prints standing on the upright page, without the

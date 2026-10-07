@@ -731,8 +731,7 @@ const sectionStart = (n) => {
   });
   check("the sheet table has a heading of its own", /^H[2-4] \S/.test(described.heading), described.heading);
   check("and a description of what its numbers are", /sheets?/i.test(described.description) && /%/.test(described.description), described.description);
-  const foot = await printDialog().locator(".print-dialog-foot").textContent();
-  check("the dialog says to print upright, the default, and never asks for Landscape", /portrait|upright/i.test(foot) && !/choose Landscape/i.test(foot), foot);
+  check("the dialog never asks for Landscape", !/choose Landscape|set .*Landscape/i.test(await printDialog().textContent()));
   check("which spells out what the percentage means", /100\s%[^.]*real size|real size[^.]*100\s%/i.test(described.description), described.description);
   check("every cell says sheets, not just a number", /\d+ sheets?/.test(described.cell), described.cell);
   // Measured within the dialog's own content, its scrolling counted in: the dialog may scroll to show
@@ -3135,8 +3134,7 @@ const sectionStart = (n) => {
     const a4Panels = await dialog.locator('.print-table tbody tr[data-paper="a4"] td:nth-of-type(2) button').getAttribute("data-pages");
     check("the print table counts six A4 sheets for its panels", a4Panels === "6", String(a4Panels));
     await pickSplit(dialog, "panel");
-    const foot = await dialog.locator(".print-dialog-foot").allTextContents();
-    check("nor does the note at the foot of the dialog", foot.length > 0 && foot.every((t) => !/turned/.test(t)), foot.join(" | "));
+    check("nor does anything else in the dialog", !/turned/.test((await dialog.textContent()) || ""));
     const pages = await sp.evaluate(() => Array.from(document.querySelectorAll(".print-pages .print-page")).map((p) => p.querySelector("svg.print-sheet > g").getAttribute("transform")));
     check("the board's pages print standing, without a quarter turn", pages.length === 6 && pages.every((t) => !t), JSON.stringify(pages.slice(0, 2)));
     await sp.keyboard.press("Escape");
