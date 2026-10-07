@@ -5,7 +5,7 @@ This page says what goes in each column. The quickest start is the templates: on
 of the three kinds below (`stops-template.csv`, `routes-template.csv`, `tickets-template.csv`) and this
 guide (`columns.md`). Get it from **Import → Spreadsheet (CSV) → Download templates (.zip)**, or from
 **Export → Spreadsheet (CSV) → Templates to fill in (.zip)**: the same file. Each template has the
-columns below and a few example rows. The three together make a tiny map, so you can import them as they
+main columns below and a few example rows (the bends, and the ids, are only in what the editor exports). The three together make a tiny map, so you can import them as they
 are, look at the result, and then replace the rows with your own.
 
 ## The three files
@@ -51,7 +51,7 @@ laid out from the routes alone. That layout knows nothing of north, so expect to
 | `Type` | no | The route type by its name in Settings: `Railway`, `Boat`, or one of the map's own. Left empty, a route is a railway. |
 | `Wagon style` | no | A wagon style by its name in Settings, such as `Tunnel`, for routes that play by a rule of their own. |
 | `Locomotives` | no | How many of the route's spaces need a locomotive card, as on a ferry. |
-| `Bends` | no | The route's bends, from its `From` stop to its `To` stop, as `x:y` pairs in board units separated by spaces, such as `412:306 450:330`. See *Bends and curves* below. |
+| `Bends` | no | The route's bends, from its `From` stop to its `To` stop, as `x|y` pairs in board units separated by spaces, such as `412|306 450|330`. See *Bends and curves* below. |
 | `Curved` | no | `no` for a route that is straightened, so that it runs in straight lines between its bends. Empty or anything else: the route curves through its bends, as routes do unless straightened. |
 
 **A double route is two rows** with the same two stops, usually in two colours.
@@ -74,7 +74,7 @@ and the import reads them back, so a round trip keeps the shape of every route, 
 bend is a place on the board in the same units as `X` and `Y`, so it is kept only when the stops stay where
 the file puts them. When the stops had to be fitted to the board, or are laid out from the routes because the
 file gave them no place, the bends would not fit and are left out, and the import says so. A `Bends` cell
-that cannot be read (anything but `x:y` pairs, more than 100 of them, or numbers far off the board) leaves
+that cannot be read (anything but `x|y` pairs, more than 100 of them, or numbers far off the board) leaves
 that route without bends and is counted in the message. A file without the columns, such as an export from
 0.4.1 or a list typed by hand, reads as it always did: routes without bends, drawn straight between their
 stops.

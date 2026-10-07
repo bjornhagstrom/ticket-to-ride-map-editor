@@ -901,7 +901,7 @@ const sectionStart = (n) => {
     const toastText = (await page.locator("[data-sonner-toast]").allTextContents()).join(" | ");
     check("and the editor says what it read", /stops/.test(toastText) && /routes/.test(toastText) && /tickets/.test(toastText), toastText);
     check("and, since the stops came back with their own ids, asks about no ticket", (await page.getByRole("dialog", { name: "Tickets to stops that changed" }).count()) === 0);
-    // The templates: one zip, from Export (and from the import dialog), with the three files and the column guide in it.
+    // The templates: one zip, from Export and from the Import menu, with the three files and the column guide in it.
     const zipDownload = async (open, item, pagePart = page) => {
       await open();
       const pending = pagePart.waitForEvent("download", { timeout: 10000 });
@@ -2917,6 +2917,17 @@ const sectionStart = (n) => {
     const rulesWritten = await page.evaluate(() => Boolean((JSON.parse(localStorage.getItem("ttr-map")).rules || "").trim()));
     if (deckSize > 0 && !wasTickets) await printPart("Print the tickets").check();
     check("with the board taken out, a paper is asked for and the tickets and the rules can be ticked, whatever the big page was", (await printDialog().locator('input[name="print-paper"]').count()) === 4 && (deckSize === 0 || (await printPart("Print the tickets").isEnabled())) && (!rulesWritten || (await printPart("Print the rules").isEnabled())) && (deckSize === 0 || !/Nothing is ticked/.test(await printDialog().textContent())));
+    if (deckSize > 0) {
+      // And the run itself: split still "page", board out, the tickets ticked: the cards print, on a page of the paper.
+      await page.evaluate(() => { window.__bigRun = null; window.print = () => { const root = document.querySelector(".print-pages"); window.__bigRun = { cards: root.querySelectorAll(".ticket-card").length, boards: root.querySelectorAll(".print-board, .print-page > svg.print-sheet").length, style: [...root.querySelectorAll("style")].map((e) => e.textContent).join(" ") }; }; });
+      await printDialog().getByRole("button", { name: "Print", exact: true }).click();
+      await page.waitForFunction(() => window.__bigRun !== null, null, { timeout: 5000 });
+      const bigRun = await page.evaluate(() => window.__bigRun);
+      check("with the board out and the big page still chosen, the cards print on pages of the paper, not on one the size of the board", bigRun.cards === deckSize && !/810mm|790mm/.test(bigRun.style) && /size:\s*\d+mm \d+mm/.test(bigRun.style), JSON.stringify({ cards: bigRun.cards, deckSize, style: bigRun.style.slice(0, 80) }));
+      await page.waitForTimeout(400);
+      await printButton().click();
+      await page.waitForTimeout(400);
+    }
     if (deckSize > 0 && !wasTickets) await printPart("Print the tickets").uncheck();
     check("and only one foot note speaks of the page", (await printDialog().locator(".print-dialog-foot").count()) === 1);
     await printPart("Print the board").check();
@@ -4317,6 +4328,24 @@ const sectionStart = (n) => {
     await dp.waitForTimeout(400);
     const afterUndo = await mapNow();
     check("the notice's Undo does not undo something else when another change came after", !afterUndo.stops.some((s) => s.id === gull.id) && afterUndo.stops.find((s) => s.name === "Pine Hill").hub === true && /map has changed since/.test((await dp.locator("[data-sonner-toast]").allTextContents()).join(" ")));
+    // The toolbar's Undo counts as a change too: a notice's Undo after it must not undo one step further back. Pine Hill's
+    // hub mark was the last change before this deletion; Undo from the toolbar takes the deletion back, and the notice's
+    // Undo, pressed after that, must not take the hub mark back as well.
+    await pickStop("Harbour");
+    await dp.waitForTimeout(300);
+    await dp.getByRole("button", { name: "Delete stop" }).click();
+    await dp.waitForTimeout(300);
+    await dp.getByRole("alertdialog").getByRole("button", { name: "Continue" }).click();
+    await dp.waitForTimeout(400);
+    const notice = dp.locator("[data-sonner-toast]").filter({ hasText: /Harbour is deleted/ });
+    check("deleting Harbour gives a notice with Undo", (await notice.getByRole("button", { name: "Undo" }).count()) === 1);
+    await dp.locator("header").getByRole("button", { name: "Undo", exact: true }).click();
+    await dp.waitForTimeout(400);
+    const harbourBack = await mapNow();
+    await notice.getByRole("button", { name: "Undo" }).click();
+    await dp.waitForTimeout(400);
+    const afterNotice = await mapNow();
+    check("the toolbar's Undo took the deletion back, and the notice's Undo after it undid nothing more: the hub mark is still there", harbourBack.stops.some((s) => s.name === "Harbour") && afterNotice.stops.find((s) => s.name === "Pine Hill").hub === true && JSON.stringify(afterNotice) === JSON.stringify(harbourBack), `${harbourBack.stops.length} / ${afterNotice.stops.length} stops, hub ${afterNotice.stops.find((s) => s.name === "Pine Hill").hub}`);
     await dp.context().close();
   }
 
@@ -4480,10 +4509,19 @@ const sectionStart = (n) => {
     check("with the ticket whose stops this map has, and not the one that names a stop it has not", theirs.length === 1 && theirs[0].a === a.id && theirs[0].b === b.id && theirs[0].points === 7, JSON.stringify(theirs));
     check("and says that one was skipped", /1 skipped/.test((await to.locator("[data-sonner-toast]").allTextContents()).join(" ")), (await to.locator("[data-sonner-toast]").allTextContents()).join(" | "));
     await to.keyboard.press("Escape"); await to.waitForTimeout(300);
+    // The Tickets panel's own Import decks is the same thing: tickets only.
+    await to.getByRole("button", { name: "Tickets", exact: true }).click(); await to.waitForTimeout(400);
+    await to.getByRole("button", { name: /Import\/Export decks/ }).click(); await to.waitForTimeout(250);
+    const deckChooser = to.waitForEvent("filechooser");
+    await to.getByRole("menuitem", { name: "Import decks", exact: true }).click();
+    await (await deckChooser).setFiles(toFile("whole-map-decks.json", wrap("map", other))); await to.waitForTimeout(700);
+    const viaPanel = await mapNow();
+    check("Import decks in the Tickets panel also takes only the tickets of a whole map file, whatever was chosen before", viaPanel.name === before.name && viaPanel.stops.length === before.stops.length && viaPanel.ticketSets.length === after.ticketSets.length + 1, `${viaPanel.name}, ${viaPanel.stops.length} stops`);
+    await to.keyboard.press("Escape"); await to.waitForTimeout(300);
     // A network file with tickets: its network is left alone too.
     await importAs("Tickets only", toFile("network.json", wrap("network", { stops: other.stops, routes: other.routes, tickets: other.tickets })));
     const net = await mapNow();
-    check("Tickets only on a network file leaves the stops and routes alone as well", net.stops.length === before.stops.length && net.routes.length === before.routes.length && net.ticketSets.length === before.ticketSets.length + 2, `${net.stops.length} stops, ${net.ticketSets.length} decks`);
+    check("Tickets only on a network file leaves the stops and routes alone as well", net.stops.length === before.stops.length && net.routes.length === before.routes.length && net.ticketSets.length === before.ticketSets.length + 3, `${net.stops.length} stops, ${net.ticketSets.length} decks`);
     await to.keyboard.press("Escape"); await to.waitForTimeout(300);
     // A file with no tickets in it.
     await importAs("Tickets only", toFile("background.json", wrap("background", { background: [{ id: "bg", type: "area", points: [{ x: 1, y: 1 }, { x: 5, y: 5 }, { x: 9, y: 1 }] }] })));

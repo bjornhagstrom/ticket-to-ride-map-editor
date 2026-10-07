@@ -123,3 +123,10 @@ repository, so it is not part of this commit):
   alone; the chain is never split.
 - **The impact map goes stale.** `test:merge` ignores it and runs every section, so a wrong map only
   makes the quick tier less useful, not the merge tier less safe.
+
+## A thing the dev server hides
+
+React's dev mode runs a state updater twice, and the editor records a history step inside one, so against the dev
+server every change leaves two identical steps. A check that counts undo steps (a notice's Undo after the toolbar's
+Undo, section 59) passes there whatever the code does, and fails only against the production build. Run that
+section against `out/` (the release tier does) before trusting it.

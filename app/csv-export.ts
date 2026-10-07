@@ -50,8 +50,8 @@ export function routesCsv(data: MapData): string {
   for (const route of data.routes) {
     rows.push([name(route.a), name(route.b), route.length, colorLabels[route.color] ?? route.color, types.get(route.type) ?? route.type,
       route.wagonStyle ? wagons.get(route.wagonStyle) ?? route.wagonStyle : "", route.locomotiveSlots?.length ?? 0, (lines.get(pairKey(route.a, route.b)) ?? 0) > 1 ? "yes" : "", route.a, route.b,
-      // The route's bends, from its From stop to its To stop, as x:y pairs in board units; and "no" when it has been straightened.
-      (route.points ?? []).map((point) => `${Math.round(point.x)}:${Math.round(point.y)}`).join(" "), route.curved === false ? "no" : ""]);
+      // The route's bends, from its From stop to its To stop, as x|y pairs in board units (a bar, since a spreadsheet reads 500:30 as a time and 5/12 as a date); and "no" when it has been straightened.
+      (route.points ?? []).map((point) => `${Math.round(point.x)}|${Math.round(point.y)}`).join(" "), route.curved === false ? "no" : ""]);
   }
   return toCsv(rows);
 }

@@ -184,6 +184,7 @@ export function readCsvImport(files: { name: string; text: string }[], data: Map
   const routes: Route[] = [];
   const missing: string[] = [], colours: string[] = [], routeTypes: string[] = [];
   let unusable = 0, missingRoutes = 0, badBends = 0;
+  const idsUnusableInRoutes: string[] = [];
   const colourKey = (text: string) => {
     const value = text.trim().toLowerCase();
     if (!value || value === "grey" || value === "gray" || value === "neutral" || value === "any") return "neutral";
@@ -200,6 +201,7 @@ export function readCsvImport(files: { name: string; text: string }[], data: Map
     for (const row of file.rows.slice(1)) {
       const ends = [row[at.a], row[at.b]].map((text) => (text ?? "").trim());
       const idCells = [row[at.aId], row[at.bId]].map((text) => (text ?? "").trim());
+      idCells.forEach((id, i) => { if (id && !usableId(id) && sorted.stops.length === 0) idsUnusableInRoutes.push(ends[i] || id.slice(0, 20)); });
       if (!ends[0] && !ends[1] && !idCells[0] && !idCells[1]) continue;
       const found = ends.map((name, i) => find(idCells[i], name) ?? (sorted.stops.length || !name ? null : addKnownOrNew(name, usableId(idCells[i]))));
       if (!found[0] || !found[1]) { missingRoutes += 1; ends.forEach((name, i) => { if (!found[i] && (name || idCells[i])) missing.push(name || idCells[i]); }); continue; }
@@ -226,6 +228,7 @@ export function readCsvImport(files: { name: string; text: string }[], data: Map
       routes.push(route);
     }
   }
+  if (idsUnusableInRoutes.length) warnings.push(`${listed(idsUnusableInRoutes)} had an id that is over 100 characters long or has control characters in it, so ${idsUnusableInRoutes.length === 1 ? "it was" : "they were"} read by name.`);
   if (missingRoutes) warnings.push(`${plural(missingRoutes, "route names a stop", "routes name stops")} the stop file does not have (${listed(missing)}), and ${missingRoutes === 1 ? "was" : "were"} left out.`);
   if (unusable) warnings.push(`${plural(unusable, "route", "routes")} had no usable length, or joined a stop to itself, and ${unusable === 1 ? "was" : "were"} left out.`);
   if (colours.length) warnings.push(`Colours the editor does not have became grey: ${listed(colours)}.`);
@@ -245,7 +248,7 @@ export function readCsvImport(files: { name: string; text: string }[], data: Map
   let sets: TicketSet[] = [], tickets: Ticket[] = [], dropped = 0;
   if (sorted.tickets.length) {
     // Into this map's own stops when the files have none: by id when a row has one this map has, else by name.
-    let findTicketStop = find;
+    let findTicketStop = findIn(byName, byId, ambiguous);
     if (!network) {
       const ownNames = new Map<string, Stop>(), ownIds = new Map<string, Stop>(), ownDupes = new Set<string>();
       for (const stop of data.stops) { ownIds.set(stop.id, stop); if (ownNames.has(nameKey(stop.name))) ownDupes.add(nameKey(stop.name)); else ownNames.set(nameKey(stop.name), stop); }
@@ -272,14 +275,14 @@ export function readCsvImport(files: { name: string; text: string }[], data: Map
   return { stops, routes, sets, tickets, network, placed, scaled, dropped, warnings };
 }
 
-// The bends of a route: x:y pairs in board units, separated by spaces. A cell with anything else in it, a number that is
+// The bends of a route: x|y pairs in board units, separated by spaces (x:y, which the first draft wrote, is read too). A cell with anything else in it, a number that is
 // not a number or lies far off the board, or more than 100 bends, is not read at all.
 function readBends(text: string): Point[] | null {
   const parts = text.split(/\s+/);
   if (parts.length > 100) return null;
   const points: Point[] = [];
   for (const part of parts) {
-    const m = /^(-?\d+(?:\.\d+)?):(-?\d+(?:\.\d+)?)$/.exec(part);
+    const m = /^(-?\d+(?:\.\d+)?)[|:](-?\d+(?:\.\d+)?)$/.exec(part);
     if (!m) return null;
     const x = Number(m[1]), y = Number(m[2]);
     if (!Number.isFinite(x) || !Number.isFinite(y) || Math.abs(x) > 100000 || Math.abs(y) > 100000) return null;

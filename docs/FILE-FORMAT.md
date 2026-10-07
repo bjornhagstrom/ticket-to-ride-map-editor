@@ -85,11 +85,11 @@ not a way to move a whole map: the background, styles and settings are only in t
   is in `docs/CSV.md` (*Ids and names*); `tests/csv-ids.cjs` holds the rules, including an export from
   before ids.
 - **Bends and curves.** Added after 1.0, an addition: the route file has `Bends` and `Curved` after the columns
-  that were there. `Bends` holds the route's bend points, from its `From` stop to its `To` stop, as `x:y`
+  that were there. `Bends` holds the route's bend points, from its `From` stop to its `To` stop, as `x|y`
   pairs in board units separated by spaces; `Curved` holds `no` for a straightened route. They are read back only
   when the stops stay where the file puts them; otherwise they are left out, and the import says so. An older
-  build reads by header and passes over both columns (`tests/csv-ids.cjs` and `tests/csv-curves.cjs` read this
-  build's export with 0.4.1's own importer), so an older build loses the bends as it always did; a file from
+  build reads by header and passes over both columns (`tests/csv-ids.cjs` reads this build's export, bends and all,
+  with 0.4.1's own importer, and checks that the same stops, routes and tickets come out), so an older build loses the bends as it always did; a file from
   before has neither column and reads as it did. The columns can grow: a later build may add more after
   these, and readers go by header. `docs/CSV.md` (*Bends and curves*) has the details, `tests/csv-curves.cjs` the rules.
 - **Positions** (`x`, `y`, in board units) are kept when every one fits the board, and fitted to it,
@@ -122,14 +122,14 @@ not a way to move a whole map: the background, styles and settings are only in t
 5. **A file with nothing of a map in it is refused.** A JSON file that holds none of `stops`, `routes`,
    `tickets`, `ticketSets`, `background`, `backgroundImage`, `notes`, `rules` or the style lists (a
    `package.json`, another tool's graph) is not a map, a network, a background or a set of tickets. The reader
-   says so and the map that is open stays as it was; it is never opened as an empty map. An older build (0.4.1 and before) turns away only what is not an object, so it opens such a file as an empty map, which then replaces the open one. The list of content fields is closed on purpose and grows with the format: a later build that writes a file whose only content is a field not in the list makes this build refuse it as not a map, until the list is brought up to date with it.
-6. **Damaged parts are left out, and the rest opens.** A reader leaves out a part it cannot use: a stop with no
+   says so and the map that is open stays as it was; it is never opened as an empty map. An older build (0.4.1 and before) turns away nothing that is JSON, so it opens such a file as an empty map, which then replaces the open one. The list of content fields is closed on purpose and grows with the format: a later build that writes a file whose only content is a field not in the list makes this build refuse it as not a map, until the list is brought up to date with it.
+6. **Damaged parts of a map are left out, and the rest opens.** This is for a map file and for the map kept in the browser (a network or a background file is read by its own reader, part by part, without these messages). A reader leaves out a part it cannot use: a stop with no
    place on the map or with an id already taken, a route or a ticket that names a stop the map does not have (or
    the same stop twice), a deck with no id, a note with no place or size, a background shape with too few points.
    It mends a value it can save: a number written as text becomes a number, a route's length becomes a whole number
    of at least 1, ticket points that are not a number become 1, a ticket in a deck that does not exist goes into the
    first deck. It says in a message what it left out or mended. A part that is whole is not touched, and fields it
-   does not know stay (rule 3). A map kept in the browser that cannot be read at all is put aside, never overwritten.
+   does not know stay (rule 3). A map kept in the browser that cannot be read at all is put aside (a copy under another key); with no room for the copy it is kept where it is, and nothing is saved over it until the map is changed.
    An older build (0.4.1 and before) mends less: it opens such a file with the damaged parts still in it. The rules
    are in `repairMap` (`app/map-storage.ts`) and `tests/corrupt-files.cjs` holds them.
 

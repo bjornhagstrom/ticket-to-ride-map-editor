@@ -137,6 +137,10 @@ const read = (files, data = emptyMap) => imp.readCsvImport(files.map(([name, tex
   check("with no id, a name two stops share is said to be ambiguous, as it is with a stop file", unnamed.warnings.some((w) => /Springfield/.test(w) && /more than one stop/.test(w)), unnamed.warnings.join(" | "));
   const renamed = read([["routes.csv", "From,To,Length,From id,To id\nSpringfield West,Shelbyville,3,sf-1,sb\n"]], twinMap);
   check("a name typed against an id that says another is reported, also on the first row, and the stop keeps its own", renamed.stops.find((s) => s.id === "sf-1").name === "Springfield" && renamed.warnings.some((w) => /Springfield West/.test(w) && /id/.test(w)), renamed.warnings.join(" | "));
+  const oddRoutes = read([["routes.csv", "From,To,Length,From id,To id\nSpringfield,Shelbyville,3," + "x".repeat(300) + ",\n"]], emptyMap);
+  check("routes alone: an id that cannot be used is said so too, and the row is read by its names", oddRoutes.routes.length === 1 && oddRoutes.warnings.some((w) => /Springfield/.test(w) && /id/.test(w) && /100 characters/.test(w)), oddRoutes.warnings.join(" | "));
+  const mixed = read([["routes.csv", "From,To,Length\nA,B,3\n"], ["tickets.csv", "Deck,From,To,Points,From id,To id\nMain,A,B,3,s-old-1,s-old-2\n"]], emptyMap);
+  check("tickets that come with routes alone, with ids the routes did not make, are matched by their names", mixed.tickets.length === 1 && mixed.dropped === 0, `${mixed.tickets.length} tickets, ${mixed.dropped} left out`);
   const odd = read([["stops.csv", "Name,Id,X,Y\nLong," + "x".repeat(300) + ",1,1\n"]]);
   check("an id that cannot be used is said so, and the stop gets one of its own", odd.stops.length === 1 && /^s-/.test(odd.stops[0].id) && odd.warnings.some((w) => /Long/.test(w) && /id/.test(w)), odd.warnings.join(" | "));
   const strange = read([["routes.csv", "From,To,Length\nAlpha,Beta,3\n" + `${m.stops[0].name},Beta,2\n`]], m);
