@@ -31,7 +31,7 @@ This file is written from `app/version.ts` by `npm run changelog`; edit the note
 - On a computer each column scrolls on its own, so the map stays in view while you edit a stop or a route in a tall Properties panel.
 - In smaller windows the map shrinks to the room there is instead of running in under the Properties column, a tablet no longer scrolls sideways, and on a phone every button in the header shows.
 - Standing ticket cards have their points at the top, beside the cities, so the small map below is larger; lying cards keep the points in their corner.
-- Settings show a stop type as the map draws it, beside its settings, and the print dialog draws how the sheets of a run divide the board.
+- Settings show a stop type as the map draws it, beside its settings.
 - In Safari, dragging a stop's name across the map no longer selects the text of the panels and hints around it.
 - About tells the whole loop, from drawing to printing again with the next version number, and shows the editor, the ticket cards and Map balance as they are now.
 

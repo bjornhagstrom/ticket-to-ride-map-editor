@@ -45,7 +45,7 @@ in the same commit as the work (AGENTS.md).
 
 - Pictures for a stop's size and symbol (the selected stop shows on the map) and for where its name
   sits (it is dragged on the map now). Route types, the board and the wagon spaces already have theirs;
-  stop types and the print split were added after 0.4.1.
+  stop types were added after 0.4.1. A drawing of how the print's sheets divide the board was added and taken away again: it counted the board alone.
 
 - The rules in the PNG image of the map.
 - Mirroring or turning a map's content on its own board.

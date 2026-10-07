@@ -200,20 +200,6 @@ function PrintBalance({ data, setId }: { data: MapData; setId: string }) {
   </section>;
 }
 
-// How the sheets of a run divide the board, drawn from the plan itself: the board's outline, each
-// sheet's share of it, numbered as the captions number them.
-function PrintSplitPreview({ plan }: { plan: PrintPlan }) {
-  const width = plan.boardMm.width, height = plan.boardMm.height;
-  const label = `${plan.pages.length} sheet${plan.pages.length === 1 ? "" : "s"}: ${plan.columns} across, ${plan.rows} down`;
-  return <svg className="print-split-preview" viewBox={`-4 -4 ${width + 8} ${height + 8}`} role="img" aria-label={`How the sheets divide the board: ${label}`}>
-    <rect className="print-split-board" x={0} y={0} width={width} height={height} />
-    {plan.pages.map((page) => <g key={page.index} className="print-split-sheet">
-      <rect x={page.tile.x * width} y={page.tile.y * height} width={page.tile.width * width} height={page.tile.height * height} />
-      {plan.pages.length > 1 && <text x={(page.tile.x + page.tile.width / 2) * width} y={(page.tile.y + page.tile.height / 2) * height} dy="0.35em">{page.index + 1}</text>}
-    </g>)}
-  </svg>;
-}
-
 // Printing is decided per run. Nothing chosen here is written to the map; the last choice is kept
 // in this browser only, for convenience.
 export function PrintDialog({ open, onOpenChange, format, orientation = "landscape", profile, choice, onChoice, parts, onPrint, version }: {
@@ -300,13 +286,12 @@ export function PrintDialog({ open, onOpenChange, format, orientation = "landsca
         </fieldset>}
       </div>
       <p className="print-summary">{summary}</p>
-      {boardIn && <PrintSplitPreview plan={plan} />}
       <p className="helper print-pdf-note">To keep it as a file, choose <strong>Save as PDF</strong> as the printer in your browser&apos;s print dialog. The file is named after the map, its version, what it holds and the date.</p>
       <p className="print-version">{version.number === undefined ? "This print will be version 1. Every print and export after a change gets the next number, on every sheet, card and rules page."
         : version.changed ? `This print will be version ${version.next}: the map has changed since version ${version.number}.`
         : `Nothing has changed since version ${version.number}: this print is version ${version.number} too.`}</p>
       {boardIn && !onePage && <><h3 id="print-table-heading" className="print-table-heading">Sheets for every choice</h3>
-      <p id="print-table-note" className="print-table-note">Each cell shows how many sheets a print run takes, and its scale: how big the printed board is against the real one. 100 % is real size; 50 % is half as wide and half as tall. Pick a cell to use it.</p>
+      <p id="print-table-note" className="print-table-note">Each cell shows how many sheets the board takes, and its scale (the tickets and the rules come on pages of their own, as the summary above says): how big the printed board is against the real one. 100 % is real size; 50 % is half as wide and half as tall. Pick a cell to use it.</p>
       <div className="print-table-wrap">
         <table className="print-table" aria-labelledby="print-table-heading" aria-describedby="print-table-note">
           <colgroup><col className="print-table-paper" />{columns.map((label) => <col key={label} />)}</colgroup>

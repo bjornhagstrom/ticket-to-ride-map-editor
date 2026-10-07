@@ -4044,7 +4044,7 @@ const sectionStart = (n) => {
   }
 
   // 53. Pictures where words fall short, drawn from the editor's own data: a stop type as the map draws
-  // it, beside its settings; and in the print dialog, how the sheets divide the board.
+  // it, beside its settings (and no drawing of the print's sheets in the print dialog).
   if (wants(53)) {
   sectionStart(53);
     const il = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
@@ -4067,16 +4067,11 @@ const sectionStart = (n) => {
     await il.waitForTimeout(300);
     await il.getByRole("button", { name: "Print map" }).click();
     await il.waitForTimeout(400);
+    // The print dialog draws no picture of the sheets: it counted the board's sheets only, and tickets and rules
+    // add pages of their own; the summary and the table say what is counted.
     const dialog = il.getByRole("dialog", { name: "Print the map" });
-    const tiles = () => dialog.locator(".print-split-preview .print-split-sheet").count();
-    check("the print dialog draws how the sheets divide the board: one sheet", (await dialog.locator(".print-split-preview").count()) === 1 && (await tiles()) === 1, String(await tiles()));
-    await pickSplit(dialog, "panel");
-    await il.waitForTimeout(300);
-    check("one per panel: six on a standard board", (await tiles()) === 6, String(await tiles()));
-    await pickSplit(dialog, "full");
-    await il.waitForTimeout(300);
-    const promised = Number(await dialog.locator('.print-table tbody tr[data-paper="a4"] td button[aria-pressed="true"], .print-table tbody tr[data-paper="a4"] td button.chosen').first().getAttribute("data-pages").catch(() => "0"));
-    check("full size: as many as the table says", (await tiles()) > 6 && (promised === 0 || (await tiles()) === promised), `${await tiles()} drawn, ${promised} in the table`);
+    check("the print dialog has no drawing of the sheets, which would count the board alone", (await dialog.locator("svg[aria-label^='How the sheets divide']").count()) === 0);
+    check("and says that the table counts the board's sheets, the tickets and the rules coming on pages of their own", /how many sheets the board takes/.test((await dialog.locator(".print-table-note").textContent()) || ""));
     await il.context().close();
   }
 
