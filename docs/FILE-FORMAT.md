@@ -123,6 +123,15 @@ not a way to move a whole map: the background, styles and settings are only in t
    `tickets`, `ticketSets`, `background`, `backgroundImage`, `notes`, `rules` or the style lists (a
    `package.json`, another tool's graph) is not a map, a network, a background or a set of tickets. The reader
    says so and the map that is open stays as it was; it is never opened as an empty map. An older build (0.4.1 and before) turns away only what is not an object, so it opens such a file as an empty map, which then replaces the open one. The list of content fields is closed on purpose and grows with the format: a later build that writes a file whose only content is a field not in the list makes this build refuse it as not a map, until the list is brought up to date with it.
+6. **Damaged parts are left out, and the rest opens.** A reader leaves out a part it cannot use: a stop with no
+   place on the map or with an id already taken, a route or a ticket that names a stop the map does not have (or
+   the same stop twice), a deck with no id, a note with no place or size, a background shape with too few points.
+   It mends a value it can save: a number written as text becomes a number, a route's length becomes a whole number
+   of at least 1, ticket points that are not a number become 1, a ticket in a deck that does not exist goes into the
+   first deck. It says in a message what it left out or mended. A part that is whole is not touched, and fields it
+   does not know stay (rule 3). A map kept in the browser that cannot be read at all is put aside, never overwritten.
+   An older build (0.4.1 and before) mends less: it opens such a file with the damaged parts still in it. The rules
+   are in `repairMap` (`app/map-storage.ts`) and `tests/corrupt-files.cjs` holds them.
 
 ## What you can rely on
 
