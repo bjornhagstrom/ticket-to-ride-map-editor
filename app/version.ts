@@ -14,7 +14,7 @@ export const UNRELEASED: string[] = [];
 export const RELEASES: Release[] = [
   {
     version: "1.0.0",
-    date: "2026-10-05",
+    date: "2026-10-07",
     title: "Version 1.0: the map against the official maps, decks calm or tense, and printing for playtests",
     changes: [
       "Map balance opens with the map against the official maps: crowded routes at a full table as a share of all routes, the ticket traffic on double routes against single ones, routes no ticket needs, the busiest stop and the average hub degree, each beside what the eight official maps measure.",

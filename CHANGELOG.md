@@ -4,7 +4,7 @@ What changed in each version of the [Ticket to Ride map editor](https://hagstrom
 
 This file is written from `app/version.ts` by `npm run changelog`; edit the notes there.
 
-## 1.0.0 · 2026-10-05
+## 1.0.0 · 2026-10-07
 
 **Version 1.0: the map against the official maps, decks calm or tense, and printing for playtests**
 
