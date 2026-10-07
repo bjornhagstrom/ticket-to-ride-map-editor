@@ -867,11 +867,10 @@ const sectionStart = (n) => {
     const after = await page.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")));
     const sameStops = stored.stops.every((s) => after.stops.some((t) => t.name === s.name && Math.abs(t.x - s.x) <= .5 && Math.abs(t.y - s.y) <= .5));
     check("the map comes back from its own spreadsheets: every stop in its place, every route", after.stops.length === stored.stops.length && sameStops && after.routes.length === stored.routes.length, `${after.stops.length} stops, ${after.routes.length} routes`);
-    // The spreadsheet's stops have ids of their own, so the old decks' tickets name stops that are gone:
-    // they are removed (with a notice), and the new decks hold the tickets that came.
-    check("the tickets arrive as new decks, and the old ones, which named stops that are gone, are removed", after.ticketSets.length === stored.ticketSets.length * 2 && after.tickets.length === stored.tickets.length && after.tickets.every((t) => after.stops.some((s) => s.id === t.a) && after.stops.some((s) => s.id === t.b)), `${after.ticketSets.length} decks, ${after.tickets.length} tickets`);
+    check("the tickets arrive as new decks beside the old ones, which still name stops that are there", after.ticketSets.length === stored.ticketSets.length * 2 && after.tickets.length === stored.tickets.length * 2 && after.tickets.every((t) => after.stops.some((s) => s.id === t.a) && after.stops.some((s) => s.id === t.b)), `${after.ticketSets.length} decks, ${after.tickets.length} tickets`);
     const toastText = (await page.locator("[data-sonner-toast]").allTextContents()).join(" | ");
-    check("and the editor says what it read, and how many old tickets it removed", /stops/.test(toastText) && /routes/.test(toastText) && /tickets/.test(toastText) && new RegExp(`${stored.tickets.length} tickets in your decks named stops that are not in the spreadsheet`).test(toastText), toastText);
+    check("and the editor says what it read", /stops/.test(toastText) && /routes/.test(toastText) && /tickets/.test(toastText), toastText);
+    check("and, since the stops came back with their own ids, asks about no ticket", (await page.getByRole("dialog", { name: "Tickets to stops that changed" }).count()) === 0);
     // The templates: downloaded from the same menu, named for what they hold, and good enough to import
     // as they are.
     const openTemplates = async () => { await page.getByRole("button", { name: "Import", exact: true }).click(); await page.waitForTimeout(250); await page.getByRole("menuitem", { name: "Spreadsheet (CSV)" }).click(); await page.waitForTimeout(250); };
@@ -4247,8 +4246,10 @@ const sectionStart = (n) => {
     await dp.context().close();
   }
 
-  // 60. A network imported over the stops takes the tickets that named stops it does not have, says how
-  // many, and Undo brings them back (found in the 1.0 review).
+  // 60. A network imported over the stops: the tickets of the decks that stay, whose stops are gone or now
+  // mean another stop, are put to the person in a dialog that cannot be dismissed by accident; each old stop
+  // is sent to a new one or its tickets go, and Undo the import brings everything back (found in the 1.0
+  // review).
   if (wants(60)) {
   sectionStart(60);
     const np = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
@@ -4258,20 +4259,74 @@ const sectionStart = (n) => {
     await np.waitForTimeout(600);
     const mapNow = () => np.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")));
     const before = await mapNow();
-    const network = { format: "ticket-to-ride-map", version: 3, kind: "network", payload: { stops: [{ id: "n-a", name: "Alpha", type: "city", x: 200, y: 200 }, { id: "n-b", name: "Beta", type: "city", x: 600, y: 300 }], routes: [{ id: "n-r", a: "n-a", b: "n-b", length: 3, type: "city", color: "red" }] } };
-    const file = path.join(os.tmpdir(), `ttr-${Date.now()}-network.json`); fs.writeFileSync(file, JSON.stringify(network));
-    await np.locator('input[type="file"][accept="application/json"]').setInputFiles(file);
-    await np.waitForTimeout(600);
-    await np.getByRole("alertdialog").getByRole("button", { name: "Continue" }).click();
+    const stopNamed = (m, name) => m.stops.find((s) => s.name === name);
+    const westport = stopNamed(before, "Westport"), millbrook = stopNamed(before, "Millbrook"), fernside = stopNamed(before, "Fernside");
+    const ticketsOf = (m, ...ids) => m.tickets.filter((t) => ids.includes(t.a) || ids.includes(t.b));
+    const importNetwork = async (stops, routes) => {
+      const file = path.join(os.tmpdir(), `ttr-${Date.now()}-network.json`);
+      fs.writeFileSync(file, JSON.stringify({ format: "ticket-to-ride-map", version: 3, kind: "network", payload: { stops, routes } }));
+      await np.locator('input[type="file"][accept="application/json"]').setInputFiles(file);
+      await np.waitForTimeout(600);
+      await np.getByRole("alertdialog").getByRole("button", { name: "Continue" }).click();
+      await np.waitForTimeout(600);
+    };
+    const dialog = np.getByRole("dialog", { name: "Tickets to stops that changed" });
+    // The new network: Westport's id now belongs to Eastgate; Millbrook is as it was; Westport is a new stop
+    // with a new id; every other stop of the example is gone.
+    const stopsIn = [{ id: westport.id, name: "Eastgate", type: "city", x: 200, y: 200 }, { id: millbrook.id, name: "Millbrook", type: "city", x: 500, y: 200 }, { id: "n-westport", name: "Westport", type: "city", x: 300, y: 400 }, { id: "n-lake", name: "Lakeview", type: "city", x: 700, y: 400 }];
+    const routesIn = [{ id: "n-r1", a: westport.id, b: millbrook.id, length: 3, type: "city", color: "red" }, { id: "n-r2", a: "n-westport", b: "n-lake", length: 3, type: "city", color: "blue" }];
+    await importNetwork(stopsIn, routesIn);
+    check("the network replaces the stops and routes", (await mapNow()).stops.length === 4 && (await mapNow()).routes.length === 2);
+    check("and a dialog asks about the tickets of the decks that stay", (await dialog.count()) === 1);
+    const asked = (await dialog.textContent()) || "";
+    const flagged = new Set(before.tickets.flatMap((t) => [t.a, t.b]).filter((id) => id !== millbrook.id));
+    check("it has one row for each old stop that is gone or changed, and none for the one that is as it was", (await dialog.locator(".rebind-row").count()) === flagged.size && !/Millbrook ·/.test(asked), `${await dialog.locator(".rebind-row").count()} rows, ${flagged.size} stops`);
+    const rowOf = (name) => dialog.locator(".rebind-row").filter({ has: np.locator("label strong", { hasText: new RegExp(`^${name}$`) }) });
+    const westportRow = rowOf("Westport");
+    check("a stop whose id now means another stop says so", /now the stop Eastgate, not Westport/.test((await westportRow.textContent()) || ""), await westportRow.textContent());
+    check("and the stop with the old name is already chosen for it", (await westportRow.locator("select").inputValue()) === "n-westport");
+    check("a stop that is gone and has no namesake is set to have its tickets removed", (await rowOf("Fernside").locator("select").inputValue()) === "");
+    await np.keyboard.press("Escape");
+    await np.waitForTimeout(300);
+    check("Escape does not close it", (await dialog.count()) === 1);
+    await np.mouse.click(5, 5);
+    await np.waitForTimeout(300);
+    check("nor does a click outside it", (await dialog.count()) === 1);
+    check("while it is open the tickets are all still there", (await mapNow()).tickets.length === before.tickets.length);
+    // Send Fernside to Millbrook, and apply.
+    await rowOf("Fernside").locator("select").selectOption({ label: "Millbrook" });
+    await dialog.getByRole("button", { name: "Apply" }).click();
     await np.waitForTimeout(600);
     const after = await mapNow();
-    check("the network replaces the stops and routes", after.stops.length === 2 && after.routes.length === 1);
-    check("and the tickets that named the old stops are gone from every deck", after.tickets.length === 0 && before.tickets.length > 10, `${before.tickets.length} before, ${after.tickets.length} after`);
-    const said = (await np.locator("[data-sonner-toast]").allTextContents()).join(" | ");
-    check("the editor says how many, and that Undo brings them back", new RegExp(`${before.tickets.length} tickets in your decks named stops that are not in the imported network`).test(said) && /Undo brings them back/.test(said), said);
+    // Old Eastgate has a namesake in the new network (the stop that took Westport's id), so it is sent there;
+    // Westport goes to the new stop of that name; Fernside was sent to Millbrook by hand; the rest go.
+    const eastgate = stopNamed(before, "Eastgate");
+    const sendTo = (id) => id === westport.id ? "n-westport" : id === eastgate.id ? westport.id : id === fernside.id ? millbrook.id : id === millbrook.id ? millbrook.id : null;
+    const expected = before.tickets.filter((t) => sendTo(t.a) && sendTo(t.b) && sendTo(t.a) !== sendTo(t.b));
+    check("Apply moves what was chosen and removes what was not, and every ticket names a stop that is there", after.tickets.length === expected.length && after.tickets.every((t) => after.stops.some((s) => s.id === t.a) && after.stops.some((s) => s.id === t.b)), `${after.tickets.length} tickets, ${expected.length} expected`);
+    check("each ticket ends where its old stop was sent, end for end", expected.every((e) => { const got = after.tickets.find((t) => t.id === e.id); return got && got.a === sendTo(e.a) && got.b === sendTo(e.b) && got.points === e.points; }), JSON.stringify(after.tickets.map((t) => [t.id, t.a, t.b])));
+    check("a ticket that named Westport follows it to its new stop, not to the stop that took its old id", before.tickets.filter((t) => t.a === westport.id || t.b === westport.id).every((t) => { const got = after.tickets.find((x) => x.id === t.id); return !got || (t.a === westport.id ? got.a : got.b) === "n-westport"; }));
+    check("the dialog has closed and says what was done", (await dialog.count()) === 0 && /moved to other stops/.test((await np.locator("[data-sonner-toast]").allTextContents()).join(" ")));
     await np.reload({ waitUntil: "networkidle" });
     await np.waitForTimeout(800);
     check("opened again, the map is not reported as damaged", !/could not be used|left out/i.test((await np.locator("[data-sonner-toast]").allTextContents()).join(" ")));
+    // Undo the import: everything as it was.
+    await np.evaluate((text) => localStorage.setItem("ttr-map", text), JSON.stringify(before));
+    await np.reload({ waitUntil: "networkidle" });
+    await np.waitForTimeout(800);
+    const again = await mapNow();
+    await importNetwork(stopsIn, routesIn);
+    await np.getByRole("dialog", { name: "Tickets to stops that changed" }).getByRole("button", { name: "Undo the import" }).click();
+    await np.waitForTimeout(600);
+    const undone = await mapNow();
+    check("Undo the import brings back the stops, routes and tickets as they were", undone.stops.length === again.stops.length && undone.routes.length === again.routes.length && undone.tickets.length === again.tickets.length && (await dialog.count()) === 0, `${undone.stops.length} stops, ${undone.tickets.length} tickets`);
+    // Remove them all.
+    await importNetwork(stopsIn, routesIn);
+    await np.getByRole("dialog", { name: "Tickets to stops that changed" }).getByRole("button", { name: "Remove them all" }).click();
+    await np.waitForTimeout(600);
+    const bare = await mapNow();
+    const stayingOnes = again.tickets.filter((t) => t.a === millbrook.id && t.b === millbrook.id).length;
+    check("Remove them all removes every ticket that named a stop that changed", bare.tickets.length === stayingOnes && (await dialog.count()) === 0, `${bare.tickets.length} tickets left`);
     await np.context().close();
   }
 

@@ -91,14 +91,30 @@ export function readCsvImport(files: { name: string; text: string }[], data: Map
   const network = sorted.stops.length > 0 || sorted.routes.length > 0;
   const stops: Stop[] = [];
   const read = new Map<Stop, { x: number; y: number; geo: boolean }>();
-  // A stop is found by the id its own file gave it, or by name.
-  const byKey = new Map<string, Stop>();
+  // A stop is found by its id when a row has one that a stop of the file has, otherwise by name. Ids are what
+  // ties the files together by machine; names are there to be read, and are the way when there is no id.
+  const byName = new Map<string, Stop>();
+  const byId = new Map<string, Stop>();
+  const ambiguous = new Set<string>();
+  const nameKey = (name: string) => name.trim().normalize("NFC").toLowerCase();
   const junction = data.stopTypeStyles.find((style) => style.junction)?.id;
   const plainStop = data.stopTypeStyles.some((style) => style.id === "city") ? "city" : data.stopTypeStyles.find((style) => !style.junction)?.id ?? "city";
-  const addStop = (name: string, type = plainStop) => { const stop: Stop = { id: `s-${stamp}-${stops.length}`, name, type, x: 0, y: 0 }; stops.push(stop); byKey.set(name.toLowerCase(), stop); return stop; };
+  // An id from a file is used when it is plain text of a sensible length and no stop has it yet.
+  const usableId = (text: string | undefined) => { const id = (text ?? "").trim(); return id && id.length <= 100 && !/[\u0000-\u001f]/.test(id) ? id : ""; };
+  let made = 0;
+  const freshId = () => { let id = `s-${stamp}-${made++}`; while (byId.has(id)) id = `s-${stamp}-${made++}`; return id; };
+  const addStop = (name: string, type = plainStop, wanted = "") => {
+    const id = wanted && !byId.has(wanted) ? wanted : freshId();
+    const stop: Stop = { id, name, type, x: 0, y: 0 };
+    stops.push(stop); byId.set(id, stop);
+    if (byName.has(nameKey(name))) ambiguous.add(nameKey(name)); else byName.set(nameKey(name), stop);
+    return stop;
+  };
+  // What the id and the name in one row say, which may differ: the id wins, and the row is remembered.
+  const disagreements: string[] = [], ambiguousUsed: string[] = [];
 
   // ---- stops
-  const twice: string[] = [], unknownTypes: string[] = [];
+  const twice: string[] = [], unknownTypes: string[] = [], idsTaken: string[] = [];
   for (const file of sorted.stops) {
     const header = headerOf(file.rows);
     const at = { id: column(header, "id"), name: column(header, "name"), type: column(header, "type"), kind: column(header, "kind"), x: column(header, "x"), y: column(header, "y"),
@@ -106,7 +122,11 @@ export function readCsvImport(files: { name: string; text: string }[], data: Map
     for (const row of file.rows.slice(1)) {
       const name = (row[at.name] ?? "").trim() || (row[at.id] ?? "").trim();
       if (!name) continue;
-      if (byKey.has(name.toLowerCase())) { twice.push(name); continue; }
+      const wanted = usableId(row[at.id]);
+      const taken = wanted && byId.has(wanted);
+      // The same name again is the same stop, unless the row has an id of its own that tells them apart.
+      if (byName.has(nameKey(name)) && (!wanted || taken)) { twice.push(name); continue; }
+      if (taken) idsTaken.push(name);
       const kind = (row[at.kind] ?? "").trim().toLowerCase();
       const typeText = (row[at.type] ?? "").trim().toLowerCase();
       let type = plainStop;
@@ -115,16 +135,26 @@ export function readCsvImport(files: { name: string; text: string }[], data: Map
         const style = data.stopTypeStyles.find((item) => item.id.toLowerCase() === typeText || item.label.toLowerCase() === typeText);
         if (style) type = style.id; else unknownTypes.push(row[at.type].trim());
       }
-      const stop = addStop(name, type);
-      const id = (row[at.id] ?? "").trim();
-      if (id) byKey.set(id.toLowerCase(), stop);
+      const stop = addStop(name, type, wanted);
       const x = number(row[at.x]), y = number(row[at.y]);
       if (x !== null && y !== null) read.set(stop, { x, y, geo: false });
       else { const lat = number(row[at.lat]), lon = number(row[at.lon]); if (lat !== null && lon !== null) read.set(stop, { x: lon, y: lat, geo: true }); }
     }
   }
   if (twice.length) warnings.push(`${listed(twice)} ${twice.length === 1 ? "is" : "are"} named more than once in the stop file; the first was kept.`);
+  if (idsTaken.length) warnings.push(`${listed(idsTaken)} had an id that another stop of the file already has, so ${idsTaken.length === 1 ? "it was" : "they were"} given an id of ${idsTaken.length === 1 ? "its" : "their"} own.`);
   if (unknownTypes.length) warnings.push(`Stop types this map does not have became regular stops: ${listed(unknownTypes)}.`);
+  // How a row finds its stop: by id when the file's stops have it, else by name; the older way, an id typed
+  // where the name goes, still works.
+  const findIn = (names: Map<string, Stop>, ids: Map<string, Stop>, dupes: Set<string>) => (idText: string | undefined, nameText: string | undefined): Stop | null => {
+    const id = (idText ?? "").trim(), name = (nameText ?? "").trim();
+    const byTheId = id ? ids.get(id) : undefined;
+    if (byTheId) { if (name && nameKey(name) !== nameKey(byTheId.name)) disagreements.push(`${name} was written where the id says ${byTheId.name}`); return byTheId; }
+    const byTheName = name ? names.get(nameKey(name)) : undefined;
+    if (byTheName) { if (dupes.has(nameKey(name))) ambiguousUsed.push(name); return byTheName; }
+    return name ? ids.get(name) ?? null : null;
+  };
+  const find = findIn(byName, byId, ambiguous);
 
   // ---- routes
   const routes: Route[] = [];
@@ -141,13 +171,14 @@ export function readCsvImport(files: { name: string; text: string }[], data: Map
   const plainRoute = data.routeTypeStyles.some((style) => style.id === "city") ? "city" : data.routeTypeStyles[0]?.id ?? "city";
   for (const file of sorted.routes) {
     const header = headerOf(file.rows);
-    const at = { a: column(header, ...FROM), b: column(header, ...TO), length: column(header, "length"), colour: column(header, "colour", "color"), type: column(header, "type"), kind: column(header, "kind"),
+    const at = { a: column(header, ...FROM), b: column(header, ...TO), aId: column(header, "from id", "a id"), bId: column(header, "to id", "b id"), length: column(header, "length"), colour: column(header, "colour", "color"), type: column(header, "type"), kind: column(header, "kind"),
       wagon: column(header, "wagon style"), tunnel: column(header, "tunnel"), locos: column(header, "locomotives", "ferrylocomotives") };
     for (const row of file.rows.slice(1)) {
       const ends = [row[at.a], row[at.b]].map((text) => (text ?? "").trim());
-      if (!ends[0] && !ends[1]) continue;
-      const found = ends.map((name) => byKey.get(name.toLowerCase()) ?? (sorted.stops.length || !name ? null : addStop(name)));
-      if (!found[0] || !found[1]) { missingRoutes += 1; ends.forEach((name, i) => { if (!found[i] && name) missing.push(name); }); continue; }
+      const idCells = [row[at.aId], row[at.bId]].map((text) => (text ?? "").trim());
+      if (!ends[0] && !ends[1] && !idCells[0] && !idCells[1]) continue;
+      const found = ends.map((name, i) => find(idCells[i], name) ?? (sorted.stops.length || !name ? null : addStop(name, plainStop, usableId(idCells[i]))));
+      if (!found[0] || !found[1]) { missingRoutes += 1; ends.forEach((name, i) => { if (!found[i] && (name || idCells[i])) missing.push(name || idCells[i]); }); continue; }
       const length = number(row[at.length]);
       if (length === null || length < 1 || !Number.isInteger(length) || found[0] === found[1]) { unusable += 1; continue; }
       const kind = (row[at.kind] ?? "").trim().toLowerCase();
@@ -180,23 +211,31 @@ export function readCsvImport(files: { name: string; text: string }[], data: Map
   // ---- tickets, through the same reader as a ticket file, so decks arrive the same way
   let sets: TicketSet[] = [], tickets: Ticket[] = [], dropped = 0;
   if (sorted.tickets.length) {
-    const lookup = network ? byKey : new Map<string, Stop>([...data.stops.map((stop) => [stop.id.toLowerCase(), stop] as const), ...data.stops.map((stop) => [stop.name.trim().normalize("NFC").toLowerCase(), stop] as const)]);
+    // Into this map's own stops when the files have none: by id when a row has one this map has, else by name.
+    let findTicketStop = find;
+    if (!network) {
+      const ownNames = new Map<string, Stop>(), ownIds = new Map<string, Stop>(), ownDupes = new Set<string>();
+      for (const stop of data.stops) { ownIds.set(stop.id, stop); if (ownNames.has(nameKey(stop.name))) ownDupes.add(nameKey(stop.name)); else ownNames.set(nameKey(stop.name), stop); }
+      findTicketStop = findIn(ownNames, ownIds, ownDupes);
+    }
     const raw: TicketFile = { kind: "tickets", map: data.name, sets: [], tickets: [] };
     const decks = new Map<string, string>();
     for (const file of sorted.tickets) {
       const header = headerOf(file.rows);
-      const at = { deck: column(header, "deck"), a: column(header, ...FROM), b: column(header, ...TO), points: column(header, "points"), long: column(header, "long deck", "long") };
+      const at = { deck: column(header, "deck"), a: column(header, ...FROM), b: column(header, ...TO), aId: column(header, "from id", "a id"), bId: column(header, "to id", "b id"), points: column(header, "points"), long: column(header, "long deck", "long") };
       for (const row of file.rows.slice(1)) {
         const label = (row[at.deck] ?? "").trim() || "Imported deck";
         if (!decks.has(label)) { decks.set(label, `deck-${decks.size}`); raw.sets.push({ id: decks.get(label)!, label }); }
         const ends = [row[at.a], row[at.b]].map((text) => (text ?? "").trim());
-        const found = ends.map((name) => lookup.get(name.toLowerCase()));
+        const found = [findTicketStop(row[at.aId], ends[0]), findTicketStop(row[at.bId], ends[1])];
         raw.tickets.push({ id: "", a: found[0]?.id ?? "", b: found[1]?.id ?? "", aName: found[0]?.name ?? "", bName: found[1]?.name ?? "", points: number(row[at.points]) ?? 1, long: yes(row[at.long]) || undefined, set: decks.get(label) });
       }
     }
     ({ sets, tickets, dropped } = normalizeTicketFile(raw, { ...data, stops: network ? stops : data.stops }));
     if (dropped) warnings.push(`${plural(dropped, "ticket names a stop", "tickets name stops")} ${network ? "the stop file" : "this map"} does not have, and ${dropped === 1 ? "was" : "were"} left out.`);
   }
+  if (disagreements.length) warnings.push(`${plural(disagreements.length, "row", "rows")} named a stop differently from its id (${listed(disagreements)}): the id was used.`);
+  if (ambiguousUsed.length) warnings.push(`${listed(ambiguousUsed)} ${new Set(ambiguousUsed).size === 1 ? "is" : "are"} the name of more than one stop, and a row names ${new Set(ambiguousUsed).size === 1 ? "it" : "them"} without an id: the first stop of that name was used.`);
   return { stops, routes, sets, tickets, network, placed, scaled, dropped, warnings };
 }
 

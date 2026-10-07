@@ -14,8 +14,9 @@ You can import one file or several at once: choose them together in **Import spr
   editor asks first. Background, notes, styles and settings are kept.
 - **Tickets always arrive as new decks**, beside the decks you have. A ticket file on its own is matched
   to the stops already on the map, by name.
-- **Names tie the files together.** A route from `Harbour` to `Hill Town` needs stops named exactly that,
-  in any case. A stop file may also have an `id` column; routes and tickets can then use the ids.
+- **Names tie the files together, and ids do when there are any.** A route from `Harbour` to `Hill Town`
+  needs stops named exactly that, in any case. The editor's own export also writes ids (see *Ids and names*
+  below), and an import that has them uses them.
 - A route file without a stop file is fine too: the stops are made from the names in it.
 
 Anything the editor cannot use is left out, and the message after the import says what and why.
@@ -60,6 +61,37 @@ laid out from the routes alone. That layout knows nothing of north, so expect to
 | `To` | yes | The stop at the other end. |
 | `Points` | yes | What the ticket is worth. The official maps use the shortest path in wagon spaces. |
 | `Long deck` | no | `yes` for a ticket from the separate long deck, as in Europe. |
+
+## Ids and names
+
+Every stop has an id, a short piece of text that is its own for ever, however it is renamed. The export
+writes the ids beside the names, so a row still reads on its own and the machine has something firm to
+hold on to:
+
+- the stop file has an `Id` column;
+- the route file has `From id` and `To id`, beside `From` and `To`;
+- the ticket file has `From id` and `To id`, beside `From` and `To`.
+
+On import, **the id decides when there is one that a stop of the files has**; the name is what is used when
+there is no id (a list typed by hand, the reference data, an export from before ids). So:
+
+- **Reading an export back keeps every id.** Tickets in the decks that stay on the map still name the right
+  stops, and nothing has to be asked.
+- **Two stops may have the same name** if they have different ids; routes and tickets go to the one their id
+  names. Without ids the second of a name is left out, as it always was, and the import says so.
+- **A row whose id and name disagree** (a stop renamed in the spreadsheet, say) goes to the stop the id
+  names, and the import tells how many rows that was.
+- **An id the files do not have** is ignored, and the name is used. An id that another stop already has,
+  or is empty, over 100 characters long or has control characters in it, is not used for the stop; it gets an
+  id of its own, and the import says so.
+- **Ids are not made up by hand.** The templates have no id columns, and a new spreadsheet needs none.
+
+When an import replaces the stops, the tickets of the decks that stay are checked against the new stops. A
+ticket whose stops are all there, with the same ids and the same names, is left alone. For the others the
+editor asks: one row for each old stop that is gone, or whose id now belongs to a stop with another name,
+with the stop of the same name already chosen when there is exactly one, and a choice to send its tickets
+to any other stop or to let them go. The question cannot be closed by Escape or a click outside it: it
+has three buttons, *Apply*, *Remove them all* and *Undo the import*.
 
 ## Saving the file
 

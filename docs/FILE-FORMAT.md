@@ -55,8 +55,8 @@ deck can be moved to another copy of a map where the ids differ but the cities a
 
 Export → Spreadsheet (CSV) writes the tickets, the routes, the stops, or the shortest distance between
 every two stops, and the Tickets panel writes one deck. They are for reading a map in a spreadsheet or
-in another tool. They have no envelope: one header row, then a row per thing, named by stop names
-rather than ids. RFC 4180 quoting, comma-separated, CRLF line ends, UTF-8 with a BOM so a spreadsheet
+in another tool. They have no envelope: one header row, then a row per thing, named by stop names and,
+since 1.0, with the stops' ids beside the names (see below). RFC 4180 quoting, comma-separated, CRLF line ends, UTF-8 with a BOM so a spreadsheet
 reads å, ä and ö. Text that a spreadsheet would run as a formula (starting with `=`, `+`, `-` or `@`)
 gets a leading apostrophe. `tests/csv-export.cjs` holds the columns.
 
@@ -67,7 +67,16 @@ not a way to move a whole map: the background, styles and settings are only in t
   ticket file, the same with `length` a route file, and `name` without ends a stop file. Our own
   exports and the reference data's exports both read; so does a list typed by hand. Comma, semicolon
   (as Swedish Excel saves) and tab all work. A distance table is recognised and turned away.
-- **Names tie the files together**, or a stop file's `id` column when it has one.
+- **Ids and names.** Added in 1.0, an addition: the stop file has an `Id` column, and the route and ticket
+  files `From id` and `To id`, after the columns that were there (which keep their places). When an import
+  has an id that a stop of the files has, the id decides; otherwise the name does, as before, so a file
+  from 0.4.1 or before, a list typed by hand and the reference data's exports read as they always did. An
+  older build reads by header and does not know the new columns, so it passes over them and matches by
+  name as it always did; a file it wrote has none, and reads here by name. Two stops may share a name when
+  their ids differ; a row whose id and name disagree goes to the stop the id names, and is said. The ids of
+  a map are those of its JSON files, so reading an export back keeps every id. The meaning of each column
+  is in `docs/CSV.md` (*Ids and names*); `tests/csv-ids.cjs` holds the rules, including an export from
+  before ids.
 - **Positions** (`x`, `y`, in board units) are kept when every one fits the board, and fitted to it,
   shape kept, when they do not. `lat` and `lon` instead are drawn north up. Stops without a position
   are worked out from the routes: between neighbours that have one, or, when none has, by a spring

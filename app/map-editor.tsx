@@ -15,7 +15,7 @@ import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { MapArtwork, type Tool } from "./map-artwork";
-import { AnalysisPanel, StopTicketsDialog, SuggestionsPanel, SuggestTicketsDialog, TicketsPanel, WelcomeGuide } from "./map-dialogs";
+import { AnalysisPanel, RebindTicketsDialog, StopTicketsDialog, SuggestionsPanel, SuggestTicketsDialog, TicketsPanel, WelcomeGuide } from "./map-dialogs";
 import { TicketCoveragePanel, type CoverageSort, BackgroundImageProperties, BackgroundProperties, NoteProperties, RouteProperties, StopProperties, StylePicker } from "./map-properties";
 import { PrintDialog, PrintPages, printTitle, type PrintParts } from "./map-print";
 import { ImageStage } from "./map-image";
@@ -33,6 +33,7 @@ import { ACTION_GAP_MS, countChange, EXPORT_REMINDER_KEY, exportAge, exported, f
 import { boardOf, rotateMap, type Orientation } from "./board";
 import { csvTemplate, distancesCsv, routesCsv, stopsCsv, ticketsCsv } from "./csv-export";
 import { decodeCsvBytes, readCsvImport, type CsvImport } from "./csv-import";
+import { planRebind, applyRebind, stopKeyOf, type RebindGroup } from "./ticket-rebind";
 import { APP_VERSION, moveLegacyStorage, repairMap, cloneForHistory, cloneMap, formatTimestamp, GUIDE_SEEN_KEY, HISTORY_LIMIT, MAX_IMAGE_WARN_BYTES, normalizeBackgroundFile, normalizeNetworkFile, normalizeTicketFile, buildTicketFile, readMapFile, writeMapFile, mapPayload, networkPayload, readBackgroundImage, rescaleMapToFormat, MAP_HINT_KEY, MAP_HINT_X_KEY } from "./map-storage";
 import { tensionOf, problemMap, colorLabels, defaultTicketSet, DEFAULT_PLAYERS, DEFAULT_WAGONS_PER_PLAYER, IMAGE_KEEP_ON_BOARD, type Ticket, type StopTypeStyle, type WagonStyle, ticketsInSet, type TicketSet, emptyMap, initialMap, type LineStyle, DEFAULT_END_GAP_MM, mapFormats, type BackgroundImage, type BackgroundShape, type BackgroundType, type MapData, type MapFormat, type Point, type Route, type RouteType, type RouteTypeStyle, routeColors, STORAGE_KEY, type Stop, type StopSize, stopSizeMeta, type StopSymbol, stopSymbolMeta, type StopType } from "./map-data";
 
@@ -49,6 +50,7 @@ const readHintOffset = () => {
   try { const x = Number(window.localStorage.getItem(MAP_HINT_X_KEY)); return Number.isFinite(x) ? x : 0; } catch { return 0; }
 };
 
+const NO_CHOICES = new Map<string, string | null>();
 const RIGHT_WIDTH_KEY = "ttr-right-column-width";
 const PRINT_RULES_KEY = "ttr-print-rules";
 const PRINT_PARTS_KEY = "ttr-print-parts";
@@ -216,6 +218,8 @@ export function MapEditor() {
   // same number of millimetres per map unit either way.
   const format = boardOf(data);
   const holdSaveRef = useRef(false);
+  // Tickets that name stops an import replaced, waiting for the person to say what became of them.
+  const [rebind, setRebind] = useState<{ groups: RebindGroup[]; ticketIds: Set<string>; stopKey: string; choices: Map<string, string | null> } | null>(null);
 
   useEffect(() => { queueMicrotask(() => {
     let stored: string | null = null;
@@ -813,26 +817,36 @@ export function MapEditor() {
         stopTypeStyles: mergeStyles(draft.stopTypeStyles, stopTypeStyles),
         wagonStyles: mergeStyles(draft.wagonStyles ?? [], wagonStyles) };
       // Tickets that came with the network go into the deck being worked on.
-      if (tickets.length) next.tickets = [...draft.tickets.filter((ticket) => (ticket.set ?? draft.ticketSets[0].id) !== activeTicketSet.id), ...tickets.map((ticket) => ({ ...ticket, set: activeTicketSet.id }))];
-      // Tickets to a stop the new network does not have cannot be played, and would be left out as damage
-      // the next time the map is opened: they go now, and the notice says how many.
-      next.tickets = ticketsOnTheMap(next.tickets, stops);
+      if (tickets.length) next.tickets = [...draft.tickets.filter((ticket) => (ticket.set ?? draft.ticketSets[0].id) !== activeTicketSet.id), ...ticketsOnTheMap(tickets, stops).map((ticket) => ({ ...ticket, set: activeTicketSet.id }))];
       return next;
     });
     clearSelection(); setDanger(null); setPendingImport(null);
     if (tickets.length) toast.success(`${tickets.length} tickets came with the network and went into ${activeTicketSet.label}.`);
-    const taken = ticketsGone(data.tickets.filter((ticket) => (ticket.set ?? data.ticketSets[0].id) !== activeTicketSet.id || !tickets.length), stops);
-    if (taken) toast.warning(`${taken} ticket${taken === 1 ? "" : "s"} in your decks named stops that are not in the imported network and ${taken === 1 ? "was" : "were"} removed. Undo brings ${taken === 1 ? "it" : "them"} back.`, { duration: 15000, action: { label: "Undo", onClick: () => undoRef.current() } });
+    // The tickets of the decks that stay may name stops that are gone or now mean something else: ask.
+    askAboutTickets(stops, data.tickets.filter((ticket) => (ticket.set ?? data.ticketSets[0].id) !== activeTicketSet.id || !tickets.length));
   };
   // The tickets whose two stops are both among `stops`.
   const ticketsOnTheMap = (list: Ticket[], stops: Stop[]) => { const ids = new Set(stops.map((stop) => stop.id)); return list.filter((ticket) => ids.has(ticket.a) && ids.has(ticket.b)); };
-  const ticketsGone = (list: Ticket[], stops: Stop[]) => list.length - ticketsOnTheMap(list, stops).length;
+  // After an import that replaced the stops: the tickets that stay, and which of their stops have gone or
+  // changed meaning, put to the person (RebindTicketsDialog). Nothing is asked when all is as it was.
+  const askAboutTickets = (stops: Stop[], kept: Ticket[]) => {
+    const groups = planRebind(data.stops, stops, kept);
+    if (!groups.length) { setRebind(null); return; }
+    setRebind({ groups, ticketIds: new Set(kept.map((ticket) => ticket.id)), stopKey: stopKeyOf(stops), choices: new Map(groups.map((group) => [group.oldId, group.suggested])) });
+  };
+  const applyRebindChoices = (choices: Map<string, string | null>) => {
+    if (!rebind) return;
+    const result = applyRebind(data.tickets.filter((ticket) => rebind.ticketIds.has(ticket.id)), choices);
+    const after = new Map(result.tickets.map((ticket) => [ticket.id, ticket]));
+    change((draft) => { draft.tickets = draft.tickets.flatMap((ticket) => (rebind.ticketIds.has(ticket.id) ? (after.has(ticket.id) ? [after.get(ticket.id)!] : []) : [ticket])); return draft; });
+    setRebind(null);
+    toast.success(`${result.moved} ticket${result.moved === 1 ? "" : "s"} moved to other stops, ${result.removed} removed.`, { action: { label: "Undo", onClick: () => undoRef.current() } });
+  };
   // Spreadsheets: stops and routes replace the network, tickets always arrive as new decks.
   const applyCsvImport = (result: CsvImport) => {
-    const taken = result.network ? ticketsGone(data.tickets, result.stops) : 0;
-    change((draft) => ({ ...draft, ...(result.network ? { stops: result.stops, routes: result.routes } : {}), ticketSets: [...draft.ticketSets, ...result.sets], tickets: [...(result.network ? ticketsOnTheMap(draft.tickets, result.stops) : draft.tickets), ...result.tickets] }));
+    change((draft) => ({ ...draft, ...(result.network ? { stops: result.stops, routes: result.routes } : {}), ticketSets: [...draft.ticketSets, ...result.sets], tickets: [...draft.tickets, ...result.tickets] }));
     if (result.network) clearSelection();
-    if (taken) toast.warning(`${taken} ticket${taken === 1 ? "" : "s"} in your decks named stops that are not in the spreadsheet and ${taken === 1 ? "was" : "were"} removed. Undo brings ${taken === 1 ? "it" : "them"} back.`, { duration: 15000, action: { label: "Undo", onClick: () => undoRef.current() } });
+    if (result.network) askAboutTickets(result.stops, data.tickets);
     setDanger(null); setPendingImport(null);
     if (result.sets.length) { setTicketSetId(result.sets[0].id); if (!result.network) openTickets(); }
     const read = [result.network && `${result.stops.length} stops`, result.network && `${result.routes.length} routes`, result.tickets.length && `${result.tickets.length} tickets`].filter(Boolean).join(", ");
@@ -1059,6 +1073,11 @@ export function MapEditor() {
     <SettingsDialog onStartOver={() => { setShowStyles(false); setDanger("reset"); }} onExport={exportMap} open={showStyles} onOpenChange={setShowStyles} target={styleTarget} onTarget={setStyleTarget} data={data} change={change} onChangeFormat={changeFormat} onChangeOrientation={changeOrientation} exportReminder={{ on: !reminder.off, onChange: (on) => setReminder((r) => (on ? turnOn(r) : stopReminding(r))) }} defaults={{ stopType, setStopType, stopSize, setStopSize: (value) => setStopSize(value as StopSize), routeType, setRouteType, routeColor, setRouteColor, routeCurved, setRouteCurved, routeLineStyle, setRouteLineStyle, linkParallel, setLinkParallel }} />
     <PrintPages data={data} plan={printPlan(data.format, printScope !== "map" && printChoice.split === "page" ? { ...printChoice, split: "panel" } : printChoice, printProfile, format.orientation)} parts={runParts} setId={activeTicketSet.id} />
     {makingImage && <ImageStage data={data} onDone={saveImage} onFail={() => setMakingImage(false)} />}
+    <RebindTicketsDialog open={rebind !== null && stopKeyOf(data.stops) === rebind.stopKey} groups={rebind?.groups ?? []} stops={data.stops} choices={rebind?.choices ?? NO_CHOICES}
+      onChoice={(oldId, value) => setRebind((current) => current && { ...current, choices: new Map(current.choices).set(oldId, value) })}
+      onApply={() => rebind && applyRebindChoices(rebind.choices)}
+      onRemoveAll={() => rebind && applyRebindChoices(new Map(rebind.groups.map((group) => [group.oldId, null])))}
+      onUndoImport={() => { setRebind(null); undoRef.current(); }} />
     <PrintDialog open={showPrint} onOpenChange={setShowPrint} format={data.format} orientation={format.orientation} profile={printProfile} choice={printChoice} onChoice={choosePrint} parts={{ value: printPartsNow, onChange: choosePrintParts, rulesWritten: Boolean(data.rules?.trim()), ticketCount: ticketsHere.length, deckLabel: activeTicketSet.label }} version={versionNow} onPrint={printRun} />
   </main></TooltipProvider>;
 }

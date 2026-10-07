@@ -1,7 +1,8 @@
 // Spreadsheet exports: the tickets, the routes, the stops and the distances between stops as CSV.
 // They are for reading a map in a spreadsheet or in someone else's tool. Stops, routes and tickets
 // read back through csv-import.ts; the JSON files stay the way to move a whole map, background and
-// styles included. Names, not ids, so a row reads on its own.
+// styles included. Every row has the names, so that it reads on its own, and the ids beside them, which are what
+// ties the files together when they are read back (docs/CSV.md, "Ids and names").
 import { bandsOf, buildAdjacency, mapDiameter, shortestPath, ticketBand, ticketEndStops } from "./map-analysis";
 import { colorLabels, type MapData } from "./map-data";
 
@@ -27,12 +28,12 @@ export function ticketsCsv(data: MapData, setIds: string[]): string {
   const adjacency = buildAdjacency(data);
   const diameter = mapDiameter(data);
   const bands = bandsOf(data);
-  const rows: Cell[][] = [["Deck", "From", "To", "Points", "Shortest path", "Length", "Long deck"]];
+  const rows: Cell[][] = [["Deck", "From", "To", "Points", "Shortest path", "Length", "Long deck", "From id", "To id"]];
   for (const ticket of data.tickets) {
     const set = ticket.set ?? first ?? "";
     if (!setIds.includes(set)) continue;
     const distance = ticket.a === ticket.b ? null : shortestPath(adjacency, ticket.a, ticket.b)?.distance ?? null;
-    rows.push([decks.get(set), name(ticket.a), name(ticket.b), ticket.points, distance, ticketBand(distance, diameter, bands), ticket.long ? "yes" : ""]);
+    rows.push([decks.get(set), name(ticket.a), name(ticket.b), ticket.points, distance, ticketBand(distance, diameter, bands), ticket.long ? "yes" : "", ticket.a, ticket.b]);
   }
   return toCsv(rows);
 }
@@ -43,22 +44,22 @@ export function routesCsv(data: MapData): string {
   const wagons = new Map((data.wagonStyles ?? []).map((style) => [style.id, style.label]));
   const lines = new Map<string, number>();
   for (const route of data.routes) lines.set(pairKey(route.a, route.b), (lines.get(pairKey(route.a, route.b)) ?? 0) + 1);
-  const rows: Cell[][] = [["From", "To", "Length", "Colour", "Type", "Wagon style", "Locomotives", "Double route"]];
+  const rows: Cell[][] = [["From", "To", "Length", "Colour", "Type", "Wagon style", "Locomotives", "Double route", "From id", "To id"]];
   for (const route of data.routes) {
     rows.push([name(route.a), name(route.b), route.length, colorLabels[route.color] ?? route.color, types.get(route.type) ?? route.type,
-      route.wagonStyle ? wagons.get(route.wagonStyle) ?? route.wagonStyle : "", route.locomotiveSlots?.length ?? 0, (lines.get(pairKey(route.a, route.b)) ?? 0) > 1 ? "yes" : ""]);
+      route.wagonStyle ? wagons.get(route.wagonStyle) ?? route.wagonStyle : "", route.locomotiveSlots?.length ?? 0, (lines.get(pairKey(route.a, route.b)) ?? 0) > 1 ? "yes" : "", route.a, route.b]);
   }
   return toCsv(rows);
 }
 
 export function stopsCsv(data: MapData): string {
   const types = new Map((data.stopTypeStyles ?? []).map((style) => [style.id, style.label]));
-  const rows: Cell[][] = [["Name", "Type", "Routes", "Neighbours", "Tickets", "X", "Y"]];
+  const rows: Cell[][] = [["Name", "Type", "Routes", "Neighbours", "Tickets", "X", "Y", "Id"]];
   for (const stop of data.stops) {
     const routes = data.routes.filter((route) => route.a === stop.id || route.b === stop.id);
     const neighbours = new Set(routes.map((route) => (route.a === stop.id ? route.b : route.a)));
     const tickets = data.tickets.filter((ticket) => ticket.a === stop.id || ticket.b === stop.id).length;
-    rows.push([stop.name, types.get(stop.type) ?? stop.type, routes.length, neighbours.size, tickets, Math.round(stop.x), Math.round(stop.y)]);
+    rows.push([stop.name, types.get(stop.type) ?? stop.type, routes.length, neighbours.size, tickets, Math.round(stop.x), Math.round(stop.y), stop.id]);
   }
   return toCsv(rows);
 }

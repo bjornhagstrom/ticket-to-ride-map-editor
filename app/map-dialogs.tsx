@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import { TicketLengths, type TicketLengthsView } from "./ticket-lengths";
 import { DeckCompare, type DeckCompareView } from "./deck-compare";
 import { TensionSlider } from "./tension-slider";
+import type { RebindGroup } from "./ticket-rebind";
 import { type DeckTension, BALANCE_OFFICIAL, CROWDING_OFFICIAL, networkShape, SHAPE_OFFICIAL, colourRouteIds, compareWithClassics, CLASSIC_ROUTE_MAPS, type Bottleneck, dealtToFullTable, deckRuleFor, deckRules, TICKET_SUGGESTER, type TicketDeckReport, type TicketStyle, type SetupBalance, type TicketReview, type ColourLengthTable, type NetworkStats, type RouteSpacing, type RouteSuggestion } from "./map-analysis";
 
 // The tour on YouTube, as a picture with a play button until someone asks for it: nothing is loaded
@@ -512,4 +513,45 @@ function NetworkShapeSection({ data, onPreviewRoutes, onPreviewStop, onAddParall
     {shape.bridges.length > 0 && <div className="shape-group"><h4>Routes that cut the map in two</h4>{shape.bridges.map((bridge) => <div key={bridge.routeIds.join()} className="shape-line"><button type="button" className={cn("shape-row", bridge.lanes === 1 && "has-warning")} onPointerEnter={() => onPreviewRoutes(bridge.routeIds)} onPointerLeave={leave} onFocus={() => onPreviewRoutes(bridge.routeIds)} onBlur={leave}><strong>{bridge.a.name}–{bridge.b.name}</strong><span>{bridge.lanes === 1 ? "one lane: a single claim cuts off what lies beyond" : `a double route, as Edinburgh–London is: still open while one lane is free`}</span></button>{bridge.lanes === 1 && <Button size="sm" variant="outline" className="shape-action" onClick={() => { leave(); onAddParallel(bridge.routeIds[0]); }}>Add a second lane</Button>}</div>)}</div>}
     {shape.corners.length > 0 && <div className="shape-group"><h4>Corners</h4>{shape.corners.map((corner) => <button type="button" key={corner.stops.map((stop) => stop.id).join()} className="shape-row" onPointerEnter={() => onPreviewRoutes(corner.routeIds)} onPointerLeave={leave} onFocus={() => onPreviewRoutes(corner.routeIds)} onBlur={leave}><strong>{names(corner.stops)}</strong><span>reached only through {and(corner.gates)} ({corner.routeIds.length} route{corner.routeIds.length === 1 ? "" : "s"})</span></button>)}</div>}
   </div>;
+}
+
+// After an import that replaced the stops: the tickets of the decks that stayed name stops that are gone, or
+// whose id now belongs to a stop with another name. One row per old stop; the person says which new stop it is,
+// or that its tickets go. It cannot be dismissed by Escape or a click outside, only by one of its three buttons,
+// so that no ticket is moved or lost by accident; closing it with "Undo the import" brings everything back.
+export function RebindTicketsDialog({ open, groups, stops, choices, onChoice, onApply, onRemoveAll, onUndoImport }: {
+  open: boolean; groups: RebindGroup[]; stops: Stop[]; choices: Map<string, string | null>;
+  onChoice: (oldId: string, value: string | null) => void; onApply: () => void; onRemoveAll: () => void; onUndoImport: () => void;
+}) {
+  const sorted = [...stops].sort((a, b) => a.name.localeCompare(b.name));
+  const total = groups.reduce((sum, group) => sum + group.tickets, 0);
+  return <Dialog open={open} onOpenChange={() => {}}>
+    <DialogContent className="rebind-dialog" showCloseButton={false} onEscapeKeyDown={(event) => event.preventDefault()} onInteractOutside={(event) => event.preventDefault()}>
+      <DialogHeader>
+        <DialogTitle>Tickets to stops that changed</DialogTitle>
+        <DialogDescription>The import replaced the stops. Tickets in your other decks name {groups.length} stop{groups.length === 1 ? "" : "s"} that {groups.length === 1 ? "is" : "are"} gone or {groups.length === 1 ? "has" : "have"} become something else ({total} ticket{total === 1 ? "" : "s"} in all). Say what each one is now, or let its tickets go.</DialogDescription>
+      </DialogHeader>
+      <ul className="rebind-list">
+        {groups.map((group) => {
+          const value = choices.get(group.oldId) ?? "";
+          const id = `rebind-${group.oldId.replace(/[^a-z0-9]+/gi, "-")}`;
+          return <li key={group.oldId} className="rebind-row">
+            <div className="rebind-what">
+              <Label htmlFor={id}><strong>{group.oldName}</strong> · {group.tickets} ticket{group.tickets === 1 ? "" : "s"}</Label>
+              <span className="helper">{group.status === "missing" ? "No stop with this id is in the new map." : `This id is now the stop ${group.newName}, not ${group.oldName}.`}{group.suggested ? " A stop with the same name was found." : ""}</span>
+            </div>
+            <NativeSelect id={id} value={value} onChange={(event) => onChoice(group.oldId, event.target.value || null)}>
+              <NativeSelectOption value="">Remove these tickets</NativeSelectOption>
+              {sorted.map((stop) => <NativeSelectOption key={stop.id} value={stop.id}>{stop.name}</NativeSelectOption>)}
+            </NativeSelect>
+          </li>;
+        })}
+      </ul>
+      <DialogFooter>
+        <Button variant="outline" onClick={onUndoImport}>Undo the import</Button>
+        <Button variant="outline" onClick={onRemoveAll}>Remove them all</Button>
+        <Button onClick={onApply}>Apply</Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>;
 }
