@@ -3,7 +3,7 @@
 // names (or a stop file's ids) tie the files together, and positions are kept when they fit the
 // board, fitted to it when they do not, and worked out from the routes when there are none.
 // Anything that cannot be used is left out and said so in `warnings`.
-import { colorLabels, routeColors, type MapData, type Route, type Stop, type Ticket, type TicketSet } from "./map-data";
+import { colorLabels, routeColors, type MapData, type Point, type Route, type Stop, type Ticket, type TicketSet } from "./map-data";
 import { normalizeTicketFile, type TicketFile } from "./map-storage";
 import { boardOf } from "./board";
 
@@ -183,7 +183,7 @@ export function readCsvImport(files: { name: string; text: string }[], data: Map
   // ---- routes
   const routes: Route[] = [];
   const missing: string[] = [], colours: string[] = [], routeTypes: string[] = [];
-  let unusable = 0, missingRoutes = 0;
+  let unusable = 0, missingRoutes = 0, badBends = 0;
   const colourKey = (text: string) => {
     const value = text.trim().toLowerCase();
     if (!value || value === "grey" || value === "gray" || value === "neutral" || value === "any") return "neutral";
@@ -195,7 +195,7 @@ export function readCsvImport(files: { name: string; text: string }[], data: Map
   const plainRoute = data.routeTypeStyles.some((style) => style.id === "city") ? "city" : data.routeTypeStyles[0]?.id ?? "city";
   for (const file of sorted.routes) {
     const header = headerOf(file.rows);
-    const at = { a: column(header, ...FROM), b: column(header, ...TO), aId: column(header, "from id", "a id"), bId: column(header, "to id", "b id"), length: column(header, "length"), colour: column(header, "colour", "color"), type: column(header, "type"), kind: column(header, "kind"),
+    const at = { a: column(header, ...FROM), b: column(header, ...TO), aId: column(header, "from id", "a id"), bId: column(header, "to id", "b id"), bends: column(header, "bends"), curved: column(header, "curved"), length: column(header, "length"), colour: column(header, "colour", "color"), type: column(header, "type"), kind: column(header, "kind"),
       wagon: column(header, "wagon style"), tunnel: column(header, "tunnel"), locos: column(header, "locomotives", "ferrylocomotives") };
     for (const row of file.rows.slice(1)) {
       const ends = [row[at.a], row[at.b]].map((text) => (text ?? "").trim());
@@ -217,6 +217,10 @@ export function readCsvImport(files: { name: string; text: string }[], data: Map
         : yes(row[at.tunnel]) ? (data.wagonStyles ?? []).find((item) => item.id === "tunnel")?.id : undefined;
       const locos = Math.max(0, Math.min(length, Math.round(number(row[at.locos]) ?? 0)));
       const route: Route = { id: `r-${stamp}-${routes.length}`, a: found[0].id, b: found[1].id, length, type, color: colourKey(row[at.colour] ?? "") };
+      // Bends and straightening, kept only when the stops stay where the file put them (checked below).
+      const bendsText = (row[at.bends] ?? "").trim();
+      if (bendsText) { const bends = readBends(bendsText); if (bends) route.points = bends; else badBends += 1; }
+      if (/^(no|false|0|straight)$/i.test((row[at.curved] ?? "").trim())) route.curved = false;
       if (wagonStyle) route.wagonStyle = wagonStyle;
       if (locos) route.locomotiveSlots = Array.from({ length: locos }, (_, index) => index);
       routes.push(route);
@@ -230,6 +234,11 @@ export function readCsvImport(files: { name: string; text: string }[], data: Map
   // ---- positions
   const board = boardOf(data);
   const { placed, scaled } = position(stops, routes, read, board);
+  // A bend is a place on the board, in the same units as the stops': when the stops were fitted to the board or laid
+  // out from the routes it would not be where it was meant, so the bends are left out and it is said.
+  const withBends = routes.filter((route) => route.points).length;
+  if ((scaled || placed.length) && withBends) { for (const route of routes) delete route.points; warnings.push(`${plural(withBends, "route had bends", "routes had bends")} that ${withBends === 1 ? "was" : "were"} left out, because the stops were fitted to the board or laid out from the routes and the bends would not fit them.`); }
+  if (badBends) warnings.push(`${plural(badBends, "route has", "routes have")} a Bends cell that could not be read, and ${badBends === 1 ? "was" : "were"} read without bends.`);
   if (placed.length) warnings.push(`${plural(placed.length, "stop", "stops")} had no position and ${placed.length === 1 ? "was" : "were"} laid out from the routes: drag ${placed.length === 1 ? "it" : "them"} into place (${listed(placed)}).`);
 
   // ---- tickets, through the same reader as a ticket file, so decks arrive the same way
@@ -261,6 +270,22 @@ export function readCsvImport(files: { name: string; text: string }[], data: Map
   if (disagreements.length) warnings.push(`${plural(disagreements.length, "row", "rows")} named a stop differently from its id (${listed(disagreements)}): the id was used.`);
   if (ambiguousUsed.length) warnings.push(`${listed(ambiguousUsed)} ${new Set(ambiguousUsed).size === 1 ? "is" : "are"} the name of more than one stop, and a row names ${new Set(ambiguousUsed).size === 1 ? "it" : "them"} without an id: the first stop of that name was used.`);
   return { stops, routes, sets, tickets, network, placed, scaled, dropped, warnings };
+}
+
+// The bends of a route: x:y pairs in board units, separated by spaces. A cell with anything else in it, a number that is
+// not a number or lies far off the board, or more than 100 bends, is not read at all.
+function readBends(text: string): Point[] | null {
+  const parts = text.split(/\s+/);
+  if (parts.length > 100) return null;
+  const points: Point[] = [];
+  for (const part of parts) {
+    const m = /^(-?\d+(?:\.\d+)?):(-?\d+(?:\.\d+)?)$/.exec(part);
+    if (!m) return null;
+    const x = Number(m[1]), y = Number(m[2]);
+    if (!Number.isFinite(x) || !Number.isFinite(y) || Math.abs(x) > 100000 || Math.abs(y) > 100000) return null;
+    points.push({ x, y });
+  }
+  return points;
 }
 
 // Positions: read ones are kept when they all fit the board, and fitted to it, shape kept, when they

@@ -46,10 +46,12 @@ export function routesCsv(data: MapData): string {
   const wagons = new Map((data.wagonStyles ?? []).map((style) => [style.id, style.label]));
   const lines = new Map<string, number>();
   for (const route of data.routes) lines.set(pairKey(route.a, route.b), (lines.get(pairKey(route.a, route.b)) ?? 0) + 1);
-  const rows: Cell[][] = [["From", "To", "Length", "Colour", "Type", "Wagon style", "Locomotives", "Double route", "From id", "To id"]];
+  const rows: Cell[][] = [["From", "To", "Length", "Colour", "Type", "Wagon style", "Locomotives", "Double route", "From id", "To id", "Bends", "Curved"]];
   for (const route of data.routes) {
     rows.push([name(route.a), name(route.b), route.length, colorLabels[route.color] ?? route.color, types.get(route.type) ?? route.type,
-      route.wagonStyle ? wagons.get(route.wagonStyle) ?? route.wagonStyle : "", route.locomotiveSlots?.length ?? 0, (lines.get(pairKey(route.a, route.b)) ?? 0) > 1 ? "yes" : "", route.a, route.b]);
+      route.wagonStyle ? wagons.get(route.wagonStyle) ?? route.wagonStyle : "", route.locomotiveSlots?.length ?? 0, (lines.get(pairKey(route.a, route.b)) ?? 0) > 1 ? "yes" : "", route.a, route.b,
+      // The route's bends, from its From stop to its To stop, as x:y pairs in board units; and "no" when it has been straightened.
+      (route.points ?? []).map((point) => `${Math.round(point.x)}:${Math.round(point.y)}`).join(" "), route.curved === false ? "no" : ""]);
   }
   return toCsv(rows);
 }

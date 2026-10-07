@@ -84,6 +84,14 @@ not a way to move a whole map: the background, styles and settings are only in t
   a map are those of its JSON files, so reading an export back keeps every id. The meaning of each column
   is in `docs/CSV.md` (*Ids and names*); `tests/csv-ids.cjs` holds the rules, including an export from
   before ids.
+- **Bends and curves.** Added after 1.0, an addition: the route file has `Bends` and `Curved` after the columns
+  that were there. `Bends` holds the route's bend points, from its `From` stop to its `To` stop, as `x:y`
+  pairs in board units separated by spaces; `Curved` holds `no` for a straightened route. They are read back only
+  when the stops stay where the file puts them; otherwise they are left out, and the import says so. An older
+  build reads by header and passes over both columns (`tests/csv-ids.cjs` and `tests/csv-curves.cjs` read this
+  build's export with 0.4.1's own importer), so an older build loses the bends as it always did; a file from
+  before has neither column and reads as it did. The columns can grow: a later build may add more after
+  these, and readers go by header. `docs/CSV.md` (*Bends and curves*) has the details, `tests/csv-curves.cjs` the rules.
 - **Positions** (`x`, `y`, in board units) are kept when every one fits the board, and fitted to it,
   shape kept, when they do not. `lat` and `lon` instead are drawn north up. Stops without a position
   are worked out from the routes: between neighbours that have one, or, when none has, by a spring

@@ -29,7 +29,6 @@ in the same commit as the work (AGENTS.md).
 
 ## Smaller follow-ups
 
-- **Curves in the spreadsheet export.** A route's bends (`points`, and `curved`) are not in the routes CSV, so a round trip through a spreadsheet straightens every curved route. Add them to the routes export and read them back; a format addition (a column or two after the others, which older builds pass over), so its name, place, what an older build does and how it can grow are thought through first, with a test against a real older export. Agreed with the owner on 2026-10-07; after the next release.
 - **ttr-map-generator, by eye**: open a graph made by `make_graph.py` in the tool's own window and see that the map is the right way up (y is read from matplotlib's default). Built and checked with the tool's own code; the picture is the one thing not seen. Fix in `positionsJson` if it is upside down.
 - Tickets to countries or groups of stops, as Switzerland has, are not modelled.
 - **Names after a turn.** A name left to place itself is placed again after the board turns, and some
