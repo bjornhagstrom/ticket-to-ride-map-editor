@@ -8,6 +8,7 @@ This file is written from `app/version.ts` by `npm run changelog`; edit the note
 
 Changes since the last release, to go into the next version.
 
+- Map balance judges the wagon count by what a full table holds against the spaces it can claim, as the official maps do (57 to 76 %), warns when the players hold more wagons than the board has room for or fewer than 40 % of it, and shows the figure beside the official range.
 - The example map's rules no longer have a table of wagons for each number of players: the map holds one wagon count, and the figures use it at every table.
 
 ## 1.1.0 · 2026-10-07

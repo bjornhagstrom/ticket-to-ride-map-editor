@@ -1,6 +1,6 @@
 // The balance layer: everything derived from the stops and routes themselves. All of it is pure,
 // computed on demand from MapData, and none of it is stored in a map file.
-import { DEFAULT_WAGONS_PER_PLAYER, DEFAULT_STARTING_TICKETS, DEFAULT_TICKET_BANDS, DEFAULT_TICKET_MIX, type TicketBands, type TicketMix, DEFAULT_PLAYERS, defaultLabelAngle, labelPush, stopSizeMeta, ticketsInSet, type MapData, type Ticket, type Point, realWagon, type Route, routeColors, type Stop, W } from "./map-data";
+import { DEFAULT_WAGONS_PER_PLAYER, DEFAULT_STARTING_TICKETS, DEFAULT_TICKET_BANDS, DEFAULT_TICKET_MIX, type TicketBands, type TicketMix, DEFAULT_PLAYERS, lanesUsableAt, defaultLabelAngle, labelPush, stopSizeMeta, ticketsInSet, type MapData, type Ticket, type Point, realWagon, type Route, routeColors, type Stop, W } from "./map-data";
 import type { TicketDeckReport } from "./ticket-suggester";
 import { boardOf } from "./board";
 import { curvedSamples, isCurved, intersects, parallelPoints, pointsFor, polylineLength, stopById } from "./map-geometry";
@@ -399,8 +399,13 @@ export function reviewTickets(data: MapData, setId?: string): TicketReview[] {
 // nobody ever competes for a route.
 export type SetupBalance = {
   totalSpaces: number;
+  // The spaces a table of the largest size can claim: a second lane of a double route counts only where that
+  // table may use it.
+  usableSpaces: number;
   wagonsPerPlayer: number;
-  supplies: number;
+  // What the largest table holds in wagons, and as a share of the usable spaces (null with no spaces).
+  wagonsAtTable: number;
+  fill: number | null;
   spaceVerdict: "tight" | "ok" | "roomy";
   deckSize: number;
   dealtAtTable: number;
@@ -409,21 +414,36 @@ export type SetupBalance = {
   deckVerdict: "empty" | "thin" | "ok";
 };
 
-const TIGHT_SUPPLIES = 2, ROOMY_SUPPLIES = 8;
+// The share of the spaces a full table holds in wagons. The eight official maps are at 57 to 76 % (BALANCE_OFFICIAL,
+// measured again in tests/balance-official.cjs). Above 100 % the players hold more wagons than the board has room for,
+// so nobody can run out and the game cannot end that way; under 40 % most of the board stays empty.
+export const FILL_TIGHT = 1, FILL_ROOMY = 0.4;
 
 export function setupBalance(data: MapData, setId?: string): SetupBalance {
   const infrastructureTypes = new Set(data.routeTypeStyles.filter((style) => style.infrastructure).map((style) => style.id));
-  const totalSpaces = data.routes.filter((route) => !infrastructureTypes.has(route.type)).reduce((sum, route) => sum + route.length, 0);
+  const wagonRoutes = data.routes.filter((route) => !infrastructureTypes.has(route.type));
+  const totalSpaces = wagonRoutes.reduce((sum, route) => sum + route.length, 0);
   const wagonsPerPlayer = data.wagonsPerPlayer ?? DEFAULT_WAGONS_PER_PLAYER;
-  const supplies = wagonsPerPlayer > 0 ? totalSpaces / wagonsPerPlayer : 0;
-  const deckSize = (setId ? ticketsInSet(data, setId) : data.tickets).length;
   const table = data.players?.max ?? DEFAULT_PLAYERS.max;
+  // Lanes between the same two stops are one multi-lane route; the table may use some of them.
+  const lanes = new Map<string, Route[]>();
+  for (const route of wagonRoutes) { const key = [route.a, route.b].sort().join("~"); lanes.set(key, [...(lanes.get(key) ?? []), route]); }
+  let usableSpaces = 0;
+  for (const group of lanes.values()) {
+    const open = lanesUsableAt(table, group.length, data.lanesUsableByPlayers);
+    for (const route of group.slice(0, open)) usableSpaces += route.length;
+  }
+  const wagonsAtTable = table * wagonsPerPlayer;
+  const fill = usableSpaces > 0 ? wagonsAtTable / usableSpaces : null;
+  const deckSize = (setId ? ticketsInSet(data, setId) : data.tickets).length;
   const dealtAtTable = table * (data.startingTickets ?? DEFAULT_STARTING_TICKETS);
   return {
     totalSpaces,
+    usableSpaces,
     wagonsPerPlayer,
-    supplies,
-    spaceVerdict: supplies < TIGHT_SUPPLIES ? "tight" : supplies > ROOMY_SUPPLIES ? "roomy" : "ok",
+    wagonsAtTable,
+    fill,
+    spaceVerdict: fill === null || fill > FILL_TIGHT ? "tight" : fill < FILL_ROOMY ? "roomy" : "ok",
     deckSize,
     dealtAtTable,
     table,
@@ -549,7 +569,7 @@ export const CROWDING_OFFICIAL: [number, number] = [8, 19];
  *  decks at the largest table each is for (tests/balance-official.cjs measures them again): crowded
  *  routes, mean ticket load on double routes against single ones, routes no ticket needs (%), most
  *  tickets on one stop, and the average hub degree. */
-export const BALANCE_OFFICIAL = { crowded: [8, 19] as [number, number], crowdedPct: [10, 17] as [number, number], loadRatio: [1.3, 3.1] as [number, number], unusedPct: [7, 21] as [number, number], maxPerStop: [4, 9] as [number, number], hubDegree: [7.6, 10.8] as [number, number] };
+export const BALANCE_OFFICIAL = { wagonFill: [57, 76] as [number, number], crowded: [8, 19] as [number, number], crowdedPct: [10, 17] as [number, number], loadRatio: [1.3, 3.1] as [number, number], unusedPct: [7, 21] as [number, number], maxPerStop: [4, 9] as [number, number], hubDegree: [7.6, 10.8] as [number, number] };
 export const SHAPE_OFFICIAL = { maps: 8, mapsWithDeadEnds: 1, mapsWithBridges: 1, singleLaneBridges: 0, mapsWithCorners: 4, cornersPerMap: [0, 3] as [number, number] };
 
 export function networkShape(data: MapData): NetworkShape {

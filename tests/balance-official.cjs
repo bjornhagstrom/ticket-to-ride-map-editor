@@ -13,7 +13,7 @@ const referencePath = process.env.TTR_REFERENCE_DATA || path.join(root, "..", "t
 const out = fs.mkdtempSync(path.join(os.tmpdir(), "ttr-balance-official-"));
 execFileSync(path.join(root, "node_modules", ".bin", "tsc"), ["app/ticket-suggester.ts", "app/map-analysis.ts", "app/map-data.ts", "--outDir", out, "--module", "commonjs", "--target", "es2022", "--moduleResolution", "node", "--skipLibCheck", "--lib", "es2022,dom"], { cwd: root, stdio: "inherit" });
 const { evaluateTicketDeck, TICKET_SUGGESTER } = require(path.join(out, "ticket-suggester.js"));
-const { networkStats, connectionCount, BALANCE_OFFICIAL } = require(path.join(out, "map-analysis.js"));
+const { networkStats, connectionCount, BALANCE_OFFICIAL, setupBalance } = require(path.join(out, "map-analysis.js"));
 
 const ok = [];
 const bad = [];
@@ -71,14 +71,16 @@ const buildMap = (source) => {
     const report = evaluateTicketDeck(map, { setId: "main", atTable: map.players.max });
     const stats = networkStats(map);
     const hubs = [...stats.hubDegree.values()];
-    return { id: source.id, dupPct: report.dupPct, perStop: report.perStop, crowded: report.bottlenecks.length, crowdedPct: 100 * report.bottlenecks.length / connectionCount(map), loadRatio: report.loadRatio, unusedPct: report.unusedPct, maxPerStop: report.maxPerStop, hubDegree: hubs.reduce((sum, value) => sum + value, 0) / (hubs.length || 1) };
+    const setup = setupBalance(map, "main");
+    return { id: source.id, fillPct: setup.fill === null ? null : 100 * setup.fill, setupVerdict: setup.spaceVerdict, dupPct: report.dupPct, perStop: report.perStop, crowded: report.bottlenecks.length, crowdedPct: 100 * report.bottlenecks.length / connectionCount(map), loadRatio: report.loadRatio, unusedPct: report.unusedPct, maxPerStop: report.maxPerStop, hubDegree: hubs.reduce((sum, value) => sum + value, 0) / (hubs.length || 1) };
   });
   const span = (key, digits = 0) => { const values = measured.map((m) => m[key]).filter((v) => typeof v === "number"); const f = 10 ** digits; return [Math.round(Math.min(...values) * f) / f, Math.round(Math.max(...values) * f) / f]; };
-  const found = { crowded: span("crowded"), crowdedPct: span("crowdedPct"), loadRatio: span("loadRatio", 1), unusedPct: span("unusedPct"), maxPerStop: span("maxPerStop"), hubDegree: span("hubDegree", 1) };
+  const found = { wagonFill: span("fillPct"), crowded: span("crowded"), crowdedPct: span("crowdedPct"), loadRatio: span("loadRatio", 1), unusedPct: span("unusedPct"), maxPerStop: span("maxPerStop"), hubDegree: span("hubDegree", 1) };
   console.log("measured", JSON.stringify(found), measured.map((m) => `${m.id}: ${m.crowded} crowded, ratio ${m.loadRatio && m.loadRatio.toFixed(2)}, ${Math.round(m.unusedPct)} % unused, ${m.maxPerStop} at one stop, hub ${m.hubDegree.toFixed(1)}`).join("; "));
   // Build a full deck shows the same figures beside its own table, and they must be the same eight maps.
   const suggesterFound = { perStop: span("perStop", 2), maxPerStop: span("maxPerStop"), dupPct: span("dupPct", 1), unusedPct: span("unusedPct") };
   for (const key of Object.keys(suggesterFound)) check(`${key}: Build a full deck quotes what the eight official maps measure`, JSON.stringify(suggesterFound[key]) === JSON.stringify(TICKET_SUGGESTER.official[key]), `${JSON.stringify(suggesterFound[key])} measured, ${JSON.stringify(TICKET_SUGGESTER.official[key])} quoted`);
+  check("none of the eight official maps is flagged by the wagon-count warning: each holds its wagons well inside it", measured.every((m) => m.setupVerdict === "ok"), measured.map((m) => `${m.id} ${m.fillPct && m.fillPct.toFixed(0)} % ${m.setupVerdict}`).join(", "));
   for (const key of Object.keys(found)) check(`${key}: the range the editor quotes is what the eight official maps measure`, JSON.stringify(found[key]) === JSON.stringify(BALANCE_OFFICIAL[key]), `${JSON.stringify(found[key])} measured, ${JSON.stringify(BALANCE_OFFICIAL[key])} quoted`);
 }
 

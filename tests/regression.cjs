@@ -297,7 +297,7 @@ const sectionStart = (n) => {
   await page.waitForTimeout(300);
   await page.getByRole("button", { name: "Map balance", exact: true }).click();
   await page.waitForTimeout(600);
-  check("the balance report finds the setup fits the map", (await page.locator(".space-warning, .deck-warning").count()) === 0, await page.locator(".balance-panel").textContent().then((t) => t.slice(0, 200)));
+  check("the balance report finds the deck fits the example map, and says what five players' wagons come to against its spaces: more than the board holds", (await page.locator(".deck-warning").count()) === 0 && (await page.locator(".space-warning").count()) === 1 && /More wagons than room/.test(await page.locator(".space-warning").textContent()), await page.locator(".balance-panel").textContent().then((t) => t.slice(0, 200)));
   await page.keyboard.press("Escape");
   await page.waitForTimeout(300);
 
@@ -1492,7 +1492,7 @@ const sectionStart = (n) => {
   await page.getByRole("button", { name: "Map balance", exact: true }).click();
   await page.waitForTimeout(600);
   const setupText = await page.locator(".setup-balance").textContent();
-  check("the balance report weighs the setup against the map", /wagon spaces/.test(setupText) && /player supplies/.test(setupText), setupText.slice(0, 140));
+  check("the balance report weighs the setup against the map: the wagons a full table holds, as a share of the spaces, beside the official maps' 57–76 %", /wagon spaces/.test(setupText) && /wagons/.test(setupText) && /% of those spaces|% of the spaces/.test(setupText) && /57–76 %/.test(setupText), setupText.slice(0, 260));
   check("and warns when the map is too small for the wagon count", (await page.locator(".setup-balance .space-warning").count()) === 1, setupText.slice(0, 260));
   check("the deck is measured against what a full table is dealt", /a table of five is dealt/.test(setupText));
   await page.keyboard.press("Escape");
@@ -3952,7 +3952,9 @@ const sectionStart = (n) => {
     check("Map balance opens with the map against the official maps", (await section.count()) === 1 && (await ob.locator(".balance-panel .analysis-section").first().evaluate((el) => el.classList.contains("against-official"))));
     const rows = await section.locator("tbody tr").evaluateAll((trs) => trs.map((tr) => Array.from(tr.cells).map((c) => c.textContent.trim())));
     const labels = rows.map((r) => r[0]).join(" | ");
-    check("with crowded routes, double-route traffic, unneeded routes, the busiest stop and the hub degree", ["Crowded routes", "Double routes", "no ticket needs", "one stop", "hub degree"].every((w) => labels.includes(w)), labels);
+    check("with crowded routes, double-route traffic, unneeded routes, the busiest stop and the hub degree", ["Crowded routes", "Double routes", "no ticket needs", "one stop", "Wagons at a full table", "hub degree"].every((w) => labels.includes(w)), labels);
+    const wagonRow = rows.find((r) => /^Wagons at a full table/.test(r[0]));
+    check("the wagon count is one of them: this map's share beside 57–76 %", wagonRow && /\d+ %/.test(wagonRow[1]) && /5 × 28 wagons for 99 spaces/.test(wagonRow[1]) && wagonRow[2] === "57–76 %", JSON.stringify(wagonRow));
     check("each with this map's figure and the official range", rows.every((r) => r.length === 3 && r[1] !== "" && /\d.*–.*\d/.test(r[2])), JSON.stringify(rows));
     const crowdedRow = rows.find((r) => /^Crowded routes/.test(r[0])) || [];
     check("crowding is a share of the routes, since a count grows with the size of the map", /as a share of all routes/.test(crowdedRow[0] || "") && /^\d+ % \(\d+ of \d+ routes, at \d players?\)$/.test(crowdedRow[1] || "") && /^\d+–\d+ %$/.test(crowdedRow[2] || ""), JSON.stringify(crowdedRow));

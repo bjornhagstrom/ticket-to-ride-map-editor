@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { DEFAULT_TICKET_MIX, colorLabels, type MapData, realWagon, type Stop, type Ticket, ticketsInSet, type TicketSet } from "./map-data";
+import { DEFAULT_TICKET_MIX, LANES_OPEN_FROM, colorLabels, type MapData, realWagon, type Stop, type Ticket, ticketsInSet, type TicketSet } from "./map-data";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -85,7 +85,7 @@ export function AnalysisPanel({ official, wide, onToggleWide, onAddParallel, len
   return <div className="balance-panel">
     <div className="panel-heading"><span>Map balance</span><Button size="sm" variant="outline" aria-expanded={wide} onClick={onToggleWide}>{wide ? "Collapse" : "Expand"}</Button></div>
       <p className="helper">A quick read on how evenly connected and coloured the network is, and how the tickets lie on it. Point at a row to see it on the map. Click one to keep it marked, and click again to let it go; double-click a stop or a route to pick it for editing.</p>
-      <OfficialFigures official={official} stats={stats} />
+      <OfficialFigures official={official} stats={stats} setup={setup} />
       <div className="analysis-section bottlenecks">
         <h3>Where the tickets crowd</h3>
         <div className="bottleneck-players">
@@ -111,10 +111,12 @@ export function AnalysisPanel({ official, wide, onToggleWide, onAddParallel, len
       <div className="analysis-section setup-balance">
         <h3>Game setup against the map</h3>
         <p className="helper">
-          The map holds <strong>{setup.totalSpaces} wagon spaces</strong>. At {setup.wagonsPerPlayer} wagons each, that is about <strong>{setup.supplies.toFixed(1)} player supplies</strong> — how many players could spend everything they have before the routes run out.
+          The map holds <strong>{setup.totalSpaces} wagon spaces</strong>{setup.usableSpaces !== setup.totalSpaces ? `, ${setup.usableSpaces} of them open to a table of ${tableWord(setup.table)} (a second lane of a double route opens from ${LANES_OPEN_FROM} players)` : ""}. At {setup.wagonsPerPlayer} wagons each, a full table of {tableWord(setup.table)} holds <strong>{setup.wagonsAtTable} wagons</strong>{setup.fill !== null ? <>, <strong>{Math.round(100 * setup.fill)} %</strong> of those spaces: the official maps hold {BALANCE_OFFICIAL.wagonFill[0]}–{BALANCE_OFFICIAL.wagonFill[1]} %</> : ""}.
         </p>
-        {setup.spaceVerdict === "tight" && <p className="helper helper-warning space-warning">Too small for {setup.wagonsPerPlayer} wagons: even two players cannot spend their supply here. Either draw more routes or cut the wagon count to about {Math.max(1, Math.floor(setup.totalSpaces / 2))}.</p>}
-        {setup.spaceVerdict === "roomy" && <p className="helper helper-warning space-warning">Very roomy: a full table would leave most of the map unclaimed, so few routes are ever contested. Either raise the wagon count or draw fewer routes.</p>}
+        {setup.spaceVerdict === "tight" && <p className="helper helper-warning space-warning">{setup.fill === null
+          ? "No routes to put wagons on yet."
+          : `More wagons than room: at a full table the players hold ${setup.wagonsAtTable} wagons for ${setup.usableSpaces} spaces, so nobody can run out and the game cannot end that way. Cut the wagon count to about ${Math.max(1, Math.floor(0.66 * setup.usableSpaces / setup.table))}, or draw more routes.`}</p>}
+        {setup.spaceVerdict === "roomy" && setup.fill !== null && <p className="helper helper-warning space-warning">Very roomy: a full table holds only {Math.round(100 * setup.fill)} % of the spaces, so most of the map stays empty and few routes are ever contested. Raise the wagon count to about {Math.ceil(BALANCE_OFFICIAL.wagonFill[0] / 100 * setup.usableSpaces / setup.table)}, or draw fewer routes.</p>}
         <p className="helper">
           The deck holds <strong>{setup.deckSize} ticket{setup.deckSize === 1 ? "" : "s"}</strong>, against the {setup.dealtAtTable} a table of {tableWord(setup.table)} is dealt at the start.
         </p>
@@ -475,7 +477,7 @@ export function SuggestTicketsDialog({ tension, onTension, open, onOpenChange, d
 // maps have. Pointing at a row marks it on the map.
 // This map's figures beside what the eight official maps measure, each with its own deck at a full
 // table. A fact, never a warning: outside the range says how the map differs, not that it is wrong.
-function OfficialFigures({ official, stats }: { official: { players: number; crowded: number; connections: number; loadRatio: number | null; unusedPct: number; maxPerStop: number }; stats: NetworkStats }) {
+function OfficialFigures({ official, stats, setup }: { official: { players: number; crowded: number; connections: number; loadRatio: number | null; unusedPct: number; maxPerStop: number }; stats: NetworkStats; setup: SetupBalance }) {
   const hubs = [...stats.hubDegree.values()];
   const hubMean = hubs.length ? hubs.reduce((sum, value) => sum + value, 0) / hubs.length : null;
   const span = ([low, high]: [number, number], unit = "") => `${low}–${high}${unit}`;
@@ -484,6 +486,7 @@ function OfficialFigures({ official, stats }: { official: { players: number; cro
     ["Double routes: their ticket traffic against single ones", official.loadRatio === null ? "no double routes" : `${official.loadRatio.toFixed(1)}×`, span(BALANCE_OFFICIAL.loadRatio, "×")],
     ["Routes no ticket needs", `${Math.round(official.unusedPct)} %`, span(BALANCE_OFFICIAL.unusedPct, " %")],
     ["Most tickets on one stop", String(official.maxPerStop), span(BALANCE_OFFICIAL.maxPerStop)],
+    ["Wagons at a full table, as a share of the spaces", setup.fill === null ? "no routes" : `${Math.round(100 * setup.fill)} % (${setup.table} × ${setup.wagonsPerPlayer} wagons for ${setup.usableSpaces} spaces)`, span(BALANCE_OFFICIAL.wagonFill, " %")],
     ["Average hub degree", hubMean === null ? "no stops" : hubMean.toFixed(1), span(BALANCE_OFFICIAL.hubDegree)],
   ];
   return <div className="analysis-section against-official">
