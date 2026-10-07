@@ -17,7 +17,7 @@ const out = fs.mkdtempSync(path.join(os.tmpdir(), "ttr-print-plan-"));
 execFileSync("npx", ["tsc", "app/print-plan.ts", "app/map-data.ts",
   "--outDir", out, "--module", "commonjs", "--target", "es2022", "--moduleResolution", "node", "--skipLibCheck", "--lib", "es2022,dom"],
   { cwd: root, stdio: "inherit" });
-const { printPlan, printChoices, printChoiceFor, describePlan, papers, splits, cardSize } = require(path.join(out, "print-plan.js"));
+const { printPlan, printChoices, printChoiceFor, papers, splits, cardSize } = require(path.join(out, "print-plan.js"));
 const { mapFormats } = require(path.join(out, "map-data.js"));
 
 const ok = [];
@@ -147,7 +147,6 @@ check("every cell says what printPlan says", printChoices("board-2x3").table.eve
   check("the extended board is 1053 × 526 mm, on a page of 1073 × 554 mm", wide.boardMm.width === 1053 && wide.pageMm.width === 1073 && wide.pageMm.height === 554, JSON.stringify([wide.boardMm, wide.pageMm]));
   check("Anniversary size is not offered on one page", printChoiceFor("board-2x3", { split: "page", paper: "a4", size: "anniversary" }).size === "standard");
   check("the other ways of splitting are turned, as before", ["sheet", "panel", "full"].every((split) => printPlan("board-2x3", { split, paper: "a4" }).turned === true));
-  check("the summary says one page, the real size and the page's size", /one page/i.test(describePlan(page)) && /100 %/.test(describePlan(page)) && /810 × 553 mm/.test(describePlan(page)), describePlan(page));
   check("the table of sheets is unchanged: still one column per way a paper can be used", printChoices("board-2x3").columns.length === 4);
 }
 
@@ -169,8 +168,6 @@ check("every cell says what printPlan says", printChoices("board-2x3").table.eve
   const page = stand("board-2x3", "a4", "page");
   check("one page the size of a standing board is 545 × 818 mm, standing", page.pageMm.width === 545 && page.pageMm.height === 818, JSON.stringify(page.pageMm));
   check("in Safari, with 21 mm kept at each end of the long side, the full-size standing board is 12 sheets", printPlan("board-2x3", { split: "full", paper: "a4" }, { id: "safari", longMarginMm: 21 }, "portrait").pages.length === 12);
-  check("the summary of a standing board does not say the map is turned", !/turned/.test(describePlan(panel)) && /upright/.test(describePlan(panel)), describePlan(panel));
-  check("and a lying board's still does", /turned/.test(describePlan(printPlan("board-2x3", { split: "panel", paper: "a4" }))));
   const table = printChoices("board-2x3", undefined, "portrait").table.find((row) => row.paper.id === "a4").cells;
   check("the sheet table counts the standing board's sheets", table.map((cell) => cell.pages).join(",") === "1,6,9,16", table.map((cell) => cell.pages).join(","));
   check("cards lie on a lying board and stand on a standing one", JSON.stringify(cardSize("board-2x3")) === JSON.stringify({ width: 62, height: 45 }) && JSON.stringify(cardSize("board-2x3", "portrait")) === JSON.stringify({ width: 45, height: 62 }));

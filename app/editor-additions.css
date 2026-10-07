@@ -66,8 +66,6 @@
 .print-option input{margin-top:3px;accent-color:#721c24}
 .print-option strong{display:block;font-size:13px;color:#1f1c18}
 .print-option small{display:block;font-size:12px;line-height:1.4;color:#2e2a24}
-/* Room for the longest summary, so a shorter one does not pull the table up. */
-.print-summary{margin:0;padding:9px 12px;min-height:calc(2 * 1.5em + 18px);border-radius:8px;background:#f3ede3;font-size:13px;line-height:1.5;color:#1f1c18}
 .print-table-heading{margin:4px 0 0;font-size:14px;font-weight:700;color:#1f1c18}
 .print-table-note{margin:0;font-size:12px;line-height:1.5;color:#2e2a24}
 .print-table-wrap{overflow-x:auto}

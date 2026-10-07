@@ -14,7 +14,7 @@ import { RulesText } from "./rules-text";
 import { versionLabel, versionStatus, type VersionStatus } from "./map-version";
 import { BALANCE_OFFICIAL, colourLengthTable, connectionCount, crossings, networkShape } from "./map-analysis";
 import { evaluateTicketDeck } from "./ticket-suggester";
-import { CUT_MARK_GAP_MM, CUT_MARK_REACH_MM, describePlan, papers, PRINT_CAPTION_MM, PRINT_MARGIN_MM, printChoices, type PrintChoice, printPlan, type PrintPlan, type PrintProfile, sameChoice, splits, cardSheets, cardSize, cardsPerRow } from "./print-plan";
+import { CUT_MARK_GAP_MM, CUT_MARK_REACH_MM, papers, PRINT_CAPTION_MM, PRINT_MARGIN_MM, printChoices, type PrintChoice, printPlan, type PrintPlan, type PrintProfile, sameChoice, splits, cardSize, cardsPerRow } from "./print-plan";
 
 // Tickets print as cut-out cards on plain paper. The same print-and-cut workflow as the board
 // itself: no bleed, a thin cut line, and nothing that needs colour to be readable. A card lies the way
@@ -225,16 +225,6 @@ export function PrintDialog({ open, onOpenChange, format, orientation = "landsca
   // The whole board on one page the size of the board: the paper is the board's own, and nothing else fits on it.
   const onePage = current.split === "page";
   const anything = parts.value.board || parts.value.tickets || parts.value.rules || Boolean(parts.value.balance && !onePage);
-  const paperLabel = papers.find((paper) => paper.id === current.paper)?.label ?? "the paper";
-  const cards = cardSheets(parts.ticketCount, plan.pageMm, cardSize(format, orientation));
-  // One sentence for the whole run, in the order it prints.
-  const summary = !anything ? "Nothing is ticked: tick at least one of the board, the tickets, the rules and the balance figures."
-    : [
-      parts.value.board ? describePlan(plan) : null,
-      parts.value.tickets ? `${parts.value.board ? "Then the" : "The"} ${parts.ticketCount} ticket${parts.ticketCount === 1 ? "" : "s"} of ${parts.deckLabel} as cut-out cards, ${cards.sheets} sheet${cards.sheets === 1 ? "" : "s"} of ${paperLabel}.` : null,
-      parts.value.rules ? `${parts.value.board || parts.value.tickets ? "Then the rules" : "The rules text"}, on pages of their own${parts.value.board || parts.value.tickets ? "" : ", upright on " + paperLabel + ", as many as it needs"}.` : null,
-      parts.value.balance && !onePage ? `${parts.value.board || parts.value.tickets || parts.value.rules ? "And a" : "A"} page of the balance figures, as they stand at this version.` : null,
-    ].filter(Boolean).join(" ");
   return <Dialog open={open} onOpenChange={onOpenChange}>
     <DialogContent className="print-dialog">
       <DialogHeader>
@@ -285,7 +275,7 @@ export function PrintDialog({ open, onOpenChange, format, orientation = "landsca
           </label>)}
         </fieldset>}
       </div>
-      <p className="print-summary">{summary}</p>
+      {!anything && <p className="helper print-nothing" role="status">Nothing is ticked: tick at least one of the board, the tickets, the rules and the balance figures.</p>}
       <p className="helper print-pdf-note">To keep it as a file, choose <strong>Save as PDF</strong> as the printer in your browser&apos;s print dialog. The file is named after the map, its version, what it holds and the date.</p>
       <p className="print-version">{version.number === undefined ? "This print will be version 1. Every print and export after a change gets the next number, on every sheet, card and rules page."
         : version.changed ? `This print will be version ${version.next}: the map has changed since version ${version.number}.`
@@ -308,7 +298,6 @@ export function PrintDialog({ open, onOpenChange, format, orientation = "landsca
         {splits.filter((split) => split.id !== "page").map((split) => <div key={split.id}><dt>{split.label}</dt><dd>{split.note}</dd></div>)}
         {anniversary && <div><dt>Full size, Anniversary</dt><dd>{anniversary.widthMm} × {anniversary.heightMm} mm, bigger wagons too. Always printed full size.</dd></div>}
       </dl></>}
-      {boardIn && !onePage && profile.id === "safari" && <p className="helper print-dialog-foot print-safari-note">In Safari the sheets are cut shorter than in other browsers. Safari’s first print layout leaves less room on the page than it shows once any setting is changed, and a full-length sheet spilled onto a second page. The counts above are Safari’s.</p>}
       {!boardIn && <p className="helper print-dialog-foot">Pages print upright (portrait), the default in every browser. The page is the paper less a margin.</p>}
       {onePage && <p className="helper print-dialog-foot print-page-note">{profile.id === "safari"
         ? `Safari ignores the size of a page. In its print dialog, add a custom paper size of ${plan.pageMm.width} × ${plan.pageMm.height} mm (Paper Size, Manage Custom Sizes), then choose PDF, or use Chrome, Edge or Firefox.`

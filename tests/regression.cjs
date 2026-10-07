@@ -28,8 +28,7 @@ const CHROMIUM_ONLY = [
   [/upright page box that fits A4 less its margins/, "Safari's page box is smaller by its own margins"],
   [/with the browser's own margins is still 9 sheets/, "a PDF count"],
   [/^and per panel it is still 6$/, "a PDF count"],
-  [/sheet count in the summary is the number of pages the browser prints/, "a PDF count"],
-  [/these rules take one page, and the cards the sheets their summary promised/, "a PDF count"],
+  [/these rules take one page, and the cards at least one/, "a PDF count"],
   [/^saved as a PDF it is a single page$/, "reads the PDF"],
   [/read from the PDF itself/, "reads the PDF"],
   [/^and the pages are the sum of the three on their own/, "a PDF count: with no PDF every count is 0 and the sum holds for nothing"],
@@ -159,8 +158,7 @@ const sectionStart = (n) => {
     await safariPage.waitForTimeout(400);
     const safariCell = await safariPage.locator('.print-table tbody tr[data-paper="a4"] td:nth-of-type(3) button').getAttribute("data-pages");
     check("in Safari the table promises 12 sheets of A4 at full size", safariCell === "12", String(safariCell));
-    const safariNote = await safariPage.locator('[role="dialog"]').first().textContent();
-    check("and the dialog says why", /Safari/.test(safariNote) && /first/i.test(safariNote), safariNote.slice(-400));
+    check("and the dialog does not go into why: that is not for the person printing", !/spilled|first print layout/i.test(await safariPage.locator('[role="dialog"]').first().textContent()));
     // Safari ignores the size of a page, so on one page the size of the board it is told what to do instead.
     await pickSplit(safariPage, "page");
     const safariPageNote = await safariPage.locator(".print-page-note").textContent();
@@ -556,7 +554,6 @@ const sectionStart = (n) => {
     await cell(paper, column).click();
     await page.waitForTimeout(200);
     const promised = Number(await cell(paper, column).getAttribute("data-pages"));
-    const summary = await printDialog().locator(".print-summary").textContent();
     await page.evaluate(() => { window.__printed = null; });
     await page.emulateMedia({ media: "print" });
     await page.evaluate(() => Array.from(document.querySelectorAll('[role="dialog"] button')).find((b) => b.textContent.trim() === "Print").click());
@@ -564,7 +561,7 @@ const sectionStart = (n) => {
     const printed = await page.evaluate(() => window.__printed);
     await page.emulateMedia({ media: "screen" });
     await page.waitForTimeout(300);
-    return { ...printed, promised, summary };
+    return { ...printed, promised };
   };
   const panels2x4 = await printFrom("a4", 2);
   {
@@ -596,7 +593,6 @@ const sectionStart = (n) => {
   check("picking a cell sets the paper", await paperIs(printDialog(), "letter"));
   check("and the way it is split", await splitIs(printDialog(), "full"));
   check("and the picked cell is marked", (await cell("letter", 3).getAttribute("aria-pressed")) === "true");
-  check("and the summary follows", /12 sheets of US Letter/.test(await printDialog().locator(".print-summary").textContent()), await printDialog().locator(".print-summary").textContent());
   check("the 2×3 offers Anniversary size as a column of the table, not as a box of its own", /Anniversary/.test(await printDialog().locator(".print-table thead").textContent()) && (await printDialog().getByRole("checkbox", { name: "Anniversary size" }).count()) === 0 && !/Supersize/.test(await printDialog().textContent()));
   check("and no Standard to pick, an empty box is the standard board", (await printDialog().getByRole("radio", { name: "Standard", exact: true }).count()) === 0);
   check("standard full size does not mark the Anniversary cell", (await cell("letter", 4).getAttribute("aria-pressed")) !== "true");
@@ -607,7 +603,7 @@ const sectionStart = (n) => {
   await page.waitForTimeout(200);
   check("picking Anniversary prints full size, since Anniversary only exists at full size", await splitIs(printDialog(), "full"));
   check("and marks the Anniversary cell in the table", (await cell("letter", 4).getAttribute("aria-pressed")) === "true");
-  check("and the summary names the bigger board", /972 × 648 mm/.test(await printDialog().locator(".print-summary").textContent()), await printDialog().locator(".print-summary").textContent());
+  check("and the notes under the table name the bigger board", /972 × 648 mm/.test(await printDialog().locator(".print-split-notes").textContent()), await printDialog().locator(".print-split-notes").textContent());
   await cell("a4", 3).click();
   await page.waitForTimeout(200);
   check("picking a standard cell takes Anniversary away", (await cell("a4", 3).getAttribute("aria-pressed")) === "true" && (await cell("letter", 4).getAttribute("aria-pressed")) !== "true");
@@ -659,7 +655,6 @@ const sectionStart = (n) => {
   const anniversary = await printFrom("a4", 4);
   check("an Anniversary board prints 16 sheets of A4", anniversary.pages === 16 && anniversary.promised === 16, `${anniversary.pages} printed, ${anniversary.promised} promised`);
   check("with wagon spaces grown to the bigger board", Math.abs(anniversary.wagonMm - 20 * 972 / 790) < 0.6, `${anniversary.wagonMm.toFixed(2)} mm`);
-  check("and the summary names the board it adds up to", /972 × 648 mm/.test(anniversary.summary), anniversary.summary);
   const tabloidSheet = await printFrom("tabloid", 1);
   check("Tabloid is declared upright in millimetres", /size:\s*279\.4mm 431\.8mm/.test(tabloidSheet.style), tabloidSheet.style);
   check("no print choice touched the map, but for its version number and playtest box", contentOf(await storedMap()) === contentOf(mapBeforeChoices));
@@ -736,7 +731,7 @@ const sectionStart = (n) => {
   });
   check("the sheet table has a heading of its own", /^H[2-4] \S/.test(described.heading), described.heading);
   check("and a description of what its numbers are", /sheets?/i.test(described.description) && /%/.test(described.description), described.description);
-  const foot = await printDialog().locator(".print-dialog-foot:not(.print-safari-note)").textContent();
+  const foot = await printDialog().locator(".print-dialog-foot").textContent();
   check("the dialog says to print upright, the default, and never asks for Landscape", /portrait|upright/i.test(foot) && !/choose Landscape/i.test(foot), foot);
   check("which spells out what the percentage means", /100\s%[^.]*real size|real size[^.]*100\s%/i.test(described.description), described.description);
   check("every cell says sheets, not just a number", /\d+ sheets?/.test(described.cell), described.cell);
@@ -2817,9 +2812,7 @@ const sectionStart = (n) => {
     await page.waitForTimeout(400);
     check("the print dialog asks what to print with three tick boxes: the board, the tickets and the rules", (await Promise.all(["Print the board", "Print the tickets", "Print the rules"].map((n) => printPart(n).count()))).every((n) => n === 1));
     check("the board and the rules are ticked at first, and the tickets are not", (await printPart("Print the board").isChecked()) && (await printPart("Print the rules").isChecked()) && !(await printPart("Print the tickets").isChecked()));
-    check("the summary of the run says the rules follow the board", /then the rules/i.test(await printDialog().locator(".print-summary").textContent()));
     await choosePrintParts(true, false, false);
-    check("with the board only, the summary is about the board alone", !/rules|ticket/i.test(await printDialog().locator(".print-summary").textContent()));
     await printDialog().getByRole("button", { name: "Cancel" }).click();
     await page.waitForTimeout(300);
     const pagesOf = async () => { await page.emulateMedia({ media: "print" }); const pdf = await pdfOf(page, { format: "A4", printBackground: true }); await page.emulateMedia({ media: "screen" }); return (pdf.toString("latin1").match(/\/Type\s*\/Page[^s]/g) || []).length; };
@@ -2833,19 +2826,13 @@ const sectionStart = (n) => {
     const t1 = await tree();
     check("with the tickets only, the tree holds one card for each ticket of the deck and no board", JSON.stringify(t1.order) === JSON.stringify(["tickets"]) && t1.boards === 0 && t1.cards === deckSize && deckSize > 0, JSON.stringify([t1.order, t1.boards, t1.cards, deckSize]));
     const pagesTickets = await pagesOf();
-    await printButton().click();
-    await page.waitForTimeout(350);
-    const cardsSummary = await printDialog().locator(".print-summary").textContent();
-    await printDialog().getByRole("button", { name: "Cancel" }).click();
-    await page.waitForTimeout(300);
-    check("the cards' sheet count in the summary is the number of pages the browser prints", Number((/(\d+) sheet/.exec(cardsSummary) || [])[1]) === pagesTickets, `${cardsSummary} against ${pagesTickets}`);
     await run(false, false, true);
     const t2 = await tree();
     check("with the rules only, the tree holds the rules and nothing else", JSON.stringify(t2.order) === JSON.stringify(["rules"]) && t2.rules === 1 && /House rules/.test(t2.text), JSON.stringify(t2.order));
     check("a reference to something that is not there prints as its plain name, unmarked", t2.missing === 0 && /Atlantis/.test(t2.text));
     check("on upright A4 with its margin", /size:\s*210mm 297mm/.test(t2.style), t2.style);
     const pagesRules = await pagesOf();
-    check("these rules take one page, and the cards the sheets their summary promised", pagesRules === 1 && pagesTickets >= 1, `${pagesBoard} board, ${pagesTickets} tickets, ${pagesRules} rules`);
+    check("these rules take one page, and the cards at least one", pagesRules === 1 && pagesTickets >= 1, `${pagesBoard} board, ${pagesTickets} tickets, ${pagesRules} rules`);
     await run(true, true, true);
     const t3 = await tree();
     check("with all three, the board comes first, then the tickets, then the rules", JSON.stringify(t3.order) === JSON.stringify(["board", "tickets", "rules"]), JSON.stringify(t3.order));
@@ -2864,8 +2851,7 @@ const sectionStart = (n) => {
     check("with the board ticked, the sheet table and the box for one big page are there, and no paper to choose apart from it", (await printDialog().locator(".print-table").count()) === 1 && (await bigPageBox(printDialog()).count()) === 1 && (await printDialog().locator('input[name="print-paper"]').count()) === 0);
     await choosePrintParts(false, true, true);
     check("without the board the table and the big page go, and a paper to choose takes their place", (await bigPageBox(printDialog()).count()) === 0 && (await printDialog().locator(".print-table").count()) === 0 && (await printDialog().locator('input[name="print-paper"]').count()) === 4);
-    const summary = await printDialog().locator(".print-summary").textContent();
-    check("the summary says how many cards, on how many sheets, and then the rules", new RegExp(`${deckSize} ticket`).test(summary) && /\d+ sheet/.test(summary) && /then the rules/i.test(summary) && !/Standard board|board/i.test(summary.replace(/cards/g, "")), summary);
+    check("the tickets' note says how many cards there are", new RegExp(`${deckSize} ticket`).test(await printDialog().locator("#print-tickets-note").textContent()));
     await choosePrintParts(false, false, false);
     check("with nothing ticked there is nothing to print, and the dialog says so", (await printDialog().getByRole("button", { name: "Print", exact: true }).isDisabled()) && /tick at least one/i.test(await printDialog().textContent()));
     await choosePrintParts(false, true, true);
@@ -2886,8 +2872,8 @@ const sectionStart = (n) => {
     const onePage = bigPageBox(printDialog());
     check("the board can go on one big page as big as the board", (await onePage.count()) === 1);
     await onePage.check();
-    const pageSummary = await printDialog().locator(".print-summary").textContent();
-    check("the dialog says what that is: one page, real size, and how big the page is", /one page/i.test(pageSummary) && /100 %/.test(pageSummary) && /810 × 553 mm/.test(pageSummary), pageSummary);
+    const pageNote = await printDialog().locator(".print-page-note").textContent();
+    check("the dialog says how big the page is", /810 × 553 mm/.test(pageNote), pageNote);
     check("and that it is for a large-format printer or a PDF", /large-format|PDF/i.test(await printDialog().textContent()));
     check("the paper no longer matters, so it is not asked for, and the table of sheets steps aside", (await printDialog().locator('input[name="print-paper"]').count()) === 0 && (await printDialog().locator(".print-table").count()) === 0);
     check("the tickets and the rules cannot join it, and the dialog says they print apart", (await printPart("Print the tickets").isDisabled()) && (await printPart("Print the rules").isDisabled()) && /print(ed)? (them )?separately|apart/i.test(await printDialog().textContent()));
@@ -3149,8 +3135,6 @@ const sectionStart = (n) => {
     const a4Panels = await dialog.locator('.print-table tbody tr[data-paper="a4"] td:nth-of-type(2) button').getAttribute("data-pages");
     check("the print table counts six A4 sheets for its panels", a4Panels === "6", String(a4Panels));
     await pickSplit(dialog, "panel");
-    const summary = await dialog.locator(".print-summary").textContent();
-    check("and does not say the map is turned on the page", !/turned/.test(summary) && /upright/.test(summary), summary);
     const foot = await dialog.locator(".print-dialog-foot").allTextContents();
     check("nor does the note at the foot of the dialog", foot.length > 0 && foot.every((t) => !/turned/.test(t)), foot.join(" | "));
     const pages = await sp.evaluate(() => Array.from(document.querySelectorAll(".print-pages .print-page")).map((p) => p.querySelector("svg.print-sheet > g").getAttribute("transform")));
@@ -3885,7 +3869,7 @@ const sectionStart = (n) => {
     await pp.getByRole("button", { name: "Print map" }).click();
     await pp.waitForTimeout(400);
     for (const name of ["Print the board", "Print the tickets", "Print the rules"]) { const box = dialog.getByRole("checkbox", { name, exact: true }); if (await box.isChecked()) await box.uncheck(); }
-    check("with only the balance page ticked, there is still something to print, and the dialog says what", await dialog.getByRole("button", { name: "Print", exact: true }).isEnabled() && /balance/i.test(await dialog.locator(".print-summary").textContent()), await dialog.locator(".print-summary").textContent());
+    check("with only the balance page ticked, there is still something to print, and the dialog says what", await dialog.getByRole("button", { name: "Print", exact: true }).isEnabled() && /network, crossings/i.test(await dialog.locator("#print-balance-note").textContent()), await dialog.locator("#print-balance-note").textContent());
     await stub();
     await dialog.getByRole("button", { name: "Print", exact: true }).click();
     const alone = await run();
@@ -4068,7 +4052,7 @@ const sectionStart = (n) => {
     await il.getByRole("button", { name: "Print map" }).click();
     await il.waitForTimeout(400);
     // The print dialog draws no picture of the sheets: it counted the board's sheets only, and tickets and rules
-    // add pages of their own; the summary and the table say what is counted.
+    // add pages of their own; the table says what is counted.
     const dialog = il.getByRole("dialog", { name: "Print the map" });
     check("the print dialog has no drawing of the sheets, which would count the board alone", (await dialog.locator("svg[aria-label^='How the sheets divide']").count()) === 0);
     check("and says that the table counts the board's sheets, the tickets and the rules coming on pages of their own", /how many sheets the board takes/.test((await dialog.locator(".print-table-note").textContent()) || ""));

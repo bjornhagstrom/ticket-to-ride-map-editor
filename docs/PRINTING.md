@@ -173,8 +173,8 @@ pass only (a 5 mm margin changed nothing).
 
 So Safari gets its own print profile, `PRINT_PROFILES.safari`: 21 mm clear at each end of the long
 side instead of 10, which caps a sheet on A4 at 255 mm, cut marks included. The editor finds Safari
-from its user agent after mounting; the dialog's table, summary and print tree all use the profile, and
-the dialog says why the counts differ. In Safari, full size is 12 sheets of A4 (9 elsewhere), 6 of A3,
+from its user agent after mounting; the dialog's table and the print tree both use the profile, and
+the dialog does not explain why the counts differ: the person sees the counts for their own browser. In Safari, full size is 12 sheets of A4 (9 elsewhere), 6 of A3,
 12 of Letter and 9 of Tabloid; Anniversary is 16 of A4 and 20 of Letter; a 2×4 is 15 of A4; one sheet
 of A4 is 32 %. Per panel is unchanged, because the panel's height decides it.
 
@@ -192,8 +192,8 @@ them. So the layout is made to fit with them on.
   word an earlier build kept in `ttr-print-rules` (`board`, `both`, `rules`, `off`, `on`) is still read.
   Without the board in the run, the sheet table and the box for one big page are hidden, and the paper
   is asked for as a list of its own. A deck with no tickets has no cards to tick, a map with no rules text has no rules, and with
-  nothing ticked Print is off. The summary says how many sheets the cards take (`cardSheets` in
-  `app/print-plan.ts`), and a test checks that it is the number of pages the browser prints. The
+  nothing ticked Print is off. The dialog has no paragraph telling what the run comes to: it
+  counted pages of the board only, and a person sees the result in the browser's own print preview. The
   "Print deck" button in the Tickets panel prints just the cards, whatever is ticked.
 - **A standing board** (Settings → Orientation) prints standing on the upright page, without the
   quarter turn: its sheet is the page's short side across and its long side, less the caption, down.
@@ -220,9 +220,8 @@ them. So the layout is made to fit with them on.
   page has no paper. The table is never disabled.
 - **Nothing may move while choices change.** The table has `table-layout: fixed` and fixed column
   widths. The picked cell is marked with a border and an inset shadow, never bold, which widened it
-  and shifted the columns 3 px. The Anniversary column is always there on a 2×3 and never comes and goes. The
-  summary always has room for two lines. Before these, the table jumped 10.6 px when full size was
-  chosen.
+  and shifted the columns 3 px. The Anniversary column is always there on a 2×3 and never comes and goes. Before these, the table
+  jumped 10.6 px when full size was chosen.
 - **Contrast.** Small text is at least 7:1 against its background, and other text at least 4.5:1.
   Numbers and `%` are joined by a non-breaking space, so "100 %" never breaks across a line.
 - **The percentage is explained where it is shown.** The note under "Sheets for every choice" says

@@ -177,16 +177,6 @@ export function printChoices(format: MapFormat, profile: PrintProfile = PRINT_PR
 
 export const sameChoice = (a: PrintChoice, b: PrintChoice) => a.split === b.split && a.paper === b.paper && (a.split !== "full" || (a.size ?? "standard") === (b.size ?? "standard"));
 
-/** One line saying what the printer will produce. */
-export function describePlan(plan: PrintPlan): string {
-  const paper = papers.find((item) => item.id === plan.choice.paper)!;
-  const count = plan.pages.length;
-  if (plan.choice.split === "page") return `One page, ${plan.pageMm.width} × ${plan.pageMm.height} mm, upright, with the board at 100 % — real size, ${plan.boardMm.width} × ${plan.boardMm.height} mm.`;
-  const sheets = `${count} sheet${count === 1 ? "" : "s"} of ${paper.label}, upright${plan.turned ? " with the map turned" : ""}`;
-  if (plan.choice.split === "full") return `${sheets}, at 100 % — real size. Together they make the ${plan.boardMm.width} × ${plan.boardMm.height} mm board: trim each at its marks and butt it to its neighbours.`;
-  return `${sheets}, at ${Math.round(plan.scale * 100)} % of real size: the board prints smaller than the real ${plan.boardMm.width} × ${plan.boardMm.height} mm.`;
-}
-
 /** Cut-out ticket cards, 62 x 45 mm, lying the way the board lies: a landscape board gives landscape
  *  cards, a portrait one upright cards. As many to a row, and as many rows, as the page holds. */
 export function cardSize(format: MapFormat, orientation: Orientation = "landscape"): { width: number; height: number } {
@@ -198,12 +188,3 @@ export function cardsPerRow(pageMm: { width: number; height: number }, card: { w
 }
 /** The run's caption above the first row of cards. */
 export const CARD_CAPTION_MM = 10;
-/** How many sheets a deck of cards takes on a page, and how many cards go on a sheet. */
-export function cardSheets(count: number, pageMm: { width: number; height: number }, card: { width: number; height: number }): { sheets: number; perSheet: number } {
-  const room = pageMm.height - 2 * PRINT_MARGIN_MM;
-  const perRow = cardsPerRow(pageMm, card);
-  const firstRows = Math.max(1, Math.floor((room - CARD_CAPTION_MM) / card.height));
-  const laterRows = Math.max(1, Math.floor(room / card.height));
-  const first = perRow * firstRows, later = perRow * laterRows;
-  return { sheets: count <= 0 ? 0 : count <= first ? 1 : 1 + Math.ceil((count - first) / later), perSheet: first };
-}
