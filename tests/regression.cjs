@@ -3885,6 +3885,11 @@ const sectionStart = (n) => {
     await ob.getByRole("button", { name: "Map balance", exact: true }).click();
     await ob.waitForTimeout(800);
     const section = ob.locator(".analysis-section.against-official");
+    // The table fits the column: no sideways scroll, the labels have room to read (one that was squeezed into
+    // a sliver, five lines to a label, was seen on screen) and the figures sit beside them.
+    const fit = await section.locator(".official-table").evaluate((table) => { const box = table.parentElement; const first = table.querySelector("tbody td").getBoundingClientRect(); const lines = Math.round(table.querySelector("tbody td").getBoundingClientRect().height / parseFloat(getComputedStyle(table.querySelector("tbody td")).lineHeight || "16")); return { overflow: box.scrollWidth - box.clientWidth, firstWidth: Math.round(first.width), box: box.clientWidth, lines }; });
+    check("the table of official figures fits its column without scrolling sideways", fit.overflow <= 1, JSON.stringify(fit));
+    check("and its labels are wide enough to read, not squeezed into a sliver", fit.firstWidth >= fit.box * 0.4, JSON.stringify(fit));
     check("Map balance opens with the map against the official maps", (await section.count()) === 1 && (await ob.locator(".balance-panel .analysis-section").first().evaluate((el) => el.classList.contains("against-official"))));
     const rows = await section.locator("tbody tr").evaluateAll((trs) => trs.map((tr) => Array.from(tr.cells).map((c) => c.textContent.trim())));
     const labels = rows.map((r) => r[0]).join(" | ");
