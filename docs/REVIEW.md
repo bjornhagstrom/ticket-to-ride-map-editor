@@ -204,6 +204,15 @@ adding the seed's exact words to it.
   naming changed stops; a spreadsheet's routes alone dropped every field of the map's stops but their place; the
   print dialog could dead-end; texts and docs that no longer said what the dialog did. All fixed in the unreleased
   notes, with a check for each that fails without its fix.
+- **2026-10-07, the third review (1.0 to 1.1.0, two shares).** No BLOCKER. Fixed from it: Undo and Redo did not count
+  as changes, so a notice's Undo after the toolbar's Undo undid an earlier change; the Tickets panel's Import decks
+  could read a whole map as a map (it now is tickets only, like Tickets only); a routes file's unusable id was not
+  said; bends were written as x:y, which Excel and Sheets read as a time (now x|y, and x:y is still read); a doc
+  named a test that does not exist, and rule 6 of the file format claimed more than the reader does. Also learned:
+  the dev server hides an undo-step bug (see `docs/TESTING.md`), so that check was proved against the production
+  build, with and without the fix. Left, for the owner: a routes-only file whose ids differ from the map's lays the
+  stops out (as written in `docs/CSV.md`), and the example rules give 22 and 18 wagons for four and five players
+  while the map holds one wagon count.
 
 ## Sources
 
