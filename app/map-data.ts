@@ -499,20 +499,21 @@ export const problemMap: MapData = {
   name: "Example map with problems",
   rules: `# Rules of the example map with problems
 
-This is the example map with two things done wrong on purpose, so that you can see what the editor says about them. In every other way it follows the standard *Ticket to Ride* rules.
+This is the example map with two things done wrong on purpose, so that you can see what the editor says about them, and a third that follows from one of them. In every other way it follows the standard *Ticket to Ride* rules.
 
 ## What is wrong
 
 - **A route that crosses another.** [[Fernside–Deepcut]] runs over a route it does not meet at a stop. Players cannot tell which one a wagon belongs to where they cross, so Map balance counts the crossing and rings it on the map.
 - **A dead end.** [[Outpost]] is reached by [[Fernside–Outpost]] only: nothing runs on from it, so it is a corner of the map that a ticket can reach by one way alone. How the network holds together lists it.
+- **A ticket worth more than its path.** [[Fernside–Deepcut]] is also a shortcut: the Long journeys ticket from [[Harbour]] to [[Fernside]] is worth 22 points, but its shortest path is now 19 spaces (8 + 5 + 6), where it was 22. Open Tickets and look at Spaces against Points: you can set the points there, to 19 to match the path, or take the shortcut away and the ticket is right again.
 
 ## What to do about it
 
-Move a stop or bend the route so that it no longer crosses, or let it cross at a stop. Join [[Outpost]] to a second stop, or accept the dead end if a corner like it is what you want. The warnings are not faults: they say how the map differs.
+Move a stop or bend the route so that it no longer crosses, or let it cross at a stop (the route is still a shortcut then: the ticket is not put right by that). Join [[Outpost]] to a second stop, or accept the dead end if a corner like it is what you want. The warnings are not faults: they say how the map differs.
 
 *Tip: point at a card in Map balance and the map marks what it is about.*
 `,
-  notes: [{ id: "problem-note", x: 40, y: 24, width: 300, height: 150, text: "Two things are wrong on purpose here: Fernside–Deepcut crosses another route, and Outpost is a dead end, reached by one route only. Open Map balance to see how the editor says so, then fix them or leave them." }],
+  notes: [{ id: "problem-note", x: 40, y: 24, width: 420, height: 150, text: "Two things are wrong on purpose here: Fernside–Deepcut crosses another route, and Outpost is a dead end, reached by one route only. A third follows: that route is a shortcut, so the ticket Harbour–Fernside is worth 22 but its path is 19. Open Map balance and Tickets to see how the editor says so, then fix them or leave them." }],
   stops: [...initialMap.stops, problemStop],
   routes: [
     ...initialMap.routes,

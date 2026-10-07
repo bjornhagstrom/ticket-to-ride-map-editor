@@ -8,6 +8,7 @@ This file is written from `app/version.ts` by `npm run changelog`; edit the note
 
 **Version 1.1: importing spreadsheets with templates, Tickets only, bends in spreadsheets, and fixes**
 
+- The example map with problems now names a third thing that follows from its crossing route: a ticket worth more than its path, with the figures, where to see them in Tickets and what to do.
 - Import → Spreadsheet opens a dialog that says which files to choose, with the column guide a click away; the templates are one zip with the guide inside it, a plain download under Import → Spreadsheet and under Export.
 - Import → Tickets only now takes just the decks and tickets of a file, even a whole map, and leaves your stops and routes; Map project takes the whole map as before. The spreadsheet templates say on screen that they were saved.
 - The spreadsheet export carries the bends and straightening of routes, and the import reads them back, so a round trip keeps the shape of every route.

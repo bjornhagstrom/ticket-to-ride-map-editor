@@ -49,6 +49,18 @@ const links = [...(problemMap.rules || "").matchAll(/\[\[([^\]]+)\]\]/g)].map((m
 check("its rules explain the two problems and link only to stops and routes on the map", /cross/i.test(problemMap.rules) && /dead end/i.test(problemMap.rules) && links.length >= 3 && links.every((l) => names.has(l) || pairNames.has(l) || [...pairNames].some((p) => p.split("–").reverse().join("–") === l)), links.join(" | "));
 check("and a note on the map says the same", problemMap.notes.some((n) => /on purpose/i.test(n.text) && /cross/i.test(n.text) && /dead end/i.test(n.text)));
 
+// A third thing follows from the crossing route: it is a shortcut, so one ticket is worth more than its path. The map
+// says so, in its rules and in its note, with the figures, and the figures are true.
+{
+  const adjacency = A.buildAdjacency(problemMap);
+  const ticket = problemMap.tickets.find((t) => (t.a === "example-harbour" && t.b === "example-fernside") || (t.b === "example-harbour" && t.a === "example-fernside"));
+  const path = A.shortestPath ? A.shortestPath(adjacency, "example-harbour", "example-fernside") : null;
+  check("a ticket from Harbour to Fernside is worth 22, and its shortest path on this map is 19, because of the crossing route", ticket && ticket.points === 22 && path && path.distance === 19, ticket && path ? `${ticket.points} points, ${path.distance} spaces` : "not found");
+  check("the rules name it as a third thing, with both figures, and say where to look and what to do", /third/i.test(problemMap.rules) && /\b22\b/.test(problemMap.rules) && /\b19\b/.test(problemMap.rules) && /Tickets/.test(problemMap.rules) && /Spaces/.test(problemMap.rules) && /Points/.test(problemMap.rules));
+  check("and the note on the map says so too", problemMap.notes.some((n) => /ticket/i.test(n.text) && /(path|shortcut)/i.test(n.text)));
+  check("the note still fits its box: a few lines, in a box tall enough", problemMap.notes.every((n) => n.text.length / Math.max(1, Math.floor(n.width / 7)) * 18 + 24 <= n.height + 1), problemMap.notes.map((n) => `${n.text.length} characters, ${n.height} high`).join(" | "));
+}
+
 // It is an ordinary map: it survives a file.
 const back = storage.normalizeMap(storage.readMapFile(JSON.parse(JSON.stringify(storage.writeMapFile("map", storage.mapPayload(storage.normalizeMap(problemMap)), problemMap)))).payload);
 check("it survives a round trip through a file", back.stops.length === problemMap.stops.length && back.routes.length === problemMap.routes.length && back.name === problemMap.name);
