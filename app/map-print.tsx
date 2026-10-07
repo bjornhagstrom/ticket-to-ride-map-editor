@@ -223,7 +223,7 @@ export function PrintDialog({ open, onOpenChange, format, orientation = "landsca
   // Without the board in the run, how it is split, its size and its sheet table do not apply.
   const boardIn = parts.value.board;
   // The whole board on one page the size of the board: the paper is the board's own, and nothing else fits on it.
-  const onePage = current.split === "page";
+  const onePage = current.split === "page" && boardIn;
   const anything = parts.value.board || parts.value.tickets || parts.value.rules || Boolean(parts.value.balance && !onePage);
   return <Dialog open={open} onOpenChange={onOpenChange}>
     <DialogContent className="print-dialog">
@@ -281,7 +281,7 @@ export function PrintDialog({ open, onOpenChange, format, orientation = "landsca
         : version.changed ? `This print will be version ${version.next}: the map has changed since version ${version.number}.`
         : `Nothing has changed since version ${version.number}: this print is version ${version.number} too.`}</p>
       {boardIn && !onePage && <><h3 id="print-table-heading" className="print-table-heading">Sheets for every choice</h3>
-      <p id="print-table-note" className="print-table-note">Each cell shows how many sheets the board takes, and its scale (the tickets and the rules come on pages of their own, as the summary above says): how big the printed board is against the real one. 100 % is real size; 50 % is half as wide and half as tall. Pick a cell to use it.</p>
+      <p id="print-table-note" className="print-table-note">Each cell shows how many sheets the board takes, and its scale (the tickets and the rules come on pages of their own): how big the printed board is against the real one. 100 % is real size; 50 % is half as wide and half as tall. Pick a cell to use it.</p>
       <div className="print-table-wrap">
         <table className="print-table" aria-labelledby="print-table-heading" aria-describedby="print-table-note">
           <colgroup><col className="print-table-paper" />{columns.map((label) => <col key={label} />)}</colgroup>

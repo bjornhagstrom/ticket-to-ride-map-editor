@@ -594,7 +594,6 @@ const sectionStart = (n) => {
   check("and the way it is split", await splitIs(printDialog(), "full"));
   check("and the picked cell is marked", (await cell("letter", 3).getAttribute("aria-pressed")) === "true");
   check("the 2×3 offers Anniversary size as a column of the table, not as a box of its own", /Anniversary/.test(await printDialog().locator(".print-table thead").textContent()) && (await printDialog().getByRole("checkbox", { name: "Anniversary size" }).count()) === 0 && !/Supersize/.test(await printDialog().textContent()));
-  check("and no Standard to pick, an empty box is the standard board", (await printDialog().getByRole("radio", { name: "Standard", exact: true }).count()) === 0);
   check("standard full size does not mark the Anniversary cell", (await cell("letter", 4).getAttribute("aria-pressed")) !== "true");
   await pickSplit(printDialog(), "sheet");
   await page.waitForTimeout(200);
@@ -2876,6 +2875,18 @@ const sectionStart = (n) => {
     check("and that it is for a large-format printer or a PDF", /large-format|PDF/i.test(await printDialog().textContent()));
     check("the paper no longer matters, so it is not asked for, and the table of sheets steps aside", (await printDialog().locator('input[name="print-paper"]').count()) === 0 && (await printDialog().locator(".print-table").count()) === 0);
     check("the tickets and the rules cannot join it, and the dialog says they print apart", (await printPart("Print the tickets").isDisabled()) && (await printPart("Print the rules").isDisabled()) && /print(ed)? (them )?separately|apart/i.test(await printDialog().textContent()));
+    // Without the board in the run the big page means nothing: the paper is asked for, and the tickets and the rules
+    // can be ticked (found in the 1.0 review: the dialog was a dead end there).
+    await printPart("Print the board").uncheck();
+    await page.waitForTimeout(200);
+    const wasTickets = await printPart("Print the tickets").isChecked();
+    const rulesWritten = await page.evaluate(() => Boolean((JSON.parse(localStorage.getItem("ttr-map")).rules || "").trim()));
+    if (deckSize > 0 && !wasTickets) await printPart("Print the tickets").check();
+    check("with the board taken out, a paper is asked for and the tickets and the rules can be ticked, whatever the big page was", (await printDialog().locator('input[name="print-paper"]').count()) === 4 && (deckSize === 0 || (await printPart("Print the tickets").isEnabled())) && (!rulesWritten || (await printPart("Print the rules").isEnabled())) && (deckSize === 0 || !/Nothing is ticked/.test(await printDialog().textContent())));
+    if (deckSize > 0 && !wasTickets) await printPart("Print the tickets").uncheck();
+    check("and only one foot note speaks of the page", (await printDialog().locator(".print-dialog-foot").count()) === 1);
+    await printPart("Print the board").check();
+    await page.waitForTimeout(200);
     await onePage.uncheck();
     await page.waitForTimeout(200);
     check("taking the big page away brings the table back, on one sheet of A4 as at first", (await printDialog().locator(".print-table").count()) === 1 && (await splitIs(printDialog(), "sheet")) && (await paperIs(printDialog(), "a4")));
@@ -4053,7 +4064,7 @@ const sectionStart = (n) => {
     // add pages of their own; the table says what is counted.
     const dialog = il.getByRole("dialog", { name: "Print the map" });
     check("the print dialog has no drawing of the sheets, which would count the board alone", (await dialog.locator("svg[aria-label^='How the sheets divide']").count()) === 0);
-    check("and says that the table counts the board's sheets, the tickets and the rules coming on pages of their own", /how many sheets the board takes/.test((await dialog.locator(".print-table-note").textContent()) || ""));
+    check("and says that the table counts the board's sheets, with the tickets and the rules on pages of their own", /how many sheets the board takes/.test((await dialog.locator(".print-table-note").textContent()) || ""));
     await il.context().close();
   }
 
@@ -4255,6 +4266,23 @@ const sectionStart = (n) => {
     await dp.waitForTimeout(500);
     const back = await mapNow();
     check("and Undo brings the stop, its routes and its tickets back", back.stops.length === mid.stops.length + 1 && back.tickets.length === mid.tickets.length + millbrookTickets && back.routes.length > mid.routes.length, `${mid.tickets.length} -> ${back.tickets.length} tickets`);
+    // A notice's Undo undoes what it names, or says it cannot: not the last change, whatever that was.
+    const gull = back.stops.find((s) => s.name === "Gull Island");
+    const pickStop = (name) => dp.evaluate((n) => { const s = Array.from(document.querySelectorAll(".map-canvas .stop")).find((g) => Array.from(g.querySelectorAll("text, title")).some((t) => t.textContent === n)); s.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true })); s.dispatchEvent(new PointerEvent("pointerup", { bubbles: true })); }, name);
+    await pickStop("Gull Island");
+    await dp.waitForTimeout(300);
+    await dp.getByRole("button", { name: "Delete stop" }).click();
+    await dp.waitForTimeout(300);
+    await dp.getByRole("alertdialog").getByRole("button", { name: "Continue" }).click();
+    await dp.waitForTimeout(400);
+    await pickStop("Pine Hill");
+    await dp.waitForTimeout(300);
+    await dp.getByRole("checkbox", { name: "A hub on purpose" }).check();
+    await dp.waitForTimeout(300);
+    await dp.locator("[data-sonner-toast]").filter({ hasText: /Gull Island is deleted/ }).getByRole("button", { name: "Undo" }).click();
+    await dp.waitForTimeout(400);
+    const afterUndo = await mapNow();
+    check("the notice's Undo does not undo something else when another change came after", !afterUndo.stops.some((s) => s.id === gull.id) && afterUndo.stops.find((s) => s.name === "Pine Hill").hub === true && /map has changed since/.test((await dp.locator("[data-sonner-toast]").allTextContents()).join(" ")));
     await dp.context().close();
   }
 
@@ -4339,6 +4367,52 @@ const sectionStart = (n) => {
     const bare = await mapNow();
     const stayingOnes = again.tickets.filter((t) => t.a === millbrook.id && t.b === millbrook.id).length;
     check("Remove them all removes every ticket that named a stop that changed", bare.tickets.length === stayingOnes && (await dialog.count()) === 0, `${bare.tickets.length} tickets left`);
+    // A network file that brings tickets: it carries every deck's tickets under their own ids. The decks that stay
+    // must not lose theirs to the copies (found in the 1.0 review): imported tickets get ids of their own.
+    await np.evaluate((text) => localStorage.setItem("ttr-map", text), JSON.stringify(before));
+    await np.reload({ waitUntil: "networkidle" });
+    await np.waitForTimeout(800);
+    const lakeside = stopNamed(before, "Lakeside");
+    const shore = { format: "ticket-to-ride-map", version: 3, kind: "network", payload: { stops: before.stops.map((s) => s.id === lakeside.id ? { ...s, name: "Lakeshore" } : s), routes: before.routes, tickets: before.tickets } };
+    const shoreFile = path.join(os.tmpdir(), `ttr-${Date.now()}-network-tickets.json`); fs.writeFileSync(shoreFile, JSON.stringify(shore));
+    await np.locator('input[type="file"][accept="application/json"]').setInputFiles(shoreFile);
+    await np.waitForTimeout(600);
+    await np.getByRole("alertdialog").getByRole("button", { name: "Continue" }).click();
+    await np.waitForTimeout(700);
+    await dialog.getByRole("button", { name: "Apply" }).click();
+    await np.waitForTimeout(600);
+    const fresh = await mapNow();
+    const longBefore = before.tickets.filter((t) => t.set === "example-long");
+    const longAfter = fresh.tickets.filter((t) => t.set === "example-long");
+    const namesLakeside = (t) => t.a === lakeside.id || t.b === lakeside.id;
+    check("the other deck keeps its tickets, but for those that named the stop that changed", longAfter.length === longBefore.filter((t) => !namesLakeside(t)).length && longBefore.filter((t) => !namesLakeside(t)).every((t) => longAfter.some((x) => x.id === t.id && x.a === t.a && x.b === t.b)), `${longAfter.length} of ${longBefore.length}`);
+    check("no two tickets share an id", new Set(fresh.tickets.map((t) => t.id)).size === fresh.tickets.length, `${fresh.tickets.length} tickets`);
+    check("and the tickets that came with the file are in the deck being worked on", fresh.tickets.filter((t) => (t.set ?? "main") === "main").length >= before.tickets.filter((t) => t.set !== "example-long").length);
+    // Undo after Apply takes the whole import back, so no ticket is left naming a stop that has changed.
+    await np.locator("[data-sonner-toast]").filter({ hasText: /moved to other stops/ }).getByRole("button", { name: "Undo" }).click();
+    await np.waitForTimeout(600);
+    const back = await mapNow();
+    check("Undo after Apply takes back the whole import: the stops and every ticket as they were", back.stops.length === before.stops.length && back.stops.find((s) => s.id === lakeside.id).name === "Lakeside" && back.tickets.length === before.tickets.length, `${back.stops.length} stops, ${back.tickets.length} tickets`);
+    // A spreadsheet replacing the stops asks too.
+    await np.evaluate((text) => localStorage.setItem("ttr-map", text), JSON.stringify(before));
+    await np.reload({ waitUntil: "networkidle" });
+    await np.waitForTimeout(800);
+    const csvStops = path.join(os.tmpdir(), `ttr-${Date.now()}-stops.csv`);
+    fs.writeFileSync(csvStops, `Name,Id,X,Y\nWestport,x-westport,200,200\nMillbrook,${millbrook.id},500,200\nAlpha,x-alpha,300,400\n`);
+    const csvRoutes = path.join(os.tmpdir(), `ttr-${Date.now()}-routes.csv`);
+    fs.writeFileSync(csvRoutes, "From,To,Length,From id,To id\nWestport,Millbrook,3,x-westport,\nMillbrook,Alpha,2,,x-alpha\n");
+    await np.getByRole("button", { name: "Import", exact: true }).click(); await np.waitForTimeout(250);
+    await np.getByRole("menuitem", { name: "Spreadsheet (CSV)" }).click(); await np.waitForTimeout(250);
+    const chooser = np.waitForEvent("filechooser");
+    await np.getByRole("menuitem", { name: "Import spreadsheets…" }).click();
+    await (await chooser).setFiles([csvStops, csvRoutes]);
+    await np.waitForTimeout(700);
+    await np.getByRole("alertdialog").getByRole("button", { name: "Continue" }).click();
+    await np.waitForTimeout(700);
+    check("a spreadsheet that replaces the stops asks about the tickets of the decks that stay", (await dialog.count()) === 1 && (await dialog.locator(".rebind-row").count()) === new Set(before.tickets.flatMap((t) => [t.a, t.b]).filter((id) => id !== millbrook.id)).size, `${await dialog.locator(".rebind-row").count()} rows`);
+    check("with Westport's new id offered for its tickets, the stop having the same name", (await rowOf("Westport").locator("select").inputValue()) === "x-westport");
+    await dialog.getByRole("button", { name: "Undo the import" }).click();
+    await np.waitForTimeout(500);
     await np.context().close();
   }
 

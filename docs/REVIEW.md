@@ -196,6 +196,14 @@ adding the seed's exact words to it.
   second run that tried to refute it. Two findings were made independently by two reviewers (tickets left
   behind by a deleted stop are reported as damage; a file with no map fields is not refused). About 15
   SHOULD and a dozen uncertain. 40 to 65 minutes of agent time in all.
+- **2026-10-07, the second review (what changed since the first, 41 commits, four shares).** Run while 1.0 was
+  being published, at the owner's word to publish first and test after, so it came too late to be a gate. One
+  BLOCKER, found independently by two reviewers: tickets that came with a network file kept the ids they had,
+  which other decks' tickets share, so answering the question about changed stops could move or lose a deck's
+  tickets. Also found: the notice's Undo undid the last change, whatever it was; Undo after the question left tickets
+  naming changed stops; a spreadsheet's routes alone dropped every field of the map's stops but their place; the
+  print dialog could dead-end; texts and docs that no longer said what the dialog did. All fixed in the unreleased
+  notes, with a check for each that fails without its fix.
 
 ## Sources
 

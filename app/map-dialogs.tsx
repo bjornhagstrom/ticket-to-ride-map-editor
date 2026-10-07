@@ -538,9 +538,9 @@ export function RebindTicketsDialog({ open, groups, stops, choices, onChoice, on
           return <li key={group.oldId} className="rebind-row">
             <div className="rebind-what">
               <Label htmlFor={id}><strong>{group.oldName}</strong> · {group.tickets} ticket{group.tickets === 1 ? "" : "s"}</Label>
-              <span className="helper">{group.status === "missing" ? "No stop with this id is in the new map." : `This id is now the stop ${group.newName}, not ${group.oldName}.`}{group.suggested ? " A stop with the same name was found." : ""}</span>
+              <span className="helper" id={`${id}-why`}>{group.status === "missing" ? "No stop with this id is in the new map." : `This id is now the stop ${group.newName}, not ${group.oldName}.`}{group.suggested ? " A stop with the same name was found." : ""}</span>
             </div>
-            <NativeSelect id={id} value={value} onChange={(event) => onChoice(group.oldId, event.target.value || null)}>
+            <NativeSelect id={id} aria-describedby={`${id}-why`} value={value} onChange={(event) => onChoice(group.oldId, event.target.value || null)}>
               <NativeSelectOption value="">Remove these tickets</NativeSelectOption>
               {sorted.map((stop) => <NativeSelectOption key={stop.id} value={stop.id}>{stop.name}</NativeSelectOption>)}
             </NativeSelect>

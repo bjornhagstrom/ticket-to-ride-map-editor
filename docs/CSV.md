@@ -13,7 +13,7 @@ You can import one file or several at once: choose them together in **Import spr
 - **Stops and routes replace the stops and routes on the map.** If the map already has some, the
   editor asks first. Background, notes, styles and settings are kept.
 - **Tickets always arrive as new decks**, beside the decks you have. A ticket file on its own is matched
-  to the stops already on the map, by name.
+  to the stops already on the map, by id when a row has one that the map has, otherwise by name.
 - **Names tie the files together, and ids do when there are any.** A route from `Harbour` to `Hill Town`
   needs stops named exactly that, in any case. The editor's own export also writes ids (see *Ids and names*
   below), and an import that has them uses them.
@@ -81,9 +81,8 @@ there is no id (a list typed by hand, the reference data, an export from before 
   names. Without ids the second of a name is left out, as it always was, and the import says so.
 - **A row whose id and name disagree** (a stop renamed in the spreadsheet, say) goes to the stop the id
   names, and the import tells how many rows that was.
-- **An id the files do not have** is ignored, and the name is used. An id that another stop already has,
-  or is empty, over 100 characters long or has control characters in it, is not used for the stop; it gets an
-  id of its own, and the import says so.
+- **An id the files do not have** is ignored, and the name is used (with no stop file, routes make the stops, and an id that is new makes a new stop with that id). An id that another stop of the file already has, or that is over 100 characters long or has control characters in it, is not used for the stop; it gets an id of its own, and the import says so.
+- **Routes without a stop file** read over a map that has the stops: a stop the map has (found by its id, or by its name when the row has no id) is that stop, whole, with its place, label, symbol, size, hub mark and locks. A name that two of the map's stops share, without an id, is said to be ambiguous.
 - **Ids are not made up by hand.** The templates have no id columns, and a new spreadsheet needs none.
 
 When an import replaces the stops, the tickets of the decks that stay are checked against the new stops. A

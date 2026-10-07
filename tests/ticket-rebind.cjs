@@ -89,7 +89,7 @@ const before = [stop("a", "Alpha"), stop("b", "Beta"), stop("c", "Gamma"), stop(
 {
   const dangling = planRebind(before, [stop("a", "Alpha")], [ticket("t1", "a", "ghost")]);
   check("a ticket that named a stop the old map never had is flagged too, by its id", dangling.length === 1 && dangling[0].oldId === "ghost" && dangling[0].status === "missing" && dangling[0].oldName === "ghost", JSON.stringify(dangling));
-  check("nothing to plan for no tickets, or for no stops", planRebind(before, [], []).length === 0 && planRebind([], [], [ticket("t", "a", "b")]).length === 2);
+  check("nothing to plan for no tickets; with no stops at all, a ticket's two ends are both flagged, by their ids", planRebind(before, [], []).length === 0 && planRebind([], [], [ticket("t", "a", "b")]).length === 2);
   const proto = planRebind(before, [stop("a", "Alpha")], [ticket("t1", "a", "__proto__")]);
   check("an id such as __proto__ is only an id", proto.length === 1 && proto[0].oldId === "__proto__" && ({}).polluted === undefined);
   const choose = applyRebind([ticket("t1", "__proto__", "b")], new Map([["__proto__", "a"]]));

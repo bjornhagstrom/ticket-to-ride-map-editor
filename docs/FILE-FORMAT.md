@@ -71,8 +71,10 @@ not a way to move a whole map: the background, styles and settings are only in t
   files `From id` and `To id`, after the columns that were there (which keep their places). When an import
   has an id that a stop of the files has, the id decides; otherwise the name does, as before, so a file
   from 0.4.1 or before, a list typed by hand and the reference data's exports read as they always did. An
-  older build reads by header and does not know the new columns, so it passes over them and matches by
-  name as it always did; a file it wrote has none, and reads here by name. Two stops may share a name when
+  older build reads by header: it takes a stop file's `Id` as one more name for the stop, to tie rows
+  together (so if one stop's id is another stop's name, as the reference data's exports have, an older build can
+  confuse the two), passes over the other new columns, and matches by name as it always did; a file it wrote has
+  none, and reads here by name. Later columns are added after these, and readers go by header. Two stops may share a name when
   their ids differ; a row whose id and name disagree goes to the stop the id names, and is said. The ids of
   a map are those of its JSON files, so reading an export back keeps every id. The meaning of each column
   is in `docs/CSV.md` (*Ids and names*); `tests/csv-ids.cjs` holds the rules, including an export from
@@ -86,7 +88,7 @@ not a way to move a whole map: the background, styles and settings are only in t
   A double route is two rows.
 - **Stops**: type by name; `kind` = `waypoint` becomes a junction.
 - Stops and routes **replace** the network, after asking when the map has one. Tickets always arrive as
-  **new decks**, named after their `Deck` column. Tickets alone are matched to the open map by name.
+  **new decks**, named after their `Deck` column. Tickets alone are matched to the open map by id when a row has one the map has, else by name.
 - Anything left out — a route to a stop the stop file lacks, a length that is not a whole number, a
   stop named twice — is said in the message after the import. `tests/csv-import.cjs` holds the rules,
   and checks them on Europe, USA, Switzerland and Northern Lights when the private reference data is
@@ -107,7 +109,7 @@ not a way to move a whole map: the background, styles and settings are only in t
 5. **A file with nothing of a map in it is refused.** A JSON file that holds none of `stops`, `routes`,
    `tickets`, `ticketSets`, `background`, `backgroundImage`, `notes`, `rules` or the style lists (a
    `package.json`, another tool's graph) is not a map, a network, a background or a set of tickets. The reader
-   says so and the map that is open stays as it was; it is never opened as an empty map.
+   says so and the map that is open stays as it was; it is never opened as an empty map. An older build (0.4.1 and before) turns away only what is not an object, so it opens such a file as an empty map, which then replaces the open one. The list of content fields is closed on purpose and grows with the format: a later build that writes a file whose only content is a field not in the list makes this build refuse it as not a map, until the list is brought up to date with it.
 
 ## What you can rely on
 

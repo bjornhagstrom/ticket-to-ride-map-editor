@@ -120,7 +120,7 @@ export function MapEditor() {
   const [clock, setClock] = useState(() => new Date());
   useEffect(() => { queueMicrotask(() => { try { setReminder(readReminder(localStorage.getItem(EXPORT_REMINDER_KEY))); } catch { /* storage blocked: start fresh */ } reminderLoaded.current = true; }); const timer = window.setInterval(() => setClock(new Date()), 60000); return () => window.clearInterval(timer); }, []);
   useEffect(() => { if (!reminderLoaded.current) return; try { localStorage.setItem(EXPORT_REMINDER_KEY, JSON.stringify(reminder)); } catch { /* not remembered, still shown */ } }, [reminder]);
-  const noteChange = () => { const now = Date.now(); if (now - lastChangeAt.current > ACTION_GAP_MS) setReminder(countChange); lastChangeAt.current = now; };
+  const noteChange = () => { changeSerialRef.current += 1; const now = Date.now(); if (now - lastChangeAt.current > ACTION_GAP_MS) setReminder(countChange); lastChangeAt.current = now; };
   const rulesPickRef = useRef<{ stop: (stopId: string) => boolean; cancel: () => boolean } | null>(null);
   const [rulesPicking, setRulesPicking] = useState(false);
   // What a print run holds is ticked in the print dialog and kept in this browser, like the other print
@@ -166,7 +166,6 @@ export function MapEditor() {
   const [bottleneckTable, setBottleneckTable] = useState<number | null>(null);
   const [bottleneckRoutes, setBottleneckRoutes] = useState<Set<string>>(new Set());
   const [suggestStyle, setSuggestStyle] = useState<TicketStyle | null>(null);
-  // How tense a deck built now is: the map's own choice unless picked in the dialog.
   const [suggestSize, setSuggestSize] = useState<number | null>(null);
   const [suggestKeep, setSuggestKeep] = useState(false);
   const [suggestSeed, setSuggestSeed] = useState(1);
@@ -208,6 +207,8 @@ export function MapEditor() {
   const dragSnapshotRef = useRef<MapData | null>(null);
   const draggedRef = useRef(false);
   const undoRef = useRef<() => void>(() => {});
+  // How many changes the person has made, for a notice's Undo to tell whether anything came after what it names.
+  const changeSerialRef = useRef(0);
   const cancelPickRef = useRef<() => void>(() => {});
   const lengthKeyRef = useRef<(event: KeyboardEvent) => boolean>(() => false);
   const redoRef = useRef<() => void>(() => {});
@@ -280,7 +281,7 @@ export function MapEditor() {
   // What is ticked, less what there is nothing to print of: a deck with no tickets has no cards, and a map with
   // no rules text has no rules.
   // On one page the size of the board nothing else fits: the tickets and the rules are printed apart.
-  const onePageRun = printChoice.split === "page";
+  const onePageRun = printChoice.split === "page" && printParts.board;
   const printPartsNow: PrintParts = { board: printParts.board, tickets: printParts.tickets && ticketsHere.length > 0 && !onePageRun, rules: printParts.rules && Boolean(data.rules?.trim()) && !onePageRun, playtest: printParts.playtest, balance: Boolean(printParts.balance) && !onePageRun };
   // The rules or the deck alone are never printed on a page the size of the board (that choice is for the board).
   const runParts: PrintParts = printScope === "deck" ? { board: false, tickets: true, rules: false, playtest: false } : printScope === "rules" ? { board: false, tickets: false, rules: true, playtest: false } : printPartsNow;
@@ -465,6 +466,7 @@ export function MapEditor() {
   const selectTool = (next: Tool) => enterTool(next === tool ? "select" : next);
   // A version number, once handed out, is on paper or in a file: undo and redo never take it back.
   const keepVersion = (snapshot: MapData): MapData => ({ ...snapshot, mapVersion: data.mapVersion });
+  const undoIfUnchanged = (expected: number) => { if (changeSerialRef.current === expected) undoRef.current(); else toast.info("The map has changed since: use Undo in the toolbar, which undoes the last change first."); };
   const undo = () => { const previous = past.at(-1); if (!previous) return; setFuture((items) => [cloneForHistory(data), ...items]); setData(keepVersion(previous)); setPast((items) => items.slice(0, -1)); clearSelection(); };
   const redo = () => { const next = future[0]; if (!next) return; setPast((items) => [...items, cloneForHistory(data)]); setData(keepVersion(next)); setFuture((items) => items.slice(1)); clearSelection(); };
   // Wagon spaces of one route, with any locomotive spaces beyond the new end let go.
@@ -720,7 +722,8 @@ export function MapEditor() {
     // A stop's tickets go with it, in every deck: a ticket to a stop that is gone cannot be played, and
     // would be left out as damage the next time the map is opened. Said on screen, with Undo.
     const goneStop = selectedStop ? data.stops.find((stop) => stop.id === selectedStop) : null;
-    if (goneStop && stopTicketCount) toast(`${goneStop.name} is deleted, with ${stopTicketCount} ticket${stopTicketCount === 1 ? "" : "s"} that named it.`, { duration: 15000, action: { label: "Undo", onClick: () => undoRef.current() } });
+    const serialAfter = changeSerialRef.current + 1;
+    if (goneStop && stopTicketCount) toast(`${goneStop.name} is deleted, with ${stopTicketCount} ticket${stopTicketCount === 1 ? "" : "s"} that named it.`, { duration: 15000, action: { label: "Undo", onClick: () => undoIfUnchanged(serialAfter) } });
     change((draft) => {
       if (imageSelected) draft.backgroundImage = undefined;
       if (selectedNote) draft.notes = draft.notes.filter((note) => note.id !== selectedNote);
@@ -816,8 +819,9 @@ export function MapEditor() {
       const next = { ...draft, stops, routes, lineStyles, routeTypeStyles,
         stopTypeStyles: mergeStyles(draft.stopTypeStyles, stopTypeStyles),
         wagonStyles: mergeStyles(draft.wagonStyles ?? [], wagonStyles) };
-      // Tickets that came with the network go into the deck being worked on.
-      if (tickets.length) next.tickets = [...draft.tickets.filter((ticket) => (ticket.set ?? draft.ticketSets[0].id) !== activeTicketSet.id), ...ticketsOnTheMap(tickets, stops).map((ticket) => ({ ...ticket, set: activeTicketSet.id }))];
+      // Tickets that came with the network go into the deck being worked on, under ids of their own: the file
+      // carries every deck's tickets with the ids they have here, and two tickets must never share one.
+      if (tickets.length) next.tickets = [...draft.tickets.filter((ticket) => (ticket.set ?? draft.ticketSets[0].id) !== activeTicketSet.id), ...ticketsOnTheMap(tickets, stops).map((ticket, index) => ({ ...ticket, id: `t-${Date.now()}-${index}`, set: activeTicketSet.id }))];
       return next;
     });
     clearSelection(); setDanger(null); setPendingImport(null);
@@ -838,9 +842,13 @@ export function MapEditor() {
     if (!rebind) return;
     const result = applyRebind(data.tickets.filter((ticket) => rebind.ticketIds.has(ticket.id)), choices);
     const after = new Map(result.tickets.map((ticket) => [ticket.id, ticket]));
-    change((draft) => { draft.tickets = draft.tickets.flatMap((ticket) => (rebind.ticketIds.has(ticket.id) ? (after.has(ticket.id) ? [after.get(ticket.id)!] : []) : [ticket])); return draft; });
+    // Not a history step of its own: Undo then takes the whole import back, not just the question's answer, so
+    // no state is left with tickets naming stops that are gone.
+    setData((previous) => ({ ...previous, tickets: previous.tickets.flatMap((ticket) => (rebind.ticketIds.has(ticket.id) ? (after.has(ticket.id) ? [after.get(ticket.id)!] : []) : [ticket])) }));
+    setSaved(false);
     setRebind(null);
-    toast.success(`${result.moved} ticket${result.moved === 1 ? "" : "s"} moved to other stops, ${result.removed} removed.`, { action: { label: "Undo", onClick: () => undoRef.current() } });
+    const expected = changeSerialRef.current;
+    toast.success(`${result.moved} ticket${result.moved === 1 ? "" : "s"} moved to other stops, ${result.removed} removed.`, { action: { label: "Undo the import", onClick: () => undoIfUnchanged(expected) } });
   };
   // Spreadsheets: stops and routes replace the network, tickets always arrive as new decks.
   const applyCsvImport = (result: CsvImport) => {
@@ -1071,7 +1079,7 @@ export function MapEditor() {
       onShuffle={() => setSuggestSeed((seed) => seed + 1)} onApply={(mode) => applySuggestion(mode, `ts-${Date.now()}`)} />
     <WelcomeGuide open={showGuide} onOpenChange={(open) => !open && dismissGuide()} onChooseBlank={() => chooseFromGuide("blank")} onChooseExample={() => chooseFromGuide("example")} onChooseProblems={() => chooseFromGuide("problems")} />
     <SettingsDialog onStartOver={() => { setShowStyles(false); setDanger("reset"); }} onExport={exportMap} open={showStyles} onOpenChange={setShowStyles} target={styleTarget} onTarget={setStyleTarget} data={data} change={change} onChangeFormat={changeFormat} onChangeOrientation={changeOrientation} exportReminder={{ on: !reminder.off, onChange: (on) => setReminder((r) => (on ? turnOn(r) : stopReminding(r))) }} defaults={{ stopType, setStopType, stopSize, setStopSize: (value) => setStopSize(value as StopSize), routeType, setRouteType, routeColor, setRouteColor, routeCurved, setRouteCurved, routeLineStyle, setRouteLineStyle, linkParallel, setLinkParallel }} />
-    <PrintPages data={data} plan={printPlan(data.format, printScope !== "map" && printChoice.split === "page" ? { ...printChoice, split: "panel" } : printChoice, printProfile, format.orientation)} parts={runParts} setId={activeTicketSet.id} />
+    <PrintPages data={data} plan={printPlan(data.format, (printScope !== "map" || !printParts.board) && printChoice.split === "page" ? { ...printChoice, split: "panel" } : printChoice, printProfile, format.orientation)} parts={runParts} setId={activeTicketSet.id} />
     {makingImage && <ImageStage data={data} onDone={saveImage} onFail={() => setMakingImage(false)} />}
     <RebindTicketsDialog open={rebind !== null && stopKeyOf(data.stops) === rebind.stopKey} groups={rebind?.groups ?? []} stops={data.stops} choices={rebind?.choices ?? NO_CHOICES}
       onChoice={(oldId, value) => setRebind((current) => current && { ...current, choices: new Map(current.choices).set(oldId, value) })}

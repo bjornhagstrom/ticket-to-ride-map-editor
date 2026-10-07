@@ -114,7 +114,7 @@ export function readCsvImport(files: { name: string; text: string }[], data: Map
   const disagreements: string[] = [], ambiguousUsed: string[] = [];
 
   // ---- stops
-  const twice: string[] = [], unknownTypes: string[] = [], idsTaken: string[] = [];
+  const twice: string[] = [], unknownTypes: string[] = [], idsTaken: string[] = [], idsUnusable: string[] = [];
   for (const file of sorted.stops) {
     const header = headerOf(file.rows);
     const at = { id: column(header, "id"), name: column(header, "name"), type: column(header, "type"), kind: column(header, "kind"), x: column(header, "x"), y: column(header, "y"),
@@ -123,6 +123,7 @@ export function readCsvImport(files: { name: string; text: string }[], data: Map
       const name = (row[at.name] ?? "").trim() || (row[at.id] ?? "").trim();
       if (!name) continue;
       const wanted = usableId(row[at.id]);
+      if ((row[at.id] ?? "").trim() && !wanted) idsUnusable.push(name);
       const taken = wanted && byId.has(wanted);
       // The same name again is the same stop, unless the row has an id of its own that tells them apart.
       if (byName.has(nameKey(name)) && (!wanted || taken)) { twice.push(name); continue; }
@@ -142,28 +143,40 @@ export function readCsvImport(files: { name: string; text: string }[], data: Map
     }
   }
   if (twice.length) warnings.push(`${listed(twice)} ${twice.length === 1 ? "is" : "are"} named more than once in the stop file; the first was kept.`);
+  if (idsUnusable.length) warnings.push(`${listed(idsUnusable)} had an id that is over 100 characters long or has control characters in it, so ${idsUnusable.length === 1 ? "it was" : "they were"} given an id of ${idsUnusable.length === 1 ? "its" : "their"} own.`);
   if (idsTaken.length) warnings.push(`${listed(idsTaken)} had an id that another stop of the file already has, so ${idsTaken.length === 1 ? "it was" : "they were"} given an id of ${idsTaken.length === 1 ? "its" : "their"} own.`);
   if (unknownTypes.length) warnings.push(`Stop types this map does not have became regular stops: ${listed(unknownTypes)}.`);
   // How a row finds its stop: by id when the file's stops have it, else by name; the older way, an id typed
   // where the name goes, still works.
-  const findIn = (names: Map<string, Stop>, ids: Map<string, Stop>, dupes: Set<string>) => (idText: string | undefined, nameText: string | undefined): Stop | null => {
+  const findIn = (names: Map<string, Stop>, ids: Map<string, Stop>, dupes: Set<string>, idIsFinal = false) => (idText: string | undefined, nameText: string | undefined): Stop | null => {
     const id = (idText ?? "").trim(), name = (nameText ?? "").trim();
     const byTheId = id ? ids.get(id) : undefined;
+    // With no stop file the routes make the stops, and a usable id that no stop has yet is a new stop, not a
+    // reason to take another stop that happens to have the name.
+    if (idIsFinal && id && !byTheId && usableId(id)) return null;
     if (byTheId) { if (name && nameKey(name) !== nameKey(byTheId.name)) disagreements.push(`${name} was written where the id says ${byTheId.name}`); return byTheId; }
     const byTheName = name ? names.get(nameKey(name)) : undefined;
     if (byTheName) { if (dupes.has(nameKey(name))) ambiguousUsed.push(name); return byTheName; }
     return name ? ids.get(name) ?? null : null;
   };
-  const find = findIn(byName, byId, ambiguous);
+  const find = findIn(byName, byId, ambiguous, sorted.stops.length === 0);
 
-  // Routes read without a stop file make their stops from the names. A stop the open map already has (by id,
-  // else by name) keeps its place, type and id, so that reading routes on their own does not scramble a map:
-  // a layout made from routes alone knows nothing of north, and turned Europe half way round.
+  // Routes read without a stop file make their stops from the ids and names. A stop the open map already has
+  // (by id; with no id, by name) is that stop as it is, every field of it, so that reading routes on their own
+  // does not scramble a map: a layout made from routes alone knows nothing of north, and turned Europe half way
+  // round. A stop the map does not have is made new, and laid out from the routes.
   const addKnownOrNew = (name: string, wanted: string) => {
-    const known = data.stops.find((stop) => wanted && stop.id === wanted) ?? data.stops.find((stop) => nameKey(stop.name) === nameKey(name));
+    const sameId = wanted ? data.stops.find((stop) => stop.id === wanted) : undefined;
+    const sameName = wanted ? [] : data.stops.filter((stop) => nameKey(stop.name) === nameKey(name));
+    const known = sameId ?? sameName[0];
     if (!known) return addStop(name, plainStop, wanted);
+    if (sameId && name && nameKey(name) !== nameKey(known.name)) disagreements.push(`${name} was written where the id says ${known.name}`);
+    if (sameName.length > 1) ambiguousUsed.push(name);
+    const { id: _id, name: _name, type: _type, x, y, ...rest } = known;
+    void _id; void _name; void _type;
     const stop = addStop(known.name, known.type, wanted || known.id);
-    read.set(stop, { x: known.x, y: known.y, geo: false });
+    Object.assign(stop, rest);
+    read.set(stop, { x, y, geo: false });
     return stop;
   };
 

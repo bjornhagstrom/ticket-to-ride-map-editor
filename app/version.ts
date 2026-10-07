@@ -9,7 +9,12 @@ export type Release = { version: string; date: string; title: string; changes: s
 // Changes made since the last release, written as they are made, in the same plain words. They go at
 // the top of CHANGELOG.md under Unreleased, and become the notes of the next version when it is
 // decided; the What's new page in the editor shows released versions only.
-export const UNRELEASED: string[] = [];
+export const UNRELEASED: string[] = [
+  "Importing a network file that carried tickets could, when stops had changed, move another deck's tickets into the deck you were working in and lose them from their own; the tickets that come with a file now get ids of their own.",
+  "After the question about tickets to changed stops, Undo takes the whole import back, and the Undo in a notice does what it says or tells you that the map has changed since.",
+  "Spreadsheet routes imported without their stops leave the stops the map has as they are, with their labels, symbols, sizes and marks, and two stops that share a name stay two.",
+  "The print dialog no longer gets stuck when the whole board on one big page is chosen and the board is then left out of the run.",
+];
 
 export const RELEASES: Release[] = [
   {
@@ -28,7 +33,7 @@ export const RELEASES: Release[] = [
       "Importing routes from a spreadsheet without its stop file leaves the stops the map already has where they are, instead of laying them out again.",
       "An import that replaces the stops asks what became of the tickets in your other decks that named a stop now gone or renamed: send each old stop to a new one, remove its tickets, or undo the import.",
       "Spreadsheets you export carry the stops' ids beside their names, so reading one back keeps every ticket, and two stops with the same name can be told apart.",
-      "A full deck built without a choice of tension now crowds the busiest routes about as much as the official maps do; 0.4.1 spread the tickets out more, which is Calm on the slider.",
+      "A full deck built without a choice of tension now crowds the busiest routes about as much as the official maps do; 0.4.1 spread the tickets out more, which is close to Calm on the slider.",
       "Build a full deck shows the same official figures as Map balance: the lowest and highest of the eight official maps.",
       "A page of the balance figures can go with a print run, or alone: the network, crossings, how it holds together, crowding and the routes by colour and length, as they stand at that version.",
       "The print dialog says how to save a run as a PDF, and the file is named after the map, its version, what it holds and the date.",

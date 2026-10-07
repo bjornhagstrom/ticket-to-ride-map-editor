@@ -12,7 +12,7 @@ const path = require("path");
 
 const root = path.join(__dirname, "..");
 const out = fs.mkdtempSync(path.join(os.tmpdir(), "ttr-csv-ids-"));
-execFileSync("npx", ["tsc", "app/csv-import.ts", "app/csv-export.ts", "app/map-data.ts", "app/map-storage.ts",
+execFileSync(path.join(root, "node_modules", ".bin", "tsc"), ["app/csv-import.ts", "app/csv-export.ts", "app/map-data.ts", "app/map-storage.ts",
   "--outDir", out, "--module", "commonjs", "--target", "es2022", "--moduleResolution", "node", "--skipLibCheck", "--lib", "es2022,dom"], { cwd: root, stdio: "inherit" });
 const imp = require(path.join(out, "csv-import.js"));
 const exp = require(path.join(out, "csv-export.js"));
@@ -118,11 +118,27 @@ const read = (files, data = emptyMap) => imp.readCsvImport(files.map(([name, tex
   const m = clone(initialMap);
   const routesCsv = exp.routesCsv(m);
   const names = new Map(m.stops.map((s) => [s.name, s]));
-  const byName = read([["routes.csv", routesCsv.split("\r\n").map((line, i) => { if (i === 0) return line; return line; }).join("\r\n")]], m);
+  const byName = read([["routes.csv", routesCsv]], m);
   const same = byName.stops.every((s) => { const o = names.get(s.name); return o && Math.abs(s.x - o.x) < 1 && Math.abs(s.y - o.y) < 1 && s.type === o.type && s.id === o.id; });
   check("routes imported without a stop file leave every stop the map already has where it was, with its type and id", byName.stops.length > 0 && same && byName.placed.length === 0, `${byName.stops.length} stops, ${byName.placed.length} laid out, ${byName.warnings.join(" | ")}`);
   const noIds = read([["routes.csv", "From,To,Length\n" + m.routes.slice(0, 3).map((r) => `${names.get(m.stops.find((s) => s.id === r.a).name) ? m.stops.find((s) => s.id === r.a).name : ""},${m.stops.find((s) => s.id === r.b).name},${r.length}`).join("\n")]], m);
-  check("also from names alone, as a hand-typed list would have them", noIds.stops.every((s) => { const o = names.get(s.name); return o && s.x === o.x && s.y === o.y && s.id === o.id; }) && noIds.placed.length === 0, `${noIds.placed.length} laid out`);
+  check("also from names alone, as a hand-typed list would have them", noIds.stops.length > 0 && noIds.stops.every((s) => { const o = names.get(s.name); return o && s.x === o.x && s.y === o.y && s.id === o.id; }) && noIds.placed.length === 0, `${noIds.placed.length} laid out`);
+  // Everything of a stop the map has is kept, not only its place, type and id (found in the 1.0 review).
+  const full = read([["routes.csv", routesCsv]], m);
+  check("a stop the map has comes through whole: its label angle, symbol, size, hub mark and locks as well", full.stops.length > 0 && full.stops.every((s) => { const o = names.get(s.name); const { x, y, ...rest } = o; return JSON.stringify({ ...s, x: undefined, y: undefined }) === JSON.stringify({ ...rest, x: undefined, y: undefined }) && Math.abs(s.x - x) < 1 && Math.abs(s.y - y) < 1; }), `${full.stops.length} stops`);
+  // Two stops with one name and different ids stay two, whether the map has them or not.
+  const twin = "From,To,Length,From id,To id\nSpringfield,Shelbyville,3,sf-1,sb\nSpringfield,Shelbyville,4,sf-2,sb\n";
+  const made = read([["routes.csv", twin]], emptyMap);
+  check("routes alone: two stops that share a name but not an id are two stops", made.stops.length === 3 && made.routes.length === 2 && made.routes[0].a === "sf-1" && made.routes[1].a === "sf-2", `${made.stops.length} stops, ${made.routes.map((r) => r.a).join()}`);
+  const twinMap = clone(emptyMap); twinMap.stops = [{ id: "sf-1", name: "Springfield", type: "city", x: 100, y: 100 }, { id: "sf-2", name: "Springfield", type: "city", x: 600, y: 400 }, { id: "sb", name: "Shelbyville", type: "city", x: 300, y: 300 }];
+  const kept = read([["routes.csv", twin]], twinMap);
+  check("and over a map that has both they stay, each where it was", kept.stops.length === 3 && kept.stops.find((s) => s.id === "sf-2").x === 600 && kept.placed.length === 0, `${kept.stops.length} stops`);
+  const unnamed = read([["routes.csv", "From,To,Length\nSpringfield,Shelbyville,3\n"]], twinMap);
+  check("with no id, a name two stops share is said to be ambiguous, as it is with a stop file", unnamed.warnings.some((w) => /Springfield/.test(w) && /more than one stop/.test(w)), unnamed.warnings.join(" | "));
+  const renamed = read([["routes.csv", "From,To,Length,From id,To id\nSpringfield West,Shelbyville,3,sf-1,sb\n"]], twinMap);
+  check("a name typed against an id that says another is reported, also on the first row, and the stop keeps its own", renamed.stops.find((s) => s.id === "sf-1").name === "Springfield" && renamed.warnings.some((w) => /Springfield West/.test(w) && /id/.test(w)), renamed.warnings.join(" | "));
+  const odd = read([["stops.csv", "Name,Id,X,Y\nLong," + "x".repeat(300) + ",1,1\n"]]);
+  check("an id that cannot be used is said so, and the stop gets one of its own", odd.stops.length === 1 && /^s-/.test(odd.stops[0].id) && odd.warnings.some((w) => /Long/.test(w) && /id/.test(w)), odd.warnings.join(" | "));
   const strange = read([["routes.csv", "From,To,Length\nAlpha,Beta,3\n" + `${m.stops[0].name},Beta,2\n`]], m);
   const strangePlaced = strange.stops.find((s) => s.name === m.stops[0].name);
   check("a stop the map does not have is still laid out from the routes, as before", strange.placed.includes("Alpha") && strange.placed.includes("Beta") && !strange.placed.includes(m.stops[0].name) && strangePlaced.x === m.stops[0].x, strange.placed.join());
@@ -136,11 +152,13 @@ const read = (files, data = emptyMap) => imp.readCsvImport(files.map(([name, tex
 {
   const old = fs.mkdtempSync(path.join(os.tmpdir(), "ttr-csv-ids-old-"));
   let built = false;
-  try {
+  let commitThere = true;
+  try { execFileSync("git", ["cat-file", "-e", "18b5763"], { cwd: root, stdio: "pipe" }); } catch { commitThere = false; console.log("The 0.4.1 commit (18b5763) is not at hand: the checks against it are skipped."); }
+  if (commitThere) try {
     execFileSync("sh", ["-c", `git archive 18b5763 app | tar -x -C ${old}`], { cwd: root, stdio: "pipe" });
     execFileSync(path.join(root, "node_modules", ".bin", "tsc"), ["app/csv-import.ts", "app/csv-export.ts", "app/map-data.ts", "app/map-storage.ts", "--outDir", path.join(old, "out"), "--module", "commonjs", "--target", "es2022", "--moduleResolution", "node", "--skipLibCheck", "--lib", "es2022,dom"], { cwd: old, stdio: "pipe" });
     built = true;
-  } catch { console.log("The 0.4.1 build is not at hand (git archive 18b5763): the checks against it are skipped."); }
+  } catch (error) { check("the 0.4.1 build compiles, to be read against", false, String(error.stdout || error.message).slice(0, 300)); }
   if (built) {
     const oldExp = require(path.join(old, "out", "csv-export.js"));
     const oldImp = require(path.join(old, "out", "csv-import.js"));

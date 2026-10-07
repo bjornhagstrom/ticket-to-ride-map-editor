@@ -57,7 +57,7 @@ Width is paper − 20 mm. Height is paper − 20 − 8 mm.
 Every page is declared upright (portrait), and the map is laid out as a landscape sheet turned a
 quarter turn on it. Safari ignores `@page` and prints portrait unless its own dialog says otherwise;
 Chrome and Firefox follow `@page`. An upright page is the one thing all of them do alike, so nobody
-has to choose an orientation, and the dialog says to leave it on Portrait.
+has to choose an orientation. The dialog used to say to leave the browser's print dialog on Portrait; it no longer does (see below).
 
 The sheet's room is still the paper's long side across and its short side down, so every count and
 scale below is the landscape one. The plan used to choose the orientation that gave the larger scale,
@@ -192,9 +192,9 @@ them. So the layout is made to fit with them on.
   word an earlier build kept in `ttr-print-rules` (`board`, `both`, `rules`, `off`, `on`) is still read.
   Without the board in the run, the sheet table and the box for one big page are hidden, and the paper
   is asked for as a list of its own. A deck with no tickets has no cards to tick, a map with no rules text has no rules, and with
-  nothing ticked Print is off. The dialog has no foot note about the browser's own print dialog either. It used to say: leave it on Portrait
+  nothing ticked Print is off. The dialog has no foot note about the browser's own print dialog for a run with the board in it. It used to say: leave it on Portrait
   (the default), print at 100 % because "fit to page" undoes the sizes, and the same dialog saves a PDF. The
-  owner took it out to save room; the advice still holds, for anyone who asks. The dialog has no paragraph telling what the run comes to: it
+  owner took it out to save room; the advice still holds, for anyone who asks. What is left is the line saying how to save a PDF, the one-page note (the size of the page, and in Safari how to add it), and, for a run without the board, that the pages print upright. The dialog has no paragraph telling what the run comes to: it
   counted pages of the board only, and a person sees the result in the browser's own print preview. The
   "Print deck" button in the Tickets panel prints just the cards, whatever is ticked.
 - **A standing board** (Settings → Orientation) prints standing on the upright page, without the
