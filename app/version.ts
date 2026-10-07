@@ -9,7 +9,9 @@ export type Release = { version: string; date: string; title: string; changes: s
 // Changes made since the last release, written as they are made, in the same plain words. They go at
 // the top of CHANGELOG.md under Unreleased, and become the notes of the next version when it is
 // decided; the What's new page in the editor shows released versions only.
-export const UNRELEASED: string[] = [];
+export const UNRELEASED: string[] = [
+  "The example map's rules no longer have a table of wagons for each number of players: the map holds one wagon count, and the figures use it at every table.",
+];
 
 export const RELEASES: Release[] = [
   {

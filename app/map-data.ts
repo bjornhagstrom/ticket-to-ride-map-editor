@@ -367,7 +367,7 @@ This map follows the standard *Ticket to Ride* rules, except where it says other
 - **Tunnel.** [[Central–Deepcut]] is a tunnel. XXX
 - **Restricted route.** [[Harbour–Eastgate]] is marked R. XXX
 - **Double route.** [[Westport–Millbrook]] has two lanes, but with two or three players only one of them is used, as in the standard rules.
-- **Four or five players.** Both lanes of a double route are used, and each player starts with fewer wagons (see the table at the end), so the game still ends before the board is full. XXX
+- **Four or five players.** Both lanes of a double route are used, as in the standard rules. XXX
 
 ## Points for routes
 
@@ -379,13 +379,6 @@ ${routePointsTable()}
 
 - XXX
 - XXX
-
-| Players | Wagons each | Tickets dealt |
-| --- | ---: | ---: |
-| 2 | 28 | 3 |
-| 3 | 28 | 3 |
-| 4 | 22 | 3 |
-| 5 | 18 | 3 |
 
 *Tip: point at a name above and the map marks it. Write your own with \`[[Stop]]\` or \`[[Stop–Stop]]\`.*
 `,
@@ -401,9 +394,9 @@ ${routePointsTable()}
   ],
   wagonStyles: defaultWagonStyles.map((style) => ({ ...style })),
   stopTypeStyles: defaultStopTypeStyles.map((style) => ({ ...style })),
-  // The standard two to five players (none is stated, so DEFAULT_PLAYERS holds). 28 wagons each is for two
-  // or three players and leaves the board about three and a half supplies of room; the rules table
-  // lowers it for four and five. Both decks can deal five players three tickets each.
+  // The standard two to five players (none is stated, so DEFAULT_PLAYERS holds). The map holds one wagon
+  // count, 28, which leaves the board about three and a half supplies of room; the rules say nothing of other
+  // counts for other tables. Both decks can deal five players three tickets each.
   wagonsPerPlayer: 28,
   startingTickets: DEFAULT_STARTING_TICKETS,
   keptTickets: DEFAULT_KEPT_TICKETS,

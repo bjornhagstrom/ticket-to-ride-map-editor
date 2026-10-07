@@ -4,6 +4,12 @@ What changed in each version of the [Ticket to Ride map editor](https://hagstrom
 
 This file is written from `app/version.ts` by `npm run changelog`; edit the notes there.
 
+## Unreleased
+
+Changes since the last release, to go into the next version.
+
+- The example map's rules no longer have a table of wagons for each number of players: the map holds one wagon count, and the figures use it at every table.
+
 ## 1.1.0 · 2026-10-07
 
 **Version 1.1: importing spreadsheets with templates, Tickets only, bends in spreadsheets, and fixes**

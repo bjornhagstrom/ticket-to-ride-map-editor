@@ -49,6 +49,11 @@ const links = [...(problemMap.rules || "").matchAll(/\[\[([^\]]+)\]\]/g)].map((m
 check("its rules explain the two problems and link only to stops and routes on the map", /cross/i.test(problemMap.rules) && /dead end/i.test(problemMap.rules) && links.length >= 3 && links.every((l) => names.has(l) || pairNames.has(l) || [...pairNames].some((p) => p.split("–").reverse().join("–") === l)), links.join(" | "));
 check("and a note on the map says the same", problemMap.notes.some((n) => /on purpose/i.test(n.text) && /cross/i.test(n.text) && /dead end/i.test(n.text)));
 
+// The example's rules carry no table of wagons by number of players: the map holds one wagon count, which the
+// editor's figures use at every table, so a table with other counts would say what the editor does not.
+check("the example map's rules have no table of wagons for each number of players", !/Wagons each/.test(initialMap.rules) && !/Tickets dealt/.test(initialMap.rules) && !/fewer wagons/.test(initialMap.rules));
+check("and the map with problems, which is made from it, has none either", !/Wagons each/.test(problemMap.rules));
+
 // A third thing follows from the crossing route: it is a shortcut, so one ticket is worth more than its path. The map
 // says so, in its rules and in its note, with the figures, and the figures are true.
 {
