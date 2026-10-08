@@ -29,7 +29,7 @@ in the same commit as the work (AGENTS.md).
 
 ## Smaller follow-ups
 
-- **ttr-map-generator, by eye**: open a graph made by `make_graph.py` in the tool's own window and see that the map is the right way up (y is read from matplotlib's default). Built and checked with the tool's own code; the picture is the one thing not seen. Fix in `positionsJson` if it is upside down.
+- **ttr-map-generator, orientation**: not checked by eye in the tool's own window (the tool's code reads y upward, like ours). Left to the tool's author by the owner's word on 2026-10-08; corrected if he reports a mirror or an upside-down map. Fix would be in `positionsJson`.
 - Tickets to countries or groups of stops, as Switzerland has, are not modelled.
 - **Names after a turn.** A name left to place itself is placed again after the board turns, and some
   then sit on a route; Move names clear fixes it in one click. Doing that as part of the turn would

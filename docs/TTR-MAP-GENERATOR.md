@@ -57,4 +57,5 @@ is on the machine (`../Test open source ttr editor/ttr-map-generator`, or `TTR_M
 them with its own `read_locations`, `read_paths` and `read_tasks`, runs `make_graph.py` from the zip, and
 loads the result back with the tool's own `TTR_Particle_Graph.load_json`: every place and route is there,
 and every node where the map has it. That y points up on the tool's plots is read from matplotlib's
-default and has not been checked by eye in the tool's window.
+default and has not been checked by eye in the tool's window; that is left to the tool's author, and
+we correct it if he reports it.
