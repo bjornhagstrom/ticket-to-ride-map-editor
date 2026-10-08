@@ -75,3 +75,13 @@ for (const line of bad) console.log(`  FAIL  ${line}`);
 console.log(`\n${ok.length} passed, ${bad.length} failed`);
 fs.rmSync(out, { recursive: true, force: true });
 process.exit(bad.length ? 1 : 0);
+
+// The example is made for two or three players, so the wagons it holds fit the spaces it can claim at its largest table,
+// and its rules say nothing of tables it is not made for.
+{
+  const s = A.setupBalance(initialMap, "main");
+  check("the example map is made for two or three players", initialMap.players && initialMap.players.min === 2 && initialMap.players.max === 3);
+  check("and its wagons fit its spaces: Map balance finds the wagon count fine", s.spaceVerdict === "ok", `${(s.fill * 100).toFixed(0)} % ${s.spaceVerdict}`);
+  check("its rules do not speak of four or five players", !/four or five/i.test(initialMap.rules));
+  check("the two decks deal three players their tickets", [...new Set(initialMap.tickets.map((t) => t.set))].every((set) => initialMap.tickets.filter((t) => t.set === set).length >= 3 * (initialMap.startingTickets ?? 3)));
+}

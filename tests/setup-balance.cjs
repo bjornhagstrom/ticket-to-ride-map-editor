@@ -59,7 +59,7 @@ const line = (lengths, extra = {}) => {
 }
 {
   const ex = setupBalance(initialMap);
-  check("the example map: 28 wagons for five players is 140 against 99 spaces", ex.usableSpaces === 99 && ex.wagonsAtTable === 140 && Math.abs(ex.fill - 140 / 99) < 1e-9 && ex.spaceVerdict === "tight", JSON.stringify({ usable: ex.usableSpaces, wagons: ex.wagonsAtTable, verdict: ex.spaceVerdict }));
+  check("the example map: 28 wagons for three players is 84 against the 95 spaces open at three players, which is fine", ex.usableSpaces === 95 && ex.wagonsAtTable === 84 && Math.abs(ex.fill - 84 / 95) < 1e-9 && ex.spaceVerdict === "ok", JSON.stringify({ usable: ex.usableSpaces, wagons: ex.wagonsAtTable, verdict: ex.spaceVerdict }));
 }
 check("the official range is on the page for the other figures to sit beside: 57 to 76 %", Array.isArray(BALANCE_OFFICIAL.wagonFill) && BALANCE_OFFICIAL.wagonFill[0] === 57 && BALANCE_OFFICIAL.wagonFill[1] === 76, JSON.stringify(BALANCE_OFFICIAL.wagonFill));
 

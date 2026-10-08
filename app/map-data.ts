@@ -367,7 +367,6 @@ This map follows the standard *Ticket to Ride* rules, except where it says other
 - **Tunnel.** [[Central–Deepcut]] is a tunnel. XXX
 - **Restricted route.** [[Harbour–Eastgate]] is marked R. XXX
 - **Double route.** [[Westport–Millbrook]] has two lanes, but with two or three players only one of them is used, as in the standard rules.
-- **Four or five players.** Both lanes of a double route are used, as in the standard rules. XXX
 
 ## Points for routes
 
@@ -394,9 +393,9 @@ ${routePointsTable()}
   ],
   wagonStyles: defaultWagonStyles.map((style) => ({ ...style })),
   stopTypeStyles: defaultStopTypeStyles.map((style) => ({ ...style })),
-  // The standard two to five players (none is stated, so DEFAULT_PLAYERS holds). The map holds one wagon
-  // count, 28, which leaves the board about three and a half supplies of room; the rules say nothing of other
-  // counts for other tables. Both decks can deal five players three tickets each.
+  // Made for two or three players, so that the wagons of a full table (3 × 28) fit the spaces it can claim: with
+  // three players one lane of a double route is used. The rules say nothing of other tables.
+  players: { min: 2, max: 3 },
   wagonsPerPlayer: 28,
   startingTickets: DEFAULT_STARTING_TICKETS,
   keptTickets: DEFAULT_KEPT_TICKETS,
