@@ -10,12 +10,19 @@ export type Release = { version: string; date: string; title: string; changes: s
 // the top of CHANGELOG.md under Unreleased, and become the notes of the next version when it is
 // decided; the What's new page in the editor shows released versions only.
 export const UNRELEASED: string[] = [
-  "Map balance judges the wagon count by what a full table holds against the spaces it can claim, as the official maps do (57 to 76 %), warns when the players hold more wagons than the board has room for or fewer than 40 % of it, and shows the figure beside the official range.",
-  "The example map's rules no longer have a table of wagons for each number of players: the map holds one wagon count, and the figures use it at every table.",
-  "The example map is made for two or three players, so its 28 wagons each fit the spaces it can claim; its rules no longer speak of four or five players.",
 ];
 
 export const RELEASES: Release[] = [
+  {
+    version: "1.2.0",
+    date: "2026-10-08",
+    title: "Version 1.2: Map balance judges the wagons against the room on the board",
+    changes: [
+      "Map balance judges the wagon count by what a full table holds against the spaces it can claim, as the official maps do (57 to 76 %), warns when the players hold more wagons than the board has room for or fewer than 40 % of it, and shows the figure beside the official range.",
+      "The example map's rules no longer have a table of wagons for each number of players: the map holds one wagon count, and the figures use it at every table.",
+      "The example map is made for two or three players, so its 28 wagons each fit the spaces it can claim; its rules no longer speak of four or five players.",
+    ],
+  },
   {
     version: "1.1.0",
     date: "2026-10-07",
