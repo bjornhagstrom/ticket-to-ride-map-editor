@@ -30,6 +30,7 @@ in the same commit as the work (AGENTS.md).
 ## Smaller follow-ups
 
 - **ttr-map-generator, orientation**: not checked by eye in the tool's own window (the tool's code reads y upward, like ours). Left to the tool's author by the owner's word on 2026-10-08; corrected if he reports a mirror or an upside-down map. Fix would be in `positionsJson`.
+- **A map file's lane rule is dropped** (`lanesUsableByPlayers`, found in the 1.2.0 review): the analysis reads it, but loading a file never copies it, so it is lost on load and on export. Nothing in the editor sets it, so only a hand-written file is hit. Carrying it is a file-format addition and waits for the owner's OK; the text in Map balance about a second lane opening from four players must then follow the rule.
 - Tickets to countries or groups of stops, as Switzerland has, are not modelled.
 - **Names after a turn.** A name left to place itself is placed again after the board turns, and some
   then sit on a route; Move names clear fixes it in one click. Doing that as part of the turn would
