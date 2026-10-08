@@ -26,7 +26,7 @@ const check = (label, pass, detail = "") => { (pass ? ok : bad).push(`${label}${
 const pct = (plan) => Math.round(plan.scale * 100);
 
 // ---------------------------------------------------------------- the board is only its shape
-check("a map is one of two board shapes", JSON.stringify(Object.keys(mapFormats).sort()) === JSON.stringify(["board-2x3", "board-2x4"]), Object.keys(mapFormats).join(", "));
+check("the two boards the editor began with keep their names and sizes (other boards are in tests/custom-board.cjs)", JSON.stringify(Object.keys(mapFormats).sort()) === JSON.stringify(["board-2x3", "board-2x4"]), Object.keys(mapFormats).join(", "));
 check("the standard board is 790 × 525 mm in 3 × 2 panels", mapFormats["board-2x3"].widthMm === 790 && mapFormats["board-2x3"].heightMm === 525 && mapFormats["board-2x3"].columns === 3 && mapFormats["board-2x3"].rows === 2);
 check("the extended board is 1053 × 526 mm in 4 × 2 panels", mapFormats["board-2x4"].widthMm === 1053 && mapFormats["board-2x4"].heightMm === 526 && mapFormats["board-2x4"].columns === 4 && mapFormats["board-2x4"].rows === 2);
 

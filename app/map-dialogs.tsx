@@ -48,7 +48,7 @@ function TourVideo() {
 export function WelcomeGuide({ open, onOpenChange, onChooseBlank, onChooseExample, onChooseProblems }: { open: boolean; onOpenChange: (open: boolean) => void; onChooseBlank: () => void; onChooseExample: () => void; onChooseProblems: () => void }) {
   // What matters, in a line or two each. How a print is laid out is for the print dialog to say.
   const steps: Array<{ icon: React.ReactNode; title: string; text: string }> = [
-    { icon: <FileStack />, title: "Choose a board", text: "The standard 2×3 or the extended 2×4, lying or standing. You can change it whenever you like; everything on the map comes along." },
+    { icon: <FileStack />, title: "Choose a board", text: "The standard 2×3, the extended 2×4 or a size of your own, lying or standing. Change it whenever you like; everything on the map comes along." },
     { icon: <Layers3 />, title: "Draw the map", text: "Sketch the background (land, water, regions), place stops, and connect them with routes, each with a length, a type and a colour, or bring them in from a spreadsheet." },
     { icon: <TicketIcon />, title: "Add destination tickets", text: "Link two stops to make a ticket, or let the editor build a full deck of tickets. Map balance shows how well the map and the tickets work together." },
     { icon: <ScrollText />, title: "Write the rules", text: "Keep the rules of your map in the Rules panel, in plain text with links to its stops and routes." },

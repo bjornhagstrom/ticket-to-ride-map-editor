@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { mapFormats, type MapData } from "./map-data";
+import { formatOrStandard, type MapData } from "./map-data";
 import { boardOf } from "./board";
 import { MapArtwork } from "./map-artwork";
 
@@ -111,7 +111,7 @@ export function ImageStage({ data, onDone, onFail }: { data: MapData; onDone: (b
   }, []);
   return <div className="image-stage" aria-hidden="true" style={{ position: "fixed", left: -20000, top: 0, width: format.width, height: format.height, pointerEvents: "none" }}>
     <svg ref={svg} width={format.width} height={format.height} viewBox={`0 0 ${format.width} ${format.height}`}>
-      <MapArtwork data={data} scaleWidthMm={mapFormats[data.format].widthMm} print />
+      <MapArtwork data={data} scaleWidthMm={formatOrStandard(data.format).widthMm} print />
     </svg>
   </div>;
 }

@@ -502,3 +502,6 @@
 /* The import-spreadsheets dialog: its three buttons wrap rather than run past the edge, and its notes are a plain list. */
 .csv-import-actions { flex-wrap: wrap; justify-content: flex-end; }
 .csv-import-notes { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; list-style: disc; font-size: 13px; line-height: 1.5; color: #2e2a24; }
+.settings-custom-board{margin-top:6px;justify-self:start}
+.custom-board-fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.custom-board-fields label{display:block;margin-bottom:4px}

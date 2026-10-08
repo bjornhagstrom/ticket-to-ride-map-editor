@@ -215,6 +215,21 @@ field untouched (rule 3) and builds its own decks as it did, so a round trip thr
 number. The field is a number so that the scale can grow: the measured places on it (and what they mean)
 live in the editor, not in the file.
 
+### Boards of any number of panels
+
+Added in 1.4.0, within versions 3 and 4: an addition, so the file version did not move. `format` names the board by its fold
+panels, rows then columns: `board-RxC` with R and C from 1 to 6 and R not above C. `board-2x3` and `board-2x4` are the two
+boards the editor began with and keep their measured sizes (790 × 525 mm and 1053 × 526 mm); every other board is C panels
+of 263.3 mm across and R of 262.5 mm down, so `board-3x3` is 790 × 788 mm and `board-3x4` 1053 × 788 mm. The long side is
+always 1100 units, as before, and a board taller than wide is the wide board standing (`orientation: "portrait"`), so
+`board-4x3` does not exist: it is `board-3x4` standing. A `format` that is none of these (a typo, `board-9x9`, a name from a
+newer build) reads as `board-2x3`, as it always has.
+
+**Older builds** (1.3.0 and before) know only the two boards: opening a file with another board they read it as `board-2x3`,
+the positions on it unchanged, so the map sits on a board of the wrong shape, and saving it writes `board-2x3`. From 1.3.0 on
+they say that the file was written by a newer editor (rule 7), which is why the boards came after that warning. The envelope's
+`board` frame carries the map's size in units, as before.
+
 ### Board formats that became print choices
 
 Within version 3, `format` narrowed to the board's shape: `board-2x3` or `board-2x4`. Test sheets,

@@ -4569,6 +4569,59 @@ const sectionStart = (n) => {
     await nv.context().close();
   }
 
+  // 63. A board of any number of fold panels, from Settings → Board format → Custom size…: two numbers (panels along the
+  // long and the short side) in a small dialog, one undoable step, kept in the map and said in the print dialog.
+  if (wants(63)) {
+  sectionStart(63);
+    const cb = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
+    cb.on("pageerror", (e) => errors.push(String(e)));
+    await cb.goto(BASE, { waitUntil: "networkidle" });
+    await cb.getByRole("button", { name: "Load the example map" }).click();
+    await cb.waitForTimeout(600);
+    const stored = () => cb.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")));
+    const before = await stored();
+    await cb.getByRole("button", { name: "Settings" }).click(); await cb.waitForTimeout(400);
+    check("Settings offers the two boards it had, and one button for another size", (await cb.locator('#settings-format input[type="radio"]').count()) === 2 && (await cb.locator("#settings-custom-board").textContent()).trim() === "Custom size…");
+    await cb.locator("#settings-custom-board").click(); await cb.waitForTimeout(300);
+    check("the button opens a dialog with the panels along each side", (await cb.locator("#custom-board-long").isVisible()) && (await cb.locator("#custom-board-short").isVisible()));
+    await cb.locator("#custom-board-long").fill("3"); await cb.locator("#custom-board-short").fill("3"); await cb.waitForTimeout(200);
+    check("it says what size that makes", /790 × 788 mm/.test(await cb.locator(".custom-board-result").textContent()), await cb.locator(".custom-board-result").textContent());
+    await cb.locator("#custom-board-long").fill("2"); await cb.waitForTimeout(200);
+    check("a short side longer than the long side is said so, and cannot be used", /cannot have more panels/.test(await cb.locator(".custom-board-result").textContent()) && (await cb.locator("#custom-board-apply").isDisabled()));
+    await cb.locator("#custom-board-long").fill("9"); await cb.waitForTimeout(200);
+    check("so is a number out of range", /whole numbers from 1 to 6/.test(await cb.locator(".custom-board-result").textContent()) && (await cb.locator("#custom-board-apply").isDisabled()));
+    await cb.getByRole("button", { name: "Cancel" }).click(); await cb.waitForTimeout(300);
+    check("Cancel leaves the board as it was", (await stored()).format === before.format);
+    await cb.locator("#settings-custom-board").click(); await cb.waitForTimeout(300);
+    await cb.locator("#custom-board-long").fill("4"); await cb.locator("#custom-board-short").fill("3"); await cb.waitForTimeout(200);
+    await cb.locator("#custom-board-apply").click(); await cb.waitForTimeout(600);
+    const after = await stored();
+    check("Use this size gives the map a 3 × 4 board, in the map as it is saved", after.format === "board-3x4", after.format);
+    const ratio = 788 / 526;
+    check("everything on the map keeps x and has its y stretched to the new height", after.stops.every((st, i) => Math.abs(st.x - before.stops[i].x) < 1e-6 && Math.abs(st.y - before.stops[i].y * (Math.round(1100 * 788 / 1053) / Math.round(1100 * 525 / 790))) < 1e-6));
+    check("Settings then shows the custom board, chosen, and the button changes it", (await cb.locator('#settings-format input[value="board-3x4"]').isChecked()) && (await cb.locator("#settings-custom-board").textContent()).trim() === "Change custom size…" && /Custom board 3×4/.test(await cb.locator("#settings-format").textContent()), await cb.locator("#settings-format").textContent());
+    await cb.locator("#settings-custom-board").click(); await cb.waitForTimeout(300);
+    check("which opens with the board's own numbers", (await cb.locator("#custom-board-long").inputValue()) === "4" && (await cb.locator("#custom-board-short").inputValue()) === "3");
+    await cb.getByRole("button", { name: "Cancel" }).click(); await cb.waitForTimeout(300);
+    await cb.locator('#settings-format input[value="board-2x3"]').check(); await cb.waitForTimeout(500);
+    const back = await stored();
+    check("choosing the standard board again takes the map back, and the custom board is no longer listed", back.format === "board-2x3" && (await cb.locator('#settings-format input[type="radio"]').count()) === 2 && back.stops.every((st, i) => Math.abs(st.y - before.stops[i].y) < 0.01));
+    await cb.keyboard.press("Escape"); await cb.waitForTimeout(300);
+    // The custom board in the print dialog: twelve panels, a sheet each.
+    await cb.getByRole("button", { name: "Settings" }).click(); await cb.waitForTimeout(400);
+    await cb.locator("#settings-custom-board").click(); await cb.waitForTimeout(300);
+    await cb.locator("#custom-board-long").fill("4"); await cb.locator("#custom-board-short").fill("3"); await cb.locator("#custom-board-apply").click(); await cb.waitForTimeout(500);
+    await cb.keyboard.press("Escape"); await cb.waitForTimeout(300);
+    await cb.getByRole("button", { name: "Print map", exact: true }).click(); await cb.waitForTimeout(500);
+    check("the print dialog counts a sheet for each of the twelve panels", (await cb.locator('.print-table tbody tr[data-paper="a4"] td:nth-of-type(2) button').getAttribute("data-pages")) === "12", await cb.locator('.print-table tbody tr[data-paper="a4"] td:nth-of-type(2) button').getAttribute("data-pages"));
+    check("and offers no Anniversary size, which only the standard board has", (await cb.locator(".print-table thead").textContent()).indexOf("Anniversary") === -1);
+    await cb.keyboard.press("Escape"); await cb.waitForTimeout(300);
+    // It survives a reload, and a file written from it carries it.
+    await cb.reload({ waitUntil: "networkidle" }); await cb.waitForTimeout(500);
+    check("the custom board is still there after a reload", (await stored()).format === "board-3x4");
+    await cb.context().close();
+  }
+
   if (sectionOpen) sectionTimes[sectionOpen.n] = Math.round((Date.now() - sectionOpen.at) / 100) / 10;
   if (process.env.TTR_TIMES) fs.writeFileSync(process.env.TTR_TIMES, JSON.stringify(sectionTimes));
   console.log("PASS:"); ok.forEach((l) => console.log("  ✓ " + l));

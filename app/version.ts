@@ -14,6 +14,14 @@ export const UNRELEASED: string[] = [
 
 export const RELEASES: Release[] = [
   {
+    version: "1.4.0",
+    date: "2026-10-09",
+    title: "Version 1.4: boards of any number of fold panels",
+    changes: [
+      "The board can be any number of fold panels, from 1 to 6 along each side: Settings → Custom size… asks for the panels along the long and the short side. The map moves to it, printing counts its sheets, and the file says which board it is.",
+    ],
+  },
+  {
     version: "1.3.0",
     date: "2026-10-09",
     title: "Version 1.3: files say which version of the editor wrote them",

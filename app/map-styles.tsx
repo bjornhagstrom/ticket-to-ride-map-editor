@@ -3,7 +3,7 @@
 // The style library: one place to create and edit every kind of reusable appearance the map has.
 // Applying a style stays in the Properties panel, where the object is; defining one lives here, so
 // the panel is about the thing you clicked rather than about the map's vocabulary.
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { boardOf, orientationLabels, orientationOf, type Orientation } from "./board";
 import { BoardPreview } from "./board-preview";
 import { Download, Plus, RotateCcw, Trash2 } from "lucide-react";
@@ -16,7 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { cn } from "@/lib/utils";
-import { DEFAULT_PLAYERS, LANES_OPEN_FROM, DEFAULT_TICKET_BANDS, DEFAULT_TICKET_MIX, TICKET_MIX_PRESETS, colorLabels, DEFAULT_WAGONS_PER_PLAYER, DEFAULT_STARTING_TICKETS, DEFAULT_KEPT_TICKETS, type MapData, type MapFormat, mapFormats, routeColors, stopSizeMeta, type RouteTypeStyle, type StopTypeStyle, type WagonShape, wagonShapeMeta } from "./map-data";
+import { DEFAULT_PLAYERS, LANES_OPEN_FROM, DEFAULT_TICKET_BANDS, DEFAULT_TICKET_MIX, TICKET_MIX_PRESETS, colorLabels, DEFAULT_WAGONS_PER_PLAYER, DEFAULT_STARTING_TICKETS, DEFAULT_KEPT_TICKETS, type MapData, type MapFormat, formatOrStandard, formatId, PRESET_FORMATS, MAX_PANELS, routeColors, stopSizeMeta, type RouteTypeStyle, type StopTypeStyle, type WagonShape, wagonShapeMeta } from "./map-data";
 
 export type StyleKind = "map" | "ticket" | "stop" | "route" | "defaults";
 export type StyleTarget = { kind: StyleKind; id?: string };
@@ -55,6 +55,40 @@ const clampCount = (raw: string, fallback: number): number => {
   const number = Math.round(Number(raw));
   return Number.isFinite(number) && number >= 1 ? number : fallback;
 };
+
+// Any number of fold panels, from 1 to MAX_PANELS along each side, the long side first: a board taller than wide is the
+// wide one standing, and whether it stands is the Orientation beside it. For the odd board, so it is one button.
+function CustomBoardSize({ format, onChangeFormat }: { format: MapFormat; onChangeFormat: (format: MapFormat) => void }) {
+  const current = formatOrStandard(format);
+  const custom = !PRESET_FORMATS.includes(format);
+  const [open, setOpen] = useState(false);
+  const [long, setLong] = useState(String(custom ? current.columns : 4));
+  const [short, setShort] = useState(String(custom ? current.rows : 3));
+  const asked = { long: Number(long), short: Number(short) };
+  const valid = (n: number) => Number.isInteger(n) && n >= 1 && n <= MAX_PANELS;
+  const problem = !valid(asked.long) || !valid(asked.short) ? `Use whole numbers from 1 to ${MAX_PANELS}.` : asked.short > asked.long ? "The short side cannot have more panels than the long side. To stand the board up, use Orientation." : "";
+  const size = problem ? null : formatOrStandard(formatId(asked.short, asked.long));
+  return <>
+    <Button type="button" variant="outline" size="sm" id="settings-custom-board" className="settings-custom-board" onClick={() => { setLong(String(custom ? current.columns : 4)); setShort(String(custom ? current.rows : 3)); setOpen(true); }}>{custom ? "Change custom size…" : "Custom size…"}</Button>
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Custom board size</DialogTitle>
+          <DialogDescription>Count the fold panels along each side. A panel is about 263 mm square, as on the standard board.</DialogDescription>
+        </DialogHeader>
+        <div className="custom-board-fields">
+          <div><Label htmlFor="custom-board-long">Long side, in panels</Label><Input id="custom-board-long" type="number" inputMode="numeric" min={1} max={MAX_PANELS} value={long} onChange={(event) => setLong(event.target.value)} /></div>
+          <div><Label htmlFor="custom-board-short">Short side, in panels</Label><Input id="custom-board-short" type="number" inputMode="numeric" min={1} max={MAX_PANELS} value={short} onChange={(event) => setShort(event.target.value)} /></div>
+        </div>
+        <p className="helper custom-board-result" role="status">{problem || (size ? `${asked.long} × ${asked.short} panels: ${size.widthMm.toLocaleString("en-GB")} × ${size.heightMm.toLocaleString("en-GB")} mm. Everything on the map keeps its place on the board, stretched to fit.` : "")}</p>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+          <Button type="button" id="custom-board-apply" disabled={Boolean(problem)} onClick={() => { onChangeFormat(formatId(asked.short, asked.long)); setOpen(false); }}>Use this size</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  </>;
+}
 
 export function SettingsDialog({ open, onOpenChange, target, onTarget, data, change, defaults, onChangeFormat, onChangeOrientation, exportReminder, onStartOver, onExport }: {
   onStartOver: () => void;
@@ -183,10 +217,11 @@ export function SettingsDialog({ open, onOpenChange, target, onTarget, data, cha
             <div className="settings-board">
               <div className="settings-board-fields">
                 <fieldset id="settings-format" className="settings-radios"><legend>Board format (# of panels)</legend>
-                  {Object.entries(mapFormats).map(([key, item]) => <label key={key} className="print-option">
-                    <input type="radio" name="settings-format" value={key} checked={data.format === key} onChange={() => onChangeFormat(key as MapFormat)} />
-                    <span><strong>{item.label}</strong><small>{(() => { const shape = boardOf({ format: key as MapFormat, orientation: data.orientation }); return `${shape.widthMm.toLocaleString("en-GB")} × ${shape.heightMm.toLocaleString("en-GB")} mm, ${item.columns * item.rows} panels`; })()}</small></span>
-                  </label>)}
+                  {[...PRESET_FORMATS, ...(PRESET_FORMATS.includes(data.format) ? [] : [data.format])].map((key) => { const item = formatOrStandard(key); return <label key={key} className="print-option">
+                    <input type="radio" name="settings-format" value={key} checked={data.format === key} onChange={() => onChangeFormat(key)} />
+                    <span><strong>{item.label}</strong><small>{(() => { const shape = boardOf({ format: key, orientation: data.orientation }); return `${shape.widthMm.toLocaleString("en-GB")} × ${shape.heightMm.toLocaleString("en-GB")} mm, ${item.columns * item.rows} panels`; })()}</small></span>
+                  </label>; })}
+                  <CustomBoardSize format={data.format} onChangeFormat={onChangeFormat} />
                   <p className="helper settings-format-help">The shape of the game board. <strong>You can change this whenever you like.</strong></p>
                 </fieldset>
                 <fieldset id="settings-orientation" className="settings-radios"><legend>Orientation</legend>

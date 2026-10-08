@@ -34,7 +34,7 @@ millimetres.
 
 ## Boards, cards and spreadsheets
 
-A board lies or stands, in the standard 2×3 or the extended 2×4. Standing it up or laying it down turns
+A board lies or stands, in the standard 2×3, the extended 2×4 or a size of your own from 1 to 6 panels along each side. Standing it up or laying it down turns
 everything on it a quarter turn without changing a single distance.
 
 The ticket cards print to be cut out, lying or standing as the board does, and each carries a small map

@@ -2,7 +2,7 @@
 // files open, board-format rescaling, and image reading.
 import { APP_VERSION } from "./version";
 import { boardOf, rotateMap, turnBetween, turnContents, type Board } from "./board";
-import { W, normalizeTension, BUILT_IN_DECK_RULES, type DeckRuleSet, type PlayerRange, DEFAULT_WAGONS_PER_PLAYER, DEFAULT_STARTING_TICKETS, DEFAULT_KEPT_TICKETS, defaultTicketSet, type Ticket, type TicketSet, defaultStopTypeStyles, fallbackStopTypeStyle, type StopTypeStyle, defaultWagonStyles, type WagonStyle, defaultRouteTypeStyles, type LineStyle, type RouteTypeStyle, type BackgroundImage, type BackgroundShape, type ImageCrop, mapFormats, type MapData, type MapFormat, type MapVersion, type MapVersionEntry, type NoteBox, type Point, type Route, type Stop, STORAGE_KEY, LEGACY_STORAGE_KEY } from "./map-data";
+import { W, formatOrStandard, isMapFormat, normalizeTension, BUILT_IN_DECK_RULES, type DeckRuleSet, type PlayerRange, DEFAULT_WAGONS_PER_PLAYER, DEFAULT_STARTING_TICKETS, DEFAULT_KEPT_TICKETS, defaultTicketSet, type Ticket, type TicketSet, defaultStopTypeStyles, fallbackStopTypeStyle, type StopTypeStyle, defaultWagonStyles, type WagonStyle, defaultRouteTypeStyles, type LineStyle, type RouteTypeStyle, type BackgroundImage, type BackgroundShape, type ImageCrop, type MapData, type MapFormat, type MapVersion, type MapVersionEntry, type NoteBox, type Point, type Route, type Stop, STORAGE_KEY, LEGACY_STORAGE_KEY } from "./map-data";
 
 export const GUIDE_SEEN_KEY = "ttr-guide-seen";
 export const MAX_IMAGE_WARN_BYTES = 2 * 1024 * 1024;
@@ -37,7 +37,6 @@ export const cloneForHistory = (data: MapData): MapData => {
   if (clone.backgroundImage) clone.backgroundImage.dataUrl = image.dataUrl;
   return clone;
 };
-const isMapFormat = (value: unknown): value is MapFormat => typeof value === "string" && value in mapFormats;
 
 // Formats a map could have before the board's shape and how it is printed were separated. Test
 // sheets and boards measured in sheets of paper are print choices now; a map that names one opens
@@ -59,7 +58,7 @@ const legacyFormats: Record<string, { height: number; to: MapFormat }> = {
 function migrateLegacyFormat(value: Partial<MapData>): Partial<MapData> {
   const legacy = typeof value.format === "string" ? legacyFormats[value.format] : undefined;
   if (!legacy) return value;
-  const toHeight = mapFormats[legacy.to].height;
+  const toHeight = formatOrStandard(legacy.to).height;
   const scale = Math.min(1, toHeight / legacy.height);
   const dx = (W - W * scale) / 2, dy = (toHeight - legacy.height * scale) / 2;
   const point = <T extends Point>(p: T): T => ({ ...p, x: dx + p.x * scale, y: dy + p.y * scale });
@@ -475,7 +474,7 @@ const scaleStopsToHeight = (stops: Stop[], fromHeight: number, toHeight: number)
 const scaleRoutesToHeight = (routes: Route[], fromHeight: number, toHeight: number): Route[] => routes.map((route) => ({ ...route, points: route.points?.map((point) => scalePointToHeight(point, fromHeight, toHeight)) }));
 const scaleImageToHeight = (image: BackgroundImage, fromHeight: number, toHeight: number): BackgroundImage => ({ ...image, y: image.y * toHeight / fromHeight, height: image.height * toHeight / fromHeight });
 const scaleNotesToHeight = (notes: NoteBox[], fromHeight: number, toHeight: number): NoteBox[] => notes.map((note) => ({ ...note, y: note.y * toHeight / fromHeight, height: note.height * toHeight / fromHeight }));
-const sourceHeight = (value: { format?: unknown }): number => isMapFormat(value.format) ? mapFormats[value.format].height : typeof value.format === "string" && legacyFormats[value.format] ? legacyFormats[value.format].height : mapFormats["board-2x3"].height;
+const sourceHeight = (value: { format?: unknown }): number => isMapFormat(value.format) ? formatOrStandard(value.format).height : typeof value.format === "string" && legacyFormats[value.format] ? legacyFormats[value.format].height : formatOrStandard("board-2x3").height;
 // Content from a file drawn on another board, brought onto this one: laid down if it stood, scaled
 // from its board's height to this one's while lying, and stood up again if this board stands.
 type BoardContents = Partial<Pick<MapData, "stops" | "routes" | "background" | "notes" | "backgroundImage">>;
@@ -583,8 +582,8 @@ export function formatTimestamp(date: Date = new Date()): string {
 export function rescaleMapToFormat(draft: MapData, nextFormat: MapFormat): MapData {
   // A standing map is laid down, moved to the other board, and stood up again.
   if (draft.orientation === "portrait") return rotateMap(rescaleMapToFormat(rotateMap(draft, "landscape"), nextFormat), "portrait");
-  const fromHeight = mapFormats[draft.format].height;
-  const toHeight = mapFormats[nextFormat].height;
+  const fromHeight = formatOrStandard(draft.format).height;
+  const toHeight = formatOrStandard(nextFormat).height;
   draft.stops = scaleStopsToHeight(draft.stops, fromHeight, toHeight);
   draft.routes = scaleRoutesToHeight(draft.routes, fromHeight, toHeight);
   draft.background = scaleBackgroundToHeight(draft.background, fromHeight, toHeight);

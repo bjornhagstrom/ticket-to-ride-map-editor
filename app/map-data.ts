@@ -8,7 +8,12 @@ export type RouteType = string;
 export type BackgroundType = "area" | "line" | "label";
 // The shape of the board, and nothing else. How it is printed — paper, how it is split, whether it
 // adds up to a standard or an Anniversary board — is chosen per print run; see app/print-plan.ts.
-export type MapFormat = "board-2x3" | "board-2x4";
+//
+// A board is named by its fold panels, rows then columns: `board-2x3` is two rows of three, `board-3x4` three rows of four,
+// from 1 to MAX_PANELS each way and never more rows than columns (a board taller than wide is the wide one standing, which
+// is the map's orientation). Anything else is not a board; see formatOf.
+export type MapFormat = `board-${number}x${number}`;
+export const MAX_PANELS = 6;
 export type Point = { x: number; y: number };
 export type Stop = Point & { id: string; name: string; type: StopType; /** A hub on purpose: many tickets may name it. */ hub?: boolean; size?: StopSize; symbol?: StopSymbol; letter?: string; labelAngle?: number; endGapMm?: number; locked?: boolean; labelLocked?: boolean };
 
@@ -157,10 +162,33 @@ export type MapFormatDefinition = {
   custom?: boolean;
 };
 
-export const mapFormats: Record<MapFormat, MapFormatDefinition> = {
+// The two boards the editor began with keep the sizes it measured; every other board is panels of about 263 mm.
+const PRESET_DEFINITIONS: Record<string, MapFormatDefinition> = {
   "board-2x3": { label: "Standard board 2×3", shortLabel: "Standard board 2×3", note: "Verified standard Ticket to Ride size", width: W, height: Math.round(W * 525 / 790), widthMm: 790, heightMm: 525, columns: 3, rows: 2 },
   "board-2x4": { label: "Extended board 2×4", shortLabel: "Extended board 2×4", note: "Custom size using standard-size square panels", width: W, height: Math.round(W * 526 / 1053), widthMm: 1053, heightMm: 526, columns: 4, rows: 2, custom: true },
 };
+/** The two boards the editor began with, by name; every other board is made by formatOf. */
+export const mapFormats: Record<string, MapFormatDefinition> = PRESET_DEFINITIONS;
+/** The boards offered first in Settings; any other is chosen by its panels. */
+export const PRESET_FORMATS: MapFormat[] = ["board-2x3", "board-2x4"];
+export const PANEL_MM = { width: 263.3, height: 262.5 };
+export const formatId = (rows: number, columns: number): MapFormat => `board-${rows}x${columns}`;
+
+/** What a board name means, or null when it is not one: `board-RxC` with R and C from 1 to MAX_PANELS and R not above C. */
+export function formatOf(value: unknown): MapFormatDefinition | null {
+  if (typeof value !== "string") return null;
+  if (PRESET_DEFINITIONS[value]) return PRESET_DEFINITIONS[value];
+  const m = /^board-([1-9])x([1-9])$/.exec(value);
+  if (!m) return null;
+  const rows = Number(m[1]), columns = Number(m[2]);
+  if (rows > MAX_PANELS || columns > MAX_PANELS || rows > columns) return null;
+  const widthMm = Math.round(columns * PANEL_MM.width), heightMm = Math.round(rows * PANEL_MM.height);
+  const label = `Custom board ${rows}×${columns}`;
+  return { label, shortLabel: label, note: `${columns} panels across, ${rows} down`, width: W, height: Math.round(W * heightMm / widthMm), widthMm, heightMm, columns, rows, custom: true };
+}
+export const isMapFormat = (value: unknown): value is MapFormat => formatOf(value) !== null;
+/** The board a name means; the standard board when it is none. */
+export const formatOrStandard = (value: unknown): MapFormatDefinition => formatOf(value) ?? PRESET_DEFINITIONS["board-2x3"];
 
 // Footprint of a real plastic train and the spacing a real board gives it, in millimetres.
 // `gap` and `endMargin` are not guesses: they come from a least-squares fit over all 101 routes of

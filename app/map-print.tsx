@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { useId } from "react";
-import { colorLabels, mapFormats, ticketsInSet, type MapData, type MapFormat } from "./map-data";
+import { colorLabels, formatOrStandard, ticketsInSet, type MapData, type MapFormat } from "./map-data";
 import { boardOf, type Orientation } from "./board";
 import { curvedPath, isCurved, pathFromPoints, pointsFor } from "./map-geometry";
 import { MapArtwork } from "./map-artwork";
@@ -147,7 +147,7 @@ export function PrintPages({ data, plan, parts, setId }: { data: MapData; plan: 
             <svg x={0} y={PRINT_CAPTION_MM} width={width} height={artHeight} viewBox={`${page.tile.x * format.width} ${page.tile.y * format.height} ${page.tile.width * format.width} ${page.tile.height * format.height}`}>
               {/* Wagons are always measured against the board the map is drawn for; printing larger or
                   smaller scales them with everything else. */}
-              <MapArtwork data={data} scaleWidthMm={mapFormats[data.format].widthMm} print hidePlaytest={!parts.playtest} />
+              <MapArtwork data={data} scaleWidthMm={formatOrStandard(data.format).widthMm} print hidePlaytest={!parts.playtest} />
             </svg>
             {full && corners.map(([x, y, dx, dy]) => <g className="cut-mark" key={`${x}-${y}`}>
               <line x1={x + dx * CUT_MARK_GAP_MM} y1={y} x2={x + dx * CUT_MARK_REACH_MM} y2={y} />

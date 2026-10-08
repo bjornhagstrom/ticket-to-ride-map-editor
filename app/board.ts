@@ -1,8 +1,8 @@
-// The board a map is drawn on: its format (2×3 or 2×4 panels) and whether it lies or stands. Its long
+// The board a map is drawn on: its format (a number of fold panels, 2×3 or 2×4 among them) and whether it lies or stands. Its long
 // side is always W map units, so a standing board is the lying one turned a quarter turn, and turning
 // a map moves everything on it without changing one distance: wagons, spacing and every analysis stay
 // as they were. A map without an orientation lies, as every map did before boards could stand.
-import { mapFormats, type BackgroundImage, type MapData, type MapFormat, type NoteBox, type Point } from "./map-data";
+import { formatOrStandard, isMapFormat, type BackgroundImage, type MapData, type MapFormat, type NoteBox, type Point } from "./map-data";
 
 export type Orientation = "landscape" | "portrait";
 export type Board = { format: MapFormat; orientation: Orientation; label: string; width: number; height: number; widthMm: number; heightMm: number; columns: number; rows: number };
@@ -14,8 +14,8 @@ export function orientationOf(data: { orientation?: unknown }): Orientation {
 }
 
 export function boardOf(data: { format: MapFormat; orientation?: unknown }): Board {
-  const format = mapFormats[data.format] ? data.format : "board-2x3";
-  const lying = mapFormats[format];
+  const format: MapFormat = isMapFormat(data.format) ? data.format : "board-2x3";
+  const lying = formatOrStandard(format);
   const orientation = orientationOf(data);
   if (orientation === "landscape") return { format, orientation, label: lying.shortLabel, width: lying.width, height: lying.height, widthMm: lying.widthMm, heightMm: lying.heightMm, columns: lying.columns, rows: lying.rows };
   return { format, orientation, label: `${lying.shortLabel}, standing`, width: lying.height, height: lying.width, widthMm: lying.heightMm, heightMm: lying.widthMm, columns: lying.rows, rows: lying.columns };

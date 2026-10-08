@@ -1,4 +1,4 @@
-import { type MapFormat } from "./map-data";
+import { formatOrStandard, type MapFormat } from "./map-data";
 import { boardOf, type Orientation } from "./board";
 
 // How a board is cut into printed sheets. The board's shape belongs to the map; everything here is
@@ -29,13 +29,12 @@ export const splits: { id: SplitId; label: string; note: string }[] = [
   { id: "page", label: "One page, real size", note: "The whole board on one page as big as the board: for a large-format printer, or to save as a PDF" },
 ];
 
-/** The real boards a full-size print can add up to. Anniversary exists only for the 2×3 shape. */
-const boardSizes: Record<MapFormat, { id: SizeId; label: string; widthMm: number; heightMm: number }[]> = {
-  "board-2x3": [
-    { id: "standard", label: "Standard", widthMm: 790, heightMm: 525 },
-    { id: "anniversary", label: "Anniversary", widthMm: 972, heightMm: 648 },
-  ],
-  "board-2x4": [{ id: "standard", label: "Standard", widthMm: 1053, heightMm: 526 }],
+/** The real boards a full-size print can add up to. Anniversary exists only for the standard 2×3; every other board has its own size. */
+type BoardSize = { id: SizeId; label: string; widthMm: number; heightMm: number };
+const boardSizes = (format: MapFormat): BoardSize[] => {
+  const board = formatOrStandard(format);
+  const standard: BoardSize = { id: "standard", label: "Standard", widthMm: board.widthMm, heightMm: board.heightMm };
+  return format === "board-2x3" ? [standard, { id: "anniversary", label: "Anniversary", widthMm: 972, heightMm: 648 }] : [standard];
 };
 
 /** What no home printer reaches, on every side. */
@@ -107,7 +106,7 @@ const orientations = (paperId: PaperId, profile: PrintProfile, standing = false)
 const sheetsFor = (length: number, room: number) => Math.max(1, Math.ceil(length / room - 1e-9));
 
 export function printChoiceFor(format: MapFormat, choice: PrintChoice): Required<PrintChoice> {
-  const sizes = boardSizes[format] ?? boardSizes["board-2x3"];
+  const sizes = boardSizes(format);
   const size = choice.split === "full" && sizes.some((item) => item.id === choice.size) ? choice.size! : "standard";
   const paper = papers.some((item) => item.id === choice.paper) ? choice.paper : "a4";
   const split = splits.some((item) => item.id === choice.split) ? choice.split : "panel";
@@ -118,7 +117,7 @@ export function printPlan(format: MapFormat, raw: PrintChoice, profile: PrintPro
   const choice = printChoiceFor(format, raw);
   const board = boardOf({ format, orientation });
   const standing = board.orientation === "portrait";
-  const size = (boardSizes[format] ?? boardSizes["board-2x3"]).find((item) => item.id === choice.size)!;
+  const size = boardSizes(format).find((item) => item.id === choice.size)!;
   const boardMm = choice.split === "full" ? (standing ? { width: size.heightMm, height: size.widthMm } : { width: size.widthMm, height: size.heightMm }) : { width: board.widthMm, height: board.heightMm };
 
   // The whole board on a page of its own size, upright and at 100 %: for a plotter or a large-format
@@ -159,7 +158,7 @@ export function printPlan(format: MapFormat, raw: PrintChoice, profile: PrintPro
 export type PrintTableCell = { choice: Required<PrintChoice>; label: string; pages: number; scale: number };
 /** Every way this board can be printed: the sizes on offer, and a row per paper to compare them by. */
 export function printChoices(format: MapFormat, profile: PrintProfile = PRINT_PROFILES.standard, orientation: Orientation = "landscape") {
-  const sizes = boardSizes[format] ?? boardSizes["board-2x3"];
+  const sizes = boardSizes(format);
   const columns: { label: string; choice: (paper: PaperId) => PrintChoice }[] = [
     { label: "One sheet", choice: (paper) => ({ split: "sheet", paper }) },
     { label: "Per panel", choice: (paper) => ({ split: "panel", paper }) },
