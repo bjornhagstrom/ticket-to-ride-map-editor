@@ -1436,8 +1436,8 @@ const sectionStart = (n) => {
   await page.getByRole("button", { name: "Settings" }).click();
   await page.waitForTimeout(500);
   check("Settings carries the game setup", await page.locator("#settings-wagons").isVisible() && await page.locator("#settings-starting-tickets").isVisible());
-  // The example map is for the standard two to five players, which is also the default range: so below, a
-  // 4 that is stored must be read back from the map, or Settings could be showing the default.
+  // The example map is for two or three players: so below, a 4 that is stored must be read back from the
+  // map, or Settings could be showing the default.
   check("including how many players the map is for", await page.locator("#settings-players-min").isVisible() && (await page.locator("#settings-players-min").inputValue()) === "2" && (await page.locator("#settings-players-max").inputValue()) === "3", `${await page.locator("#settings-players-min").inputValue()}–${await page.locator("#settings-players-max").inputValue()}`);
   await page.locator("#settings-players-max").fill("4");
   await page.locator("#settings-players-max").blur();

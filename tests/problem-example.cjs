@@ -70,12 +70,6 @@ check("and the map with problems, which is made from it, has none either", !/Wag
 const back = storage.normalizeMap(storage.readMapFile(JSON.parse(JSON.stringify(storage.writeMapFile("map", storage.mapPayload(storage.normalizeMap(problemMap)), problemMap)))).payload);
 check("it survives a round trip through a file", back.stops.length === problemMap.stops.length && back.routes.length === problemMap.routes.length && back.name === problemMap.name);
 
-for (const line of ok) console.log(`  ok    ${line}`);
-for (const line of bad) console.log(`  FAIL  ${line}`);
-console.log(`\n${ok.length} passed, ${bad.length} failed`);
-fs.rmSync(out, { recursive: true, force: true });
-process.exit(bad.length ? 1 : 0);
-
 // The example is made for two or three players, so the wagons it holds fit the spaces it can claim at its largest table,
 // and its rules say nothing of tables it is not made for.
 {
@@ -85,3 +79,9 @@ process.exit(bad.length ? 1 : 0);
   check("its rules do not speak of four or five players", !/four or five/i.test(initialMap.rules));
   check("the two decks deal three players their tickets", [...new Set(initialMap.tickets.map((t) => t.set))].every((set) => initialMap.tickets.filter((t) => t.set === set).length >= 3 * (initialMap.startingTickets ?? 3)));
 }
+
+for (const line of ok) console.log(`  ok    ${line}`);
+for (const line of bad) console.log(`  FAIL  ${line}`);
+console.log(`\n${ok.length} passed, ${bad.length} failed`);
+fs.rmSync(out, { recursive: true, force: true });
+process.exit(bad.length ? 1 : 0);

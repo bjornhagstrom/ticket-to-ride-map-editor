@@ -566,7 +566,8 @@ export type NetworkShape = {
 /** Routes more tickets want than they can carry, at the largest table each official map is for. */
 export const CROWDING_OFFICIAL: [number, number] = [8, 19];
 /** The official range beside each balance figure, measured on the eight calibration maps with their own
- *  decks at the largest table each is for (tests/balance-official.cjs measures them again): crowded
+ *  decks at the largest table each is for (tests/balance-official.cjs measures them again): wagons of a
+ *  full table as a share of the spaces it can claim, crowded
  *  routes, mean ticket load on double routes against single ones, routes no ticket needs (%), most
  *  tickets on one stop, and the average hub degree. */
 export const BALANCE_OFFICIAL = { wagonFill: [57, 76] as [number, number], crowded: [8, 19] as [number, number], crowdedPct: [10, 17] as [number, number], loadRatio: [1.3, 3.1] as [number, number], unusedPct: [7, 21] as [number, number], maxPerStop: [4, 9] as [number, number], hubDegree: [7.6, 10.8] as [number, number] };

@@ -20,7 +20,7 @@ export const RELEASES: Release[] = [
     changes: [
       "Map balance judges the wagon count by what a full table holds against the spaces it can claim, as the official maps do (57 to 76 %), warns when the players hold more wagons than the board has room for or fewer than 40 % of it, and shows the figure beside the official range.",
       "The example map's rules no longer have a table of wagons for each number of players: the map holds one wagon count, and the figures use it at every table.",
-      "The example map is made for two or three players, so its 28 wagons each fit the spaces it can claim; its rules no longer speak of four or five players.",
+      "The example map is made for two or three players, so its 28 wagons each fit the spaces it can claim; its rules no longer speak of four or five players. A copy of the old example saved in your browser keeps its five players, and Map balance will say that its wagons do not fit.",
     ],
   },
   {
