@@ -27,7 +27,7 @@ import { useTicketSuggestion } from "./use-ticket-suggestion";
 import { SettingsDialog, type StyleTarget } from "./map-styles";
 import { BALANCE_OFFICIAL, connectionCount, fittingLength, bandsOf, bandCuts, mapDiameter, deckFigures, defaultStyle, deckRuleFor, TICKET_SUGGESTER, evaluateTicketDeck, suggestedDeckSize, ticketEndStopCount, type TicketStyle, autoPlaceLabels, labelledStops, setupBalance, stopCoverage, ticketBand, type TicketBand, reviewTickets, ticketPointsPerSpace, ticketCoverage, type RouteSuggestion, labelCovers, labelAngleOptions, routeSamplePoints, colourLengthTable, crossings as crossingList, networkShape, SHAPE_OFFICIAL, buildAdjacency, networkStats, routeSpacing, shortestPath, suggestRoutes } from "./map-analysis";
 import { canvasPoint, canvasPointRaw, pointsFor, samePair, stopById } from "./map-geometry";
-import { REPO_URL } from "./version";
+import { REPO_URL, newerEditor } from "./version";
 import { RouteLogo } from "./logo";
 import { ACTION_GAP_MS, countChange, EXPORT_REMINDER_KEY, exportAge, exported, freshReminder, isDue, isLastStep, later, lessOften, readReminder, stop as stopReminding, turnOn, type ExportReminder } from "./export-reminder";
 import { boardOf, rotateMap, type Orientation } from "./board";
@@ -880,6 +880,8 @@ export function MapEditor() {
       try {
         const parsed = readMapFile(JSON.parse(String(reader.result)));
         const raw = parsed.payload as Record<string, never>;
+        // A file from a newer editor opens, but may hold things this one does not know: say so, and what to do.
+        if (newerEditor(parsed.app?.version)) toast.warning(`This file was written by a newer version of the editor (${parsed.app?.version}; this one is ${APP_VERSION}). It opens here, but some of what it holds may be missing or changed. Reload the page, or update your copy of the editor, to get the newest.`, { duration: 20000 });
         if (parsed.kind === "background" && !ticketsOnly) {
           const { background, backgroundImage } = normalizeBackgroundFile(raw, format);
           if (data.background.length || data.backgroundImage) { setPendingImport({ kind: "background", background, backgroundImage }); setDanger("import-background"); }

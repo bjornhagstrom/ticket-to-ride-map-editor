@@ -15,7 +15,7 @@ Every file has the same wrapper.
   "version": 3,
   "kind": "map",
   "written": "2026-09-29T15:12:00.000Z",
-  "app": { "name": "Map prototypes", "version": "0.1.0" },
+  "app": { "name": "Map prototypes", "version": "1.2.0" },
   "board": { "width": 1100, "height": 731 },
   "payload": { }
 }
@@ -27,7 +27,7 @@ Every file has the same wrapper.
 | `version` | The schema this file follows. Currently 3. |
 | `kind` | `map`, `background`, `network` or `tickets`. |
 | `written` | When it was written, ISO 8601. For your information; nothing depends on it. |
-| `app` | What wrote it. For tracing a problem back to a build. |
+| `app` | What wrote it: the name and the version of the editor (`1.2.0`). For tracing a problem back to a build, and read from 1.3.0 on for a warning (rule 7). |
 | `board` | The frame the coordinates are in. Positions in the payload are in these units. |
 | `payload` | The content. Its shape depends on `kind`. |
 
@@ -132,6 +132,7 @@ not a way to move a whole map: the background, styles and settings are only in t
    does not know stay (rule 3). A map kept in the browser that cannot be read at all is put aside (a copy under another key); with no room for the copy it is kept where it is, and nothing is saved over it until the map is changed.
    An older build (0.4.1 and before) mends less: it opens such a file with the damaged parts still in it. The rules
    are in `repairMap` (`app/map-storage.ts`) and `tests/corrupt-files.cjs` holds them.
+7. **A file from a newer editor opens, with a warning.** From 1.3.0, a reader that finds `app.version` higher than its own (compared as numbers part by part, so 1.10.0 is newer than 1.9.0) opens the file as usual and says which version wrote it, which this is, and that some of it may be missing or changed here; reloading the page or updating a downloaded copy gets the newest. The warning is only a note, and rule 2 is the lock. A file with no `app`, a version that is not `x.y.z`, or one the same or older says nothing. Builds before 1.3.0 do not read `app.version` at all, so they never warn; for them rules 2 and 3 are all that protect a file. Spreadsheets (CSV), the tool's zip, pictures and prints carry no editor version.
 
 ## What you can rely on
 

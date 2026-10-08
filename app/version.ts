@@ -10,6 +10,7 @@ export type Release = { version: string; date: string; title: string; changes: s
 // the top of CHANGELOG.md under Unreleased, and become the notes of the next version when it is
 // decided; the What's new page in the editor shows released versions only.
 export const UNRELEASED: string[] = [
+  "A map file written by a newer version of the editor than yours still opens, and now says which version wrote it and that some of it may be missing or changed here, so you know to reload the page or update your copy.",
 ];
 
 export const RELEASES: Release[] = [
@@ -158,3 +159,18 @@ export const RELEASES: Release[] = [
 ];
 
 export const APP_VERSION = RELEASES[0].version;
+
+// Whether a file was written by a newer editor than this one: a note for the person, never a lock (a file this build
+// cannot follow is refused by the file's own version). The parts are compared as numbers, so 1.10.0 is newer than 1.9.0;
+// a pre-release suffix is left out, and a version that is missing or not x.y.z says nothing.
+export function newerEditor(fileVersion: unknown, own: string = APP_VERSION): boolean {
+  const parts = (v: unknown): number[] | null => {
+    const m = typeof v === "string" ? /^(\d+)\.(\d+)\.(\d+)(?:[-+].*)?$/.exec(v.trim()) : null;
+    return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : null;
+  };
+  const theirs = parts(fileVersion);
+  const mine = parts(own);
+  if (!theirs || !mine) return false;
+  for (let i = 0; i < 3; i++) if (theirs[i] !== mine[i]) return theirs[i] > mine[i];
+  return false;
+}

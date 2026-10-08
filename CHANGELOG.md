@@ -4,6 +4,12 @@ What changed in each version of the [Ticket to Ride map editor](https://hagstrom
 
 This file is written from `app/version.ts` by `npm run changelog`; edit the notes there.
 
+## Unreleased
+
+Changes since the last release, to go into the next version.
+
+- A map file written by a newer version of the editor than yours still opens, and now says which version wrote it and that some of it may be missing or changed here, so you know to reload the page or update your copy.
+
 ## 1.2.0 · 2026-10-08
 
 **Version 1.2: Map balance judges the wagons against the room on the board**

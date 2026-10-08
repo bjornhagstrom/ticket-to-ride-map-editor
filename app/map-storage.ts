@@ -170,7 +170,7 @@ const NOT_A_MAP = "This is not a map file: it holds no map, network, background 
 const holdsContent = (payload: Record<string, unknown>) => CONTENT_KEYS.some((key) => payload[key] !== undefined);
 
 // Reads either an enveloped file or one of the flat files written before the envelope existed.
-export function readMapFile(raw: unknown): { kind: FileKind; version: number; payload: Record<string, unknown>; board?: { width: number; height: number } } {
+export function readMapFile(raw: unknown): { kind: FileKind; version: number; payload: Record<string, unknown>; board?: { width: number; height: number }; app?: { version: string } } {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error(NOT_A_MAP);
   const value = raw as Record<string, unknown>;
   if (value.format === FILE_FORMAT) {
@@ -186,6 +186,8 @@ export function readMapFile(raw: unknown): { kind: FileKind; version: number; pa
       version,
       payload: (value.payload ?? {}) as Record<string, unknown>,
       board: value.board as { width: number; height: number } | undefined,
+      // Which editor wrote the file, when it says: only a note (newerEditor in version.ts).
+      ...(value.app && typeof value.app === "object" && typeof (value.app as { version?: unknown }).version === "string" ? { app: { version: (value.app as { version: string }).version } } : {}),
     };
   }
   // Version 1: the payload was the file, with `kind` mixed in beside the data.

@@ -52,11 +52,11 @@ runs the sections on the right, on top of the section for the feature itself.
 | Changed | Run |
 |---|---|
 | `app/ticket-suggester.ts`, `app/map-analysis.ts` | the calibration suites, `intended`, and the sections on Tickets, Map balance and tension (12, 45, 51, 52, 54, 55) |
-| `app/map-storage.ts`, `app/map-data.ts` | `file-format`, `corrupt-files`, `map-version`, `csv-*`, `board`, and the sections on persistence and import (11, 43, 49, 50) |
+| `app/map-storage.ts`, `app/map-data.ts` | `file-format`, `corrupt-files`, `map-version`, `editor-version`, `csv-*`, `board`, and the sections on persistence and import (11, 43, 49, 50) |
 | `app/map-print.tsx`, `app/print-*` | `print-plan` and the printing sections (10, 12, 22, 41) |
 | `app/map-dialogs.tsx`, `app/deck-rules-panel.tsx`, `app/tension-slider.tsx` | the Tickets, Map balance and Settings sections |
 | `app/*.css` | the contrast and layout sections (34, 56) and one section per panel |
-| `app/version.ts`, `CHANGELOG.md` | `releases` |
+| `app/version.ts`, `CHANGELOG.md` | `releases`, `editor-version` |
 | anything else | the sections found by `git diff --stat` against a short list, then ask |
 
 The numbers are to be checked against the real section titles when the map is written; this table is

@@ -4535,6 +4535,40 @@ const sectionStart = (n) => {
     await to.context().close();
   }
 
+  // 62. A file written by a newer editor opens, and says so: which version wrote it, which this is, and what to do.
+  // A file from an older version, one with no version and one with a version that is no number say nothing.
+  if (wants(62)) {
+  sectionStart(62);
+    const nv = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
+    nv.on("pageerror", (e) => errors.push(String(e)));
+    await nv.goto(BASE, { waitUntil: "networkidle" });
+    await nv.getByRole("button", { name: "Load the example map" }).click();
+    await nv.waitForTimeout(600);
+    const mapIs = () => nv.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")));
+    const base = await mapIs();
+    const withApp = (name, app) => { const f = path.join(os.tmpdir(), `ttr-${Date.now()}-${name}`); const body = { format: "ticket-to-ride-map", version: 3, kind: "map", payload: { ...base, name: `From ${name}` } }; if (app !== undefined) body.app = app; fs.writeFileSync(f, JSON.stringify(body)); return f; };
+    const importFile = async (file) => {
+      await nv.getByRole("button", { name: "Import", exact: true }).click(); await nv.waitForTimeout(250);
+      const chooser = nv.waitForEvent("filechooser");
+      await nv.getByRole("menuitem", { name: "Map project", exact: true }).click();
+      await (await chooser).setFiles(file); await nv.waitForTimeout(700);
+    };
+    const toasts = async () => (await nv.locator("[data-sonner-toast]").allTextContents()).join(" | ");
+    const clearToasts = () => nv.evaluate(() => document.querySelectorAll("[data-sonner-toast]").forEach((t) => t.remove()));
+    await importFile(withApp("newer", { name: "Map prototypes", version: "99.1.0" }));
+    const said = await toasts();
+    check("a file from a newer editor opens", (await mapIs()).name === "From newer");
+    check("and says which version wrote it and what to do", /newer version of the editor/.test(said) && /99\.1\.0/.test(said) && /Reload the page, or update your copy/.test(said), said);
+    await clearToasts();
+    for (const [name, label, app] of [["older", "an older version", { name: "Map prototypes", version: "1.0.0" }], ["noapp", "no version", undefined], ["odd", "a version that is no number", { name: "x", version: "next" }]]) {
+      await importFile(withApp(name, app));
+      const t = await toasts();
+      check(`a file with ${label} says nothing about versions`, (await mapIs()).name === `From ${name}` && !/newer version of the editor/.test(t), t);
+      await clearToasts();
+    }
+    await nv.context().close();
+  }
+
   if (sectionOpen) sectionTimes[sectionOpen.n] = Math.round((Date.now() - sectionOpen.at) / 100) / 10;
   if (process.env.TTR_TIMES) fs.writeFileSync(process.env.TTR_TIMES, JSON.stringify(sectionTimes));
   console.log("PASS:"); ok.forEach((l) => console.log("  ✓ " + l));
