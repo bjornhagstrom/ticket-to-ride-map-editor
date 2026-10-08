@@ -6,6 +6,7 @@
 import { colorLabels, routeColors, type MapData, type Point, type Route, type Stop, type Ticket, type TicketSet } from "./map-data";
 import { normalizeTicketFile, type TicketFile } from "./map-storage";
 import { boardOf } from "./board";
+import { APP_VERSION, newerEditor } from "./version";
 
 export type CsvFileKind = "stops" | "routes" | "tickets" | "distances" | "unknown";
 export type CsvImport = {
@@ -86,6 +87,13 @@ export function readCsvImport(files: { name: string; text: string }[], data: Map
   for (const file of files) { const rows = parseCsv(file.text); sorted[csvFileKind(rows)].push({ name: file.name, rows }); }
   for (const file of sorted.distances) warnings.push(`${file.name} is a table of distances, which cannot be read back: import the stops and routes instead.`);
   for (const file of sorted.unknown) warnings.push(`${file.name} is not a stop, route or ticket file, so it was left out.`);
+  // The Editor column, on every row of a file this editor wrote: one note when any row comes from a newer editor than this one.
+  let newest = APP_VERSION;
+  for (const file of [...sorted.stops, ...sorted.routes, ...sorted.tickets]) {
+    const at = headerOf(file.rows).indexOf("editor");
+    if (at >= 0) for (const row of file.rows.slice(1)) if (newerEditor(row[at]?.trim(), newest)) newest = row[at].trim();
+  }
+  if (newest !== APP_VERSION) warnings.push(`These files were written by a newer version of the editor (${newest}; this one is ${APP_VERSION}). They were read, but some of what they hold may be missing or changed here. Reload the page, or update your copy of the editor, to get the newest.`);
 
   const stamp = Date.now();
   const network = sorted.stops.length > 0 || sorted.routes.length > 0;

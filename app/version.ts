@@ -11,6 +11,7 @@ export type Release = { version: string; date: string; title: string; changes: s
 // decided; the What's new page in the editor shows released versions only.
 export const UNRELEASED: string[] = [
   "A map file written by a newer version of the editor than yours still opens, and now says which version wrote it and that some of it may be missing or changed here, so you know to reload the page or update your copy.",
+  "The spreadsheet files carry the version of the editor too, in a last column, and say the same when you import files from a newer editor.",
 ];
 
 export const RELEASES: Release[] = [

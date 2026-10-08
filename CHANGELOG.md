@@ -9,6 +9,7 @@ This file is written from `app/version.ts` by `npm run changelog`; edit the note
 Changes since the last release, to go into the next version.
 
 - A map file written by a newer version of the editor than yours still opens, and now says which version wrote it and that some of it may be missing or changed here, so you know to reload the page or update your copy.
+- The spreadsheet files carry the version of the editor too, in a last column, and say the same when you import files from a newer editor.
 
 ## 1.2.0 · 2026-10-08
 

@@ -128,6 +128,8 @@ and only read by people: a stop's `Routes`, `Neighbours` and `Tickets`; a route'
 ticket's `Shortest path` and `Length` (short, medium or long). The import skips those. **Distances
 between stops** is a table of the shortest path between every two stops; it cannot be imported.
 
+**Editor version.** From 1.3.0 the stop, route and ticket files end in a column `Editor`, with the version of the editor that wrote them (for example `1.3.0`) on every row, so a row that is sorted or copied into another file still carries it. Reading a file, the import looks at the column: if any row comes from a newer version of the editor than the one open, it reads the files as usual and says so once, with the newest version it saw, since a newer editor may have columns this one does not know. Leave the column out, or empty, or write anything that is not a version, and nothing is said. The table of distances and the templates have no such column. Older builds read by heading and pass over it.
+
 ## Other names the import understands
 
 So that files from elsewhere read without editing, these headings mean the same as the ones above:

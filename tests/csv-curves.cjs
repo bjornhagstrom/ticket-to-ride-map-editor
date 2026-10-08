@@ -37,7 +37,7 @@ for (const lane of lanes) { lane.points = clone(r0.points); delete lane.curved; 
 // ---------------------------------------------------------------- what the export writes
 {
   const routes = table(exp.routesCsv(map));
-  const last = routes.header.slice(-4);
+  const last = routes.header.slice(-5, -1);
   check("the route file has Bends and Curved, after the columns that were there, which keep their places", last.join() === ["From id", "To id", "Bends", "Curved"].join() && routes.header.slice(0, 8).join() === ["From", "To", "Length", "Colour", "Type", "Wagon style", "Locomotives", "Double route"].join(), routes.header.join());
   const row = (id) => routes.rows[map.routes.findIndex((r) => r.id === id)];
   check("a route's bends are written as x|y pairs from its From stop to its To stop, in board units, with a sign no spreadsheet reads as a time or a date", row(r0.id)[routes.col("Bends")] === "412|306 450|330", String(row(r0.id)[routes.col("Bends")]));
