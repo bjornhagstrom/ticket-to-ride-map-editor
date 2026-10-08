@@ -286,7 +286,7 @@ const sectionStart = (n) => {
   check("two ticket decks to compare", decks.length === 2 && decks.every((deck) => deck.tickets.length > 0), decks.map((d) => `${d.set.label} ${d.tickets.length}`).join(", "));
   const mainDeck = decks[0].tickets;
   check("the main deck can deal a full table", mainDeck.length >= (example.players?.max ?? 5) * (example.startingTickets ?? 3), `${mainDeck.length} for ${(example.players?.max ?? 5)} × ${example.startingTickets ?? 3}`);
-  check("and so can the other deck: a full table of the standard two to five players is dealt from either", decks.every((deck) => deck.tickets.length >= 5 * (example.startingTickets ?? 3)) && example.players === undefined, decks.map((d) => `${d.set.label} ${d.tickets.length}`).join(", "));
+  check("and so can the other deck: a full table of the two or three players it is made for is dealt from either", decks.every((deck) => deck.tickets.length >= 3 * (example.startingTickets ?? 3)) && example.players?.max === 3, decks.map((d) => `${d.set.label} ${d.tickets.length}`).join(", "));
   check("with long tickets among the rest", mainDeck.some((t) => t.long) && mainDeck.some((t) => !t.long));
   check("every stop but the junction is on a ticket", example.stops.filter((st) => !typeOf(st.type).junction).every((st) => mainDeck.some((t) => t.a === st.id || t.b === st.id)));
   await page.getByRole("button", { name: "Tickets", exact: true }).click();
@@ -297,7 +297,7 @@ const sectionStart = (n) => {
   await page.waitForTimeout(300);
   await page.getByRole("button", { name: "Map balance", exact: true }).click();
   await page.waitForTimeout(600);
-  check("the balance report finds the deck fits the example map, and says what five players' wagons come to against its spaces: more than the board holds", (await page.locator(".deck-warning").count()) === 0 && (await page.locator(".space-warning").count()) === 1 && /More wagons than room/.test(await page.locator(".space-warning").textContent()), await page.locator(".balance-panel").textContent().then((t) => t.slice(0, 200)));
+  check("the balance report finds the deck fits the example map, and has no warning about its wagons: three players' wagons fit its spaces", (await page.locator(".deck-warning").count()) === 0 && (await page.locator(".space-warning").count()) === 0, await page.locator(".balance-panel").textContent().then((t) => t.slice(0, 200)));
   await page.keyboard.press("Escape");
   await page.waitForTimeout(300);
 
@@ -1438,7 +1438,7 @@ const sectionStart = (n) => {
   check("Settings carries the game setup", await page.locator("#settings-wagons").isVisible() && await page.locator("#settings-starting-tickets").isVisible());
   // The example map is for the standard two to five players, which is also the default range: so below, a
   // 4 that is stored must be read back from the map, or Settings could be showing the default.
-  check("including how many players the map is for", await page.locator("#settings-players-min").isVisible() && (await page.locator("#settings-players-min").inputValue()) === "2" && (await page.locator("#settings-players-max").inputValue()) === "5", `${await page.locator("#settings-players-min").inputValue()}–${await page.locator("#settings-players-max").inputValue()}`);
+  check("including how many players the map is for", await page.locator("#settings-players-min").isVisible() && (await page.locator("#settings-players-min").inputValue()) === "2" && (await page.locator("#settings-players-max").inputValue()) === "3", `${await page.locator("#settings-players-min").inputValue()}–${await page.locator("#settings-players-max").inputValue()}`);
   await page.locator("#settings-players-max").fill("4");
   await page.locator("#settings-players-max").blur();
   await page.waitForTimeout(400);
@@ -3954,7 +3954,7 @@ const sectionStart = (n) => {
     const labels = rows.map((r) => r[0]).join(" | ");
     check("with crowded routes, double-route traffic, unneeded routes, the busiest stop and the hub degree", ["Crowded routes", "Double routes", "no ticket needs", "one stop", "Wagons at a full table", "hub degree"].every((w) => labels.includes(w)), labels);
     const wagonRow = rows.find((r) => /^Wagons at a full table/.test(r[0]));
-    check("the wagon count is one of them: this map's share beside 57–76 %", wagonRow && /\d+ %/.test(wagonRow[1]) && /5 × 28 wagons for 99 spaces/.test(wagonRow[1]) && wagonRow[2] === "57–76 %", JSON.stringify(wagonRow));
+    check("the wagon count is one of them: this map's share beside 57–76 %", wagonRow && /\d+ %/.test(wagonRow[1]) && /3 × 28 wagons for 95 spaces/.test(wagonRow[1]) && wagonRow[2] === "57–76 %", JSON.stringify(wagonRow));
     check("each with this map's figure and the official range", rows.every((r) => r.length === 3 && r[1] !== "" && /\d.*–.*\d/.test(r[2])), JSON.stringify(rows));
     const crowdedRow = rows.find((r) => /^Crowded routes/.test(r[0])) || [];
     check("crowding is a share of the routes, since a count grows with the size of the map", /as a share of all routes/.test(crowdedRow[0] || "") && /^\d+ % \(\d+ of \d+ routes, at \d players?\)$/.test(crowdedRow[1] || "") && /^\d+–\d+ %$/.test(crowdedRow[2] || ""), JSON.stringify(crowdedRow));
