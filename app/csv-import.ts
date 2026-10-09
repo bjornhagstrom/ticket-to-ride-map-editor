@@ -93,7 +93,7 @@ export function readCsvImport(files: { name: string; text: string }[], data: Map
     const at = headerOf(file.rows).indexOf("editor");
     if (at >= 0) for (const row of file.rows.slice(1)) if (newerEditor(row[at]?.trim(), newest)) newest = row[at].trim();
   }
-  if (newest !== APP_VERSION) warnings.push(`These files were written by a newer version of the editor (${newest}; this one is ${APP_VERSION}). They were read, but some of what they hold may be missing or changed here. Reload the page, or update your copy of the editor, to get the newest.`);
+  if (newest !== APP_VERSION) warnings.push(`These files were written by a newer version of the editor (${newest}; this one is ${APP_VERSION}). Some of what they hold may be missing or changed here. Reload the page, or update your copy of the editor, to get the newest.`);
 
   const stamp = Date.now();
   const network = sorted.stops.length > 0 || sorted.routes.length > 0;

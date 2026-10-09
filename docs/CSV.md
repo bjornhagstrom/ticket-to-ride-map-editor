@@ -69,7 +69,7 @@ laid out from the routes alone. That layout knows nothing of north, so expect to
 ## Bends and curves
 
 A route runs from one stop to the other through its bends, drawn as a curve unless it is straightened. The
-export writes the bends in `Bends` and a straightened route as `no` in `Curved`, after the other columns,
+export writes the bends in `Bends` and a straightened route as `no` in `Curved`, after the other columns (and before `Editor`),
 and the import reads them back, so a round trip keeps the shape of every route, double routes included. A
 bend is a place on the board in the same units as `X` and `Y`, so it is kept only when the stops stay where
 the file puts them. When the stops had to be fitted to the board, or are laid out from the routes because the

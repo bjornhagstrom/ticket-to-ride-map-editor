@@ -881,7 +881,7 @@ export function MapEditor() {
         const parsed = readMapFile(JSON.parse(String(reader.result)));
         const raw = parsed.payload as Record<string, never>;
         // A file from a newer editor opens, but may hold things this one does not know: say so, and what to do.
-        if (newerEditor(parsed.app?.version)) toast.warning(`This file was written by a newer version of the editor (${parsed.app?.version}; this one is ${APP_VERSION}). It opens here, but some of what it holds may be missing or changed. Reload the page, or update your copy of the editor, to get the newest.`, { duration: 20000 });
+        if (newerEditor(parsed.app?.version)) toast.warning(`This file was written by a newer version of the editor (${parsed.app?.version}; this one is ${APP_VERSION}). Some of what it holds may be missing or changed here. Reload the page, or update your copy of the editor, to get the newest.`, { duration: 20000 });
         if (parsed.kind === "background" && !ticketsOnly) {
           const { background, backgroundImage } = normalizeBackgroundFile(raw, format);
           if (data.background.length || data.backgroundImage) { setPendingImport({ kind: "background", background, backgroundImage }); setDanger("import-background"); }
