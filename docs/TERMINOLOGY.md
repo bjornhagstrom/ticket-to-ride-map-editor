@@ -12,7 +12,7 @@ The editor speaks English. Swedish equivalents are given where the work is discu
 | Term | Meaning | Swedish |
 | --- | --- | --- |
 | **map** | Everything one file holds: board, stops, routes, tickets, rules, settings. | karta |
-| **board** | The game board the map is drawn for: its **format** (standard 2×3 or extended 2×4, in fold **panels**) and whether it lies (**landscape**) or stands (**portrait**). | bräde |
+| **board** | The game board the map is drawn for: its **format** (standard 2×3, extended 2×4 or a size of your own from 2 to 6 panels along the long side, in fold **panels**) and whether it lies (**landscape**) or stands (**portrait**). | bräde |
 | **stop** | A place on the map that routes join. In the editor always *stop*; in a video or a post, *city* reads more like the game and is fine. | hållplats, station |
 | **junction** | A stop no ticket ends at and whose name is not printed: it only joins routes. | knutpunkt |
 | **route** | A connection between two stops, a number of wagon spaces long, in a colour. | rutt, sträcka |

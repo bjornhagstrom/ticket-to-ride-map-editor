@@ -4585,11 +4585,13 @@ const sectionStart = (n) => {
     await cb.locator("#settings-custom-board").click(); await cb.waitForTimeout(300);
     check("the button opens a dialog with the panels along each side", (await cb.locator("#custom-board-long").isVisible()) && (await cb.locator("#custom-board-short").isVisible()));
     await cb.locator("#custom-board-long").fill("3"); await cb.locator("#custom-board-short").fill("3"); await cb.waitForTimeout(200);
-    check("it says what size that makes", /790 × 788 mm/.test(await cb.locator(".custom-board-result").textContent()), await cb.locator(".custom-board-result").textContent());
+    check("it says what size that makes", /3 panels along the long side and 3 along the short: 790 × 788 mm/.test(await cb.locator(".custom-board-result").textContent()), await cb.locator(".custom-board-result").textContent());
     await cb.locator("#custom-board-long").fill("2"); await cb.waitForTimeout(200);
     check("a short side longer than the long side is said so, and cannot be used", /cannot have more panels/.test(await cb.locator(".custom-board-result").textContent()) && (await cb.locator("#custom-board-apply").isDisabled()));
     await cb.locator("#custom-board-long").fill("9"); await cb.waitForTimeout(200);
     check("so is a number out of range", /whole numbers from 1 to 6/.test(await cb.locator(".custom-board-result").textContent()) && (await cb.locator("#custom-board-apply").isDisabled()));
+    await cb.locator("#custom-board-long").fill("1"); await cb.locator("#custom-board-short").fill("1"); await cb.waitForTimeout(200);
+    check("one panel alone is not a board, and is said so", /at least two panels/.test(await cb.locator(".custom-board-result").textContent()) && (await cb.locator("#custom-board-apply").isDisabled()));
     await cb.getByRole("button", { name: "Cancel" }).click(); await cb.waitForTimeout(300);
     check("Cancel leaves the board as it was", (await stored()).format === before.format);
     await cb.locator("#settings-custom-board").click(); await cb.waitForTimeout(300);
@@ -4597,7 +4599,6 @@ const sectionStart = (n) => {
     await cb.locator("#custom-board-apply").click(); await cb.waitForTimeout(600);
     const after = await stored();
     check("Use this size gives the map a 3 × 4 board, in the map as it is saved", after.format === "board-3x4", after.format);
-    const ratio = 788 / 526;
     check("everything on the map keeps x and has its y stretched to the new height", after.stops.every((st, i) => Math.abs(st.x - before.stops[i].x) < 1e-6 && Math.abs(st.y - before.stops[i].y * (Math.round(1100 * 788 / 1053) / Math.round(1100 * 525 / 790))) < 1e-6));
     check("Settings then shows the custom board, chosen, and the button changes it", (await cb.locator('#settings-format input[value="board-3x4"]').isChecked()) && (await cb.locator("#settings-custom-board").textContent()).trim() === "Change custom size…" && /Custom board 3×4/.test(await cb.locator("#settings-format").textContent()), await cb.locator("#settings-format").textContent());
     await cb.locator("#settings-custom-board").click(); await cb.waitForTimeout(300);
@@ -4616,7 +4617,7 @@ const sectionStart = (n) => {
     check("the print dialog counts a sheet for each of the twelve panels", (await cb.locator('.print-table tbody tr[data-paper="a4"] td:nth-of-type(2) button').getAttribute("data-pages")) === "12", await cb.locator('.print-table tbody tr[data-paper="a4"] td:nth-of-type(2) button').getAttribute("data-pages"));
     check("and offers no Anniversary size, which only the standard board has", (await cb.locator(".print-table thead").textContent()).indexOf("Anniversary") === -1);
     await cb.keyboard.press("Escape"); await cb.waitForTimeout(300);
-    // It survives a reload, and a file written from it carries it.
+    // It survives a reload (the file carrying it is checked in tests/custom-board.cjs).
     await cb.reload({ waitUntil: "networkidle" }); await cb.waitForTimeout(500);
     check("the custom board is still there after a reload", (await stored()).format === "board-3x4");
     await cb.context().close();

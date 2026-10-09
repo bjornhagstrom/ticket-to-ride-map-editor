@@ -10,7 +10,7 @@ The decision itself — the map knows its board's shape, and printing is asked f
 ## What belongs to the map and what does not
 
 The map stores only its **board shape**: `board-2x3` (790 × 525 mm, 3 × 2 fold panels) or `board-2x4`
-(1053 × 526 mm, 4 × 2), or a board of its own of 1 to 6 panels along each side (`board-3x4` is 1053 × 788 mm; docs/FILE-FORMAT.md, "Boards of any number of panels"). The map is drawn against that board, and wagon spaces are always measured
+(1053 × 526 mm, 4 × 2), or a board of its own of up to 6 panels along each side, never one panel alone (`board-3x4` is 1053 × 788 mm; docs/FILE-FORMAT.md, "Boards of any number of panels"). The map is drawn against that board, and wagon spaces are always measured
 against it: a space is 20 × 9 mm at 100 %.
 
 Everything else is a **print choice**, made in the dialog and kept in `localStorage` under

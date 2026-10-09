@@ -218,7 +218,7 @@ live in the editor, not in the file.
 ### Boards of any number of panels
 
 Added in 1.4.0, within versions 3 and 4: an addition, so the file version did not move. `format` names the board by its fold
-panels, rows then columns: `board-RxC` with R and C from 1 to 6 and R not above C. `board-2x3` and `board-2x4` are the two
+panels, rows then columns: `board-RxC` with R and C from 1 to 6, R not above C and C at least 2 (one panel alone is exactly square, so it could not be told to lie or stand). `board-2x3` and `board-2x4` are the two
 boards the editor began with and keep their measured sizes (790 × 525 mm and 1053 × 526 mm); every other board is C panels
 of 263.3 mm across and R of 262.5 mm down, so `board-3x3` is 790 × 788 mm and `board-3x4` 1053 × 788 mm. The long side is
 always 1100 units, as before, and a board taller than wide is the wide board standing (`orientation: "portrait"`), so

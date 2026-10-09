@@ -33,7 +33,7 @@ Anything the editor cannot use is left out, and the message after the import say
 | `Y` | no | Down, in board units: 0 at the top edge. |
 
 A lying 2×3 board is 1100 units across and 731 down; a standing one 731 across and 1100 down (the
-extended 2×4 is 1100 by 549, a 3×3 board 1100 by 1098; the long side is always 1100). Positions that all fit the board are kept as they are. Positions from
+extended 2×4 is 1100 by 549, a 3×3 board 1100 by 1097; the long side is always 1100). Positions that all fit the board are kept as they are. Positions from
 somewhere else — pixels from a scanned map, say — are scaled to fit the board, shape kept. Instead of
 `X` and `Y` you can give `Lat` and `Lon` (latitude and longitude); they are drawn with north up.
 

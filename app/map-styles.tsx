@@ -56,7 +56,7 @@ const clampCount = (raw: string, fallback: number): number => {
   return Number.isFinite(number) && number >= 1 ? number : fallback;
 };
 
-// Any number of fold panels, from 1 to MAX_PANELS along each side, the long side first: a board taller than wide is the
+// Any number of fold panels, from 1 to MAX_PANELS along each side (not one panel alone), the long side first: a board taller than wide is the
 // wide one standing, and whether it stands is the Orientation beside it. For the odd board, so it is one button.
 function CustomBoardSize({ format, onChangeFormat }: { format: MapFormat; onChangeFormat: (format: MapFormat) => void }) {
   const current = formatOrStandard(format);
@@ -66,7 +66,7 @@ function CustomBoardSize({ format, onChangeFormat }: { format: MapFormat; onChan
   const [short, setShort] = useState(String(custom ? current.rows : 3));
   const asked = { long: Number(long), short: Number(short) };
   const valid = (n: number) => Number.isInteger(n) && n >= 1 && n <= MAX_PANELS;
-  const problem = !valid(asked.long) || !valid(asked.short) ? `Use whole numbers from 1 to ${MAX_PANELS}.` : asked.short > asked.long ? "The short side cannot have more panels than the long side. To stand the board up, use Orientation." : "";
+  const problem = !valid(asked.long) || !valid(asked.short) ? `Use whole numbers from 1 to ${MAX_PANELS}.` : asked.short > asked.long ? "The short side cannot have more panels than the long side. To stand the board up, use Orientation." : asked.long < 2 ? "A board needs at least two panels along its long side." : "";
   const size = problem ? null : formatOrStandard(formatId(asked.short, asked.long));
   return <>
     <Button type="button" variant="outline" size="sm" id="settings-custom-board" className="settings-custom-board" onClick={() => { setLong(String(custom ? current.columns : 4)); setShort(String(custom ? current.rows : 3)); setOpen(true); }}>{custom ? "Change custom size…" : "Custom size…"}</Button>
@@ -80,7 +80,7 @@ function CustomBoardSize({ format, onChangeFormat }: { format: MapFormat; onChan
           <div><Label htmlFor="custom-board-long">Long side, in panels</Label><Input id="custom-board-long" type="number" inputMode="numeric" min={1} max={MAX_PANELS} value={long} onChange={(event) => setLong(event.target.value)} /></div>
           <div><Label htmlFor="custom-board-short">Short side, in panels</Label><Input id="custom-board-short" type="number" inputMode="numeric" min={1} max={MAX_PANELS} value={short} onChange={(event) => setShort(event.target.value)} /></div>
         </div>
-        <p className="helper custom-board-result" role="status">{problem || (size ? `${asked.long} × ${asked.short} panels: ${size.widthMm.toLocaleString("en-GB")} × ${size.heightMm.toLocaleString("en-GB")} mm. Everything on the map keeps its place on the board, stretched to fit.` : "")}</p>
+        <p className="helper custom-board-result" role="status">{problem || (size ? `${asked.long} panels along the long side and ${asked.short} along the short: ${size.widthMm.toLocaleString("en-GB")} × ${size.heightMm.toLocaleString("en-GB")} mm. Everything on the map keeps its place on the board, stretched to fit.` : "")}</p>
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
           <Button type="button" id="custom-board-apply" disabled={Boolean(problem)} onClick={() => { onChangeFormat(formatId(asked.short, asked.long)); setOpen(false); }}>Use this size</Button>

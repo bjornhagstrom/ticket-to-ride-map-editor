@@ -67,7 +67,7 @@ export default function About() {
     <section>
       <h2>Boards, cards and spreadsheets</h2>
       <p>
-        A board lies or stands, in the standard 2×3 or the extended 2×4. Standing it up or laying it
+        A board lies or stands, in the standard 2×3, the extended 2×4 or a size of your own. Standing it up or laying it
         down turns everything on it a quarter turn without changing a single distance, so the wagons
         and every number the editor gives stay as they were.
       </p>

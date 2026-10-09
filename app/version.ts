@@ -18,7 +18,7 @@ export const RELEASES: Release[] = [
     date: "2026-10-09",
     title: "Version 1.4: boards of any number of fold panels",
     changes: [
-      "The board can be any number of fold panels, from 1 to 6 along each side: Settings → Custom size… asks for the panels along the long and the short side. The map moves to it, printing counts its sheets, and the file says which board it is.",
+      "The board can be any number of fold panels, up to 6 along each side: Settings → Custom size… asks for the panels along the long and the short side. The map moves to it, printing counts its sheets, and the file says which board it is.",
     ],
   },
   {

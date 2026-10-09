@@ -1,8 +1,9 @@
-// Boards of any number of fold panels, from 1 to 6 across and down, never more rows than columns (docs/FILE-FORMAT.md, "The board's shape").
+// Boards of any number of fold panels, from 1 to 6 along each side, never more rows than columns, and never one panel only (docs/FILE-FORMAT.md, "Boards of any number of panels").
 // Written before the code. A board is named by its panels, rows then columns, as the two it had were: `board-2x3` is
 // two rows of three and `board-3x4` three rows of four. Any other name is not a board and reads as the standard one,
-// as before; the two it had keep their own sizes. A board is never taller than wide: one that is is the wide board standing,
-// and standing is the map's orientation. A panel is about 263 mm square, so the board's size, how it is cut
+// as before; the two it had keep their own sizes. A board is always wider than tall: one that is taller is the wide board standing,
+// and standing is the map's orientation. That is how a board is told to lie or stand, so one panel alone (exactly square)
+// is not a board. A panel is about 263 mm square, so the board's size, how it is cut
 // into printed sheets and how a map moves to it follow from the panels.
 //
 //   npm run test:custom-board
@@ -33,9 +34,12 @@ check("the extended board is as it was: 1053 × 526 mm, four across and two down
 check("the long side is always W map units, the other follows the shape", [f("board-2x3"), f("board-2x4"), f("board-3x3"), f("board-3x4"), f("board-1x6"), f("board-6x6")].every((d) => d && d.width === W && d.height === Math.round(W * d.heightMm / d.widthMm)));
 check("a 3 × 3 board is about 790 × 788 mm", f("board-3x3") && f("board-3x3").widthMm === 790 && f("board-3x3").heightMm === 788 && f("board-3x3").columns === 3 && f("board-3x3").rows === 3, JSON.stringify(f("board-3x3")));
 check("a 3 × 4 board (three rows of four) is about 1053 × 788 mm", f("board-3x4") && f("board-3x4").widthMm === 1053 && f("board-3x4").heightMm === 788 && f("board-3x4").columns === 4 && f("board-3x4").rows === 3, JSON.stringify(f("board-3x4")));
-check("one panel is a board too, and the largest is six by six", f("board-1x1") && f("board-1x1").columns === 1 && f("board-6x6") && f("board-6x6").rows === 6);
+check("the smallest board is one row of two panels, and the largest six by six; one panel alone is square, so it is not a board", f("board-1x2") && f("board-1x2").rows === 1 && f("board-6x6") && f("board-6x6").rows === 6 && f("board-1x1") === null);
+const all = []; for (let r = 1; r <= 6; r++) for (let c = r; c <= 6; c++) if (data.formatOf(data.formatId(r, c))) all.push(data.formatOf(data.formatId(r, c)));
+check("every board is wider than tall, in millimetres and in units, so it can tell lying from standing", all.length === 20 && all.every((d) => d.widthMm > d.heightMm && d.width > d.height), String(all.length));
+check("names a plain object has anyway are not boards", ["constructor", "toString", "__proto__", "hasOwnProperty", "valueOf"].every((n) => f(n) === null && !data.isMapFormat(n)));
 check("a board wide and one panel tall is the longest", (() => { const d = f("board-1x6"); return d && d.widthMm > d.heightMm && d.width === W && d.height < W / 5; })(), JSON.stringify(f("board-1x6")));
-const notBoards = ["board-0x3", "board-7x2", "board-2x7", "board-3x2", "board-6x1", "board-4x3", "board-2x3x4", "board-02x3", "board-2.5x3", "board--2x3", "board-2x", "board-x3", "Board-2x3", "board-2x3 ", "a4", "", "board-custom", 5, null, undefined, {}, "board-2x3\n"];
+const notBoards = ["board-1x1", "board-0x3", "board-7x2", "board-2x7", "board-3x2", "board-6x1", "board-4x3", "board-2x3x4", "board-02x3", "board-2.5x3", "board--2x3", "board-2x", "board-x3", "Board-2x3", "board-2x3 ", "a4", "", "board-custom", 5, null, undefined, {}, "board-2x3\n"];
 check("anything else is not a board, nor one taller than wide (that is a wide board standing)", notBoards.every((id) => f(id) === null && !data.isMapFormat(id)), JSON.stringify(notBoards.filter((id) => f(id) !== null)));
 check("formatId names the panels, rows then columns", data.formatId(3, 4) === "board-3x4" && data.formatId(2, 3) === "board-2x3");
 check("and the labels say what the board is: the two it had keep their names", f("board-2x3").label === "Standard board 2×3" && f("board-2x4").label === "Extended board 2×4" && /3 × 4|3×4/.test(f("board-3x4").label) && !/Standard|Extended/.test(f("board-3x4").label), f("board-3x4").label);
@@ -68,6 +72,36 @@ check("a file naming a board that is not one opens on the standard board, as bef
   check("and back again to where it was", there.stops.every((s, i) => Math.abs(s.y - from.stops[i].y) < 1e-6));
   const stood = storage.rescaleMapToFormat(storage.normalizeMap(Object.assign(clone(from), { orientation: "portrait" })), "board-3x3");
   check("a standing map moves too, and stays standing", stood.format === "board-3x3" && stood.orientation === "portrait");
+}
+
+// A board stands and lies again, whatever its shape, and a standing map moves to another board (the smallest and the squarest too).
+{
+  const { rotateMap } = require(path.join(out, "board.js"));
+  for (const id of ["board-1x2", "board-2x2", "board-3x3", "board-6x6", "board-3x4"]) {
+    const lying = storage.normalizeMap(clone(initialMap)); lying.format = id;
+    const stood = rotateMap(lying, "portrait");
+    const laid = rotateMap(stood, "landscape");
+    check(`${id}: stood up it stands, laid down it lies, and the map is as it was`, stood.orientation === "portrait" && laid.orientation === undefined && lying.stops.every((st, i) => Math.abs(laid.stops[i].x - st.x) < 1e-6 && Math.abs(laid.stops[i].y - st.y) < 1e-6));
+    const moved = storage.rescaleMapToFormat(clone(stood), "board-2x3");
+    check(`${id}: a standing map moves to another board and keeps standing`, moved.format === "board-2x3" && moved.orientation === "portrait");
+  }
+}
+
+// ---------------------------------------------------------------- the build before the boards (1.3.0), reading a file that names one
+{
+  const old = fs.mkdtempSync(path.join(os.tmpdir(), "ttr-custom-board-old-"));
+  let commitThere = true;
+  try { execFileSync("git", ["cat-file", "-e", "4b82aa7"], { cwd: root, stdio: "pipe" }); } catch { commitThere = false; console.log("The 1.3.0 commit (4b82aa7) is not at hand: the check against it is skipped."); }
+  if (commitThere) {
+    try {
+      execFileSync("sh", ["-c", `git archive 4b82aa7 app | tar -x -C ${old}`], { cwd: root, stdio: "pipe" });
+      execFileSync(path.join(root, "node_modules", ".bin", "tsc"), ["app/map-storage.ts", "app/map-data.ts", "--outDir", path.join(old, "out"), "--module", "commonjs", "--target", "es2022", "--moduleResolution", "node", "--skipLibCheck", "--lib", "es2022,dom"], { cwd: old, stdio: "pipe" });
+      const oldStorage = require(path.join(old, "out", "map-storage.js"));
+      const theirs = oldStorage.normalizeMap(oldStorage.readMapFile(clone(file)).payload);
+      check("1.3.0 reads a file with a 3 × 4 board as the standard board, with the positions as they were (docs/FILE-FORMAT.md says so)", theirs.format === "board-2x3" && theirs.stops.length === norm.stops.length && theirs.stops.every((st, i) => st.x === norm.stops[i].x && st.y === norm.stops[i].y));
+    } catch (error) { check("the 1.3.0 build compiles, to be read against", false, String(error.stdout || error.message).slice(0, 300)); }
+  }
+  fs.rmSync(old, { recursive: true, force: true });
 }
 
 // ---------------------------------------------------------------- printing

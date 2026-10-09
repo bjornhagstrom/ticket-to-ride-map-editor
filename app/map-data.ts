@@ -10,8 +10,8 @@ export type BackgroundType = "area" | "line" | "label";
 // adds up to a standard or an Anniversary board — is chosen per print run; see app/print-plan.ts.
 //
 // A board is named by its fold panels, rows then columns: `board-2x3` is two rows of three, `board-3x4` three rows of four,
-// from 1 to MAX_PANELS each way and never more rows than columns (a board taller than wide is the wide one standing, which
-// is the map's orientation). Anything else is not a board; see formatOf.
+// from 1 to MAX_PANELS each way, never more rows than columns (a board taller than wide is the wide one standing, which
+// is the map's orientation) and never one panel alone (a square board could not be told to lie or stand). Anything else is not a board; see formatOf.
 export type MapFormat = `board-${number}x${number}`;
 export const MAX_PANELS = 6;
 export type Point = { x: number; y: number };
@@ -174,14 +174,14 @@ export const PRESET_FORMATS: MapFormat[] = ["board-2x3", "board-2x4"];
 export const PANEL_MM = { width: 263.3, height: 262.5 };
 export const formatId = (rows: number, columns: number): MapFormat => `board-${rows}x${columns}`;
 
-/** What a board name means, or null when it is not one: `board-RxC` with R and C from 1 to MAX_PANELS and R not above C. */
+/** What a board name means, or null when it is not one: `board-RxC` with R and C from 1 to MAX_PANELS, R not above C and C at least 2. */
 export function formatOf(value: unknown): MapFormatDefinition | null {
   if (typeof value !== "string") return null;
-  if (PRESET_DEFINITIONS[value]) return PRESET_DEFINITIONS[value];
+  if (Object.hasOwn(PRESET_DEFINITIONS, value)) return PRESET_DEFINITIONS[value];
   const m = /^board-([1-9])x([1-9])$/.exec(value);
   if (!m) return null;
   const rows = Number(m[1]), columns = Number(m[2]);
-  if (rows > MAX_PANELS || columns > MAX_PANELS || rows > columns) return null;
+  if (rows > MAX_PANELS || columns > MAX_PANELS || rows > columns || columns < 2) return null;
   const widthMm = Math.round(columns * PANEL_MM.width), heightMm = Math.round(rows * PANEL_MM.height);
   const label = `Custom board ${rows}×${columns}`;
   return { label, shortLabel: label, note: `${columns} panels across, ${rows} down`, width: W, height: Math.round(W * heightMm / widthMm), widthMm, heightMm, columns, rows, custom: true };

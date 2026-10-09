@@ -8,7 +8,7 @@ This file is written from `app/version.ts` by `npm run changelog`; edit the note
 
 **Version 1.4: boards of any number of fold panels**
 
-- The board can be any number of fold panels, from 1 to 6 along each side: Settings → Custom size… asks for the panels along the long and the short side. The map moves to it, printing counts its sheets, and the file says which board it is.
+- The board can be any number of fold panels, up to 6 along each side: Settings → Custom size… asks for the panels along the long and the short side. The map moves to it, printing counts its sheets, and the file says which board it is.
 
 ## 1.3.0 · 2026-10-09
 
