@@ -247,8 +247,10 @@ lane below the number, all from it; ruling them separately, as Northern Lights d
 **Why `laneRule`, and not the name the analysis used.** The analysis and the model called the field `lanesUsableByPlayers` from the start,
 and every build up to 1.4.0 lists that name as a field it knows, but none ever copied it: a file carrying it comes out of any older build
 without it. A name no older build knows is carried through under rule 3, so a map with a rule passes through 0.4.1 to 1.4.0 and comes out
-with it. `tests/lane-rule.cjs` checks both against the builds themselves (0.4.1 and 1.4.0). No build ever wrote the old name in a file, so
-none is in the wild; a file that does carry it is kept as an unknown field. 1.3.0 and 1.4.0, which have the editor-version note (rule 7),
+with it, as a file, and for as long as the page stays open: those builds lose an unknown field when the map they keep in the browser is
+read again after a reload (the stored copy holds it under `unknown`, which they leave out), so a rule carried by an older build lasts
+until its page is reloaded. 1.5.0 reads it back, so a map kept in the browser holds what it does not know through any reload. `tests/lane-rule.cjs` checks both against the builds themselves (0.4.1 and 1.4.0). No build ever wrote the old name in a file, so
+none is in the wild; a file that does carry it is kept as an unknown field (and, from 1.5.0, through a reload of the map kept in the browser). 1.3.0 and 1.4.0, which have the editor-version note (rule 7),
 say that a file from a newer editor opens with that note; earlier builds say nothing, and read the map with the standard rule.
 
 ### Board formats that became print choices

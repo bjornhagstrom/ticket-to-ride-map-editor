@@ -92,6 +92,19 @@ const writtenAgain = storage.writeMapFile("map", storage.mapPayload(keptMap), ke
 check("a field this build has never heard of comes back out untouched",
   JSON.stringify(writtenAgain.payload.weatherRules) === JSON.stringify({ rain: "slows ferries" }), JSON.stringify(writtenAgain.payload.weatherRules));
 check("and it is not left lying in the map as a stray key", keptMap.weatherRules === undefined);
+// The map kept in the browser is the map as JSON, `unknown` and all, and is read again when the page reloads: what a build does not know
+// must come through that as well as through a file (it did not: the stored `unknown` was left out as a field the reader knows).
+const storedCopy = JSON.parse(JSON.stringify(keptMap));
+const afterStore = storage.normalizeMap(storedCopy);
+const afterReload = storage.writeMapFile("map", storage.mapPayload(afterStore), afterStore);
+check("a field this build has never heard of survives the map being kept in the browser and read again after a reload", JSON.stringify(afterReload.payload.weatherRules) === JSON.stringify({ rain: "slows ferries" }), JSON.stringify(afterReload.payload.weatherRules));
+const twice = storage.normalizeMap(JSON.parse(JSON.stringify(afterStore)));
+check("and again after a second reload, without being nested in itself", JSON.stringify(storage.mapPayload(twice).weatherRules) === JSON.stringify({ rain: "slows ferries" }) && twice.unknown && twice.unknown.unknown === undefined, JSON.stringify(twice.unknown));
+const mixed = JSON.parse(JSON.stringify(storedCopy)); mixed.climate = "wet";
+const mixedMap = storage.normalizeMap(mixed);
+check("a field added beside the stored ones is kept with them", JSON.stringify(mixedMap.unknown) === JSON.stringify({ weatherRules: { rain: "slows ferries" }, climate: "wet" }), JSON.stringify(mixedMap.unknown));
+const notObject = storage.normalizeMap(Object.assign(JSON.parse(JSON.stringify(storedCopy)), { unknown: "not an object" }));
+check("a stored `unknown` that is not an object is left out, and nothing breaks", notObject.unknown === undefined);
 check("an unknown field on a stop survives as well", writtenAgain.payload.stops[0].elevation === 120, String(writtenAgain.payload.stops[0].elevation));
 
 // ---------------------------------------------------------------- a file carries what it refers to

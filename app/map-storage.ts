@@ -208,7 +208,10 @@ const MAP_KEYS = new Set([
 
 const unknownKeys = (value: Record<string, unknown>): Record<string, unknown> | undefined => {
   // Built from entries, so a key such as __proto__ in a file is kept as data, never as a prototype.
-  const kept = Object.fromEntries(Object.entries(value).filter(([key]) => !MAP_KEYS.has(key)));
+  // `unknown` itself is a field the map keeps (so a map held in the browser comes back with what it carried): its entries are
+  // folded in beside the new ones, so nothing is nested in itself and a field is kept after any number of reloads.
+  const before = isRecord(value.unknown) ? Object.entries(value.unknown) : [];
+  const kept = Object.fromEntries([...before, ...Object.entries(value).filter(([key]) => !MAP_KEYS.has(key))]);
   return Object.keys(kept).length ? kept : undefined;
 };
 

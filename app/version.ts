@@ -18,6 +18,7 @@ export const RELEASES: Release[] = [
     date: "2026-10-09",
     title: "Version 1.5: the second lane's rule is a setting",
     changes: [
+      "A map kept in the browser keeps the fields this version does not know after the page is reloaded, as a file does, so a map opened from a newer editor does not lose them.",
       "Settings has a box for from how many players the second lane of a double route opens, 2 to 6 (4 is the standard), kept with the map and in its files. Map balance counts the spaces and says the rule by it, so a map made for a different rule is judged by that rule.",
     ],
   },
