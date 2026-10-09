@@ -203,7 +203,7 @@ const MAP_KEYS = new Set([
   "name", "format", "orientation", "background", "backgroundImage", "stops", "routes", "notes",
   "lineStyles", "routeTypeStyles", "wagonStyles", "stopTypeStyles", "tickets", "ticketSets",
   "wagonsPerPlayer", "startingTickets", "keptTickets", "players", "ticketBands", "ticketMix",
-  "ticketValuation", "lanesUsableByPlayers", "endGapMm", "deckRules", "deckRule", "deckTension", "rules", "mapVersion", "unknown",
+  "ticketValuation", "laneRule", "endGapMm", "deckRules", "deckRule", "deckTension", "rules", "mapVersion", "unknown",
 ]);
 
 const unknownKeys = (value: Record<string, unknown>): Record<string, unknown> | undefined => {
@@ -438,7 +438,7 @@ const normalizeMapFields = (value: Partial<MapData>): MapData => ({
   startingTickets: countOr(value.startingTickets, DEFAULT_STARTING_TICKETS),
   keptTickets: Math.min(countOr(value.keptTickets, DEFAULT_KEPT_TICKETS), countOr(value.startingTickets, DEFAULT_STARTING_TICKETS)),
   players: normalizePlayers(value.players),
-  lanesUsableByPlayers: normalizeLaneRule(value.lanesUsableByPlayers),
+  laneRule: normalizeLaneRule(value.laneRule),
   ticketBands: value.ticketBands,
   ticketMix: value.ticketMix,
   ...normalizeDeckRules(value),

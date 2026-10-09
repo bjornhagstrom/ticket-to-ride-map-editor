@@ -79,7 +79,7 @@ export function AnalysisPanel({ official, wide, onToggleWide, onAddParallel, len
   const classicRows = compareWithClassics(data);
   const pointAt = (length: number | null, colour: string | null) => ({ className: cn("colour-cell", pinKey === `cell:${length ?? "*"}:${colour ?? "*"}` && "pinned"), "aria-pressed": pinKey === `cell:${length ?? "*"}:${colour ?? "*"}`, onClick: () => onPin(`cell:${length ?? "*"}:${colour ?? "*"}`, colourRouteIds(data, length, colour), null), onPointerEnter: () => onPreviewRoutes(colourRouteIds(data, length, colour)), onPointerLeave: () => onPreviewRoutes(null) });
   const players = data.players ?? { min: 2, max: 5 };
-  const laneFrom = lanesOpenFrom(data.lanesUsableByPlayers);
+  const laneFrom = lanesOpenFrom(data.laneRule);
   const sortedStops = [...data.stops].sort((a, b) => (stats.hubDegree.get(b.id) ?? 0) - (stats.hubDegree.get(a.id) ?? 0));
   // In the right column rather than a dialog, so the map stays in view: pointing at a row marks
   // the stop or routes it is about, and picking one selects it as before.

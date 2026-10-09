@@ -430,7 +430,7 @@ export function setupBalance(data: MapData, setId?: string): SetupBalance {
   for (const route of wagonRoutes) { const key = [route.a, route.b].sort().join("~"); lanes.set(key, [...(lanes.get(key) ?? []), route]); }
   let usableSpaces = 0;
   for (const group of lanes.values()) {
-    const open = lanesUsableAt(table, group.length, data.lanesUsableByPlayers);
+    const open = lanesUsableAt(table, group.length, data.laneRule);
     for (const route of group.slice(0, open)) usableSpaces += route.length;
   }
   const wagonsAtTable = table * wagonsPerPlayer;

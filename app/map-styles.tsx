@@ -113,7 +113,7 @@ export function SettingsDialog({ open, onOpenChange, target, onTarget, data, cha
   const totalSpaces = data.routes.reduce((sum, route) => sum + route.length, 0);
   const diameter = useMemo(() => mapDiameter(data), [data]);
   const players = data.players ?? DEFAULT_PLAYERS;
-  const laneFrom = lanesOpenFrom(data.lanesUsableByPlayers);
+  const laneFrom = lanesOpenFrom(data.laneRule);
   // A map with nothing on it yet: say what is worth doing now and what can wait.
   const fresh = data.stops.length === 0 && data.routes.length === 0;
 
@@ -244,7 +244,7 @@ export function SettingsDialog({ open, onOpenChange, target, onTarget, data, cha
                   onChange={(event) => change((draft) => { const max = clampCount(event.target.value, DEFAULT_PLAYERS.max); draft.players = { min: Math.min(players.min, max), max }; return draft; })} /></div>
               <div><Label htmlFor="settings-lanes-from">Second lane opens from</Label>
                 <NativeSelect id="settings-lanes-from" value={laneFrom === null ? "own" : String(laneFrom)}
-                  onChange={(event) => change((draft) => { const rule = laneRuleOpeningFrom(Number(event.target.value)); if (rule) draft.lanesUsableByPlayers = rule; else delete draft.lanesUsableByPlayers; return draft; })}>
+                  onChange={(event) => change((draft) => { const rule = laneRuleOpeningFrom(Number(event.target.value)); if (rule) draft.laneRule = rule; else delete draft.laneRule; return draft; })}>
                   {laneFrom === null && <NativeSelectOption value="own">The map&apos;s own rule</NativeSelectOption>}
                   {Array.from({ length: LANES_OPEN_FROM_RANGE.max - LANES_OPEN_FROM_RANGE.min + 1 }, (_, i) => LANES_OPEN_FROM_RANGE.min + i).map((n) => <NativeSelectOption key={n} value={String(n)}>{n} players{n === LANES_OPEN_FROM ? " (standard)" : ""}</NativeSelectOption>)}
                 </NativeSelect></div>

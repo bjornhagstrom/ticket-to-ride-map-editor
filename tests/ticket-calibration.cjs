@@ -72,7 +72,7 @@ const buildMap = (source) => {
     // The map's own player range and double-route rule, so the score counts the lanes a player may
     // actually use at the largest table it is built for (docs/ROUTE-LOAD.md §5).
     players: playersOf(source),
-    lanesUsableByPlayers: source.lanesUsableByPlayers,
+    laneRule: source.lanesUsableByPlayers,
   };
 };
 

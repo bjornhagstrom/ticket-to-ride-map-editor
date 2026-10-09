@@ -62,7 +62,7 @@ different sizes. Fixed wagon counts would mean something different on a small ma
 ## The suggester counts every lane, at the map's largest table
 
 **Chosen.** `f_load` divides a route's load by the lanes usable at the map's **maximum** player
-count, taken from `lanesUsableByPlayers` when the map has it.
+count, taken from the map's `laneRule` when it has one (docs/FILE-FORMAT.md, "The lane rule").
 
 **Why.** Measured: where an official deck is distinguishable from random at all, it is balanced for
 all lanes open, not for one lane per edge. Switzerland is the clearest — a 2–3 player map whose deck

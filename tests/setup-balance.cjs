@@ -48,7 +48,7 @@ const line = (lengths, extra = {}) => {
   check("at three players the second lane of a double route is not open, so its spaces are not counted", three.totalSpaces === 100 && three.usableSpaces === 80 && Math.abs(three.fill - 60 / 80) < 1e-9, `${three.usableSpaces} usable of ${three.totalSpaces}`);
   const four = setupBalance({ ...m, players: { min: 2, max: 4 } });
   check("from four players it is open, and counted", four.usableSpaces === 100 && Math.abs(four.fill - 80 / 100) < 1e-9, `${four.usableSpaces}`);
-  const rule = setupBalance({ ...m, players: { min: 2, max: 3 }, lanesUsableByPlayers: { "2+": "all" } });
+  const rule = setupBalance({ ...m, players: { min: 2, max: 3 }, laneRule: { "2+": "all" } });
   check("a map's own rule for its lanes is followed", rule.usableSpaces === 100, `${rule.usableSpaces}`);
 }
 {

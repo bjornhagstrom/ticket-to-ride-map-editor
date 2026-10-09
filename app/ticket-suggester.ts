@@ -330,7 +330,7 @@ class SuggesterModel {
     }
 
     const largestTable = data.players?.max ?? DEFAULT_PLAYERS.max;
-    this.lanesAtLargestTable = this.edges.map((edge) => lanesUsableAt(largestTable, edge.lanes, data.lanesUsableByPlayers));
+    this.lanesAtLargestTable = this.edges.map((edge) => lanesUsableAt(largestTable, edge.lanes, data.laneRule));
 
     this.reach = Math.max(1, Math.min(this.diameter, Math.floor(lengthCap * wagonsPerPlayer)));
 
@@ -781,7 +781,7 @@ function buildReport(model: SuggesterModel, deck: DeckState, styleName: TicketSt
   const hard = deck.members
     .filter((candidate) => candidate.locos > 0 || candidate.tunnels > 0)
     .map((candidate) => ({ ticketId: ids.get(candidate) ?? "", a: candidate.a, b: candidate.b, locomotives: candidate.locos, tunnels: candidate.tunnels }));
-  const bottlenecksAt = (table: number) => findBottlenecks(model, deck, ids, table, data?.lanesUsableByPlayers);
+  const bottlenecksAt = (table: number) => findBottlenecks(model, deck, ids, table, data?.laneRule);
   const players = data?.players ?? DEFAULT_PLAYERS;
   return {
     style: styleName,

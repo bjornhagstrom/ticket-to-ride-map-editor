@@ -4636,14 +4636,14 @@ const sectionStart = (n) => {
     const openBalance = async () => { await lr.getByRole("button", { name: "Map balance", exact: true }).click(); await lr.waitForTimeout(600); };
     await lr.getByRole("button", { name: "Settings" }).click(); await lr.waitForTimeout(400);
     check("Settings has the second lane's setting beside the players, at 4 players, the standard", (await lr.locator("#settings-lanes-from").inputValue()) === "4" && /4 players \(standard\)/.test(await lr.locator("#settings-lanes-from").textContent()));
-    check("and the map has no rule of its own saved", (await stored()).lanesUsableByPlayers === undefined);
+    check("and the map has no rule of its own saved", (await stored()).laneRule === undefined);
     await lr.locator("#settings-lanes-from").selectOption("2"); await lr.waitForTimeout(400);
     const two = await stored();
-    check("choosing 2 keeps the rule in the map: both lanes always open", JSON.stringify(two.lanesUsableByPlayers) === JSON.stringify({ "2+": "all" }), JSON.stringify(two.lanesUsableByPlayers));
+    check("choosing 2 keeps the rule in the map: both lanes always open", JSON.stringify(two.laneRule) === JSON.stringify({ "2+": "all" }), JSON.stringify(two.laneRule));
     await lr.locator("#settings-lanes-from").selectOption("3"); await lr.waitForTimeout(400);
-    check("choosing 3: one lane from two players, both from three", JSON.stringify((await stored()).lanesUsableByPlayers) === JSON.stringify({ "2+": 1, "3+": "all" }));
+    check("choosing 3: one lane from two players, both from three", JSON.stringify((await stored()).laneRule) === JSON.stringify({ "2+": 1, "3+": "all" }));
     await lr.locator("#settings-lanes-from").selectOption("4"); await lr.waitForTimeout(400);
-    check("choosing 4 again leaves no rule, as a map that never chose", (await stored()).lanesUsableByPlayers === undefined);
+    check("choosing 4 again leaves no rule, as a map that never chose", (await stored()).laneRule === undefined);
     await lr.locator("#settings-lanes-from").selectOption("2"); await lr.waitForTimeout(300);
     await lr.keyboard.press("Escape"); await lr.waitForTimeout(300);
     await openBalance();
@@ -4658,13 +4658,13 @@ const sectionStart = (n) => {
     check("and at the standard 4 it says that a second lane opens from four players, and counts 95 of 99 open", /95 of them open/.test(std) && /opens from 4 players/.test(std), std.slice(0, 300));
     await lr.keyboard.press("Escape"); await lr.waitForTimeout(300);
     // A rule of the map's own, from a file.
-    await lr.evaluate(() => { const map = JSON.parse(localStorage.getItem("ttr-map")); map.lanesUsableByPlayers = { "2": 1, "3": 2, "4": "all" }; localStorage.setItem("ttr-map", JSON.stringify(map)); });
+    await lr.evaluate(() => { const map = JSON.parse(localStorage.getItem("ttr-map")); map.laneRule = { "2": 1, "3": 2, "4": "all" }; localStorage.setItem("ttr-map", JSON.stringify(map)); });
     await lr.reload({ waitUntil: "networkidle" }); await lr.waitForTimeout(500);
-    check("a rule of the map's own survives a reload", JSON.stringify((await stored()).lanesUsableByPlayers) === JSON.stringify({ "2": 1, "3": 2, "4": "all" }));
+    check("a rule of the map's own survives a reload", JSON.stringify((await stored()).laneRule) === JSON.stringify({ "2": 1, "3": 2, "4": "all" }));
     await lr.getByRole("button", { name: "Settings" }).click(); await lr.waitForTimeout(400);
     check("Settings shows it as the map's own rule, and says choosing a number replaces it", (await lr.locator("#settings-lanes-from").inputValue()) === "own" && /rule of its own/.test(await lr.locator("#settings-lanes-from").evaluate((el) => el.closest(".settings-pair").nextElementSibling.textContent)));
     await lr.locator("#settings-lanes-from").selectOption("5"); await lr.waitForTimeout(400);
-    check("choosing a number replaces it, and the map's own rule is no longer offered", JSON.stringify((await stored()).lanesUsableByPlayers) === JSON.stringify({ "2+": 1, "5+": "all" }) && (await lr.locator('#settings-lanes-from option[value="own"]').count()) === 0);
+    check("choosing a number replaces it, and the map's own rule is no longer offered", JSON.stringify((await stored()).laneRule) === JSON.stringify({ "2+": 1, "5+": "all" }) && (await lr.locator('#settings-lanes-from option[value="own"]').count()) === 0);
     await lr.context().close();
   }
 

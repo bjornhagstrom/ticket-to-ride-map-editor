@@ -56,7 +56,7 @@ Each map sets its own threshold for when a double route opens; see §5. The stan
 
 - For the current deck, compute `load` per route pair: all parallel routes between the same two stops count as one edge with `lanes` = number of routes.
 - A bottleneck is an edge where `load / lanesUsable` is high:
-  - `lanesUsable` comes from the map's `lanesUsableByPlayers` (§5) for the chosen player count. Without data, use the standard rule: 1 lane at 2–3 players, all lanes at 4+.
+  - `lanesUsable` comes from the map's `laneRule` (§5; the reference data calls it `lanesUsableByPlayers`) for the chosen player count. Without data, use the standard rule: 1 lane at 2–3 players, all lanes at 4+.
   - Flag it when the ratio is in the top 10 % of edges and ≥ 3 tickets, or ≥ 2 × the mean ratio.
 - Show bottlenecks as a list, with stops, length, lanes, load and the tickets that use the edge, and highlight them on the map.
 - Suggested action text: "Many tickets need this route. Consider making it a double route, adding an alternative path, or moving a ticket." The fix is usually a change to the **map**, not to the tickets.
@@ -77,7 +77,7 @@ For every map with `useForCalibration: true`:
 
 ## Built
 
-A, B and C are built. `lanesUsableByPlayers` came into the editor's own map model, the score counts
+A, B and C are built. `lanesUsableByPlayers` came into the editor's own map model (it is called `laneRule` there since 1.5.0), the score counts
 the lanes open at the map's largest table, and the balancing view lists crowded routes at a table
 the designer picks inside the map's range, marking them on the map. Feeding the real per-map lane
 rules into the calibration changed no score on any of the eight maps, which is what §5.3 predicted
@@ -202,7 +202,7 @@ The official deck is compared with 30 random decks of the same size, drawn from 
 ### 5.3 What this implies (for the build session; nothing changed here)
 
 - **The suggester's `f_load` should keep counting lanes in full,** using the lanes usable at the map's **maximum** player count. That is what the official decks match. This is a data-backed confirmation of the current behaviour. No weight or target in `TICKET-SUGGESTER.md` was changed.
-- **The bottleneck view should follow the selected player count,** using `lanesUsableByPlayers`, down to the map's minimum. It is a diagnostic of how tight the smallest game gets, not a target for the suggester.
+- **The bottleneck view should follow the selected player count,** using the map's `laneRule`, down to the map's minimum. It is a diagnostic of how tight the smallest game gets, not a target for the suggester.
 - **Possible spec change (not made):** if the map's `players.max` is below the threshold, for example a custom 2–3 player map on the standard rule, then no lane beyond the first can ever open and the full-lane count would be wrong. In that case `f_load` should use `lanesUsableByPlayers[players.max]`. None of the official maps hits this case. Nordic and Switzerland looked like they did, but their rule opens doubles at 3.
 - **Knock-on: Northern Lights' `trainsPerPlayer` is now 40,** not the default 45, so reach drops from 20 to 18. Rerunning `generic` with 40 trains (measured): official 31.0, random median 37.1, suggested (seed 1) 1.3. The official deck still beats random, but the §2b row in `TICKET-SUGGESTER.md` (23.6 / 35.8 / 1.5–1.6) was computed with 45 trains and should be updated by the build session. Polska at 35 trains keeps reach 14, so its numbers are unchanged.
 - **The §2 table here** used 45 trains for Northern Lights, and for Polska through the same default. The Polska row is unaffected; Northern Lights would drop 2 of 55 tickets that are over reach, which changes nothing visible.

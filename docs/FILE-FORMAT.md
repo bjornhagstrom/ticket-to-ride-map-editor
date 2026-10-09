@@ -232,19 +232,24 @@ they say that the file was written by a newer editor (rule 7), which is why the 
 
 ### The lane rule
 
-Added in 1.5.0, within versions 3 and 4: an addition, so the file version did not move. A map may carry `lanesUsableByPlayers`, how many lanes of a
-double or triple route a player may use at each player count. Before 1.5.0 the field was in the model and read by the analysis, but nothing
-set it and a file never carried it (it was dropped on load). Now it is read, written and kept. Keys are a player count (`"3"`) or a count and
-a plus (`"3+"`, that count and up), values a number of lanes from 1 to 8 or `"all"`; an exact count wins over a `+`, and a count the rule
-does not reach follows the standard rule (one lane below four players, all from four). Entries that are neither are left out when the
-file is read; a rule with none left is no rule.
+Added in 1.5.0, within versions 3 and 4: an addition, so the file version did not move. A map may carry `laneRule`, how many lanes of a
+double or triple route a player may use at each player count. Keys are a player count (`"3"`) or a count and a plus (`"3+"`, that count
+and up), values a number of lanes from 1 to 8 or `"all"`; an exact count wins over a `+`, and a count the rule does not reach follows the
+standard rule (one lane below four players, all from four). Entries that are neither are left out when the file is read; a rule with
+none left is no rule.
 
-Settings has one box for it, **Second lane opens from** 2 to 6 players, 4 being the standard. It writes `{ "2+": "all" }` for 2 (always open),
-`{ "2+": 1, "N+": "all" }` for 3, 5 and 6 (one lane from two players up, every lane from N), and nothing for 4, so a map that never chose
-stays as it was. A rule of the map's own that no number says (a hand-written file's, with exact counts or a lane count in between) is kept
-as it is and shown as "The map's own rule" until a number is chosen, which replaces it. Triple routes follow the same rule: one lane
-below the number, all from it; ruling them separately, as Northern Lights does, has no setting. Older builds keep the field untouched
-(rule 3) and read it as they always have, which is not at all in the editor and as the analysis does for the figures.
+Settings has one box for it, **Second lane opens from** 2 to 6 players, 4 being the standard. It writes `{ "2+": "all" }` for 2 (always
+open), `{ "2+": 1, "N+": "all" }` for 3, 5 and 6 (one lane from two players up, every lane from N), and nothing for 4, so a map that never
+chose stays as it was. A rule of the map's own that no number says (a hand-written file's, with exact counts or a lane count in between)
+is kept as it is and shown as "The map's own rule" until a number is chosen, which replaces it. Triple routes follow the same rule: one
+lane below the number, all from it; ruling them separately, as Northern Lights does, has no setting.
+
+**Why `laneRule`, and not the name the analysis used.** The analysis and the model called the field `lanesUsableByPlayers` from the start,
+and every build up to 1.4.0 lists that name as a field it knows, but none ever copied it: a file carrying it comes out of any older build
+without it. A name no older build knows is carried through under rule 3, so a map with a rule passes through 0.4.1 to 1.4.0 and comes out
+with it. `tests/lane-rule.cjs` checks both against the builds themselves (0.4.1 and 1.4.0). No build ever wrote the old name in a file, so
+none is in the wild; a file that does carry it is kept as an unknown field. 1.3.0 and 1.4.0, which have the editor-version note (rule 7),
+say that a file from a newer editor opens with that note; earlier builds say nothing, and read the map with the standard rule.
 
 ### Board formats that became print choices
 
