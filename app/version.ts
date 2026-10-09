@@ -10,11 +10,18 @@ export type Release = { version: string; date: string; title: string; changes: s
 // the top of CHANGELOG.md under Unreleased, and become the notes of the next version when it is
 // decided; the What's new page in the editor shows released versions only.
 export const UNRELEASED: string[] = [
-  "A map file written by a newer version of the editor than yours still opens, and now says which version wrote it and that some of it may be missing or changed here, so you know to reload the page or update your copy.",
-  "The spreadsheet files carry the version of the editor too, in a last column, and say the same when you import files from a newer editor.",
 ];
 
 export const RELEASES: Release[] = [
+  {
+    version: "1.3.0",
+    date: "2026-10-09",
+    title: "Version 1.3: files say which version of the editor wrote them",
+    changes: [
+      "A map file written by a newer version of the editor than yours still opens, and now says which version wrote it and that some of it may be missing or changed here, so you know to reload the page or update your copy.",
+      "The spreadsheet files carry the version of the editor too, in a last column, and say the same when you import files from a newer editor.",
+    ],
+  },
   {
     version: "1.2.0",
     date: "2026-10-08",
