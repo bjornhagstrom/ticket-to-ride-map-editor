@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { DEFAULT_TICKET_MIX, LANES_OPEN_FROM, colorLabels, type MapData, realWagon, type Stop, type Ticket, ticketsInSet, type TicketSet } from "./map-data";
+import { DEFAULT_TICKET_MIX, lanesOpenFrom, colorLabels, type MapData, realWagon, type Stop, type Ticket, ticketsInSet, type TicketSet } from "./map-data";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -79,6 +79,7 @@ export function AnalysisPanel({ official, wide, onToggleWide, onAddParallel, len
   const classicRows = compareWithClassics(data);
   const pointAt = (length: number | null, colour: string | null) => ({ className: cn("colour-cell", pinKey === `cell:${length ?? "*"}:${colour ?? "*"}` && "pinned"), "aria-pressed": pinKey === `cell:${length ?? "*"}:${colour ?? "*"}`, onClick: () => onPin(`cell:${length ?? "*"}:${colour ?? "*"}`, colourRouteIds(data, length, colour), null), onPointerEnter: () => onPreviewRoutes(colourRouteIds(data, length, colour)), onPointerLeave: () => onPreviewRoutes(null) });
   const players = data.players ?? { min: 2, max: 5 };
+  const laneFrom = lanesOpenFrom(data.lanesUsableByPlayers);
   const sortedStops = [...data.stops].sort((a, b) => (stats.hubDegree.get(b.id) ?? 0) - (stats.hubDegree.get(a.id) ?? 0));
   // In the right column rather than a dialog, so the map stays in view: pointing at a row marks
   // the stop or routes it is about, and picking one selects it as before.
@@ -94,7 +95,7 @@ export function AnalysisPanel({ official, wide, onToggleWide, onAddParallel, len
             {Array.from({ length: Math.max(1, players.max - players.min + 1) }, (_, i) => players.min + i).map((count) => <NativeSelectOption key={count} value={String(count)}>{count} players</NativeSelectOption>)}
           </NativeSelect>
         </div>
-        <p className="helper">How many tickets want each route, against the lanes a player may use at that table. Only the second lane of a double route depends on the player count{players.max < 4 ? ", and on this map it never opens" : ""}.</p>
+        <p className="helper">How many tickets want each route, against the lanes a player may use at that table. Only the second lane of a double route depends on the player count{laneFrom !== null && players.max < laneFrom ? ", and on this map it never opens" : ""}.</p>
         {bottlenecks.length === 0
           ? <p className="helper">No route is wanted by more tickets than it can carry. Official maps have {CROWDING_OFFICIAL[0]}–{CROWDING_OFFICIAL[1]} such routes at a full table, {BALANCE_OFFICIAL.crowdedPct[0]}–{BALANCE_OFFICIAL.crowdedPct[1]} % of their routes: some contention is part of the game.</p>
           : <>
@@ -111,7 +112,7 @@ export function AnalysisPanel({ official, wide, onToggleWide, onAddParallel, len
       <div className="analysis-section setup-balance">
         <h3>Game setup against the map</h3>
         <p className="helper">
-          The map holds <strong>{setup.totalSpaces} wagon spaces</strong>{setup.usableSpaces !== setup.totalSpaces ? `, ${setup.usableSpaces} of them open to a table of ${tableWord(setup.table)} (a second lane of a double route opens from ${LANES_OPEN_FROM} players)` : ""}. At {setup.wagonsPerPlayer} wagons each, a full table of {tableWord(setup.table)} holds <strong>{setup.wagonsAtTable} wagons</strong>{setup.fill !== null ? <>, <strong>{Math.round(100 * setup.fill)} %</strong> of those spaces: the official maps hold {BALANCE_OFFICIAL.wagonFill[0]}–{BALANCE_OFFICIAL.wagonFill[1]} %</> : ""}.
+          The map holds <strong>{setup.totalSpaces} wagon spaces</strong>{setup.usableSpaces !== setup.totalSpaces ? `, ${setup.usableSpaces} of them open to a table of ${tableWord(setup.table)} (${laneFrom === null ? "the map's own rule for a second lane of a double route" : `a second lane of a double route opens from ${laneFrom} players`})` : ""}. At {setup.wagonsPerPlayer} wagons each, a full table of {tableWord(setup.table)} holds <strong>{setup.wagonsAtTable} wagons</strong>{setup.fill !== null ? <>, <strong>{Math.round(100 * setup.fill)} %</strong> of those spaces: the official maps hold {BALANCE_OFFICIAL.wagonFill[0]}–{BALANCE_OFFICIAL.wagonFill[1]} %</> : ""}.
         </p>
         {setup.spaceVerdict === "tight" && <p className="helper helper-warning space-warning">{setup.fill === null
           ? "No routes to put wagons on yet."

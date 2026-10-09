@@ -4,6 +4,12 @@ What changed in each version of the [Ticket to Ride map editor](https://hagstrom
 
 This file is written from `app/version.ts` by `npm run changelog`; edit the notes there.
 
+## Unreleased
+
+Changes since the last release, to go into the next version.
+
+- Settings has a box for from how many players the second lane of a double route opens, 2 to 6 (4 is the standard), kept with the map and in its files. Map balance counts the spaces and says the rule by it, so a map made for a different rule is judged by that rule.
+
 ## 1.4.0 · 2026-10-09
 
 **Version 1.4: boards of any number of fold panels**

@@ -276,6 +276,32 @@ export function lanesUsableAt(players: number, lanes: number, rule?: LaneRule): 
   return players >= LANES_OPEN_FROM ? lanes : 1;
 }
 
+/** The panel of choices in Settings: from how many players the second lane of a double route opens, 2 (always) to 6. */
+export const LANES_OPEN_FROM_RANGE = { min: 2, max: 6 };
+/** The rule that opens the second lane from `players` players: none for the standard four, so a file stays as it was. */
+export function laneRuleOpeningFrom(players: number): LaneRule | undefined {
+  const from = Math.min(LANES_OPEN_FROM_RANGE.max, Math.max(LANES_OPEN_FROM_RANGE.min, Math.round(players)));
+  if (from === LANES_OPEN_FROM) return undefined;
+  return from === 2 ? { "2+": "all" } : { "2+": 1, [`${from}+`]: "all" };
+}
+/** The number of players a rule opens the second lane from: 4 for no rule, null when it is a rule of the map's own that no number says. */
+export function lanesOpenFrom(rule: LaneRule | undefined): number | null {
+  const entries = Object.entries(rule ?? {});
+  if (!entries.length) return LANES_OPEN_FROM;
+  for (let from = LANES_OPEN_FROM_RANGE.min; from <= LANES_OPEN_FROM_RANGE.max; from++) {
+    const same = laneRuleOpeningFrom(from) ?? { "2+": 1, "4+": "all" };
+    const keys = Object.keys(same);
+    if (entries.length === keys.length && keys.every((key) => rule![key] === same[key])) return from;
+  }
+  return null;
+}
+/** A lane rule read from a file: the entries that are a player count (or `N+`) and a number of lanes (or `all`); nothing when none is. */
+export function normalizeLaneRule(value: unknown): LaneRule | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const kept = Object.entries(value as Record<string, unknown>).filter(([key, lanes]) => /^[1-9]\d?\+?$/.test(key) && (lanes === "all" || (typeof lanes === "number" && Number.isInteger(lanes) && lanes >= 1 && lanes <= 8)));
+  return kept.length ? (Object.fromEntries(kept) as LaneRule) : undefined;
+}
+
 // Where a ticket stops being short and where it becomes long, as fractions of the map's own
 // diameter — the same measure the official decks were read with, so a mix carries between maps of
 // different sizes. The shares are what fraction of the deck should sit in each band.

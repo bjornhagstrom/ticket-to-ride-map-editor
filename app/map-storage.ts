@@ -2,7 +2,7 @@
 // files open, board-format rescaling, and image reading.
 import { APP_VERSION } from "./version";
 import { boardOf, rotateMap, turnBetween, turnContents, type Board } from "./board";
-import { W, formatOrStandard, isMapFormat, normalizeTension, BUILT_IN_DECK_RULES, type DeckRuleSet, type PlayerRange, DEFAULT_WAGONS_PER_PLAYER, DEFAULT_STARTING_TICKETS, DEFAULT_KEPT_TICKETS, defaultTicketSet, type Ticket, type TicketSet, defaultStopTypeStyles, fallbackStopTypeStyle, type StopTypeStyle, defaultWagonStyles, type WagonStyle, defaultRouteTypeStyles, type LineStyle, type RouteTypeStyle, type BackgroundImage, type BackgroundShape, type ImageCrop, type MapData, type MapFormat, type MapVersion, type MapVersionEntry, type NoteBox, type Point, type Route, type Stop, STORAGE_KEY, LEGACY_STORAGE_KEY } from "./map-data";
+import { W, formatOrStandard, isMapFormat, normalizeTension, normalizeLaneRule, BUILT_IN_DECK_RULES, type DeckRuleSet, type PlayerRange, DEFAULT_WAGONS_PER_PLAYER, DEFAULT_STARTING_TICKETS, DEFAULT_KEPT_TICKETS, defaultTicketSet, type Ticket, type TicketSet, defaultStopTypeStyles, fallbackStopTypeStyle, type StopTypeStyle, defaultWagonStyles, type WagonStyle, defaultRouteTypeStyles, type LineStyle, type RouteTypeStyle, type BackgroundImage, type BackgroundShape, type ImageCrop, type MapData, type MapFormat, type MapVersion, type MapVersionEntry, type NoteBox, type Point, type Route, type Stop, STORAGE_KEY, LEGACY_STORAGE_KEY } from "./map-data";
 
 export const GUIDE_SEEN_KEY = "ttr-guide-seen";
 export const MAX_IMAGE_WARN_BYTES = 2 * 1024 * 1024;
@@ -438,6 +438,7 @@ const normalizeMapFields = (value: Partial<MapData>): MapData => ({
   startingTickets: countOr(value.startingTickets, DEFAULT_STARTING_TICKETS),
   keptTickets: Math.min(countOr(value.keptTickets, DEFAULT_KEPT_TICKETS), countOr(value.startingTickets, DEFAULT_STARTING_TICKETS)),
   players: normalizePlayers(value.players),
+  lanesUsableByPlayers: normalizeLaneRule(value.lanesUsableByPlayers),
   ticketBands: value.ticketBands,
   ticketMix: value.ticketMix,
   ...normalizeDeckRules(value),

@@ -16,7 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { cn } from "@/lib/utils";
-import { DEFAULT_PLAYERS, LANES_OPEN_FROM, DEFAULT_TICKET_BANDS, DEFAULT_TICKET_MIX, TICKET_MIX_PRESETS, colorLabels, DEFAULT_WAGONS_PER_PLAYER, DEFAULT_STARTING_TICKETS, DEFAULT_KEPT_TICKETS, type MapData, type MapFormat, formatOrStandard, formatId, PRESET_FORMATS, MAX_PANELS, routeColors, stopSizeMeta, type RouteTypeStyle, type StopTypeStyle, type WagonShape, wagonShapeMeta } from "./map-data";
+import { DEFAULT_PLAYERS, LANES_OPEN_FROM, LANES_OPEN_FROM_RANGE, laneRuleOpeningFrom, lanesOpenFrom, DEFAULT_TICKET_BANDS, DEFAULT_TICKET_MIX, TICKET_MIX_PRESETS, colorLabels, DEFAULT_WAGONS_PER_PLAYER, DEFAULT_STARTING_TICKETS, DEFAULT_KEPT_TICKETS, type MapData, type MapFormat, formatOrStandard, formatId, PRESET_FORMATS, MAX_PANELS, routeColors, stopSizeMeta, type RouteTypeStyle, type StopTypeStyle, type WagonShape, wagonShapeMeta } from "./map-data";
 
 export type StyleKind = "map" | "ticket" | "stop" | "route" | "defaults";
 export type StyleTarget = { kind: StyleKind; id?: string };
@@ -113,6 +113,7 @@ export function SettingsDialog({ open, onOpenChange, target, onTarget, data, cha
   const totalSpaces = data.routes.reduce((sum, route) => sum + route.length, 0);
   const diameter = useMemo(() => mapDiameter(data), [data]);
   const players = data.players ?? DEFAULT_PLAYERS;
+  const laneFrom = lanesOpenFrom(data.lanesUsableByPlayers);
   // A map with nothing on it yet: say what is worth doing now and what can wait.
   const fresh = data.stops.length === 0 && data.routes.length === 0;
 
@@ -241,9 +242,14 @@ export function SettingsDialog({ open, onOpenChange, target, onTarget, data, cha
               <div><Label htmlFor="settings-players-max">Players, most</Label>
                 <Input id="settings-players-max" type="number" min={1} max={8} value={players.max}
                   onChange={(event) => change((draft) => { const max = clampCount(event.target.value, DEFAULT_PLAYERS.max); draft.players = { min: Math.min(players.min, max), max }; return draft; })} /></div>
-              <div />
+              <div><Label htmlFor="settings-lanes-from">Second lane opens from</Label>
+                <NativeSelect id="settings-lanes-from" value={laneFrom === null ? "own" : String(laneFrom)}
+                  onChange={(event) => change((draft) => { const rule = laneRuleOpeningFrom(Number(event.target.value)); if (rule) draft.lanesUsableByPlayers = rule; else delete draft.lanesUsableByPlayers; return draft; })}>
+                  {laneFrom === null && <NativeSelectOption value="own">The map&apos;s own rule</NativeSelectOption>}
+                  {Array.from({ length: LANES_OPEN_FROM_RANGE.max - LANES_OPEN_FROM_RANGE.min + 1 }, (_, i) => LANES_OPEN_FROM_RANGE.min + i).map((n) => <NativeSelectOption key={n} value={String(n)}>{n} players{n === LANES_OPEN_FROM ? " (standard)" : ""}</NativeSelectOption>)}
+                </NativeSelect></div>
             </div>
-            <p className="helper">How many players the map is built for. It sets how big a deck has to be to deal from, and whether the second lane of a double route is ever in play: the standard rule opens it only from {LANES_OPEN_FROM} players up{players.max < LANES_OPEN_FROM ? ", so on this map a double route is always worth one lane" : ""}.</p>
+            <p className="helper">How many players the map is built for. It sets how big a deck has to be to deal from, and whether the second lane of a double route is ever in play: the standard rule opens it only from {LANES_OPEN_FROM} players up. The box beside them sets that for this map{laneFrom === null ? " (it now holds a rule of its own, from a file, which choosing a number replaces)" : ""}{laneFrom !== null && players.max < laneFrom ? "; as it is, a double route is always worth one lane on this map" : ""}.</p>
             <div className="settings-pair">
               <div><Label htmlFor="settings-wagons">Wagons each</Label>
                 <Input id="settings-wagons" type="number" min={1} max={99} value={data.wagonsPerPlayer ?? DEFAULT_WAGONS_PER_PLAYER}

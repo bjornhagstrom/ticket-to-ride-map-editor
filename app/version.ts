@@ -10,6 +10,7 @@ export type Release = { version: string; date: string; title: string; changes: s
 // the top of CHANGELOG.md under Unreleased, and become the notes of the next version when it is
 // decided; the What's new page in the editor shows released versions only.
 export const UNRELEASED: string[] = [
+  "Settings has a box for from how many players the second lane of a double route opens, 2 to 6 (4 is the standard), kept with the map and in its files. Map balance counts the spaces and says the rule by it, so a map made for a different rule is judged by that rule.",
 ];
 
 export const RELEASES: Release[] = [
