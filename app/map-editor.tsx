@@ -25,12 +25,12 @@ import { type DeckCompareView } from "./deck-compare";
 import { DEFAULT_PRINT_CHOICE, isSafari, PRINT_CHOICE_KEY, PRINT_PROFILES, type PrintChoice, type PrintProfile, printPlan } from "./print-plan";
 import { useTicketSuggestion } from "./use-ticket-suggestion";
 import { SettingsDialog, type StyleTarget } from "./map-styles";
-import { BALANCE_OFFICIAL, connectionCount, fittingLength, bandsOf, bandCuts, mapDiameter, deckFigures, defaultStyle, deckRuleFor, TICKET_SUGGESTER, evaluateTicketDeck, suggestedDeckSize, ticketEndStopCount, type TicketStyle, autoPlaceLabels, labelledStops, setupBalance, stopCoverage, ticketBand, type TicketBand, reviewTickets, ticketPointsPerSpace, ticketCoverage, type RouteSuggestion, labelCovers, labelAngleOptions, routeSamplePoints, colourLengthTable, crossings as crossingList, networkShape, SHAPE_OFFICIAL, buildAdjacency, networkStats, routeSpacing, shortestPath, suggestRoutes } from "./map-analysis";
+import { BALANCE_OFFICIAL, connectionCount, fittingLength, bandsOf, bandCuts, mapDiameter, deckFigures, defaultStyle, deckRuleFor, TICKET_SUGGESTER, evaluateTicketDeck, suggestedDeckSize, ticketEndStopCount, type TicketStyle, autoPlaceLabels, turnAndTidy, labelledStops, setupBalance, stopCoverage, ticketBand, type TicketBand, reviewTickets, ticketPointsPerSpace, ticketCoverage, type RouteSuggestion, labelCovers, labelAngleOptions, routeSamplePoints, colourLengthTable, crossings as crossingList, networkShape, SHAPE_OFFICIAL, buildAdjacency, networkStats, routeSpacing, shortestPath, suggestRoutes } from "./map-analysis";
 import { canvasPoint, canvasPointRaw, pointsFor, samePair, stopById } from "./map-geometry";
 import { REPO_URL, newerEditor } from "./version";
 import { RouteLogo } from "./logo";
 import { ACTION_GAP_MS, countChange, EXPORT_REMINDER_KEY, exportAge, exported, freshReminder, isDue, isLastStep, later, lessOften, readReminder, stop as stopReminding, turnOn, type ExportReminder } from "./export-reminder";
-import { boardOf, rotateMap, type Orientation } from "./board";
+import { boardOf, type Orientation } from "./board";
 import { distancesCsv, routesCsv, stopsCsv, templatesZip, ticketsCsv } from "./csv-export";
 import { decodeCsvBytes, readCsvImport, type CsvImport } from "./csv-import";
 import { planRebind, applyRebind, stopKeyOf, type RebindGroup } from "./ticket-rebind";
@@ -949,9 +949,13 @@ export function MapEditor() {
   // Standing a board up or laying it down turns everything on it a quarter turn, as one undoable step.
   const changeOrientation = (next: Orientation) => {
     if (next === format.orientation) return;
-    change((draft) => rotateMap(draft, next));
+    // The names that end up on a route after the turn are moved clear in the same step, as the button does; Undo takes both back.
+    const turned = turnAndTidy(data, next);
+    change(() => turned.data);
     setDraftPoints([]);
     clearSelection();
+    if (turned.moved) toast.success(`Turned the board, and moved ${turned.moved} name${turned.moved === 1 ? "" : "s"} clear of the routes.`);
+    if (turned.unresolved.length) toast.warning(`${turned.unresolved.length} name${turned.unresolved.length === 1 ? " is" : "s are"} still on a route after the turn: ${turned.unresolved.map((id) => stopById(data, id)?.name).filter(Boolean).slice(0, 4).join(", ")}${turned.unresolved.length > 4 ? ` and ${turned.unresolved.length - 4} more` : ""}. Use Move names clear, or move the stop or bend the route.`);
   };
   const changeFormat = (nextFormat: MapFormat) => {
     if (nextFormat === data.format) return;

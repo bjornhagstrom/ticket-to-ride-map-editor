@@ -4,6 +4,13 @@ What changed in each version of the [Ticket to Ride map editor](https://hagstrom
 
 This file is written from `app/version.ts` by `npm run changelog`; edit the notes there.
 
+## Unreleased
+
+Changes since the last release, to go into the next version.
+
+- Turning the board also moves the stop names that would end up on a route, as the Move names clear button does, in the same step, and Undo takes both back. A name that is already clear or locked stays where it is.
+- The tension slider now makes its choice when it has stopped moving, so it also works moved by a screen reader on a phone, which sends no key or pointer.
+
 ## 1.5.0 · 2026-10-09
 
 **Version 1.5: the second lane's rule is a setting**

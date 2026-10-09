@@ -10,6 +10,8 @@ export type Release = { version: string; date: string; title: string; changes: s
 // the top of CHANGELOG.md under Unreleased, and become the notes of the next version when it is
 // decided; the What's new page in the editor shows released versions only.
 export const UNRELEASED: string[] = [
+  "Turning the board also moves the stop names that would end up on a route, as the Move names clear button does, in the same step, and Undo takes both back. A name that is already clear or locked stays where it is.",
+  "The tension slider now makes its choice when it has stopped moving, so it also works moved by a screen reader on a phone, which sends no key or pointer.",
 ];
 
 export const RELEASES: Release[] = [

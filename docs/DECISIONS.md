@@ -180,3 +180,16 @@ what a visitor remembers. The release notes say that it warms up when pointed at
 play, or a visitor count that shows that the wait is not noticed. Removing it is one line in
 `app/map-dialogs.tsx`.
 
+## Names after a turn
+
+**Decision.** Turning the board (standing it up or laying it down) also moves the stop names that would end up on a route,
+as the button "Move names clear" does, in the same step. A name that is already clear stays where it is, a locked name stays,
+and what cannot be placed is said in the notice (and left as the turn put it). Undo takes the turn and the names back together.
+Decided by the owner on 2026-10-09.
+
+**Why.** A name left to place itself (no angle of its own) is placed again after a turn, and some then sit on a route; on the
+example map four to five names did. Pressing the button was the cure every time, so the turn does it, at the cost of moving
+names the person had not asked to move: only those that would sit on a route, never one that was already clear.
+
+**Would change it.** A wish to have a turn move nothing but the geometry (the button is still there for it), or names that were
+set by hand being moved; those are locked to stay (`labelLocked`).

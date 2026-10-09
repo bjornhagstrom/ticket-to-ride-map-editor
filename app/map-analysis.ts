@@ -2,7 +2,7 @@
 // computed on demand from MapData, and none of it is stored in a map file.
 import { DEFAULT_WAGONS_PER_PLAYER, DEFAULT_STARTING_TICKETS, DEFAULT_TICKET_BANDS, DEFAULT_TICKET_MIX, type TicketBands, type TicketMix, DEFAULT_PLAYERS, lanesUsableAt, defaultLabelAngle, labelPush, stopSizeMeta, ticketsInSet, type MapData, type Ticket, type Point, realWagon, type Route, routeColors, type Stop, W } from "./map-data";
 import type { TicketDeckReport } from "./ticket-suggester";
-import { boardOf } from "./board";
+import { boardOf, rotateMap, type Orientation } from "./board";
 import { curvedSamples, isCurved, intersects, parallelPoints, pointsFor, polylineLength, stopById } from "./map-geometry";
 
 export type RouteSpacing = { route: Route; drawnMm: number; neededMm: number; ratio: number; verdict: "short" | "long" | "ok" };
@@ -332,6 +332,17 @@ export function autoPlaceLabels(data: MapData): { placed: Map<string, number>; u
     if (labelCovers(data, stop, samples)) unresolved.push(stop.id);
   }
   return { placed, unresolved, locked };
+}
+
+// Turning the board and tidying the names in one go: a name left to place itself is placed again after a turn, and some then sit
+// on a route, so the turn does what the Move names clear button does. A name that is already clear stays where it is, a locked
+// one stays, and what cannot be placed is reported rather than shuffled. Turning to the way the board already lies changes nothing.
+export function turnAndTidy(data: MapData, to: Orientation): { data: MapData; moved: number; unresolved: string[] } {
+  const turned = rotateMap(data, to);
+  if (turned === data) return { data, moved: 0, unresolved: [] };
+  const { placed, unresolved } = autoPlaceLabels(turned);
+  if (!placed.size) return { data: turned, moved: 0, unresolved };
+  return { data: { ...turned, stops: turned.stops.map((stop) => (placed.has(stop.id) ? { ...stop, labelAngle: placed.get(stop.id) } : stop)) }, moved: placed.size, unresolved };
 }
 
 // Junctions only join routes: no ticket ends at one, and its name is never drawn. So they are left

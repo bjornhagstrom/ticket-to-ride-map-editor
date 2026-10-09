@@ -3995,6 +3995,17 @@ const sectionStart = (n) => {
     await rebuilt();
     text = (await description()).replace(/\s+/g, " ");
     check("the lowest end is calm, said to be a little calmer than the calmest official map", (await slider.inputValue()) === "0" && /^Calm\./.test(text) && /calmer than the calmest official/.test(text), text.slice(0, 200));
+    // A screen reader on a phone moves a slider with change events only: no key goes up and no pointer is lifted. The choice is
+    // made when the value has stopped changing for a moment (and not at every step along the way).
+    await slider.evaluate((el) => { const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set; for (const v of ["20", "45", "70"]) { set.call(el, v); el.dispatchEvent(new Event("input", { bubbles: true })); el.dispatchEvent(new Event("change", { bubbles: true })); } });
+    await tp2.waitForTimeout(150);
+    check("moved by change events alone, the number follows at once and the choice is not made at every step", (await tp2.locator(".suggest-dialog .tension-slider-value").textContent()).trim() === "70" && (await tp2.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")).deckTension)) === 0);
+    await tp2.waitForTimeout(1800);
+    check("and is made once it has stopped changing, with no key or pointer to say so: 70", (await tp2.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")).deckTension)) === 70);
+    await rebuilt();
+    await slider.focus();
+    await tp2.keyboard.press("Home");
+    await rebuilt();
     // A place between: clicking the slider where a person would.
     const box = await slider.boundingBox();
     await tp2.mouse.click(box.x + box.width * 0.75, box.y + box.height / 2);
@@ -4666,6 +4677,36 @@ const sectionStart = (n) => {
     await lr.locator("#settings-lanes-from").selectOption("5"); await lr.waitForTimeout(400);
     check("choosing a number replaces it, and the map's own rule is no longer offered", JSON.stringify((await stored()).laneRule) === JSON.stringify({ "2+": 1, "5+": "all" }) && (await lr.locator('#settings-lanes-from option[value="own"]').count()) === 0);
     await lr.context().close();
+  }
+
+  // 65. Turning the board moves the names that end up on a route, in the same step: the toast says how many, no name is left on a
+  // route that could be placed clear, and Undo takes the turn and the names back together.
+  if (wants(65)) {
+  sectionStart(65);
+    const tn = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
+    tn.on("pageerror", (e) => errors.push(String(e)));
+    await tn.goto(BASE, { waitUntil: "networkidle" });
+    await tn.getByRole("button", { name: "Load the example map" }).click();
+    await tn.waitForTimeout(600);
+    const stored = () => tn.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")));
+    const onRoute = () => tn.getByText(/stop names? on a route/).count();
+    // Start from names that are clear, as after pressing the button, so a name on a route afterwards is the turn's doing.
+    if (await onRoute()) { await tn.getByRole("button", { name: /Move \d+ names? clear/ }).click(); await tn.waitForTimeout(500); }
+    check("before the turn no name is on a route", (await onRoute()) === 0);
+    const before = await stored();
+    await tn.getByRole("button", { name: "Settings" }).click(); await tn.waitForTimeout(400);
+    await tn.locator('#settings-orientation input[value="portrait"]').check(); await tn.waitForTimeout(700);
+    const toasts = (await tn.locator("[data-sonner-toast]").allTextContents()).join(" | ");
+    const turned = await stored();
+    check("the board stands", turned.orientation === "portrait");
+    check("the turn says how many names it moved clear of the routes", /Turned the board, and moved \d+ names? clear of the routes/.test(toasts), toasts);
+    await tn.keyboard.press("Escape"); await tn.waitForTimeout(400);
+    check("and no name sits on a route after it", (await onRoute()) === 0);
+    check("some names did move: their angles are not those the plain turn gave them", turned.stops.some((st) => { const was = before.stops.find((b) => b.id === st.id); return st.labelAngle !== undefined && was && (was.labelAngle === undefined || ((was.labelAngle + 90) % 360 + 360) % 360 !== st.labelAngle); }));
+    await tn.getByRole("button", { name: "Undo" }).click(); await tn.waitForTimeout(500);
+    const undone = await stored();
+    check("Undo takes the turn and the names back in one step: the board lies, and the names are as they were", undone.orientation === undefined && undone.stops.every((st) => { const was = before.stops.find((b) => b.id === st.id); return st.x === was.x && st.y === was.y && st.labelAngle === was.labelAngle; }));
+    await tn.context().close();
   }
 
   if (sectionOpen) sectionTimes[sectionOpen.n] = Math.round((Date.now() - sectionOpen.at) / 100) / 10;
