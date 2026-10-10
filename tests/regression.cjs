@@ -4709,6 +4709,61 @@ const sectionStart = (n) => {
     await tn.context().close();
   }
 
+  // 66. The phone: the map first, the tools and the properties in sheets from a bar at the foot of the screen. At 390 px wide the
+  // map is in view without scrolling, the tools are one tap away and shut again when a tool is chosen, a selected object has its
+  // properties one tap away, and nothing spills sideways. A wide screen has none of it.
+  if (wants(66)) {
+  sectionStart(66);
+    const phoneCtx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
+    const ph = await phoneCtx.newPage();
+    ph.on("pageerror", (e) => errors.push(String(e)));
+    await ph.goto(BASE, { waitUntil: "networkidle" });
+    await ph.getByRole("button", { name: "Load the example map" }).click();
+    await ph.waitForTimeout(600);
+    const visibleHeight = (selector) => ph.evaluate((sel) => { const r = document.querySelector(sel).getBoundingClientRect(); return Math.max(0, Math.min(r.bottom, innerHeight) - Math.max(r.top, 0)); }, selector);
+    const shown = async (selector) => (await ph.locator(selector).count()) > 0 && (await ph.locator(selector).first().isVisible());
+    check("the map is in view without scrolling: at least 40 % of the screen's height", (await visibleHeight(".map-wrap")) >= 0.4 * 844, `${Math.round(await visibleHeight(".map-wrap"))} px of 844`);
+    check("the top of the page is short: the map starts within the top third", (await ph.evaluate(() => document.querySelector(".map-wrap").getBoundingClientRect().top)) <= 844 / 3, String(await ph.evaluate(() => Math.round(document.querySelector(".map-wrap").getBoundingClientRect().top))));
+    check("the tools are not on the page until asked for, and a bar at the foot offers them", !(await shown(".tools-panel")) && (await shown(".phone-bar")) && (await ph.locator(".phone-bar").evaluate((el) => { const r = el.getBoundingClientRect(); return Math.round(r.bottom) === innerHeight; })));
+    check("nothing spills sideways", (await ph.evaluate(() => document.documentElement.scrollWidth)) <= 390, String(await ph.evaluate(() => document.documentElement.scrollWidth)));
+    await ph.locator("#phone-tools").tap(); await ph.waitForTimeout(300);
+    check("Tools opens the tools, above the bar and inside the screen", (await shown(".tools-panel")) && (await ph.locator(".tools-panel").evaluate((el) => { const r = el.getBoundingClientRect(), bar = document.querySelector(".phone-bar").getBoundingClientRect(); return r.bottom <= bar.top + 1 && r.top >= 0 && r.left >= 0 && r.right <= innerWidth + 1; })));
+    check("with every tool and the panels reachable: Settings, Map balance, Tickets, Rules", (await ph.locator(".tools-panel").getByRole("button", { name: "Settings" }).isVisible()) && (await ph.locator(".tools-panel").getByRole("button", { name: "Map balance", exact: true }).isVisible()));
+    await ph.locator("#phone-tools").tap(); await ph.waitForTimeout(300);
+    check("tapping it again shuts them", !(await shown(".tools-panel")));
+    await ph.locator("#phone-tools").tap(); await ph.waitForTimeout(300);
+    await ph.locator(".tools-panel .tool-row button").nth(1).tap(); await ph.waitForTimeout(300);
+    check("choosing a tool shuts the sheet, so the map can be touched, and the tool is the one chosen", !(await shown(".tools-panel")) && (await ph.locator(".tool-row button").nth(1).getAttribute("aria-pressed")) === "true");
+    await ph.locator("#phone-tools").tap(); await ph.waitForTimeout(300);
+    await ph.locator(".tools-panel .tool-row button").nth(0).tap(); await ph.waitForTimeout(300);
+    await ph.locator("#phone-tools").tap(); await ph.waitForTimeout(300);
+    await ph.locator(".tools-panel").getByRole("button", { name: "Settings" }).tap(); await ph.waitForTimeout(500);
+    check("Settings opens as a dialog that fits the screen, and the sheet is out of its way", !(await shown(".tools-panel")) && (await ph.getByRole("dialog").evaluate((el) => { const r = el.getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth + 1; })));
+    await ph.keyboard.press("Escape"); await ph.waitForTimeout(300);
+    check("the properties are on the bar too, with no mark while nothing is selected", (await ph.locator("#phone-properties").count()) === 1 && (await ph.locator("#phone-properties .phone-dot").count()) === 0);
+    // Select a stop by touching it.
+    const stop = await ph.locator(".map-canvas .stop").first().boundingBox();
+    await ph.touchscreen.tap(stop.x + stop.width / 2, stop.y + stop.height / 2); await ph.waitForTimeout(400);
+    check("selecting a stop marks the Properties button", (await ph.locator("#phone-properties .phone-dot").count()) === 1);
+    await ph.locator("#phone-properties").tap(); await ph.waitForTimeout(300);
+    check("which opens the properties of that stop in a sheet", (await shown(".properties")) && /Name|Stop/i.test(await ph.locator(".properties").textContent()));
+    const box = await ph.locator(".map-wrap").boundingBox();
+    await ph.touchscreen.tap(box.x + 12, box.y + 12); await ph.waitForTimeout(300);
+    check("touching the map shuts the sheet", !(await shown(".properties")));
+    // A panel opened from the tools shows in the sheet of the properties.
+    await ph.locator("#phone-tools").tap(); await ph.waitForTimeout(300);
+    await ph.locator(".tools-panel").getByRole("button", { name: "Map balance", exact: true }).tap(); await ph.waitForTimeout(700);
+    check("Map balance, opened from the tools, opens in the sheet of panels and the tools sheet is shut", (await shown(".properties")) && !(await shown(".tools-panel")) && /Map balance/.test(await ph.locator(".properties").textContent()));
+    check("and still nothing spills sideways", (await ph.evaluate(() => document.documentElement.scrollWidth)) <= 390);
+    await phoneCtx.close();
+    // A wide screen has none of it.
+    const wide = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
+    await wide.goto(BASE, { waitUntil: "networkidle" });
+    await wide.getByRole("button", { name: "Load the example map" }).click(); await wide.waitForTimeout(500);
+    check("a wide screen has no phone bar, and its tools are on the page as ever", !(await wide.locator(".phone-bar").isVisible()) && (await wide.locator(".tools-panel").isVisible()) && (await wide.locator(".properties").isVisible()));
+    await wide.context().close();
+  }
+
   if (sectionOpen) sectionTimes[sectionOpen.n] = Math.round((Date.now() - sectionOpen.at) / 100) / 10;
   if (process.env.TTR_TIMES) fs.writeFileSync(process.env.TTR_TIMES, JSON.stringify(sectionTimes));
   console.log("PASS:"); ok.forEach((l) => console.log("  ✓ " + l));
