@@ -1,6 +1,6 @@
 {
   "name": "ticket-to-ride-map-editor",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "private": true,
   "license": "MIT",
   "repository": { "type": "git", "url": "git+https://github.com/bjornhagstrom/ticket-to-ride-map-editor.git" },

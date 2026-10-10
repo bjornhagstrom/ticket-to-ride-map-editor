@@ -4,9 +4,9 @@ What changed in each version of the [Ticket to Ride map editor](https://hagstrom
 
 This file is written from `app/version.ts` by `npm run changelog`; edit the notes there.
 
-## Unreleased
+## 1.6.0 · 2026-10-11
 
-Changes since the last release, to go into the next version.
+**Version 1.6: the phone, and fixes after an independent review**
 
 - On a phone the map can be zoomed with buttons in the bar or by pinching with two fingers, from the whole map in view to six times larger, and the point between your fingers stays where it is.
 - On a phone Settings is one column with its pages in a row on top, the notices sit above the bar instead of over the buttons at the top, and the page itself no longer scrolls: the map has the room.
