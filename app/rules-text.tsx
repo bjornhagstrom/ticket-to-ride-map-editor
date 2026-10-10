@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { fallbackStopTypeStyle, routeColors, type MapData } from "./map-data";
+import { fallbackStopTypeStyle, routeColorOf, routeColors, type MapData } from "./map-data";
 import { parseMarkdown, resolveRef, type Block, type Inline, type ListBlock } from "./markdown";
 
 // The rules text drawn: on screen beside the map, and on the pages after the board. Nothing here
@@ -26,7 +26,7 @@ function Reference({ name, ctx }: { name: string; ctx: Context }) {
   if (ref.kind === "route") {
     const colourOf = (route: (typeof ref.routes)[number]) => {
       const type = data.routeTypeStyles.find((style) => style.id === route.type);
-      return type?.infrastructure ? type.stroke : routeColors[route.color] ?? routeColors.neutral;
+      return type?.infrastructure ? type.stroke : routeColorOf(route.color) ?? routeColors.neutral;
     };
     return <span className="rule-ref route" onPointerEnter={hover ? () => hover.routes(ref.routes.map((route) => route.id)) : undefined} onPointerLeave={hover ? () => hover.routes(null) : undefined}>
       {ref.routes.map((route) => <span key={route.id} className="rule-swatch" style={{ background: colourOf(route) }} />)}

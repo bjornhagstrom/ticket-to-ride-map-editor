@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { useId } from "react";
-import { colorLabels, formatOrStandard, pairKeyOf, ticketsInSet, type MapData, type MapFormat } from "./map-data";
+import { colorLabelOf, formatOrStandard, pairKeyOf, ticketsInSet, type MapData, type MapFormat } from "./map-data";
 import { boardOf, type Orientation } from "./board";
 import { curvedPath, isCurved, pathFromPoints, pointsFor } from "./map-geometry";
 import { MapArtwork } from "./map-artwork";
@@ -194,7 +194,7 @@ function PrintBalance({ data, setId }: { data: MapData; setId: string }) {
     <dl>{rows.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
     <h2>Routes by colour and length</h2>
     <table>
-      <thead><tr><th>Length</th>{table.colours.map((colour) => <th key={colour}>{colorLabels[colour] ?? colour}</th>)}<th>All</th></tr></thead>
+      <thead><tr><th>Length</th>{table.colours.map((colour) => <th key={colour}>{colorLabelOf(colour) ?? colour}</th>)}<th>All</th></tr></thead>
       <tbody>{table.lengths.map((length) => <tr key={length}><td>{length}</td>{table.colours.map((colour) => <td key={colour}>{table.counts.get(length)?.get(colour) ?? 0}</td>)}<td>{table.colours.reduce((sum, colour) => sum + (table.counts.get(length)?.get(colour) ?? 0), 0)}</td></tr>)}</tbody>
     </table>
   </section>;

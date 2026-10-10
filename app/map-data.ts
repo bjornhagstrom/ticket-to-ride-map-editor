@@ -378,6 +378,9 @@ export const colorLabels: Record<string, string> = {
   neutral: "Grey", red: "Red", blue: "Blue", green: "Green", yellow: "Yellow",
   black: "Black", white: "White", orange: "Orange", purple: "Purple",
 };
+/** The label and the stroke of a route colour, only for a colour the editor has: a name from a file such as toString or constructor is none (a plain object has those too). */
+export const colorLabelOf = (color: string): string | undefined => (Object.hasOwn(colorLabels, color) ? colorLabels[color] : undefined);
+export const routeColorOf = (color: string): string | undefined => (Object.hasOwn(routeColors, color) ? routeColors[color] : undefined);
 
 /** The playtest box: its size, its place in the top right corner of a lying 2×3 board, and what it
  *  says in a build that does not draw it itself. map-version.ts places it on other maps. */

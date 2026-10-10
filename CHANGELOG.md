@@ -8,11 +8,14 @@ This file is written from `app/version.ts` by `npm run changelog`; edit the note
 
 **Version 1.6: the phone, and fixes after an independent review**
 
+- A route colour or a stop name that is also a word every object has, such as toString or __proto__, no longer breaks the stop-deletion question, the print, the spreadsheet or the file for the other tool; they are plain names now.
+- A map read from a file whose stops or routes sit under the fields of a newer version is repaired like any other: a stop with no name gets one, a route to a stop that is not there is left out.
+- On a phone a second finger on the board places nothing, a third finger does not make the zoom jump, and the zoom is brought back inside its limits when the screen is turned.
 - On a phone the map can be zoomed with buttons in the bar or by pinching with two fingers, from the whole map in view to six times larger, and the point between your fingers stays where it is.
 - On a phone Settings is one column with its pages in a row on top, the notices sit above the bar instead of over the buttons at the top, and the page itself no longer scrolls: the map has the room.
 - A map file that names its board with a word every object has, such as toString, no longer loses its stops: it opens on the standard board as any unknown board name does.
 - A map kept in the browser by an older version, with a lane rule it did not know, now has that rule here, and choosing another number is not written over by the old one.
-- Two routes whose stop names happen to join into the same text, such as a~b with c and a with b~c, are no longer counted as one double route.
+- Two routes whose stop ids happen to join into the same text, such as a~b with c and a with b~c, are no longer counted as one double route.
 - On a phone, keyboard focus moves into a sheet when it opens and back to the bar when it closes, so a keyboard or a screen reader does not end up on a button out of sight.
 - On a phone the map comes first: the tools and the properties open in sheets from a bar at the foot of the screen, close when you choose a tool or touch the map, and the top of the page is shorter.
 - Turning the board also moves the stop names that would end up on a route, as the Move names clear button does, in the same step, and Undo takes both back. A name that is already clear or locked stays where it is.

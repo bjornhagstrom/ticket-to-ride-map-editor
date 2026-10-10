@@ -14,7 +14,7 @@ const path = require("path");
 
 const root = path.join(__dirname, "..");
 const out = fs.mkdtempSync(path.join(os.tmpdir(), "ttr-codex-findings-"));
-execFileSync(path.join(root, "node_modules", ".bin", "tsc"), ["app/map-storage.ts", "app/map-data.ts", "app/map-analysis.ts", "app/csv-export.ts", "app/ticket-suggester.ts",
+execFileSync(path.join(root, "node_modules", ".bin", "tsc"), ["app/map-storage.ts", "app/map-data.ts", "app/map-analysis.ts", "app/csv-export.ts", "app/ticket-suggester.ts", "app/ttr-map-generator-export.ts",
   "--outDir", out, "--module", "commonjs", "--target", "es2022", "--moduleResolution", "node", "--skipLibCheck", "--lib", "es2022,dom"], { cwd: root, stdio: "inherit" });
 const storage = require(path.join(out, "map-storage.js"));
 const data = require(path.join(out, "map-data.js"));
@@ -83,6 +83,30 @@ for (const name of ["__proto__", "constructor", "toString", "hasOwnProperty", "v
   check("the spreadsheet does not call them a double route either", csv.routesCsv(two).split(/\r?\n/).slice(1).filter(Boolean).every((line) => line.split(",")[7] !== "yes"));
   const double = clone(two); double.routes = [route("r1", "a", "c"), route("r2", "c", "a")];
   check("a real double route is still one", A.setupBalance(double, "main").usableSpaces === 6, String(A.setupBalance(double, "main").usableSpaces));
+}
+
+// ---------------------------------------------------------------- the review of 1.6.0: the same classes of fault, found again
+{
+  // A known field lifted from `unknown` must be repaired like the same field on the map: a stop with no name gets one, a route to a
+  // stop that is not there is left out.
+  const raw = { background: [], unknown: { stops: [{ id: "a", x: 10, y: 10 }, { id: "b", x: 50, y: 50, name: "Bee" }], routes: [{ id: "r1", a: "a", b: "b", length: 2, type: "city", color: "red" }, { id: "r2", a: "a", b: "zzz", length: 2, type: "city", color: "red" }] } };
+  const { map } = storage.repairMap(clone(raw));
+  check("a stop lifted from unknown is repaired as any stop is: it gets a name", map.stops.length === 2 && map.stops[0].name === "a", JSON.stringify(map.stops.map((s) => s.name)));
+  check("and a route lifted from unknown that names a stop the map does not have is left out", map.routes.length === 1 && map.routes[0].id === "r1", JSON.stringify(map.routes.map((r) => r.id)));
+  const twice = storage.repairMap(JSON.parse(JSON.stringify(map))).map;
+  check("and reading the result again changes nothing", JSON.stringify(twice) === JSON.stringify(map));
+}
+{
+  // Names from a file in tables of colours: a plain object has toString, constructor and __proto__ too.
+  check("a colour called toString or constructor has no label and no stroke of its own", ["toString", "constructor", "__proto__", "hasOwnProperty"].every((c) => data.colorLabelOf(c) === undefined && data.routeColorOf(c) === undefined));
+  check("a real colour has both", data.colorLabelOf("red") === data.colorLabels.red && data.routeColorOf("red") === data.routeColors.red && data.colorLabelOf("red") !== undefined);
+  const odd = storage.normalizeMap(clone(initialMap)); odd.routes[0].color = "toString";
+  const rows = csv.routesCsv(odd).split(/\r?\n/);
+  check("the spreadsheet writes such a colour as it is, not the text of a function", !rows.some((line) => /function|native code/.test(line)) && /toString/.test(rows[1]), rows[1].slice(0, 120));
+  const named = storage.normalizeMap(clone(initialMap)); named.stops[0].name = "__proto__";
+  const gen = require(path.join(out, "ttr-map-generator-export.js")).generatorFiles(named);
+  const positions = JSON.parse(gen.positions).positions;
+  check("a stop named __proto__ is in the positions file for the other tool, as a stop is", Object.hasOwn(positions, "__proto__") && Object.keys(positions).length === named.stops.length, Object.keys(positions).length + " of " + named.stops.length);
 }
 
 for (const line of ok) console.log(`  ok    ${line}`);

@@ -4,7 +4,7 @@
 // styles included. Every row has the names, so that it reads on its own, and the ids beside them, which are what
 // ties the files together when they are read back (docs/CSV.md, "Ids and names").
 import { bandsOf, buildAdjacency, mapDiameter, shortestPath, ticketBand, ticketEndStops } from "./map-analysis";
-import { colorLabels, pairKeyOf, type MapData } from "./map-data";
+import { colorLabelOf, pairKeyOf, type MapData } from "./map-data";
 import { zipOf } from "./ttr-map-generator-export";
 import { APP_VERSION } from "./version";
 import { CSV_GUIDE } from "./csv-guide";
@@ -49,7 +49,7 @@ export function routesCsv(data: MapData): string {
   for (const route of data.routes) lines.set(pairKey(route.a, route.b), (lines.get(pairKey(route.a, route.b)) ?? 0) + 1);
   const rows: Cell[][] = [["From", "To", "Length", "Colour", "Type", "Wagon style", "Locomotives", "Double route", "From id", "To id", "Bends", "Curved", "Editor"]];
   for (const route of data.routes) {
-    rows.push([name(route.a), name(route.b), route.length, colorLabels[route.color] ?? route.color, types.get(route.type) ?? route.type,
+    rows.push([name(route.a), name(route.b), route.length, colorLabelOf(route.color) ?? route.color, types.get(route.type) ?? route.type,
       route.wagonStyle ? wagons.get(route.wagonStyle) ?? route.wagonStyle : "", route.locomotiveSlots?.length ?? 0, (lines.get(pairKey(route.a, route.b)) ?? 0) > 1 ? "yes" : "", route.a, route.b,
       // The route's bends, from its From stop to its To stop, as x|y pairs in board units (a bar, since a spreadsheet reads 500:30 as a time and 5/12 as a date); and "no" when it has been straightened.
       (route.points ?? []).map((point) => `${Math.round(point.x)}|${Math.round(point.y)}`).join(" "), route.curved === false ? "no" : "", APP_VERSION]);

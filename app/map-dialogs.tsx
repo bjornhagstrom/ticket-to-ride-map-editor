@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { DEFAULT_TICKET_MIX, lanesOpenFrom, colorLabels, type MapData, realWagon, type Stop, type Ticket, ticketsInSet, type TicketSet } from "./map-data";
+import { DEFAULT_TICKET_MIX, lanesOpenFrom, colorLabelOf, type MapData, realWagon, type Stop, type Ticket, ticketsInSet, type TicketSet } from "./map-data";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -150,7 +150,7 @@ export function AnalysisPanel({ official, wide, onToggleWide, onAddParallel, len
         <h3>Colour × length distribution</h3>
         <p className="helper">Counts card-route colours by length, and below them the wagon spaces each colour adds up to. Point at a number to see its routes on the map; click to keep them marked, and click again to let go. Pre-built infrastructure routes (no train cards) are excluded.</p>
         {colourTable.grandTotal === 0 ? <p className="helper">No card routes yet.</p> : <div className="analysis-table-scroll"><table className="analysis-table colour-table">
-          <thead><tr><th>Length</th>{colourTable.colours.map((colour) => <th key={colour}>{colorLabels[colour]}</th>)}<th>Total</th></tr></thead>
+          <thead><tr><th>Length</th>{colourTable.colours.map((colour) => <th key={colour}>{colorLabelOf(colour)}</th>)}<th>Total</th></tr></thead>
           <tbody>
             {colourTable.lengths.map((length) => <tr key={length}>
               <td {...pointAt(length, null)}>{length}</td>
@@ -193,7 +193,7 @@ export function SuggestionsPanel({ suggestions, onAdd, onHover, onClose }: { sug
     {suggestions.length === 0 ? <p className="helper">No good candidates right now: every nearby pair is connected already, would cross a route, or there are not enough stops yet.</p>
       : <ul className="suggestion-list">
         {suggestions.map((suggestion) => <li key={`${suggestion.a}-${suggestion.b}`} className="suggestion-row" onPointerEnter={() => onHover(suggestion)} onPointerLeave={() => onHover(null)} onFocus={() => onHover(suggestion)} onBlur={() => onHover(null)}>
-          <div><strong>{suggestion.aName} ↔ {suggestion.bName}</strong><p className="helper">Length {suggestion.suggestedLength} · {colorLabels[suggestion.suggestedColor]}</p></div>
+          <div><strong>{suggestion.aName} ↔ {suggestion.bName}</strong><p className="helper">Length {suggestion.suggestedLength} · {colorLabelOf(suggestion.suggestedColor)}</p></div>
           <Button size="sm" onClick={() => { onHover(null); onAdd(suggestion); }}><Plus />Add</Button>
         </li>)}
       </ul>}
@@ -576,7 +576,7 @@ export function StopDeletionList({ data, stopId }: { data: MapData; stopId: stri
     <ul>
       <li><strong>The stop {stop.name}</strong></li>
       {routes.length > 0 && <li><strong>{count(routes.length, "route", "routes")}</strong> that end{routes.length === 1 ? "s" : ""} at it:
-        <ul>{routes.map((route) => <li key={route.id}><strong>{name(route.a)}–{name(route.b)}</strong>, {route.length} {route.length === 1 ? "space" : "spaces"}, {colorLabels[route.color]?.toLowerCase() ?? route.color}</li>)}</ul></li>}
+        <ul>{routes.map((route) => <li key={route.id}><strong>{name(route.a)}–{name(route.b)}</strong>, {route.length} {route.length === 1 ? "space" : "spaces"}, {colorLabelOf(route.color)?.toLowerCase() ?? route.color}</li>)}</ul></li>}
       {tickets.length > 0 && <li><strong>{count(tickets.length, "ticket", "tickets")}</strong> that name{tickets.length === 1 ? "s" : ""} it, in every deck:
         <ul>{tickets.map((ticket) => <li key={ticket.id}><strong>{name(ticket.a)}–{name(ticket.b)}</strong>, {ticket.points} {ticket.points === 1 ? "point" : "points"}, {decks.get(ticket.set ?? first ?? "") ?? "a deck"}</li>)}</ul></li>}
     </ul>

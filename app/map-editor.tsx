@@ -243,11 +243,23 @@ export function MapEditor() {
     const phone = () => window.matchMedia("(max-width: 720px)").matches;
     const canvas = () => wrap.querySelector<SVGElement>(".map-canvas");
     const two = () => { const [a, b] = [...pointers.values()]; return { mid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, dist: Math.hypot(a.x - b.x, a.y - b.y) || 1 }; };
+    // The first two fingers are a pair; the baseline is taken again whenever the pair changes, so a third finger or one lifted does not jump the zoom.
+    const rebase = () => {
+      const c = canvas();
+      if (pointers.size < 2 || !c) { gesture = null; return; }
+      const { mid, dist } = two();
+      const r = c.getBoundingClientRect();
+      gesture = { dist, width: r.width, fx: (mid.x - r.left) / r.width, fy: (mid.y - r.top) / r.height };
+      latest = r.width;
+    };
     const down = (event: PointerEvent) => {
       if (!phone()) return;
+      // A new touch that is the primary one starts afresh: a finger whose end was never seen is not still down.
+      if (event.isPrimary) { pointers.clear(); gesture = null; }
       pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
-      const c = canvas();
-      if (pointers.size === 2 && c) { const { mid, dist } = two(); const r = c.getBoundingClientRect(); gesture = { dist, width: r.width, fx: (mid.x - r.left) / r.width, fy: (mid.y - r.top) / r.height }; latest = r.width; }
+      // A second finger belongs to the pinch: it places nothing, whatever tool is chosen.
+      if (!event.isPrimary) event.stopPropagation();
+      if (pointers.size >= 2) rebase();
     };
     const move = (event: PointerEvent) => {
       if (!pointers.has(event.pointerId)) return;
@@ -267,13 +279,22 @@ export function MapEditor() {
     };
     const up = (event: PointerEvent) => {
       pointers.delete(event.pointerId);
-      if (gesture && pointers.size < 2) { gesture = null; setPhoneMapWidth(Math.round(latest)); }
+      if (!gesture) return;
+      if (pointers.size < 2) { gesture = null; setPhoneMapWidth(Math.round(latest)); } else rebase();
     };
+    // The screen turned or changed size: the zoom is brought back inside its limits (six times the whole map at the most).
+    const resize = () => {
+      if (!phone()) return;
+      const cs = getComputedStyle(wrap);
+      const fit = Math.max(200, wrap.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight));
+      setPhoneMapWidth((width) => Math.round(Math.min(fit * 6, Math.max(fit, width))));
+    };
+    window.addEventListener("resize", resize);
     wrap.addEventListener("pointerdown", down, true);
     wrap.addEventListener("pointermove", move, true);
     wrap.addEventListener("pointerup", up, true);
     wrap.addEventListener("pointercancel", up, true);
-    return () => { wrap.removeEventListener("pointerdown", down, true); wrap.removeEventListener("pointermove", move, true); wrap.removeEventListener("pointerup", up, true); wrap.removeEventListener("pointercancel", up, true); };
+    return () => { window.removeEventListener("resize", resize); wrap.removeEventListener("pointerdown", down, true); wrap.removeEventListener("pointermove", move, true); wrap.removeEventListener("pointerup", up, true); wrap.removeEventListener("pointercancel", up, true); };
   }, []);
   const [wasStylesOpen, setWasStylesOpen] = useState(showStyles);
   if (showStyles !== wasStylesOpen) { setWasStylesOpen(showStyles); if (showStyles) setPhoneSheet(null); }

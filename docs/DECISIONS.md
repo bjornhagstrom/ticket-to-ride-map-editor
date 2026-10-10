@@ -183,7 +183,7 @@ play, or a visitor count that shows that the wait is not noticed. Removing it is
 ## Names after a turn
 
 **Decision.** Turning the board (standing it up or laying it down) also moves the stop names that would end up on a route,
-as the button "Move names clear" does, in the same step. A name that is already clear stays where it is, a locked name stays,
+as the button "Move names clear" does, in the same step. A name that is already clear of the routes and of the other names stays where it is, a locked name stays,
 and what cannot be placed is said in the notice (and left as the turn put it). Undo takes the turn and the names back together.
 Decided by the owner on 2026-10-09.
 

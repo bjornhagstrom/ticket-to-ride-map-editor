@@ -53,8 +53,8 @@ function positionsJson(data: MapData, names: Map<string, string>): string {
   const board = boardOf(data);
   const cmWide = board.widthMm / 10, cmHigh = board.heightMm / 10;
   const round = (value: number) => Math.round(value * 1000) / 1000;
-  const positions: Record<string, [number, number]> = {};
-  for (const stop of data.stops) positions[names.get(stop.id)!.replace(/\\n/g, "\n")] = [round(stop.x / board.width * cmWide), round((board.height - stop.y) / board.height * cmHigh)];
+  // Built from entries, so a stop named __proto__ is a key like any other, not the prototype.
+  const positions = Object.fromEntries(data.stops.map((stop): [string, [number, number]] => [names.get(stop.id)!.replace(/\\n/g, "\n"), [round(stop.x / board.width * cmWide), round((board.height - stop.y) / board.height * cmHigh)]]));
   return `${JSON.stringify({ unit: "cm", board: [round(cmWide), round(cmHigh)], positions }, null, 1)}\n`;
 }
 

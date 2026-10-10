@@ -36,6 +36,8 @@ in the same commit as the work (AGENTS.md).
   preview where a printed page would break.
 - **Safari** has not been tried for the small ticket map, the standing board or its print.
 - **Phones**: built (below 721 px: the map first, the tools and the properties as sheets from a bar at the foot, zoom in the bar and a pinch, Settings in one column, notices above the bar; sections 66 and 67 of the suite). Not done: it has been tried only in Chromium and WebKit at 390 px with synthetic touches, never on a real phone or with a real screen reader; the wide tables in Map balance and Tickets are read by scrolling the sheet.
+## Decided against
+
 - Tickets to countries or groups of stops, as Switzerland has: no support. A person draws the countries as background areas and puts the stops where they belong; decided by the owner on 2026-10-10.
 - Pictures for a stop's size and symbol (the selected stop shows on the map) and for where its name
   sits (it is dragged on the map now). Route types, the board and the wagon spaces already have theirs;

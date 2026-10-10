@@ -218,11 +218,12 @@ const unknownKeys = (value: Record<string, unknown>): Record<string, unknown> | 
 
 // A field an older build did not know was kept under `unknown`, in the map it stored in its browser; this build may know it (the lane
 // rule, for one). Read here, it is the map's own field again, unless the map already has one: the one on the map wins.
-const liftKnown = (value: Partial<MapData>): Partial<MapData> => {
-  if (!isRecord(value.unknown)) return value;
-  const lifted: Record<string, unknown> = { ...value };
-  for (const [key, field] of Object.entries(value.unknown)) if (key !== "unknown" && MAP_KEYS.has(key) && lifted[key] === undefined) lifted[key] = field;
-  return lifted as Partial<MapData>;
+const liftKnown = <T extends object>(value: T): T => {
+  const kept = (value as { unknown?: unknown }).unknown;
+  if (!isRecord(kept)) return value;
+  const lifted: Record<string, unknown> = { ...(value as Record<string, unknown>) };
+  for (const [key, field] of Object.entries(kept)) if (key !== "unknown" && MAP_KEYS.has(key) && lifted[key] === undefined) lifted[key] = field;
+  return lifted as T;
 };
 
 // A map as it goes into a file: its own fields, with anything a newer build left behind put back where it was found. What the map
@@ -329,7 +330,8 @@ export const normalizeMap = (raw: Partial<MapData>): MapData => repairMap(raw).m
 export function repairMap(raw: unknown): { map: MapData; repairs: string[] } {
   const repairs: string[] = [];
   const say = (count: number, one: string, many: string) => { if (count) repairs.push(`${count} ${count === 1 ? one : many}`); };
-  const value: Record<string, unknown> = isRecord(raw) ? { ...raw } : {};
+  // What an older build kept under `unknown` and this one knows is the map's own again, and is repaired like the rest: lifted first.
+  const value: Record<string, unknown> = liftKnown(isRecord(raw) ? { ...raw } : {});
   const number = (v: unknown): number | null => { const n = typeof v === "number" ? v : typeof v === "string" && v.trim() !== "" ? Number(v) : NaN; return Number.isFinite(n) ? n : null; };
   const point = (p: unknown): Point | null => { if (!isRecord(p)) return null; const x = number(p.x), y = number(p.y); return x === null || y === null ? null : { ...(p as object), x, y } as Point; };
 

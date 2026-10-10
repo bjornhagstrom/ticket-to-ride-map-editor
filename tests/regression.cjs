@@ -4833,6 +4833,29 @@ const sectionStart = (n) => {
     await pz.locator("#phone-zoom-fit").tap(); await pz.waitForTimeout(300);
     check("the zoom buttons carry on from where a pinch left it (the state is the map's, not the gesture's)", await (async () => { await pinch(60, 120, centre); await pz.waitForTimeout(200); const w = await canvasWidth(); await pz.locator("#phone-zoom-in").tap(); await pz.waitForTimeout(250); return (await canvasWidth()) > w * 1.2; })());
     await pz.locator("#phone-zoom-fit").tap();
+    // Two fingers on the board with the Add stop tool chosen: the first finger places a stop as it always did, the second is part of a
+    // pinch and places nothing.
+    await pz.locator("#phone-zoom-fit").tap(); await pz.waitForTimeout(200);
+    await pz.locator("#phone-tools").tap(); await pz.waitForTimeout(300);
+    await pz.locator(".tools-panel .tool-row button").nth(1).tap(); await pz.waitForTimeout(300);
+    const stopsBefore = await pz.locator(".map-canvas .stop").count();
+    await pz.evaluate(() => { const bg = document.querySelector(".map-canvas .map-bg") || document.querySelector(".map-canvas"); const r = bg.getBoundingClientRect(); const fire = (type, id, primary, x, y) => bg.dispatchEvent(new PointerEvent(type, { pointerId: id, pointerType: "touch", isPrimary: primary, clientX: x, clientY: y, bubbles: true, cancelable: true })); const y = r.top + r.height * 0.85; fire("pointerdown", 21, true, r.left + 40, y); fire("pointerdown", 22, false, r.left + 120, y); fire("pointermove", 21, true, r.left + 30, y); fire("pointermove", 22, false, r.left + 130, y); fire("pointerup", 22, false, r.left + 130, y); fire("pointerup", 21, true, r.left + 30, y); });
+    await pz.waitForTimeout(400);
+    const stopsAfter = await pz.locator(".map-canvas .stop").count();
+    check("a second finger lands on the board with the Add stop tool and places nothing: at most one stop for the pair", stopsAfter - stopsBefore <= 1, `${stopsBefore} then ${stopsAfter}`);
+    await pz.getByRole("button", { name: "Undo" }).tap(); await pz.waitForTimeout(300);
+    await pz.locator("#phone-tools").tap(); await pz.waitForTimeout(300);
+    await pz.locator(".tools-panel .tool-row button").nth(0).tap(); await pz.waitForTimeout(300);
+    // The zoom is brought back inside its limits when the screen's size changes (a phone turned and turned back).
+    await pz.locator("#phone-zoom-fit").tap(); await pz.waitForTimeout(200);
+    for (let i = 0; i < 12; i++) await pz.locator("#phone-zoom-in").tap({ force: true });
+    await pz.setViewportSize({ width: 667, height: 390 }); await pz.waitForTimeout(400);
+    await pz.setViewportSize({ width: 390, height: 844 }); await pz.waitForTimeout(400);
+    const fitNow = await pz.evaluate(() => { const w = document.querySelector(".map-wrap"); const cs = getComputedStyle(w); return Math.round(w.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)); });
+    check("turned and turned back, the map is still within six times the whole map", (await canvasWidth()) <= fitNow * 6 + 2 && (await canvasWidth()) >= fitNow - 2, `${await canvasWidth()} of ${fitNow}`);
+    await pz.locator("#phone-zoom-in").tap(); await pz.waitForTimeout(250);
+    check("and larger makes it larger, not smaller", (await canvasWidth()) >= fitNow * 6 - 2 || (await canvasWidth()) > fitNow * 6 * 0.99);
+    await pz.locator("#phone-zoom-fit").tap(); await pz.waitForTimeout(200);
     // Settings: a column, the pages in a row above it, the board's choices readable.
     await pz.locator("#phone-tools").tap(); await pz.waitForTimeout(300);
     await pz.locator(".tools-panel").getByRole("button", { name: "Settings" }).tap(); await pz.waitForTimeout(600);

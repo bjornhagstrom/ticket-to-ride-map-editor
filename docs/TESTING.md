@@ -102,7 +102,7 @@ Each step stands on its own and can be stopped after any of them.
    build with the waits as written in Chromium and in WebKit at the same time. It serves `out/` itself under `/ttr` on a free
    port, so nothing else has to run. It says "green" only when everything it ran was, exits non-zero otherwise, and always
    ends with what it did not run: Chromium against the dev server (the production build is the stricter of the two for what
-   ships), and the review, the walk-through and the owner's go, which are by hand.
+   ships; it can be added when wanted), and the review, the walk-through and the owner's go, which are by hand. AGENTS.md, which the owner keeps, still lists the dev server in the release tier: the release runs since 1.0 have been the production build in Chromium and in WebKit, and the owner has been asked whether the dev server should be part of it.
 6. **The impact map** (`tests/impact.json` and `npm run test:changed`): chooses the quick tier's sections
    from `git diff --name-only main`. Last, because it is only as good as the table and needs the
    earlier steps to be worth anything.
