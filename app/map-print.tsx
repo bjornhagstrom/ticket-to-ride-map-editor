@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { useId } from "react";
-import { colorLabels, formatOrStandard, ticketsInSet, type MapData, type MapFormat } from "./map-data";
+import { colorLabels, formatOrStandard, pairKeyOf, ticketsInSet, type MapData, type MapFormat } from "./map-data";
 import { boardOf, type Orientation } from "./board";
 import { curvedPath, isCurved, pathFromPoints, pointsFor } from "./map-geometry";
 import { MapArtwork } from "./map-artwork";
@@ -27,7 +27,7 @@ function TicketMapSymbol({ data, id }: { data: MapData; id: string }) {
   const { width, height } = boardOf(data);
   const junctions = new Set(data.stopTypeStyles.filter((style) => style.junction).map((style) => style.id));
   const pairs = new Set<string>();
-  const routes = data.routes.filter((route) => { const key = [route.a, route.b].sort().join("~"); if (pairs.has(key)) return false; pairs.add(key); return true; });
+  const routes = data.routes.filter((route) => { const key = pairKeyOf(route.a, route.b); if (pairs.has(key)) return false; pairs.add(key); return true; });
   return <svg className="ticket-map-defs" width="0" height="0" aria-hidden="true">
     <symbol id={id} viewBox={`0 0 ${width} ${height}`}>
       {data.background.filter((shape) => shape.type === "area").map((shape) => <polygon key={shape.id} className="ticket-map-area" points={shape.points.map((point) => `${point.x},${point.y}`).join(" ")} />)}

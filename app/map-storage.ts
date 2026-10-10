@@ -56,7 +56,7 @@ const legacyFormats: Record<string, { height: number; to: MapFormat }> = {
 // Moves a map drawn on an old format onto its board: scaled evenly so nothing changes shape, never
 // enlarged, and centred on the board.
 function migrateLegacyFormat(value: Partial<MapData>): Partial<MapData> {
-  const legacy = typeof value.format === "string" ? legacyFormats[value.format] : undefined;
+  const legacy = typeof value.format === "string" && Object.hasOwn(legacyFormats, value.format) ? legacyFormats[value.format] : undefined;
   if (!legacy) return value;
   const toHeight = formatOrStandard(legacy.to).height;
   const scale = Math.min(1, toHeight / legacy.height);
@@ -210,16 +210,26 @@ const unknownKeys = (value: Record<string, unknown>): Record<string, unknown> | 
   // Built from entries, so a key such as __proto__ in a file is kept as data, never as a prototype.
   // `unknown` itself is a field the map keeps (so a map held in the browser comes back with what it carried): its entries are
   // folded in beside the new ones, so nothing is nested in itself and a field is kept after any number of reloads.
-  const before = isRecord(value.unknown) ? Object.entries(value.unknown) : [];
+  // What an older build kept under `unknown` and this one knows is the map's own field again (see liftKnown), so it is not kept here too.
+  const before = isRecord(value.unknown) ? Object.entries(value.unknown).filter(([key]) => !MAP_KEYS.has(key)) : [];
   const kept = Object.fromEntries([...before, ...Object.entries(value).filter(([key]) => !MAP_KEYS.has(key))]);
   return Object.keys(kept).length ? kept : undefined;
 };
 
-// A map as it goes into a file: its own fields, with anything a newer build left behind put back
-// where it was found.
+// A field an older build did not know was kept under `unknown`, in the map it stored in its browser; this build may know it (the lane
+// rule, for one). Read here, it is the map's own field again, unless the map already has one: the one on the map wins.
+const liftKnown = (value: Partial<MapData>): Partial<MapData> => {
+  if (!isRecord(value.unknown)) return value;
+  const lifted: Record<string, unknown> = { ...value };
+  for (const [key, field] of Object.entries(value.unknown)) if (key !== "unknown" && MAP_KEYS.has(key) && lifted[key] === undefined) lifted[key] = field;
+  return lifted as Partial<MapData>;
+};
+
+// A map as it goes into a file: its own fields, with anything a newer build left behind put back where it was found. What the map
+// holds now wins over what was kept: a field changed here is not written over by the old value.
 export function mapPayload(data: MapData): Record<string, unknown> {
   const { unknown, ...rest } = data;
-  return { ...rest, ...(unknown ?? {}) };
+  return { ...(unknown ?? {}), ...rest };
 }
 
 // A network file carries the styles its own objects point at, so it can be read into any map.
@@ -418,7 +428,7 @@ export function repairMap(raw: unknown): { map: MapData; repairs: string[] } {
 }
 const isRecord = (value: unknown): value is Record<string, unknown> => Boolean(value) && typeof value === "object" && !Array.isArray(value);
 
-const normalizeMapFields = (value: Partial<MapData>): MapData => ({
+const normalizeMapFields = (raw: Partial<MapData>): MapData => { const value = liftKnown(raw); return {
   name: typeof value.name === "string" ? value.name : "Imported map",
   format: isMapFormat(value.format) ? value.format : "board-2x3",
   // Lying is the default and is not written, so a lying map is the same file it always was.
@@ -450,7 +460,7 @@ const normalizeMapFields = (value: Partial<MapData>): MapData => ({
   // How tense a full deck built for this map is, 0 to 100, or nothing (read as like the official maps).
   deckTension: normalizeTension(value.deckTension),
   unknown: unknownKeys(value as Record<string, unknown>),
-});
+}; };
 
 // A version record is trusted only when it makes sense: a whole number above 0 and a fingerprint.
 // Otherwise it is dropped, and the next print starts the series again at 1. Log entries that make no
@@ -478,7 +488,7 @@ const scaleStopsToHeight = (stops: Stop[], fromHeight: number, toHeight: number)
 const scaleRoutesToHeight = (routes: Route[], fromHeight: number, toHeight: number): Route[] => routes.map((route) => ({ ...route, points: route.points?.map((point) => scalePointToHeight(point, fromHeight, toHeight)) }));
 const scaleImageToHeight = (image: BackgroundImage, fromHeight: number, toHeight: number): BackgroundImage => ({ ...image, y: image.y * toHeight / fromHeight, height: image.height * toHeight / fromHeight });
 const scaleNotesToHeight = (notes: NoteBox[], fromHeight: number, toHeight: number): NoteBox[] => notes.map((note) => ({ ...note, y: note.y * toHeight / fromHeight, height: note.height * toHeight / fromHeight }));
-const sourceHeight = (value: { format?: unknown }): number => isMapFormat(value.format) ? formatOrStandard(value.format).height : typeof value.format === "string" && legacyFormats[value.format] ? legacyFormats[value.format].height : formatOrStandard("board-2x3").height;
+const sourceHeight = (value: { format?: unknown }): number => isMapFormat(value.format) ? formatOrStandard(value.format).height : typeof value.format === "string" && Object.hasOwn(legacyFormats, value.format) ? legacyFormats[value.format].height : formatOrStandard("board-2x3").height;
 // Content from a file drawn on another board, brought onto this one: laid down if it stood, scaled
 // from its board's height to this one's while lying, and stood up again if this board stands.
 type BoardContents = Partial<Pick<MapData, "stops" | "routes" | "background" | "notes" | "backgroundImage">>;

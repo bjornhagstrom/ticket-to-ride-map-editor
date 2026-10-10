@@ -186,6 +186,9 @@ export function formatOf(value: unknown): MapFormatDefinition | null {
   const label = `Custom board ${rows}×${columns}`;
   return { label, shortLabel: label, note: `${columns} panels across, ${rows} down`, width: W, height: Math.round(W * heightMm / widthMm), widthMm, heightMm, columns, rows, custom: true };
 }
+/** One key for a pair of stops, the same whichever way round, and never the same for two different pairs (a joined text is not: the
+ *  ids "a~b" + "c" and "a" + "b~c" join alike). The first id's length goes in front, so where it ends is known. */
+export const pairKeyOf = (a: string, b: string): string => { const [x, y] = a <= b ? [a, b] : [b, a]; return `${x.length}:${x}${y}`; };
 export const isMapFormat = (value: unknown): value is MapFormat => formatOf(value) !== null;
 /** The board a name means; the standard board when it is none. */
 export const formatOrStandard = (value: unknown): MapFormatDefinition => formatOf(value) ?? PRESET_DEFINITIONS["board-2x3"];

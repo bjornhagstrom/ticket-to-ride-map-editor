@@ -10,6 +10,10 @@ export type Release = { version: string; date: string; title: string; changes: s
 // the top of CHANGELOG.md under Unreleased, and become the notes of the next version when it is
 // decided; the What's new page in the editor shows released versions only.
 export const UNRELEASED: string[] = [
+  "A map file that names its board with a word every object has, such as toString, no longer loses its stops: it opens on the standard board as any unknown board name does.",
+  "A map kept in the browser by an older version, with a lane rule it did not know, now has that rule here, and choosing another number is not written over by the old one.",
+  "Two routes whose stop names happen to join into the same text, such as a~b with c and a with b~c, are no longer counted as one double route.",
+  "On a phone, keyboard focus moves into a sheet when it opens and back to the bar when it closes, so a keyboard or a screen reader does not end up on a button out of sight.",
   "On a phone the map comes first: the tools and the properties open in sheets from a bar at the foot of the screen, close when you choose a tool or touch the map, and the top of the page is shorter.",
   "Turning the board also moves the stop names that would end up on a route, as the Move names clear button does, in the same step, and Undo takes both back. A name that is already clear or locked stays where it is.",
   "The tension slider now makes its choice when it has stopped moving, so it also works moved by a screen reader on a phone, which sends no key or pointer.",

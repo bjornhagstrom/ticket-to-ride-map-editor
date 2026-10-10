@@ -4,7 +4,7 @@
 // styles included. Every row has the names, so that it reads on its own, and the ids beside them, which are what
 // ties the files together when they are read back (docs/CSV.md, "Ids and names").
 import { bandsOf, buildAdjacency, mapDiameter, shortestPath, ticketBand, ticketEndStops } from "./map-analysis";
-import { colorLabels, type MapData } from "./map-data";
+import { colorLabels, pairKeyOf, type MapData } from "./map-data";
 import { zipOf } from "./ttr-map-generator-export";
 import { APP_VERSION } from "./version";
 import { CSV_GUIDE } from "./csv-guide";
@@ -22,7 +22,7 @@ const cell = (value: Cell): string => {
 export const toCsv = (rows: Cell[][]): string => `﻿${rows.map((row) => row.map(cell).join(",")).join("\r\n")}\r\n`;
 
 const namer = (data: MapData) => { const names = new Map(data.stops.map((stop) => [stop.id, stop.name])); return (id: string) => names.get(id) ?? ""; };
-const pairKey = (a: string, b: string) => (a < b ? `${a}~${b}` : `${b}~${a}`);
+const pairKey = pairKeyOf;
 
 export function ticketsCsv(data: MapData, setIds: string[]): string {
   const name = namer(data);

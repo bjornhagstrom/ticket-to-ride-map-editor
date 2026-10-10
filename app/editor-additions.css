@@ -525,3 +525,4 @@
   .properties .property-form > * { min-width: 0; }
   .phone-dot { position: absolute; top: 6px; right: 14px; width: 9px; height: 9px; border-radius: 50%; background: #721c24; box-shadow: 0 0 0 2px #faf6ef; }
 }
+.tools-panel:focus, .properties:focus { outline: none; }

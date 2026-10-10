@@ -1,6 +1,6 @@
 // The balance layer: everything derived from the stops and routes themselves. All of it is pure,
 // computed on demand from MapData, and none of it is stored in a map file.
-import { DEFAULT_WAGONS_PER_PLAYER, DEFAULT_STARTING_TICKETS, DEFAULT_TICKET_BANDS, DEFAULT_TICKET_MIX, type TicketBands, type TicketMix, DEFAULT_PLAYERS, lanesUsableAt, defaultLabelAngle, labelPush, stopSizeMeta, ticketsInSet, type MapData, type Ticket, type Point, realWagon, type Route, routeColors, type Stop, W } from "./map-data";
+import { pairKeyOf, DEFAULT_WAGONS_PER_PLAYER, DEFAULT_STARTING_TICKETS, DEFAULT_TICKET_BANDS, DEFAULT_TICKET_MIX, type TicketBands, type TicketMix, DEFAULT_PLAYERS, lanesUsableAt, defaultLabelAngle, labelPush, stopSizeMeta, ticketsInSet, type MapData, type Ticket, type Point, realWagon, type Route, routeColors, type Stop, W } from "./map-data";
 import type { TicketDeckReport } from "./ticket-suggester";
 import { boardOf, rotateMap, type Orientation } from "./board";
 import { curvedSamples, isCurved, intersects, parallelPoints, pointsFor, polylineLength, stopById } from "./map-geometry";
@@ -68,7 +68,7 @@ export function buildAdjacency(data: MapData): Map<string, NetworkEdge[]> {
 export function connectionCount(data: MapData): number {
   const ids = new Set(data.stops.map((stop) => stop.id));
   const pairs = new Set<string>();
-  for (const route of data.routes) if (ids.has(route.a) && ids.has(route.b)) pairs.add([route.a, route.b].sort().join("|"));
+  for (const route of data.routes) if (ids.has(route.a) && ids.has(route.b)) pairs.add(pairKeyOf(route.a, route.b));
   return pairs.size;
 }
 export type NetworkStats = { neighbours: Map<string, number>; links: Map<string, number>; hubDegree: Map<string, number> };
@@ -184,7 +184,7 @@ export function colourRouteIds(data: MapData, length: number | null, colour: str
   const infrastructureTypes = new Set(data.routeTypeStyles.filter((style) => style.infrastructure).map((style) => style.id));
   return data.routes.filter((route) => !infrastructureTypes.has(route.type) && (length === null || route.length === length) && (colour === null || route.color === colour)).map((route) => route.id);
 }
-const pairKey = (a: string, b: string) => [a, b].sort().join("::");
+const pairKey = pairKeyOf;
 export function averageLengthPerDistance(data: MapData): number {
   let totalLength = 0, totalDistance = 0;
   for (const route of data.routes) {
@@ -388,7 +388,7 @@ export function reviewTickets(data: MapData, setId?: string): TicketReview[] {
   });
   const rate = ticketPointsPerSpace(measured);
   return measured.map(({ ticket, distance, routeIds }) => {
-    const key = [ticket.a, ticket.b].sort().join("~");
+    const key = pairKeyOf(ticket.a, ticket.b);
     const duplicate = seen.has(key) && seen.get(key) !== ticket.id;
     if (!seen.has(key)) seen.set(key, ticket.id);
     const suggested = distance ? Math.max(1, Math.round(distance * rate)) : null;
@@ -438,7 +438,7 @@ export function setupBalance(data: MapData, setId?: string): SetupBalance {
   const table = data.players?.max ?? DEFAULT_PLAYERS.max;
   // Lanes between the same two stops are one multi-lane route; the table may use some of them.
   const lanes = new Map<string, Route[]>();
-  for (const route of wagonRoutes) { const key = [route.a, route.b].sort().join("~"); lanes.set(key, [...(lanes.get(key) ?? []), route]); }
+  for (const route of wagonRoutes) { const key = pairKeyOf(route.a, route.b); lanes.set(key, [...(lanes.get(key) ?? []), route]); }
   let usableSpaces = 0;
   for (const group of lanes.values()) {
     const open = lanesUsableAt(table, group.length, data.laneRule);
@@ -588,12 +588,13 @@ export function networkShape(data: MapData): NetworkShape {
   const byId = new Map(data.stops.map((stop) => [stop.id, stop]));
   const neighbours = new Map(data.stops.map((stop) => [stop.id, new Set<string>()]));
   const lanes = new Map<string, string[]>();
-  const pair = (a: string, b: string) => (a < b ? `${a}|${b}` : `${b}|${a}`);
+  const ends = new Map<string, [string, string]>();
   for (const route of data.routes) {
     if (!byId.has(route.a) || !byId.has(route.b) || route.a === route.b) continue;
     neighbours.get(route.a)!.add(route.b);
     neighbours.get(route.b)!.add(route.a);
-    const key = pair(route.a, route.b);
+    const key = pairKeyOf(route.a, route.b);
+    ends.set(key, [route.a, route.b]);
     lanes.set(key, [...(lanes.get(key) ?? []), route.id]);
   }
   const connected = data.stops.filter((stop) => neighbours.get(stop.id)!.size > 0).map((stop) => stop.id);
@@ -615,7 +616,7 @@ export function networkShape(data: MapData): NetworkShape {
     return found;
   };
   const whole = parts(new Set()).length;
-  const bridges = [...lanes.entries()].filter(([key]) => parts(new Set(), key.split("|") as [string, string]).length > whole)
+  const bridges = [...lanes.entries()].filter(([key]) => parts(new Set(), ends.get(key)!).length > whole)
     // Named as the route was drawn, from its first lane.
     .map(([, routeIds]) => { const first = data.routes.find((route) => route.id === routeIds[0])!; return { a: byId.get(first.a)!, b: byId.get(first.b)!, lanes: routeIds.length, routeIds }; });
   // Corners: a part of at least two stops and at most a quarter of the map, cut off when one or two
@@ -625,7 +626,7 @@ export function networkShape(data: MapData): NetworkShape {
   const consider = (gates: string[]) => {
     for (const part of parts(new Set(gates))) {
       if (part.length < 2 || part.length > limit) continue;
-      const key = [...part].sort().join("|");
+      const key = JSON.stringify([...part].sort());
       const known = found.get(key);
       if (!known || known.gates.length > gates.length) found.set(key, { stops: part, gates });
     }

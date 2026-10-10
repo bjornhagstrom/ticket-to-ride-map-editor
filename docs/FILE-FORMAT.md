@@ -244,6 +244,10 @@ chose stays as it was. A rule of the map's own that no number says (a hand-writt
 is kept as it is and shown as "The map's own rule" until a number is chosen, which replaces it. Triple routes follow the same rule: one
 lane below the number, all from it; ruling them separately, as Northern Lights does, has no setting.
 
+A field an older build kept under `unknown` in the map it stored in its browser, and that this build knows (the lane rule, when a
+1.4.0 page is upgraded to 1.5.0 before it has been reloaded), is read as the map's own field; a field on the map itself wins over the
+same field under `unknown`, and what the map holds is never written over by what was kept (`mapPayload`).
+
 **Why `laneRule`, and not the name the analysis used.** The analysis and the model called the field `lanesUsableByPlayers` from the start,
 and every build up to 1.4.0 lists that name as a field it knows, but none ever copied it: a file carrying it comes out of any older build
 without it. A name no older build knows is carried through under rule 3, so a map with a rule passes through 0.4.1 to 1.4.0 and comes out

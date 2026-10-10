@@ -6,7 +6,7 @@
 // scripts/ticket-suggester-reference.py is the Python original this was ported from. The two use
 // different random number generators, so they agree on the metrics, not on the ticket lists.
 import { valueTicket, type TicketPath } from "./ticket-valuation";
-import { DEFAULT_STARTING_TICKETS, DEFAULT_TENSION, TENSION_CALM, TENSION_TENSE, tensionOf, DEFAULT_TICKET_BANDS, DEFAULT_WAGONS_PER_PLAYER, DEFAULT_PLAYERS, lanesUsableAt, type LaneRule, type MapData, type Ticket, type TicketBands, type TicketMix, ticketsInSet } from "./map-data";
+import { pairKeyOf, DEFAULT_STARTING_TICKETS, DEFAULT_TENSION, TENSION_CALM, TENSION_TENSE, tensionOf, DEFAULT_TICKET_BANDS, DEFAULT_WAGONS_PER_PLAYER, DEFAULT_PLAYERS, lanesUsableAt, type LaneRule, type MapData, type Ticket, type TicketBands, type TicketMix, ticketsInSet } from "./map-data";
 
 /** Our three sets of deck rules. */
 export type BuiltInStyle = "generic" | "classic" | "europe";
@@ -232,7 +232,7 @@ type Candidate = {
   load: Map<number, number>; corridor: string[]; locos: number; tunnels: number;
 };
 
-const pairKey = (a: string, b: string) => (a < b ? `${a}\u0000${b}` : `${b}\u0000${a}`);
+const pairKey = pairKeyOf;
 
 // Parallel routes between the same two stops are one edge: the cheapest of them decides the weight,
 // and how many lanes it has decides how much traffic it can take.
@@ -470,7 +470,7 @@ class SuggesterModel {
   // Two tickets are near-duplicates when they are of similar length and one of them costs at most
   // one extra wagon once the other has been built.
   duplicate(x: Candidate, y: Candidate): boolean {
-    const key = `${pairKey(x.a, x.b)}|${pairKey(y.a, y.b)}`;
+    const key = JSON.stringify([pairKey(x.a, x.b), pairKey(y.a, y.b)]);
     const cached = this.dupCache.get(key);
     if (cached !== undefined) return cached;
     let result = false;

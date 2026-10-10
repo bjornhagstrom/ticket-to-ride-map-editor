@@ -4755,12 +4755,28 @@ const sectionStart = (n) => {
     await ph.locator(".tools-panel").getByRole("button", { name: "Map balance", exact: true }).tap(); await ph.waitForTimeout(700);
     check("Map balance, opened from the tools, opens in the sheet of panels and the tools sheet is shut", (await shown(".properties")) && !(await shown(".tools-panel")) && /Map balance/.test(await ph.locator(".properties").textContent()));
     check("and still nothing spills sideways", (await ph.evaluate(() => document.documentElement.scrollWidth)) <= 390);
+    // Keyboard focus follows the sheets (a keyboard, a switch and a screen reader reach the phone too): into a sheet when it opens,
+    // into the opened panel when a button of the tools opens one, back to the bar's button when a sheet shuts after a choice.
+    const within = (selector) => ph.evaluate((sel) => { const a = document.activeElement; return Boolean(a && a.closest(sel)); }, selector);
+    await ph.touchscreen.tap(box.x + 12, box.y + 12); await ph.waitForTimeout(300);
+    await ph.locator("#phone-tools").tap(); await ph.waitForTimeout(300);
+    check("opening the tools puts keyboard focus in them, not left on the bar", await within(".tools-panel"));
+    await ph.locator(".tools-panel").getByRole("button", { name: "Tickets", exact: true }).focus();
+    await ph.keyboard.press("Enter"); await ph.waitForTimeout(600);
+    check("a panel opened with the keyboard from the tools has the focus, not the button that is now out of sight", (await shown(".properties")) && !(await shown(".tools-panel")) && (await within(".properties")));
+    await ph.locator("#phone-tools").tap(); await ph.waitForTimeout(300);
+    await ph.locator(".tools-panel .tool-row button").nth(1).focus();
+    await ph.keyboard.press("Enter"); await ph.waitForTimeout(300);
+    check("choosing a tool with the keyboard shuts the sheet and the focus goes to the bar's Tools button", !(await shown(".tools-panel")) && (await ph.evaluate(() => document.activeElement && document.activeElement.id === "phone-tools")));
     await phoneCtx.close();
     // A wide screen has none of it.
     const wide = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
     await wide.goto(BASE, { waitUntil: "networkidle" });
     await wide.getByRole("button", { name: "Load the example map" }).click(); await wide.waitForTimeout(500);
     check("a wide screen has no phone bar, and its tools are on the page as ever", !(await wide.locator(".phone-bar").isVisible()) && (await wide.locator(".tools-panel").isVisible()) && (await wide.locator(".properties").isVisible()));
+    await wide.getByRole("button", { name: "Map balance", exact: true }).focus();
+    await wide.keyboard.press("Enter"); await wide.waitForTimeout(600);
+    check("and opening a panel there does not move the focus: it stays where it was", await wide.evaluate(() => { const a = document.activeElement; return !a || (!a.matches(".tools-panel, .properties") && a.tagName !== "ASIDE"); }));
     await wide.context().close();
   }
 

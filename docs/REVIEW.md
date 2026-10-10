@@ -83,7 +83,10 @@ In this order, most important first. Each is a question with a concrete way to l
 1. **Correctness.** Does the changed code do what it says, in the cases around the ones tested? Edge cases:
    an empty map, one stop, a map with no tickets, two to five players, a standing board, a map from an
    older file. Arithmetic on units (board units, millimetres, centimetres), off-by-ones, state that is read
-   after it has changed, a branch that is never reached.
+   after it has changed, a branch that is never reached. Two things a review found that this list did not
+   ask for (2026-10-10): **a lookup by a name from a file in a plain object** (`table[name]`) also finds `__proto__`,
+   `constructor` and `toString`, so use `Object.hasOwn` or a `Map`; and **a key made by joining ids** with `~`, `|` or `::`
+   is the same for two different pairs when an id holds the separator, so use `pairKeyOf` (`app/map-data.ts`) or JSON.
 2. **Files and compatibility.** AGENTS.md: a change to what the editor writes or reads (map, network,
    background and ticket files, CSV, the envelope: a field renamed, removed or given another meaning, a
    migration, a version bump) is checked with the owner *before* it is built. An addition (a new optional
@@ -214,6 +217,16 @@ adding the seed's exact words to it.
   stops out (as written in `docs/CSV.md`), and the example rules give 22 and 18 wagons for four and five players
   while the map holds one wagon count.
 
+- **2026-10-10, an independent review by Codex** of 1.0.0 to `ce8149f` (the basis: `~/Developer/ttr-codex-review-prompt.md`, outside the
+  repo). Four findings, all reproduced and fixed with the checks written first (`tests/codex-findings.cjs`, section 66 of the browser
+  suite): (1) **BLOCKER**, a board name that a plain object has anyway (`__proto__`, `constructor`, `toString`) was read as an old
+  board by `legacyFormats[value.format]` and made every coordinate NaN, which a save turned into null and the next reading threw
+  away (1.0.0 threw instead; the loss was silent); (2) **BLOCKER**, a field an older build keeps under `unknown` and this one knows
+  (the lane rule) stayed there when the stored copy was read here, and `mapPayload` let `unknown` win over the new value;
+  (3) a key for a pair of stops made by joining the ids with `~`, `|` or `::` is the same for `a~b`+`c` and `a`+`b~c`, so two routes
+  counted as a double route (now `pairKeyOf` in `app/map-data.ts`, length first, used everywhere); (4) on the phone keyboard focus
+  stayed on a button that was out of sight. **What it shows:** our own reviewer (`ttr-reviewer`, which had reviewed every release in the range) found
+  none of the first three; each came from a plain-object lookup or a joined-text key, which are now in the checklist below.
 ## Sources
 
 - Claude Code documentation: [Create custom subagents](https://code.claude.com/docs/en/sub-agents) (tools,
