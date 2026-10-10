@@ -4780,6 +4780,82 @@ const sectionStart = (n) => {
     await wide.context().close();
   }
 
+  // 67. The phone, finished: Settings and the other dialogs fit and read at 390 px, the map can be zoomed (buttons in the bar, and a
+  // pinch with two fingers that keeps the point between them in place) from the whole map in view to a size to work in, and a notice
+  // sits above the bar, not under it.
+  if (wants(67)) {
+  sectionStart(67);
+    const ctx67 = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
+    const pz = await ctx67.newPage();
+    pz.on("pageerror", (e) => errors.push(String(e)));
+    await pz.goto(BASE, { waitUntil: "networkidle" });
+    await pz.getByRole("button", { name: "Load the example map" }).click();
+    await pz.waitForTimeout(700);
+    const canvasWidth = () => pz.evaluate(() => Math.round(document.querySelector(".map-canvas").getBoundingClientRect().width));
+    const wrapInner = () => pz.evaluate(() => { const w = document.querySelector(".map-wrap"); const cs = getComputedStyle(w); return Math.round(w.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)); });
+    const sideways = () => pz.evaluate(() => document.documentElement.scrollWidth);
+    // The size it has always had on a phone, to work in.
+    const start = await canvasWidth();
+    check("the map starts at a size to work in: about 900 px wide, as before, in its own scrolling area", start >= 850 && start <= 950, String(start));
+    check("the bar has the zoom: smaller, the whole map, larger", (await pz.locator("#phone-zoom-out").isVisible()) && (await pz.locator("#phone-zoom-fit").isVisible()) && (await pz.locator("#phone-zoom-in").isVisible()));
+    await pz.locator("#phone-zoom-fit").tap(); await pz.waitForTimeout(300);
+    const fit = await canvasWidth(), inner = await wrapInner();
+    check("Fit shows the whole map: as wide as the area it is in, no sideways scroll needed", Math.abs(fit - inner) <= 2 && (await pz.evaluate(() => { const w = document.querySelector(".map-wrap").getBoundingClientRect(), c = document.querySelector(".map-canvas").getBoundingClientRect(); return c.left >= w.left - 1 && c.right <= w.right + 1; })), `${fit} against ${inner}`);
+    await pz.locator("#phone-zoom-in").tap(); await pz.waitForTimeout(300);
+    const bigger = await canvasWidth();
+    check("larger makes it larger, by a step", bigger > fit * 1.2, `${fit} then ${bigger}`);
+    await pz.locator("#phone-zoom-out").tap(); await pz.waitForTimeout(300);
+    check("smaller takes it back", Math.abs((await canvasWidth()) - fit) <= 2);
+    for (let i = 0; i < 8; i++) await pz.locator("#phone-zoom-out").tap({ force: true });
+    await pz.waitForTimeout(200);
+    check("it does not go smaller than the whole map", (await canvasWidth()) >= inner - 2);
+    for (let i = 0; i < 12; i++) await pz.locator("#phone-zoom-in").tap({ force: true });
+    await pz.waitForTimeout(200);
+    const most = await canvasWidth();
+    check("nor larger than a limit: six times the whole map", most <= inner * 6 + 2 && most > inner * 4, `${most} of ${inner}`);
+    check("and nothing spills sideways at any size", (await sideways()) <= 390);
+    await pz.locator("#phone-zoom-fit").tap(); await pz.waitForTimeout(300);
+    // A pinch with two fingers: pointer events, as a touch screen sends them, spread apart from the middle of the map.
+    const pinch = async (from, to, centre) => pz.evaluate(([f, t, c]) => { const el = document.querySelector(".map-wrap"); const fire = (type, id, x, y) => el.dispatchEvent(new PointerEvent(type, { pointerId: id, pointerType: "touch", isPrimary: id === 1, clientX: x, clientY: y, bubbles: true, cancelable: true })); fire("pointerdown", 1, c.x - f / 2, c.y); fire("pointerdown", 2, c.x + f / 2, c.y); for (let i = 1; i <= 10; i++) { const d = f + ((t - f) * i) / 10; fire("pointermove", 1, c.x - d / 2, c.y); fire("pointermove", 2, c.x + d / 2, c.y); } fire("pointerup", 1, c.x - t / 2, c.y); fire("pointerup", 2, c.x + t / 2, c.y); }, [from, to, centre]);
+    // Between the fingers is a point of the map (one outside it cannot be kept still: nothing scrolls past the map's edge).
+    const centre = await pz.evaluate(() => { const r = document.querySelector(".map-canvas").getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
+    const before = await canvasWidth();
+    const under = await pz.evaluate((c) => { const r = document.querySelector(".map-canvas").getBoundingClientRect(); return { fx: (c.x - r.left) / r.width, fy: (c.y - r.top) / r.height }; }, centre);
+    await pinch(60, 180, centre); await pz.waitForTimeout(300);
+    const after = await canvasWidth();
+    check("spreading two fingers zooms in, about as much as they spread (three times)", after > before * 2.5 && after < before * 3.5 || after >= inner * 5.9, `${before} then ${after}`);
+    const kept = await pz.evaluate((arg) => { const r = document.querySelector(".map-canvas").getBoundingClientRect(), w = document.querySelector(".map-wrap"); return { x: r.left + arg.under.fx * r.width, y: r.top + arg.under.fy * r.height, atX: w.scrollLeft <= 0 || w.scrollLeft >= w.scrollWidth - w.clientWidth - 1, atY: w.scrollTop <= 0 || w.scrollTop >= w.scrollHeight - w.clientHeight - 1 }; }, { under });
+    // Kept to within a few pixels, unless the map's own edge stops it: nothing scrolls past the end of what there is to scroll.
+    check("and the point between the fingers stays between them (or the edge of the map stops it)", (Math.abs(kept.x - centre.x) <= 6 || kept.atX) && (Math.abs(kept.y - centre.y) <= 6 || kept.atY), `${Math.round(kept.x - centre.x)}, ${Math.round(kept.y - centre.y)} px off, at an edge: ${kept.atX}, ${kept.atY}`);
+    check("the point stays within a quarter of the screen of the fingers even then", Math.abs(kept.x - centre.x) <= 100 && Math.abs(kept.y - centre.y) <= 100);
+    await pinch(180, 60, centre); await pz.waitForTimeout(300);
+    check("pinching together zooms out again", (await canvasWidth()) < after * 0.6, `${after} then ${await canvasWidth()}`);
+    await pz.locator("#phone-zoom-fit").tap(); await pz.waitForTimeout(300);
+    check("the zoom buttons carry on from where a pinch left it (the state is the map's, not the gesture's)", await (async () => { await pinch(60, 120, centre); await pz.waitForTimeout(200); const w = await canvasWidth(); await pz.locator("#phone-zoom-in").tap(); await pz.waitForTimeout(250); return (await canvasWidth()) > w * 1.2; })());
+    await pz.locator("#phone-zoom-fit").tap();
+    // Settings: a column, the pages in a row above it, the board's choices readable.
+    await pz.locator("#phone-tools").tap(); await pz.waitForTimeout(300);
+    await pz.locator(".tools-panel").getByRole("button", { name: "Settings" }).tap(); await pz.waitForTimeout(600);
+    const settings = await pz.evaluate(() => {
+      const dialog = document.querySelector("[role=dialog]"), body = dialog.querySelector(".settings-body"), nav = dialog.querySelector(".settings-nav");
+      const items = [...nav.querySelectorAll(".settings-nav-item")].map((el) => Math.round(el.getBoundingClientRect().top));
+      const radio = dialog.querySelector("#settings-format label span strong");
+      const dr = dialog.getBoundingClientRect(), br = body.getBoundingClientRect();
+      const wide = [...dialog.querySelectorAll(".settings-body *")].filter((el) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.right > dr.right + 1 && !el.closest("[data-scroll], .overflow-x-auto"); }).length;
+      return { dialogInside: dr.left >= 0 && dr.right <= innerWidth + 1, bodyWide: br.width, navRow: new Set(items).size === 1, labelHeight: Math.round(radio.getBoundingClientRect().height), wide };
+    });
+    check("Settings fits the screen, with its pages in one row on top and the settings under them using the width", settings.dialogInside && settings.navRow && settings.bodyWide >= 300, JSON.stringify(settings));
+    check("the board's choices are readable: a name fits on one line, not a word to a line", settings.labelHeight <= 24, `${settings.labelHeight} px high`);
+    check("and nothing in it reaches beyond the dialog's edge", settings.wide === 0, `${settings.wide} elements`);
+    // Standing the board up makes a notice (names moved clear of the routes): it sits above the bar, not under it.
+    await pz.locator('#settings-orientation input[value="portrait"]').check(); await pz.waitForTimeout(700);
+    await pz.keyboard.press("Escape"); await pz.waitForTimeout(400);
+    check("a notice sits above the bar, not under it, and not over the buttons at the top", (await pz.locator("[data-sonner-toast]").count()) > 0 && (await pz.evaluate(() => { const t = document.querySelector("[data-sonner-toast]").getBoundingClientRect(), bar = document.querySelector(".phone-bar").getBoundingClientRect(); const print = [...document.querySelectorAll("button")].find((b) => /Print map/.test(b.textContent)).getBoundingClientRect(); const hit = document.elementFromPoint(print.x + print.width / 2, print.y + print.height / 2); return t.bottom <= bar.top + 1 && t.top > print.bottom && Boolean(hit && /Print map/.test(hit.textContent || "")); })));
+    await pz.getByRole("button", { name: "Print map" }).tap(); await pz.waitForTimeout(600);
+    check("the print dialog fits too", await pz.evaluate(() => { const d = document.querySelector("[role=dialog]").getBoundingClientRect(); return d.left >= 0 && d.right <= innerWidth + 1 && document.documentElement.scrollWidth <= 390; }));
+    await ctx67.close();
+  }
+
   if (sectionOpen) sectionTimes[sectionOpen.n] = Math.round((Date.now() - sectionOpen.at) / 100) / 10;
   if (process.env.TTR_TIMES) fs.writeFileSync(process.env.TTR_TIMES, JSON.stringify(sectionTimes));
   console.log("PASS:"); ok.forEach((l) => console.log("  ✓ " + l));

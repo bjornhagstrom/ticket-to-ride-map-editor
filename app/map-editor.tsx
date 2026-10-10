@@ -2,7 +2,7 @@
 
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { issueVersion, olderCopyWarning, playtestNote, versionLabel, versionStatus, type VersionBy } from "./map-version";
-import { Wrench, SlidersHorizontal, Code, FileArchive, FileSpreadsheet, Grid3x3, MapPin, Route as RouteIcon, ScrollText, Sparkles, AlertTriangle, BarChart3, Crosshair, Settings2, Ticket as TicketIcon, Check, ChevronDown, ChevronUp, GripVertical, CircleDot, CircleHelp, Download, Image as ImageIcon, Layers3, Lightbulb, Link2, MapPinPlus, MousePointer2, Printer, Redo2, Ruler, StickyNote, Trash2, Undo2, Upload, X } from "lucide-react";
+import { Wrench, SlidersHorizontal, ZoomIn, ZoomOut, Maximize, Code, FileArchive, FileSpreadsheet, Grid3x3, MapPin, Route as RouteIcon, ScrollText, Sparkles, AlertTriangle, BarChart3, Crosshair, Settings2, Ticket as TicketIcon, Check, ChevronDown, ChevronUp, GripVertical, CircleDot, CircleHelp, Download, Image as ImageIcon, Layers3, Lightbulb, Link2, MapPinPlus, MousePointer2, Printer, Redo2, Ruler, StickyNote, Trash2, Undo2, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { generatorFiles, generatorZip } from "./ttr-map-generator-export";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -212,6 +212,69 @@ export function MapEditor() {
       if (!active || active === document.body || active.closest(".tools-panel, .properties")) (was === "tools" ? toolsBarButtonRef : propertiesBarButtonRef).current?.focus({ preventScroll: true });
     }
   }, [phoneSheet]);
+  // The map on a phone: its width in pixels, from the whole map in the area it is in (Fit) to six times that, changed by the buttons in
+  // the bar and by a pinch of two fingers, which keeps the point between them where it is. It starts at 900 px, a size to work in.
+  const mapWrapRef = useRef<HTMLElement>(null);
+  const [phoneMapWidth, setPhoneMapWidth] = useState(900);
+  const PHONE_ZOOM_MAX = 6, PHONE_ZOOM_STEP = 1.4;
+  const phoneFitWidth = () => { const wrap = mapWrapRef.current; if (!wrap) return 360; const cs = getComputedStyle(wrap); return Math.max(200, wrap.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)); };
+  const zoomPhoneMapTo = (width: number) => {
+    const wrap = mapWrapRef.current, canvas = wrap?.querySelector<SVGElement>(".map-canvas");
+    const fit = phoneFitWidth();
+    const next = Math.round(Math.min(fit * PHONE_ZOOM_MAX, Math.max(fit, width)));
+    if (!wrap || !canvas) { setPhoneMapWidth(next); return; }
+    // About the middle of what is in view.
+    const box = wrap.getBoundingClientRect(), r = canvas.getBoundingClientRect();
+    const mid = { x: box.left + box.width / 2, y: box.top + box.height / 2 };
+    const fx = (mid.x - r.left) / r.width, fy = (mid.y - r.top) / r.height;
+    wrap.style.setProperty("--phone-map-width", `${next}px`);
+    const after = canvas.getBoundingClientRect();
+    wrap.scrollLeft += after.left + fx * after.width - mid.x;
+    wrap.scrollTop += after.top + fy * after.height - mid.y;
+    setPhoneMapWidth(next);
+  };
+  const currentPhoneMapWidth = () => mapWrapRef.current?.querySelector<SVGElement>(".map-canvas")?.getBoundingClientRect().width ?? phoneMapWidth;
+  useEffect(() => {
+    const wrap = mapWrapRef.current;
+    if (!wrap) return;
+    const pointers = new Map<number, { x: number; y: number }>();
+    let gesture: { dist: number; width: number; fx: number; fy: number } | null = null;
+    let latest = 0;
+    const phone = () => window.matchMedia("(max-width: 720px)").matches;
+    const canvas = () => wrap.querySelector<SVGElement>(".map-canvas");
+    const two = () => { const [a, b] = [...pointers.values()]; return { mid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, dist: Math.hypot(a.x - b.x, a.y - b.y) || 1 }; };
+    const down = (event: PointerEvent) => {
+      if (!phone()) return;
+      pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      const c = canvas();
+      if (pointers.size === 2 && c) { const { mid, dist } = two(); const r = c.getBoundingClientRect(); gesture = { dist, width: r.width, fx: (mid.x - r.left) / r.width, fy: (mid.y - r.top) / r.height }; latest = r.width; }
+    };
+    const move = (event: PointerEvent) => {
+      if (!pointers.has(event.pointerId)) return;
+      pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      const c = canvas();
+      if (!gesture || pointers.size < 2 || !c) return;
+      const { mid, dist } = two();
+      const cs = getComputedStyle(wrap);
+      const fit = Math.max(200, wrap.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight));
+      const width = Math.min(fit * 6, Math.max(fit, gesture.width * dist / gesture.dist));
+      wrap.style.setProperty("--phone-map-width", `${width}px`);
+      const r = c.getBoundingClientRect();
+      wrap.scrollLeft += r.left + gesture.fx * r.width - mid.x;
+      wrap.scrollTop += r.top + gesture.fy * r.height - mid.y;
+      latest = width;
+      event.preventDefault();
+    };
+    const up = (event: PointerEvent) => {
+      pointers.delete(event.pointerId);
+      if (gesture && pointers.size < 2) { gesture = null; setPhoneMapWidth(Math.round(latest)); }
+    };
+    wrap.addEventListener("pointerdown", down, true);
+    wrap.addEventListener("pointermove", move, true);
+    wrap.addEventListener("pointerup", up, true);
+    wrap.addEventListener("pointercancel", up, true);
+    return () => { wrap.removeEventListener("pointerdown", down, true); wrap.removeEventListener("pointermove", move, true); wrap.removeEventListener("pointerup", up, true); wrap.removeEventListener("pointercancel", up, true); };
+  }, []);
   const [wasStylesOpen, setWasStylesOpen] = useState(showStyles);
   if (showStyles !== wasStylesOpen) { setWasStylesOpen(showStyles); if (showStyles) setPhoneSheet(null); }
   // The suggested route the pointer is on, drawn on the map while it is there.
@@ -1072,7 +1135,7 @@ export function MapEditor() {
         {data.stops.length > 1 && <Button variant="outline" size="sm" className="analyze-button" onClick={() => { closeAnalysis(); setShowTickets(false); setShowRules(false); setShowSuggestions(true); }}><Lightbulb />Suggest routes</Button>}
         <div className="legend"><p className="eyebrow">Stop types</p>{data.stopTypeStyles.map((meta) => <button type="button" key={meta.id} className="legend-item" title={`Edit the ${meta.label} stop type`} onClick={() => openStyles({ kind: "stop", id: meta.id })}><i style={{ background: meta.fill, borderColor: meta.stroke }} />{meta.label}</button>)}</div>
       </aside>
-      <section className="map-wrap" onPointerDownCapture={() => setPhoneSheet(null)}>
+      <section ref={mapWrapRef} className="map-wrap" style={{ "--phone-map-width": `${phoneMapWidth}px` } as React.CSSProperties} onPointerDownCapture={() => setPhoneSheet(null)}>
         {litTicket && <div className="highlight-chip"><TicketIcon /><span>{stopById(data, litTicket.a)?.name} → {stopById(data, litTicket.b)?.name}</span><Button variant="ghost" size="icon" aria-label="Stop showing this ticket" onClick={() => setSelectedTicket(null)}><X /></Button></div>}
         <div className="map-status"><Badge variant="secondary">{format.label}</Badge><Badge variant="secondary">{format.widthMm.toLocaleString("en-GB")} × {format.heightMm.toLocaleString("en-GB")} mm</Badge><Badge variant="secondary">{data.stops.length} stops</Badge><Badge variant="secondary">{data.routes.length} routes</Badge>{versionNow.number !== undefined && <Badge variant="secondary" className="map-version" title={versionNow.changed ? `${versionLabel(versionNow)}. Changed since: the next print or export will be version ${versionNow.next}.` : `${versionLabel(versionNow)}. Unchanged since: a print or export now is version ${versionNow.number} too.`}>Version {versionNow.number}{versionNow.changed ? " · changed" : ""}</Badge>}<Badge variant="secondary" className="ticket-count" title={`${ticketCount} in ${activeTicketSet.label}`}>{ticketCountLabel}</Badge><Badge variant="secondary">{data.background.length} background objects</Badge>{data.notes.length > 0 && <Badge variant="secondary">{data.notes.length} note{data.notes.length === 1 ? "" : "s"}</Badge>}<Badge variant="outline" className="map-status-note">Everything is stored in the exported map file</Badge></div>
         {hint && hint.atTop && <MapHint atTop title={hint.title} open={routeHintOpen} onToggle={toggleRouteHint} offsetX={routeHintX} onOffsetChange={moveRouteHint}>{hint.body}</MapHint>}
@@ -1114,6 +1177,11 @@ export function MapEditor() {
       <nav className="phone-bar" aria-label="Tools and properties">
         <Button type="button" ref={toolsBarButtonRef} id="phone-tools" variant={phoneSheet === "tools" ? "default" : "outline"} aria-expanded={phoneSheet === "tools"} onClick={() => setPhoneSheet(phoneSheet === "tools" ? null : "tools")}><Wrench />Tools</Button>
         <Button type="button" ref={propertiesBarButtonRef} id="phone-properties" variant={phoneSheet === "properties" ? "default" : "outline"} aria-expanded={phoneSheet === "properties"} onClick={() => setPhoneSheet(phoneSheet === "properties" ? null : "properties")}><SlidersHorizontal />Properties{(selectedStop || selectedRoute || selectedBackground || imageSelected || selectedNote) && <span className="phone-dot" role="img" aria-label="something is selected" />}</Button>
+        <div className="phone-zoom" role="group" aria-label="Zoom the map">
+          <Button type="button" id="phone-zoom-out" variant="outline" aria-label="Zoom out" onClick={() => zoomPhoneMapTo(currentPhoneMapWidth() / PHONE_ZOOM_STEP)}><ZoomOut /></Button>
+          <Button type="button" id="phone-zoom-fit" variant="outline" aria-label="Show the whole map" onClick={() => zoomPhoneMapTo(0)}><Maximize /></Button>
+          <Button type="button" id="phone-zoom-in" variant="outline" aria-label="Zoom in" onClick={() => zoomPhoneMapTo(currentPhoneMapWidth() * PHONE_ZOOM_STEP)}><ZoomIn /></Button>
+        </div>
       </nav>
     </div>
     <AlertDialog open={danger !== null} onOpenChange={(open) => { if (!open) { setDanger(null); setPendingImport(null); } }}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{danger === "reset" ? "Start over with an empty map?" : danger === "load-blank" ? "Replace the current map with a blank one?" : danger === "load-example" ? "Replace the current map with the example?" : danger === "load-problems" ? "Replace the current map with the example with problems?" : danger === "import-background" ? "Replace the background?" : danger === "import-network" ? "Replace stops and routes?" : danger === "import-image" ? "Replace the background image?" : danger === "import-csv" ? "Replace stops and routes?" : (selectedStop && data.stops.find((stop) => stop.id === selectedStop) ? `Delete ${data.stops.find((stop) => stop.id === selectedStop)!.name}?` : "Delete the selected object?")}</AlertDialogTitle><AlertDialogDescription asChild><div>{danger === "reset" ? "Everything on this map is removed from this browser: its stops, routes, tickets and decks, rules, notes and background. An empty map takes its place. Undo brings it back until you close the page; export first to keep a copy." : danger === "load-blank" ? "Your current background objects, stops and routes will be replaced with a blank map. Export the map first if you want to keep your work." : danger === "load-example" ? "Your current background objects, stops and routes will be replaced with the neutral example map. Export the map first if you want to keep your work." : danger === "load-problems" ? "Your current background objects, stops and routes will be replaced with the example map that has two problems on purpose, a crossing and a dead end, to show how the warnings look. Export the map first if you want to keep your work." : danger === "import-background" ? "The imported background, including any background image, will replace the current one. Stops and routes are kept as they are." : danger === "import-network" ? "The imported stops and routes will replace the current network, and any tickets in the file replace the deck you are working in. Background objects are kept as they are." : danger === "import-image" ? "The new image will replace the current background image." : danger === "import-csv" ? "The stops and routes in the spreadsheet will replace the current network. Tickets in it arrive as new decks, beside the ones you have. Background objects are kept as they are." : selectedStop ? <StopDeletionList data={data} stopId={selectedStop} /> : "The selected object will be deleted."}</div></AlertDialogDescription></AlertDialogHeader><AlertDialogFooter>{danger === "reset" && <Button variant="outline" onClick={exportMap}><Download />Export first</Button>}<AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => { if (danger === "reset") { change(() => cloneMap(emptyMap)); clearSelection(); setDanger(null); } else if (danger === "load-blank") applyGuideChoice(emptyMap); else if (danger === "load-example") applyGuideChoice(initialMap); else if (danger === "load-problems") applyGuideChoice(problemMap); else if (danger === "import-background" && pendingImport?.kind === "background") applyBackgroundImport(pendingImport.background, pendingImport.backgroundImage); else if (danger === "import-network" && pendingImport?.kind === "network") applyNetworkImport(pendingImport.stops, pendingImport.routes, pendingImport.lineStyles, pendingImport.routeTypeStyles, pendingImport.stopTypeStyles, pendingImport.wagonStyles, pendingImport.tickets); else if (danger === "import-image" && pendingImport?.kind === "image") applyImageImport(pendingImport.image); else if (danger === "import-csv" && pendingImport?.kind === "csv") applyCsvImport(pendingImport.result); else deleteSelected(); }}>{danger === "reset" ? "Start over" : "Continue"}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>

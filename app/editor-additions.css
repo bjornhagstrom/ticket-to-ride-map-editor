@@ -50,7 +50,7 @@
 
 @media(max-width:720px){
   .map-wrap{overflow-x:scroll!important;overflow-y:auto!important;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-x pan-y}
-  .map-canvas{width:900px!important;min-width:900px!important;touch-action:pan-x pan-y!important}
+  .map-canvas{width:var(--phone-map-width,900px)!important;min-width:var(--phone-map-width,900px)!important;touch-action:pan-x pan-y!important}
   .map-canvas .stop{touch-action:none}
   .map-status{position:sticky!important;left:8px!important;width:max-content;z-index:3}
 }
@@ -515,14 +515,24 @@
   .brand-mark { width: 30px; height: 30px; }
   .header-actions { gap: 6px; padding-top: 6px; }
   .header-actions > * { flex-shrink: 0; }
-  .workspace { padding-bottom: 64px; }
-  .map-wrap { order: -1; max-height: none !important; min-height: 62svh; }
+  /* The page is the screen: the map scrolls inside its own area, which takes what the top and the bar leave. */
+  .app-shell { height: 100svh; min-height: 0; }
+  .workspace { flex: 1; min-height: 0; padding-bottom: 56px; }
+  .map-wrap { order: -1; flex: 1 1 auto; height: auto; min-height: 0; max-height: none !important; }
   .tools-panel, .properties { position: fixed; left: 0; right: 0; bottom: 56px; z-index: 30; max-height: 64svh; min-height: 0; overflow-y: auto; border: 0; border-top: 1px solid #ccc2b3; background: var(--background, #faf6ef); box-shadow: 0 -8px 24px rgba(40, 30, 20, .2); -webkit-overflow-scrolling: touch; }
   .tools-panel:not(.phone-open), .properties:not(.phone-open) { display: none !important; }
   .phone-bar { display: flex; gap: 8px; position: fixed; left: 0; right: 0; bottom: 0; height: 56px; z-index: 40; padding: 8px 12px; background: #faf6ef; border-top: 1px solid #ccc2b3; }
   .phone-bar button { flex: 1; height: 40px; position: relative; }
   .properties .property-form { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
   .properties .property-form > * { min-width: 0; }
+  .phone-zoom { display: flex; gap: 4px; flex: none; }
+  .phone-zoom button { flex: none; width: 40px; padding: 0; }
+  /* Settings in one column: the pages in a row on top, the settings under them using the width. */
+  .style-dialog .settings-layout { grid-template-columns: minmax(0, 1fr); min-height: 0; gap: 12px; }
+  .style-dialog .settings-nav { display: flex; gap: 6px; overflow-x: auto; border-right: 0; border-bottom: 1px solid #ddd4c6; padding: 0 0 8px; }
+  .style-dialog .settings-nav-item { flex: none; white-space: nowrap; }
+  .style-dialog .settings-board { grid-template-columns: minmax(0, 1fr); }
+  .style-dialog .style-columns { grid-template-columns: minmax(0, 1fr); }
   .phone-dot { position: absolute; top: 6px; right: 14px; width: 9px; height: 9px; border-radius: 50%; background: #721c24; box-shadow: 0 0 0 2px #faf6ef; }
 }
 .tools-panel:focus, .properties:focus { outline: none; }

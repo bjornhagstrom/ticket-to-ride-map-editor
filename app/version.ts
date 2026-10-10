@@ -10,6 +10,8 @@ export type Release = { version: string; date: string; title: string; changes: s
 // the top of CHANGELOG.md under Unreleased, and become the notes of the next version when it is
 // decided; the What's new page in the editor shows released versions only.
 export const UNRELEASED: string[] = [
+  "On a phone the map can be zoomed with buttons in the bar or by pinching with two fingers, from the whole map in view to six times larger, and the point between your fingers stays where it is.",
+  "On a phone Settings is one column with its pages in a row on top, the notices sit above the bar instead of over the buttons at the top, and the page itself no longer scrolls: the map has the room.",
   "A map file that names its board with a word every object has, such as toString, no longer loses its stops: it opens on the standard board as any unknown board name does.",
   "A map kept in the browser by an older version, with a lane rule it did not know, now has that rule here, and choosing another number is not written over by the old one.",
   "Two routes whose stop names happen to join into the same text, such as a~b with c and a with b~c, are no longer counted as one double route.",
