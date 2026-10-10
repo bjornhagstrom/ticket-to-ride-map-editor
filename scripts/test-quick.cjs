@@ -8,7 +8,7 @@
 const { spawnSync } = require("child_process");
 const root = require("path").join(__dirname, "..");
 const withCalibration = process.argv.includes("--with-calibration");
-const fast = ["synthetic", "suggester", "file-format", "print-plan", "markdown", "releases", "editor-version", "custom-board", "lane-rule", "turn-names", "csv-editor-version", "license", "csv", "csv-import", "csv-ids", "setup-balance", "csv-curves", "ticket-rebind", "board", "terminology", "network-shape", "map-version", "corrupt-files", "intended", "problem-example", "ttr-map-generator"];
+const fast = ["synthetic", "suggester", "file-format", "print-plan", "markdown", "releases", "editor-version", "custom-board", "lane-rule", "turn-names", "tiers", "csv-editor-version", "license", "csv", "csv-import", "csv-ids", "setup-balance", "csv-curves", "ticket-rebind", "board", "terminology", "network-shape", "map-version", "corrupt-files", "intended", "problem-example", "ttr-map-generator"];
 const slow = ["calibration", "balance-official", "deck-tension"];
 const steps = [["typecheck"], ["lint"], ...fast.map((name) => [`test:${name}`]), ...(withCalibration ? slow.map((name) => [`test:${name}`]) : [])];
 const started = Date.now();

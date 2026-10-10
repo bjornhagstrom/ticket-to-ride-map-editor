@@ -1,7 +1,7 @@
 # Testing: what runs when
 
-Status: **plan**, agreed with the owner on 2026-10-06. Steps 1 to 4 are built (marked below); steps 5 and 6
-are not. The aim is that ordinary development gets an answer in about a
+Status: **plan**, agreed with the owner on 2026-10-06. Steps 1 to 5 are built (marked below); step 6
+is not. The aim is that ordinary development gets an answer in about a
 minute, a merge into `main` in two to three minutes, and the full set only where it matters:
 before a release.
 
@@ -37,7 +37,7 @@ Where the regression time goes:
 |---|---|---|---|
 | **quick** | while working, before each commit | `typecheck`, `lint`, the fast unit suites, and the regression sections for the area touched (see the map below) in Chromium against the dev server | about 1 minute |
 | **merge** | before work is merged into `main` | for more than a small change, the review in `docs/REVIEW.md`; `npm test` without the calibration suites unless the suggester or balance figures changed, and the whole regression in Chromium in parallel with `--fast` | about 2–3 minutes (the regression 93 s) |
-| **release** | before every push of a release and every deploy | the code review of the release (`docs/REVIEW.md`), then everything: `npm test` with the calibration suites, the whole regression in Chromium on the dev server and on the production build, and in WebKit, run in parallel, then the walk-through in `docs/DEPLOYMENT.md` | about 5 minutes, plus the walk-through |
+| **release** | before every push of a release and every deploy | the code review of the release (`docs/REVIEW.md`), then everything: `npm test` with the calibration suites, the whole regression on the production build, in Chromium and in WebKit, run in parallel (`npm run test:release`; the dev server is left out, which it says), then the walk-through in `docs/DEPLOYMENT.md` | about 4 minutes, plus the walk-through |
 
 What does not change: **tests are designed before the feature**, the checks that are worth keeping are
 folded into `tests/regression.cjs` (or a unit suite), and a failing check is first judged for which
@@ -92,10 +92,17 @@ Each step stands on its own and can be stopped after any of them.
    six workers, 850 checks: **124 s with the waits as written, 93 s with `--fast`, against 418 s one after
    another.** In WebKit the same run, 838 checks (12 are Chromium's own), takes 129 s. What is left is the chain (about 93 s, real work and page loads rather than waiting) and
    section 33 (about 82 s); splitting the chain at a point where it starts afresh would be the next gain.
-5. **One command for each tier.** `npm run test:quick`, `npm run test:merge`, `npm run test:release`,
-   each printing what it ran, what it left out and why, and how long it took. `test:release` runs
-   Chromium (dev), Chromium (production build) and WebKit side by side and refuses to say "green"
-   unless all three are.
+5. **One command for each tier. Built (2026-10-10).** `npm run test:quick`, `npm run test:merge`, `npm run test:release`,
+   each printing what it ran, what it left out and why, and how long it took (`scripts/test-tiers.cjs`, helpers in
+   `scripts/tier-lib.cjs`, checked by `tests/tiers.cjs`). **`test:merge`** (128 s): the quick tier (the calibration suites
+   too when the change touches the ticket suggester, the balance figures or `map-data.ts`, found with `git diff --name-only
+   main`), the build, and the whole regression in Chromium on that build with `--fast`. **`test:release`** (211 s):
+   `npm test` (everything, the build included), a scan of `out/` for names from the private reference data (the public
+   place names the notes carry on purpose are listed, any other name fails), and the whole regression on the production
+   build with the waits as written in Chromium and in WebKit at the same time. It serves `out/` itself under `/ttr` on a free
+   port, so nothing else has to run. It says "green" only when everything it ran was, exits non-zero otherwise, and always
+   ends with what it did not run: Chromium against the dev server (the production build is the stricter of the two for what
+   ships), and the review, the walk-through and the owner's go, which are by hand.
 6. **The impact map** (`tests/impact.json` and `npm run test:changed`): chooses the quick tier's sections
    from `git diff --name-only main`. Last, because it is only as good as the table and needs the
    earlier steps to be worth anything.
