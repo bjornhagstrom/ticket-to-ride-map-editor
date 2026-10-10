@@ -10,6 +10,7 @@ export type Release = { version: string; date: string; title: string; changes: s
 // the top of CHANGELOG.md under Unreleased, and become the notes of the next version when it is
 // decided; the What's new page in the editor shows released versions only.
 export const UNRELEASED: string[] = [
+  "A map whose stops, routes or styles hold a value the editor does not know, such as a stop size from a newer version, or an object where a name belongs, now opens instead of stopping the drawing: a value in a field of choice is kept, and a field of the wrong kind is mended and said.",
 ];
 
 export const RELEASES: Release[] = [

@@ -426,6 +426,39 @@ export function repairMap(raw: unknown): { map: MapData; repairs: string[] } {
   say(pointsDropped, "point of a background shape was not a point and has been dropped.", "points of background shapes were not points and have been dropped.");
 
   const map = normalizeMapFields(mergeStylesIntoRouteTypes(migrateLegacyFormat(value as Partial<MapData>)));
+  // The plain fields of the lists a person edits are what they should be: text where text is drawn, a number where one is counted with,
+  // yes or no where it is a switch. Anything else (an object in a label, a number in a mark) would stop the drawing, so it is replaced by
+  // a plain default or left out. (A value the editor does not know in a field of choices, such as a size, is kept and drawn as the default.)
+  let mended = 0;
+  const mend = (list: unknown, spec: Record<string, "string" | "text" | "number" | "number?" | "boolean">) => {
+    if (!Array.isArray(list)) return;
+    const defaults: Record<string, string | number> = { stroke: "#736d64", fill: "#ffffff", dash: "", strokeWidth: 6, opacity: 1 };
+    for (const item of list) {
+      if (!isRecord(item)) continue;
+      for (const [key, kind] of Object.entries(spec)) {
+        const v = item[key];
+        if (v === undefined) continue;
+        const fine = kind === "number" || kind === "number?" ? typeof v === "number" && Number.isFinite(v) : kind === "boolean" ? typeof v === "boolean" : typeof v === "string";
+        if (fine) continue;
+        mended++;
+        if (kind === "string") item[key] = key === "label" ? String(item.id ?? "") : defaults[key] ?? "";
+        else if (kind === "number") item[key] = defaults[key] ?? 0;
+        else delete item[key];
+      }
+    }
+  };
+  mend(map.stops, { letter: "text", locked: "boolean", labelLocked: "boolean", hub: "boolean", labelAngle: "number?", endGapMm: "number?" });
+  mend(map.tickets, { adjust: "number?", long: "boolean", set: "text" });
+  mend(map.routes, { contested: "boolean", curved: "boolean", lineStyle: "text", wagonStyle: "text" });
+  mend(map.routeTypeStyles, { label: "string", stroke: "string", dash: "string", strokeWidth: "number", infrastructure: "boolean", shape: "text", glyph: "text" });
+  mend(map.stopTypeStyles, { label: "string", fill: "string", stroke: "string", square: "boolean", junction: "boolean" });
+  mend(map.wagonStyles, { label: "string", shape: "text", glyph: "text" });
+  mend(map.lineStyles, { label: "string", dash: "string", strokeWidth: "number" });
+  mend(map.ticketSets, { label: "string" });
+  mend(map.background, { label: "string", fill: "string", stroke: "string", opacity: "number", strokeWidth: "number", locked: "boolean" });
+  mend(map.notes, { text: "string", locked: "boolean", collapsed: "boolean" });
+  if (map.endGapMm !== undefined && !(typeof map.endGapMm === "number" && Number.isFinite(map.endGapMm))) { delete map.endGapMm; mended++; }
+  say(mended, "field of a stop, route, style, deck, note or background shape was not of the kind it should be and has been mended.", "fields of stops, routes, styles, decks, notes or background shapes were not of the kind they should be and have been mended.");
   return { map, repairs };
 }
 const isRecord = (value: unknown): value is Record<string, unknown> => Boolean(value) && typeof value === "object" && !Array.isArray(value);

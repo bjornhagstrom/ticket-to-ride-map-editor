@@ -3,6 +3,7 @@
 //
 //   npm run test:merge      # before work is merged into main
 //   npm run test:release    # before every push of a release and every deploy
+//   npm run test:release -- --dev   # and Chromium on the dev server too (for a change to how components are built, their effects and state)
 //
 // merge:   typecheck, lint and the fast unit suites (the calibration suites too when the change touches the ticket suggester or the
 //          balance figures), the build, then the whole regression in Chromium on that build, in parallel, with shorter waits.
@@ -15,6 +16,7 @@ const lib = require("./tier-lib.cjs");
 
 const root = path.join(__dirname, "..");
 const tier = process.argv[2];
+const withDev = process.argv.includes("--dev");
 if (tier !== "merge" && tier !== "release") { console.error("usage: node scripts/test-tiers.cjs merge|release"); process.exit(2); }
 
 const started = Date.now();
@@ -85,13 +87,27 @@ const show = (out, lines = 25) => { const bad = out.split("\n").filter((l) => /â
         record(`regression, ${name}, production build, waits as written`, r.code === 0 && sum !== null && sum.failed === 0, t, sum ? `${sum.passed} checks` : "no summary");
         if (r.code !== 0) show(r.out);
       }
+      if (withDev) {
+        // The dev server shows what the production build hides (keys, effects run twice, hydration); it is slower and runs the editor's state updaters twice.
+        const dev = await lib.startDev(root);
+        t = Date.now();
+        if (!dev) record("dev server starts", false, t);
+        else {
+          const r = await run("node", ["scripts/test-regression-parallel.cjs"], { TTR_URL: `http://localhost:${dev.port}/ttr/` });
+          await dev.close();
+          const sum = lib.regressionSummary(r.out);
+          record("regression, Chromium, dev server, waits as written", r.code === 0 && sum !== null && sum.failed === 0, t, sum ? `${sum.passed} checks` : "no summary");
+          if (r.code !== 0) show(r.out);
+        }
+      }
     } else left.push("the scan and the regression: npm test failed");
-    left.push("Chromium against the dev server (the production build is the stricter of the two for what ships)", "the review of the release (docs/REVIEW.md) and the walk-through (docs/DEPLOYMENT.md): by hand", "the owner's go for a push or a deploy");
+    if (!withDev) left.push("Chromium against the dev server (--dev; the production build is the stricter of the two for what ships)");
+    left.push("the review of the release (docs/REVIEW.md) and the walk-through (docs/DEPLOYMENT.md): by hand", "the owner's go for a push or a deploy");
   }
 
   const failed = results.filter((r) => !r.ok);
   console.log(`\n${tier[0].toUpperCase()}${tier.slice(1)} tier: ${failed.length ? `NOT green, ${failed.length} of ${results.length} steps failed (${failed.map((r) => r.name).join("; ")})` : `green, ${results.length} steps`} in ${seconds(started)} s.`);
   console.log(`Not run: ${left.join("; ")}.`);
   const regressions = results.filter((r) => r.name.startsWith("regression")).length;
-  process.exit(failed.length || regressions < (tier === "release" ? 2 : 1) ? 1 : 0);
+  process.exit(failed.length || regressions < (tier === "release" ? (withDev ? 3 : 2) : 1) ? 1 : 0);
 })();

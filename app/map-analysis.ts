@@ -1,6 +1,6 @@
 // The balance layer: everything derived from the stops and routes themselves. All of it is pure,
 // computed on demand from MapData, and none of it is stored in a map file.
-import { pairKeyOf, DEFAULT_WAGONS_PER_PLAYER, DEFAULT_STARTING_TICKETS, DEFAULT_TICKET_BANDS, DEFAULT_TICKET_MIX, type TicketBands, type TicketMix, DEFAULT_PLAYERS, lanesUsableAt, defaultLabelAngle, labelPush, stopSizeMeta, ticketsInSet, type MapData, type Ticket, type Point, realWagon, type Route, routeColors, type Stop, W } from "./map-data";
+import { pairKeyOf, DEFAULT_WAGONS_PER_PLAYER, DEFAULT_STARTING_TICKETS, DEFAULT_TICKET_BANDS, DEFAULT_TICKET_MIX, type TicketBands, type TicketMix, DEFAULT_PLAYERS, lanesUsableAt, defaultLabelAngle, labelPush, stopSizeMetaOf, ticketsInSet, type MapData, type Ticket, type Point, realWagon, type Route, routeColors, type Stop, W } from "./map-data";
 import type { TicketDeckReport } from "./ticket-suggester";
 import { boardOf, rotateMap, type Orientation } from "./board";
 import { curvedSamples, isCurved, intersects, parallelPoints, pointsFor, polylineLength, stopById } from "./map-geometry";
@@ -283,14 +283,14 @@ const overlapCount = (box: ReturnType<typeof labelBox>, samples: Point[]) =>
 export const labelAngleOf = (stop: Stop, boardWidth = W) => stop.labelAngle ?? defaultLabelAngle(stop, boardWidth);
 
 export function labelCovers(data: MapData, stop: Stop, samples: Point[]): boolean {
-  const radius = stopSizeMeta[stop.size ?? "medium"].radius;
+  const radius = stopSizeMetaOf(stop.size).radius;
   return overlapCount(labelBox(stop, labelAngleOf(stop, boardOf(data).width), radius), samples) > 0;
 }
 
 // Every bearing, with how much of a route each one would sit on. The caller picks the first clear
 // one, or the least bad when the stop is so hemmed in that nothing is clear.
 export function labelAngleOptions(data: MapData, stop: Stop, samples: Point[]): { angle: number; overlap: number }[] {
-  const radius = stopSizeMeta[stop.size ?? "medium"].radius;
+  const radius = stopSizeMetaOf(stop.size).radius;
   const options = [];
   for (let angle = 0; angle < 360; angle += 15) options.push({ angle, overlap: overlapCount(labelBox(stop, angle, radius), samples) });
   return options;
@@ -305,7 +305,7 @@ const bearingGap = (a: number, b: number) => { const d = Math.abs(a - b) % 360; 
 // already fine stays where it is. Whatever cannot be placed is reported rather than shuffled.
 export function autoPlaceLabels(data: MapData): { placed: Map<string, number>; unresolved: string[]; locked: string[] } {
   const samples = routeSamplePoints(data);
-  const radiusOf = (stop: Stop) => stopSizeMeta[stop.size ?? "medium"].radius;
+  const radiusOf = (stop: Stop) => stopSizeMetaOf(stop.size).radius;
   const scored = labelledStops(data).map((stop) => ({ stop, options: labelAngleOptions(data, stop, samples) }));
   scored.sort((a, b) => a.options.filter((o) => !o.overlap).length - b.options.filter((o) => !o.overlap).length);
   const taken: Box[] = [];

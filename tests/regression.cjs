@@ -4879,6 +4879,67 @@ const sectionStart = (n) => {
     await ctx67.close();
   }
 
+  // 68. Hostile maps on screen: a map whose optional fields hold values the editor does not know (a word, a number, nothing: what a
+  // newer version or a damaged file could hold) opens and is drawn, and Settings, Map balance, Tickets, Rules, the properties of a
+  // stop and a route, and the print dialog open on it without an error. If one fails, each field is tried alone to name it.
+  if (wants(68)) {
+  sectionStart(68);
+    const hp = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
+    const hostileErrors = [];
+    hp.on("pageerror", (e) => hostileErrors.push(String(e)));
+    await hp.goto(BASE, { waitUntil: "networkidle" });
+    await hp.getByRole("button", { name: "Load a map with problems" }).click();
+    await hp.waitForTimeout(700);
+    const baseMap = await hp.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")));
+    const enrich = (m) => {
+      Object.assign(m.stops[0], { hub: true, size: "medium", symbol: "letter", letter: "A", labelAngle: 45, endGapMm: 2, locked: true, labelLocked: true });
+      Object.assign(m.routes[0], { contested: true, points: [{ x: m.stops[0].x + 10, y: m.stops[0].y + 10 }], locomotiveSlots: [1], curved: true });
+      if (m.lineStyles[0]) m.routes[0].lineStyle = m.lineStyles[0].id;
+      if (m.wagonStyles && m.wagonStyles[0]) m.routes[0].wagonStyle = m.wagonStyles[0].id;
+      Object.assign(m.tickets[0], { long: true, adjust: 1 });
+      Object.assign(m.routeTypeStyles[0], { shape: "plain", glyph: "R" });
+      if (m.wagonStyles && m.wagonStyles[0]) m.wagonStyles[0].glyph = "W";
+      Object.assign(m.stopTypeStyles[0], { square: true, junction: false });
+      Object.assign(m, { orientation: "portrait", rules: "Some rules.", endGapMm: 2, deckTension: 50, ticketBands: { medium: 0.35, long: 0.6 }, ticketMix: { short: 30, medium: 47, long: 23 }, ticketValuation: { longBonus: true, ferryPremium: 1 }, laneRule: { "2+": 1, "3+": "all" }, players: { min: 2, max: 3 }, wagonsPerPlayer: 28, startingTickets: 3, keptTickets: 2 });
+      return m;
+    };
+    const KEEP = new Set(["id", "x", "y", "a", "b", "length", "unknown", "stops", "routes", "tickets", "ticketSets", "points", "stopTypeStyles", "routeTypeStyles", "wagonStyles", "lineStyles", "background", "notes"]);
+    // Every optional field of the first object of each list, and of the map, set to `value`: the fields a map cannot do without are left.
+    const hostile = (value, only) => {
+      const m = enrich(JSON.parse(JSON.stringify(baseMap)));
+      const names = [];
+      const visit = (obj, prefix) => { for (const key of Object.keys(obj)) { const here = `${prefix}${key}`; if (KEEP.has(key)) { if (Array.isArray(obj[key]) && obj[key].length && obj[key][0] && typeof obj[key][0] === "object" && !Array.isArray(obj[key][0]) && !["points"].includes(key)) visit(obj[key][0], `${here}.0.`); continue; } names.push(here); if (!only || only === here) obj[key] = value; } };
+      visit(m, "");
+      return { map: m, names };
+    };
+    const tryOpen = async (map) => {
+      const before = hostileErrors.length;
+      await hp.evaluate((m) => localStorage.setItem("ttr-map", JSON.stringify(m)), map);
+      await hp.reload({ waitUntil: "networkidle" }); await hp.waitForTimeout(500);
+      const alive = async () => (await hp.locator(".workspace").count()) === 1 && (await hp.locator(".map-canvas").count()) === 1 && hostileErrors.length === before;
+      let ok_ = await alive();
+      const steps = [
+        async () => { await hp.getByRole("button", { name: "Settings" }).click(); await hp.waitForTimeout(300); for (const label of ["Deck rules", "Stop types", "Route types", "Default object style", "Map"]) { await hp.locator(".settings-nav-item", { hasText: new RegExp(`^${label}`) }).click(); await hp.waitForTimeout(150); } await hp.keyboard.press("Escape"); await hp.waitForTimeout(200); },
+        async () => { await hp.getByRole("button", { name: "Map balance", exact: true }).click(); await hp.waitForTimeout(500); },
+        async () => { await hp.getByRole("button", { name: "Tickets", exact: true }).click(); await hp.waitForTimeout(500); },
+        async () => { await hp.getByRole("button", { name: "Rules", exact: true }).click(); await hp.waitForTimeout(400); },
+        async () => { const stop = await hp.locator(".map-canvas .stop").first().boundingBox(); await hp.mouse.click(stop.x + stop.width / 2, stop.y + stop.height / 2); await hp.waitForTimeout(300); },
+        async () => { await hp.getByRole("button", { name: "Print map" }).click(); await hp.waitForTimeout(500); await hp.keyboard.press("Escape"); await hp.waitForTimeout(200); },
+      ];
+      for (const step of steps) { if (!ok_) break; try { await step(); } catch { /* a missing control is not this test's concern: the error count is */ } ok_ = await alive(); }
+      return ok_;
+    };
+    const failedFields = [];
+    for (const [label, value] of [["a word the editor does not know", "huge"], ["a number", 5], ["nothing", null], ["true", true], ["an empty object", {}], ["an empty list", []], ["a word every object has", "constructor"], ["__proto__", "__proto__"]]) {
+      const all = hostile(value);
+      const fine = await tryOpen(all.map);
+      check(`with every optional field set to ${label}, the map opens and everything on it opens`, fine, fine ? `${all.names.length} fields` : "");
+      if (!fine) { for (const name of all.names) { const one = hostile(value, name); if (!(await tryOpen(one.map))) failedFields.push(`${name} = ${JSON.stringify(value)}`); } }
+    }
+    if (failedFields.length) check("and the fields that broke it, tried alone: none", false, failedFields.slice(0, 12).join("; "));
+    await hp.context().close();
+  }
+
   if (sectionOpen) sectionTimes[sectionOpen.n] = Math.round((Date.now() - sectionOpen.at) / 100) / 10;
   if (process.env.TTR_TIMES) fs.writeFileSync(process.env.TTR_TIMES, JSON.stringify(sectionTimes));
   console.log("PASS:"); ok.forEach((l) => console.log("  ✓ " + l));

@@ -63,4 +63,31 @@ function regressionSummary(output) {
 const CALIBRATION_FILES = [/^app\/ticket-suggester/, /^app\/map-analysis\.ts$/, /^app\/ticket-valuation\.ts$/, /^app\/map-data\.ts$/];
 const needsCalibration = (files) => files.some((file) => CALIBRATION_FILES.some((pattern) => pattern.test(file)));
 
-module.exports = { serveOut, scanOut, referenceNames, regressionSummary, needsCalibration, ALLOWED_NAMES };
+// The dev server on a free port of its own (reached as localhost: it refuses another host name for its own files, so the page would not start), ready when /ttr/ answers; null if it does not within three minutes. close() stops it.
+async function startDev(root) {
+  const { spawn } = require("child_process");
+  const net = require("net");
+  const port = await new Promise((resolve) => { const s = net.createServer().listen(0, "127.0.0.1", () => { const p = s.address().port; s.close(() => resolve(p)); }); });
+  const child = spawn("npx", ["next", "dev", "-p", String(port)], { cwd: root, stdio: "ignore", detached: true });
+  const stop = () => new Promise((done) => { try { process.kill(-child.pid, "SIGTERM"); } catch { /* already gone */ } setTimeout(done, 500); });
+  const until = Date.now() + 180000;
+  while (Date.now() < until) {
+    const up = await new Promise((resolve) => { http.get({ host: "localhost", port, path: "/ttr/" }, (res) => { res.resume(); resolve(res.statusCode === 200); }).on("error", () => resolve(false)); });
+    if (up) {
+      // The first load compiles the page on demand; six workers meeting a cold server all time out. One real page load first, until the app has started.
+      try {
+        const browser = await require("playwright").chromium.launch();
+        const page = await browser.newPage();
+        await page.goto(`http://localhost:${port}/ttr/`, { waitUntil: "load", timeout: 120000 });
+        await page.getByRole("button", { name: "Load the example map" }).waitFor({ timeout: 120000 });
+        await browser.close();
+      } catch { /* the run will say what is wrong */ }
+      return { port, close: stop };
+    }
+    await new Promise((r) => setTimeout(r, 1500));
+  }
+  await stop();
+  return null;
+}
+
+module.exports = { serveOut, startDev, scanOut, referenceNames, regressionSummary, needsCalibration, ALLOWED_NAMES };

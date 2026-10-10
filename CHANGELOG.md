@@ -4,6 +4,12 @@ What changed in each version of the [Ticket to Ride map editor](https://hagstrom
 
 This file is written from `app/version.ts` by `npm run changelog`; edit the notes there.
 
+## Unreleased
+
+Changes since the last release, to go into the next version.
+
+- A map whose stops, routes or styles hold a value the editor does not know, such as a stop size from a newer version, or an object where a name belongs, now opens instead of stopping the drawing: a value in a field of choice is kept, and a field of the wrong kind is mended and said.
+
 ## 1.6.0 · 2026-10-11
 
 **Version 1.6: the phone, and fixes after an independent review**

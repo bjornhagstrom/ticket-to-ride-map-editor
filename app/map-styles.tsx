@@ -16,7 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { cn } from "@/lib/utils";
-import { DEFAULT_PLAYERS, LANES_OPEN_FROM, LANES_OPEN_FROM_RANGE, laneRuleOpeningFrom, lanesOpenFrom, DEFAULT_TICKET_BANDS, DEFAULT_TICKET_MIX, TICKET_MIX_PRESETS, colorLabels, DEFAULT_WAGONS_PER_PLAYER, DEFAULT_STARTING_TICKETS, DEFAULT_KEPT_TICKETS, type MapData, type MapFormat, formatOrStandard, formatId, PRESET_FORMATS, MAX_PANELS, routeColors, stopSizeMeta, type RouteTypeStyle, type StopTypeStyle, type WagonShape, wagonShapeMeta } from "./map-data";
+import { DEFAULT_PLAYERS, LANES_OPEN_FROM, LANES_OPEN_FROM_RANGE, laneRuleOpeningFrom, lanesOpenFrom, DEFAULT_TICKET_BANDS, DEFAULT_TICKET_MIX, TICKET_MIX_PRESETS, colorLabels, DEFAULT_WAGONS_PER_PLAYER, DEFAULT_STARTING_TICKETS, DEFAULT_KEPT_TICKETS, type MapData, type MapFormat, formatOrStandard, formatId, PRESET_FORMATS, MAX_PANELS, routeColors, stopSizeMeta, type RouteTypeStyle, type StopTypeStyle, type WagonShape, wagonShapeMetaOf, wagonShapeMeta } from "./map-data";
 
 export type StyleKind = "map" | "ticket" | "stop" | "route" | "defaults";
 export type StyleTarget = { kind: StyleKind; id?: string };
@@ -363,7 +363,7 @@ function RoutePreview({ style, className }: { style: RouteTypeStyle; className?:
   // built route is drawn in the type's own colour, because that is where its colour comes from.
   const ink = style.infrastructure ? style.stroke : "#8a1c24";
   return <svg className={cn("route-preview", className)} viewBox="-46 -13 92 26" role="img"
-    aria-label={`${style.label}: ${style.strokeWidth}px ${style.dash ? "dashed" : "solid"} line${style.infrastructure ? ", already built" : `, ${wagonShapeMeta[shape].label.toLowerCase()} spaces`}`}>
+    aria-label={`${style.label}: ${style.strokeWidth}px ${style.dash ? "dashed" : "solid"} line${style.infrastructure ? ", already built" : `, ${wagonShapeMetaOf(shape).label.toLowerCase()} spaces`}`}>
     <line x1="-44" y1="0" x2="44" y2="0" stroke={ink} strokeWidth={style.strokeWidth} strokeDasharray={style.dash || undefined} strokeLinecap="round" />
     {!style.infrastructure && [-15, 15].map((x) => <g key={x} transform={`translate(${x},0)`}>
       <path d={slot} fill="#fffaf0" stroke={ink} strokeWidth={shape === "heavy" ? 3 : 2} strokeLinejoin="round" />

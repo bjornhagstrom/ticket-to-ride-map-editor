@@ -193,3 +193,16 @@ names the person had not asked to move: only those that would sit on a route, ne
 
 **Would change it.** A wish to have a turn move nothing but the geometry (the button is still there for it), or names that were
 set by hand being moved; those are locked to stay (`labelLocked`).
+
+## The dev server is part of the release tier only when components change
+
+**Decision.** `npm run test:release` runs the browser suite on the production build in Chromium and in WebKit. Chromium against the dev server
+is added with `--dev` when the change touches how components are built, their effects, refs or state. Decided by the owner on 2026-10-11 on
+Claude's recommendation (AGENTS.md had listed the dev server in every release run; the runs since 1.0 had left it out).
+
+**Why.** The production build is what ships and is the stricter for most things (a history-step check passes in dev whatever the code does, since
+React runs a state updater twice there). The dev server is slower and heavier on memory. What it alone shows is React's own warnings and
+double-run effects, which matter when components, refs or effects change, as with the phone layout.
+
+**Would change it.** A release that went out with a warning the dev server would have shown: then `--dev` becomes the default.
+

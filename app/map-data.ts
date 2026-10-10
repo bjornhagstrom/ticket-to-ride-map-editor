@@ -338,6 +338,10 @@ export const stopSizeMeta: Record<StopSize, { label: string; radius: number }> =
   large: { label: "Large", radius: 9 },
 };
 
+/** The size of a stop as the editor draws it. A size the editor does not know (one a newer version wrote, or a damaged file) is drawn as medium, and kept as it is in the file. */
+export const stopSizeMetaOf = (size: unknown): { label: string; radius: number } => (typeof size === "string" && Object.hasOwn(stopSizeMeta, size) ? stopSizeMeta[size as StopSize] : stopSizeMeta.medium);
+export const wagonShapeMetaOf = (shape: unknown): { label: string } => (typeof shape === "string" && Object.hasOwn(wagonShapeMeta, shape) ? wagonShapeMeta[shape as WagonShape] : wagonShapeMeta.plain);
+
 export const stopSymbolMeta: Record<StopSymbol, { label: string }> = {
   none: { label: "No symbol" },
   dot: { label: "Dot" },

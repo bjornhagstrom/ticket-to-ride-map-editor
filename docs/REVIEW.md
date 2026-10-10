@@ -86,7 +86,10 @@ In this order, most important first. Each is a question with a concrete way to l
    after it has changed, a branch that is never reached. Two things a review found that this list did not
    ask for (2026-10-10): **a lookup by a name from a file in a plain object** (`table[name]`) also finds `__proto__`,
    `constructor` and `toString`, so use `Object.hasOwn` or a `Map`; and **a key made by joining ids** with `~`, `|` or `::`
-   is the same for two different pairs when an id holds the separator, so use `pairKeyOf` (`app/map-data.ts`) or JSON.
+   is the same for two different pairs when an id holds the separator, so use `pairKeyOf` (`app/map-data.ts`) or JSON. A third, found
+   by the hostile-maps test (2026-10-11): **a value from a file in a field of choice** (`stopSizeMeta[stop.size]`) that the editor does not
+   know, which a newer version may write, threw and stopped the drawing; keep it and draw the default (`stopSizeMetaOf`). Run
+   `npm run test:hostile-maps` and section 68 for anything that reads a field of a file.
 2. **Files and compatibility.** AGENTS.md: a change to what the editor writes or reads (map, network,
    background and ticket files, CSV, the envelope: a field renamed, removed or given another meaning, a
    migration, a version bump) is checked with the owner *before* it is built. An addition (a new optional
@@ -227,6 +230,11 @@ adding the seed's exact words to it.
   counted as a double route (now `pairKeyOf` in `app/map-data.ts`, length first, used everywhere); (4) on the phone keyboard focus
   stayed on a button that was out of sight. **What it shows:** our own reviewer (`ttr-reviewer`, which had reviewed every release in the range) found
   none of the first three; each came from a plain-object lookup or a joined-text key, which are now in the checklist below.
+  **Follow-up, 2026-10-11:** asked whether the class went further, a scan and a test for it found more: a stop size the editor does not know
+  (`"huge"`) threw in four places, a number or object in a label, a width, a letter or a mark threw in Settings and in the properties
+  of a stop, and a stop named `__proto__` vanished from the file for the other tool. `tests/hostile-maps.cjs` (1,440 odd maps through
+  everything that runs on a map, in 11 s) and section 68 (every field of the first object of each list set to eight kinds of odd value,
+  on screen) now prove it; `ttr-reviewer` had not found any of it either.
 ## Sources
 
 - Claude Code documentation: [Create custom subagents](https://code.claude.com/docs/en/sub-agents) (tools,

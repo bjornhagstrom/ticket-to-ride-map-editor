@@ -133,6 +133,13 @@ not a way to move a whole map: the background, styles and settings are only in t
    An older build (0.4.1 and before) mends less: it opens such a file with the damaged parts still in it. The rules
    are in `repairMap` (`app/map-storage.ts`) and `tests/corrupt-files.cjs` holds them.
 7. **A file from a newer editor opens, with a warning.** From 1.3.0, a reader that finds `app.version` higher than its own (compared as numbers part by part, so 1.10.0 is newer than 1.9.0) opens the file as usual and says which version wrote it, which this is, and that some of it may be missing or changed here; reloading the page or updating a downloaded copy gets the newest. The warning is only a note, and rule 2 is the lock. A file with no `app`, a version that is not `x.y.z`, or one the same or older says nothing. Builds before 1.3.0 do not read `app.version` at all, so they never warn; for them rules 2 and 3 are all that protect a file. The spreadsheets carry it too, in a last column `Editor` (docs/CSV.md, "What the export writes"); the tool's zip, pictures and prints carry no editor version.
+8. **A value the editor does not know opens the map all the same.** In a field of choice (a stop's `size`, `symbol`, a route's `color`,
+   a style's `shape`, the board's `format`) a value this build does not know, one a newer build may have written, is kept as it is
+   and drawn as the default (a stop of an unknown size as medium); it is never an error and never lost in a round trip. In a plain
+   field of a stop, route, style, deck, note or background shape (a label, a colour, a width, a switch, the letter on a stop, the mark in
+   a wagon space) a value of the wrong kind (an object where text belongs, a word where a number is counted with) is mended: text
+   becomes the id or an empty text, a number a plain default, a switch or an optional mark is left out; the reader says how many.
+   `tests/hostile-maps.cjs` and section 68 of the browser suite set one odd value at a time in every field to prove it.
 
 ## What you can rely on
 
