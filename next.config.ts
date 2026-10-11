@@ -11,6 +11,8 @@ const nextConfig: NextConfig = {
   assetPrefix: "/ttr",
   trailingSlash: true,
   images: { unoptimized: true },
+  // The dev server's round "N" badge sits at the bottom left, over the editor's own buttons on a phone (the Tools button in the bar), and the browser tests on the dev server cannot touch what it covers.
+  devIndicators: false,
 };
 
 export default nextConfig;

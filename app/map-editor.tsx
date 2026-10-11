@@ -183,6 +183,8 @@ export function MapEditor() {
   const togglePin = (key: string, routes: string[] | null, stop: string | null) => setPin((current) => (current?.key === key ? null : { key, routes, stop }));
   const closeAnalysis = () => { setShowAnalysis(false); setBalanceRoutes(null); setBalanceStop(null); setPin(null); setBottleneckRoutes(new Set()); };
   // The right column holds one panel at a time: Map balance, Suggest routes or Tickets.
+  // The suggested route the pointer is on, drawn on the map while it is there.
+  const [hoveredSuggestion, setHoveredSuggestion] = useState<RouteSuggestion | null>(null);
   const openTickets = () => { closeAnalysis(); setShowSuggestions(false); setHoveredSuggestion(null); setShowRules(false); setShowTickets(true); };
   const openRules = () => { closeAnalysis(); setShowSuggestions(false); setHoveredSuggestion(null); setShowTickets(false); setShowRules(true); };
   const widePanel = showAnalysis || showTickets || showRules;
@@ -317,21 +319,38 @@ export function MapEditor() {
     document.addEventListener("keydown", escape);
     return () => { document.removeEventListener("pointerdown", outside, true); document.removeEventListener("keydown", escape); };
   }, [menuOpen]);
-  // How far up a sheet may reach on a phone: to the foot of the header, whatever its height is (it changes with the width and the menu).
+  // The room a sheet fills on a phone: from the foot of the header to the top of the bar at the foot, worked out here from the page itself
+  // (the header's height changes with the width, the bar's with its buttons), so that it is right on any screen and when the screen turns.
   useEffect(() => {
-    const bar = document.querySelector(".topbar");
-    if (!bar) return;
-    const set = () => document.documentElement.style.setProperty("--phone-top", `${bar.getBoundingClientRect().top + window.scrollY + bar.getBoundingClientRect().height}px`);
+    const header = document.querySelector(".topbar");
+    const bar = document.querySelector(".phone-bar");
+    if (!header) return;
+    const set = () => {
+      const top = header.getBoundingClientRect();
+      document.documentElement.style.setProperty("--phone-top", `${top.top + window.scrollY + top.height}px`);
+      if (bar && bar.getBoundingClientRect().height > 0) document.documentElement.style.setProperty("--phone-bar", `${bar.getBoundingClientRect().height}px`);
+    };
     set();
     const observer = new ResizeObserver(set);
-    observer.observe(bar);
+    observer.observe(header);
+    if (bar) observer.observe(bar);
     window.addEventListener("resize", set);
     return () => { observer.disconnect(); window.removeEventListener("resize", set); };
   }, []);
+  // Escape shuts the sheet that is open on a phone (the focus goes back to the bar's button by the effect above), unless a dialog or a menu has it.
+  useEffect(() => {
+    if (!phoneSheet) return;
+    const escape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || !window.matchMedia("(max-width: 720px)").matches) return;
+      if (document.querySelector("[role=\"dialog\"], [role=\"alertdialog\"], [role=\"menu\"]")) return;
+      event.preventDefault();
+      closePhoneSheet();
+    };
+    document.addEventListener("keydown", escape);
+    return () => document.removeEventListener("keydown", escape);
+  });
   const [wasStylesOpen, setWasStylesOpen] = useState(showStyles);
   if (showStyles !== wasStylesOpen) { setWasStylesOpen(showStyles); if (showStyles) setPhoneSheet(null); }
-  // The suggested route the pointer is on, drawn on the map while it is there.
-  const [hoveredSuggestion, setHoveredSuggestion] = useState<RouteSuggestion | null>(null);
   const [selectedStop, setSelectedStop] = useState<string | null>(null);
   const [selectedRoute, setSelectedRoute] = useState<string | null>(null);
   const [selectedBackground, setSelectedBackground] = useState<string | null>(null);
