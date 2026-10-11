@@ -116,7 +116,7 @@ A route's shape is `Route.points`: any number of bend points between its two sto
 
 Several sizes are set to print at roughly what a real board uses, all measured against
 `REFERENCE_BOARD_MM`: a wagon space is `realWagon`'s 20 × 9 mm, the lines of a double route sit
-`PARALLEL_SPACING_MM` apart (a wagon's width plus 2.5 mm), and a stop circle is about 9 mm across at
+`parallelSpacingMm` apart (the map's wagon width plus 2.5 mm, 5.5 for a styled space), and a stop circle is about 9 mm across at
 the medium size. Stop circles used to be half again that, which pushed the first wagon of every
 route away from its stop and made double routes look detached. Because the circles are now small,
 each stop carries an invisible `stop-hit` circle so it stays comfortable to click.

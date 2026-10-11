@@ -5197,6 +5197,22 @@ const sectionStart = (n) => {
     const cu = await stored73();
     check("and applying it gives the map that board and those sizes (the capitals were filled in from Amsterdam's and stay)", cu.format === "board-2x2" && cu.panelMm.width === 200 && cu.panelMm.height === 150 && cu.wagonMm.length === 22 && cu.stopMm === 12 && cu.nameMm === 4.3, JSON.stringify([cu.format, cu.panelMm, cu.wagonMm, cu.stopMm, cu.nameMm]));
     check("the board is then a custom one in the list, chosen", (await sb.locator('#settings-format input[value="custom"]').count()) === 1 && (await sb.locator('#settings-format input[value="custom"]').isChecked()));
+    // Found in review: a wagon given without a panel was thrown away, and a wagon from a file was cut down to its length.
+    const reopen73 = async (edit) => { await sb.evaluate((e) => { const m = JSON.parse(localStorage.getItem("ttr-map")); const f = new Function("m", e); f(m); localStorage.setItem("ttr-map", JSON.stringify(m)); }, edit); await sb.reload({ waitUntil: "networkidle" }); await sb.waitForTimeout(600); await sb.getByRole("button", { name: "Settings" }).click(); await sb.waitForTimeout(400); await sb.locator("#settings-custom-board").click(); await sb.waitForTimeout(300); };
+    await sb.keyboard.press("Escape"); await sb.keyboard.press("Escape");
+    await reopen73("m.wagonMm = { length: 24, width: 11, gap: 7, endMargin: 18 };");
+    await sb.locator("#custom-board-apply").click(); await sb.waitForTimeout(500);
+    const kept73 = (await stored73()).wagonMm;
+    check("a wagon with its own width, gap and end margin keeps them when Custom size is used again with the same length", kept73 && kept73.length === 24 && kept73.width === 11 && kept73.gap === 7 && kept73.endMargin === 18, JSON.stringify(kept73));
+    await sb.keyboard.press("Escape");
+    await reopen73("m.format = 'board-2x3'; delete m.panelMm; delete m.wagonMm; delete m.stopMm; delete m.nameMm; delete m.orientation;");
+    await sb.locator("#custom-board-long").fill("3"); await sb.locator("#custom-board-short").fill("2");
+    await sb.locator(".custom-board-real summary").click();
+    for (const id of ["#custom-board-panel-long", "#custom-board-panel-short", "#custom-board-stop", "#custom-board-name"]) await sb.locator(id).fill("");
+    await sb.locator("#custom-board-wagon").fill("24"); await sb.waitForTimeout(200);
+    await sb.locator("#custom-board-apply").click(); await sb.waitForTimeout(500);
+    const only = await stored73();
+    check("a wagon given with no panel is kept, on the standard panels of that board", only.wagonMm && only.wagonMm.length === 24 && only.panelMm && only.panelMm.width === 263.3, JSON.stringify([only.wagonMm, only.panelMm]));
     await sb.context().close();
   }
 
@@ -5232,6 +5248,11 @@ const sectionStart = (n) => {
     check("on a small board the ticket cards are small to begin with: 50 × 36 mm", (await pp.getByRole("radio", { name: /Small cards/ }).isChecked()) && (await cardWidth()) === "36mm", String(await cardWidth()));
     const panelCell = pp.locator('.print-table tbody tr[data-paper="a4"] td:nth-of-type(2) button');
     check("a sheet per panel is four A4 sheets on the standing New York board", (await panelCell.getAttribute("data-pages")) === "4", String(await panelCell.getAttribute("data-pages")));
+    // The sheets are in the page though out of sight: a wagon of the printed board is 24 mm of the board's 428 (found in review: it printed at 19.5 on a small board).
+    await pp.keyboard.press("Escape"); await pp.waitForTimeout(300);
+    const share = await pp.evaluate(() => { const slot = document.querySelector(".print-pages rect.wagon-slot-outline"); return slot ? (Number(slot.getAttribute("width")) - 2) / 1100 : null; });
+    check("on the printed sheets a wagon of New York is 24 of the board's 428 mm (5.6 %)", share !== null && Math.abs(share - 24 / 428) < 0.002, String(share));
+    await openPrint();
     check("and there is no Anniversary size to offer", (await pp.locator(".print-table thead").textContent()).indexOf("Anniversary") === -1);
     check("the dialog says the board stays a custom one of the size it is", /Custom board 2×2/.test(await pp.locator(".print-dialog").textContent()), (await pp.locator(".print-dialog").textContent()).slice(0, 160));
     await pp.context().close();

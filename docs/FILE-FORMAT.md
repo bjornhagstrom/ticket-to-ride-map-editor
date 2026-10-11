@@ -283,6 +283,8 @@ Without a profile every board is drawn exactly as before (`tests/golden-drawing.
 Older builds keep the four fields as unknown names under rule 3, so a small map passes through them and comes out with its profile; they draw it on
 standard panels. From 1.3.0 they say a newer editor wrote the file (rule 7). `tests/board-profile.cjs` reads files through the compiled 0.4.1 and 1.6.0 builds.
 
+The network file and the background file carry `panelMm` too when the board has one, since the positions in them are drawn for that board's height; a file without it is read onto the standard panels of its format, as before. A part the profile may grow later needs a field of its own: this build keeps only the parts it knows (a newer key inside `panelMm` or `wagonMm` is not carried through it). An older build that changes the board of a small map rescales it as if the panels were standard and keeps the profile as an unknown name; this build then reads the profile again and the stops no longer fit the board, so a small map is best edited in one build.
+
 A board preset also brings **a game**: Settings sets `wagonsPerPlayer` and `players` (New York 15 and 2 to 4, Amsterdam 16 and 2 to 4) when the person has not
 chosen them; no new field, those two were always in the file.
 

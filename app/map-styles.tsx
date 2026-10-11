@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { cn } from "@/lib/utils";
-import { DEFAULT_PLAYERS, BOARD_PRESETS, hasPanelProfile, boardDefinition, LANES_OPEN_FROM, LANES_OPEN_FROM_RANGE, laneRuleOpeningFrom, lanesOpenFrom, DEFAULT_TICKET_BANDS, DEFAULT_TICKET_MIX, TICKET_MIX_PRESETS, colorLabels, DEFAULT_WAGONS_PER_PLAYER, DEFAULT_STARTING_TICKETS, DEFAULT_KEPT_TICKETS, type MapData, formatId, PRESET_FORMATS, MAX_PANELS, routeColors, stopSizeMeta, type RouteTypeStyle, type StopTypeStyle, type WagonShape, wagonShapeMetaOf, wagonShapeMeta } from "./map-data";
+import { DEFAULT_PLAYERS, PANEL_MM, BOARD_PRESETS, hasPanelProfile, boardDefinition, LANES_OPEN_FROM, LANES_OPEN_FROM_RANGE, laneRuleOpeningFrom, lanesOpenFrom, DEFAULT_TICKET_BANDS, DEFAULT_TICKET_MIX, TICKET_MIX_PRESETS, colorLabels, DEFAULT_WAGONS_PER_PLAYER, DEFAULT_STARTING_TICKETS, DEFAULT_KEPT_TICKETS, type MapData, formatId, PRESET_FORMATS, MAX_PANELS, routeColors, stopSizeMeta, type RouteTypeStyle, type StopTypeStyle, type WagonShape, wagonShapeMetaOf, wagonShapeMeta } from "./map-data";
 
 export type StyleKind = "map" | "ticket" | "stop" | "route" | "defaults";
 export type StyleTarget = { kind: StyleKind; id?: string };
@@ -100,7 +100,7 @@ function CustomBoardSize({ data, onApply }: { data: MapData; onApply: (choice: B
         </div>
         <details className="custom-board-real" open={Object.values(sizesOf(data)).some(Boolean)}>
           <summary>Real sizes, in millimetres (for a small board)</summary>
-          <p className="helper">Measure the real board and say what it is: the panel as the board lies (the long side first), a wagon, across a stop, and the capital letters of the city names. Empty is the standard; the width, gap and end margin of the wagon follow its length.</p>
+          <p className="helper">Measure the real board and say what it is: the panel as the board lies (the long side first), a wagon, across a stop, and the capital letters of the stop names. Empty is the standard; the width, gap and end margin of the wagon follow its length.</p>
           <div className="custom-board-fields">
             {field("custom-board-panel-long", "Panel, long side", "panelLong", "263.3")}
             {field("custom-board-panel-short", "Panel, short side", "panelShort", "262.5")}
@@ -113,7 +113,11 @@ function CustomBoardSize({ data, onApply }: { data: MapData; onApply: (choice: B
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
           <Button type="button" id="custom-board-apply" disabled={Boolean(problem)} onClick={() => {
-            const profile = panel ? { panelMm: panel, ...(filled(real.wagon) ? { wagonMm: { length: Number(real.wagon) } } : {}), ...(filled(real.stop) ? { stopMm: Number(real.stop) } : {}), ...(filled(real.name) ? { nameMm: Number(real.name) } : {}) } : undefined;
+            // A size given with no panel is on the standard panels of the board; a wagon of the same length keeps the width, gap and margin it has.
+            const anySize = filled(real.wagon) || filled(real.stop) || filled(real.name);
+            const wagonLength = Number(real.wagon);
+            const wagonMm = !filled(real.wagon) ? undefined : data.wagonMm && data.wagonMm.length === wagonLength ? { ...data.wagonMm } : { length: wagonLength };
+            const profile = panel || anySize ? { panelMm: panel ?? { ...PANEL_MM }, ...(wagonMm ? { wagonMm } : {}), ...(filled(real.stop) ? { stopMm: Number(real.stop) } : {}), ...(filled(real.name) ? { nameMm: Number(real.name) } : {}) } : undefined;
             onApply({ format: formatId(asked.short, asked.long), profile });
             setOpen(false);
           }}>Use this size</Button>

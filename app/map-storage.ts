@@ -2,7 +2,7 @@
 // files open, board-format rescaling, and image reading.
 import { APP_VERSION } from "./version";
 import { boardOf, rotateMap, turnBetween, turnContents, type Board } from "./board";
-import { W, formatOrStandard, boardDefinition, validPanelFor, normalizeWagonMm, normalizeMm, BOARD_PRESETS, DEFAULT_PLAYERS, type PanelMm, type WagonMm, isMapFormat, normalizeTension, normalizeLaneRule, BUILT_IN_DECK_RULES, type DeckRuleSet, type PlayerRange, DEFAULT_WAGONS_PER_PLAYER, DEFAULT_STARTING_TICKETS, DEFAULT_KEPT_TICKETS, defaultTicketSet, type Ticket, type TicketSet, defaultStopTypeStyles, fallbackStopTypeStyle, type StopTypeStyle, defaultWagonStyles, type WagonStyle, defaultRouteTypeStyles, type LineStyle, type RouteTypeStyle, type BackgroundImage, type BackgroundShape, type ImageCrop, type MapData, type MapFormat, type MapVersion, type MapVersionEntry, type NoteBox, type Point, type Route, type Stop, STORAGE_KEY, LEGACY_STORAGE_KEY } from "./map-data";
+import { W, formatOrStandard, boardDefinition, validPanelFor, normalizeWagonMm, normalizeMm, BOARD_PRESETS, DEFAULT_PLAYERS, hasPanelProfile, type PanelMm, type WagonMm, isMapFormat, normalizeTension, normalizeLaneRule, BUILT_IN_DECK_RULES, type DeckRuleSet, type PlayerRange, DEFAULT_WAGONS_PER_PLAYER, DEFAULT_STARTING_TICKETS, DEFAULT_KEPT_TICKETS, defaultTicketSet, type Ticket, type TicketSet, defaultStopTypeStyles, fallbackStopTypeStyle, type StopTypeStyle, defaultWagonStyles, type WagonStyle, defaultRouteTypeStyles, type LineStyle, type RouteTypeStyle, type BackgroundImage, type BackgroundShape, type ImageCrop, type MapData, type MapFormat, type MapVersion, type MapVersionEntry, type NoteBox, type Point, type Route, type Stop, STORAGE_KEY, LEGACY_STORAGE_KEY } from "./map-data";
 
 export const GUIDE_SEEN_KEY = "ttr-guide-seen";
 export const MAX_IMAGE_WARN_BYTES = 2 * 1024 * 1024;
@@ -241,6 +241,8 @@ export function networkPayload(data: MapData): Record<string, unknown> {
   const routeTypes = new Set(data.routes.map((route) => route.type));
   return {
     format: data.format,
+    // The panel of a small board, so a reader knows the height the positions were drawn for.
+    ...(data.panelMm ? { panelMm: data.panelMm } : {}),
     ...(data.orientation === "portrait" ? { orientation: "portrait" } : {}),
     stops: data.stops,
     routes: data.routes,
@@ -531,11 +533,11 @@ const scaleStopsToHeight = (stops: Stop[], fromHeight: number, toHeight: number)
 const scaleRoutesToHeight = (routes: Route[], fromHeight: number, toHeight: number): Route[] => routes.map((route) => ({ ...route, points: route.points?.map((point) => scalePointToHeight(point, fromHeight, toHeight)) }));
 const scaleImageToHeight = (image: BackgroundImage, fromHeight: number, toHeight: number): BackgroundImage => ({ ...image, y: image.y * toHeight / fromHeight, height: image.height * toHeight / fromHeight });
 const scaleNotesToHeight = (notes: NoteBox[], fromHeight: number, toHeight: number): NoteBox[] => notes.map((note) => ({ ...note, y: note.y * toHeight / fromHeight, height: note.height * toHeight / fromHeight }));
-const sourceHeight = (value: { format?: unknown }): number => isMapFormat(value.format) ? formatOrStandard(value.format).height : typeof value.format === "string" && Object.hasOwn(legacyFormats, value.format) ? legacyFormats[value.format].height : formatOrStandard("board-2x3").height;
+const sourceHeight = (value: { format?: unknown; panelMm?: unknown }): number => isMapFormat(value.format) ? boardDefinition(value).height : typeof value.format === "string" && Object.hasOwn(legacyFormats, value.format) ? legacyFormats[value.format].height : formatOrStandard("board-2x3").height;
 // Content from a file drawn on another board, brought onto this one: laid down if it stood, scaled
 // from its board's height to this one's while lying, and stood up again if this board stands.
 type BoardContents = Partial<Pick<MapData, "stops" | "routes" | "background" | "notes" | "backgroundImage">>;
-function ontoBoard<T extends BoardContents>(value: T, source: { format?: unknown; orientation?: unknown }, to: Pick<Board, "width" | "height">): T {
+function ontoBoard<T extends BoardContents>(value: T, source: { format?: unknown; panelMm?: unknown; orientation?: unknown }, to: Pick<Board, "width" | "height">): T {
   const fromHeight = sourceHeight(source);
   let next = value;
   if (source.orientation === "portrait") { const lay = turnBetween({ width: fromHeight, height: W }, "landscape")!; next = turnContents(next, lay.turn, lay.degrees); }
@@ -549,13 +551,13 @@ function ontoBoard<T extends BoardContents>(value: T, source: { format?: unknown
   if (to.width < to.height) { const stand = turnBetween({ width: W, height: toHeight }, "portrait")!; next = turnContents(next, stand.turn, stand.degrees); }
   return next;
 }
-export const normalizeBackgroundFile = (value: { format?: unknown; orientation?: unknown; background?: unknown; backgroundImage?: unknown }, to: Pick<Board, "width" | "height">): { background: BackgroundShape[]; backgroundImage?: BackgroundImage } => {
+export const normalizeBackgroundFile = (value: { format?: unknown; panelMm?: unknown; orientation?: unknown; background?: unknown; backgroundImage?: unknown }, to: Pick<Board, "width" | "height">): { background: BackgroundShape[]; backgroundImage?: BackgroundImage } => {
   const image = normalizeBackgroundImage(value.backgroundImage);
   const moved = ontoBoard({ background: Array.isArray(value.background) ? value.background as BackgroundShape[] : [], backgroundImage: image }, value, to);
   return { background: moved.background ?? [], backgroundImage: moved.backgroundImage };
 };
 // A network file may carry the tickets that belong to its stops, as the official reference maps do.
-export const normalizeNetworkFile = (value: { format?: unknown; orientation?: unknown; stops?: unknown; routes?: unknown; lineStyles?: unknown; routeTypeStyles?: unknown; stopTypeStyles?: unknown; wagonStyles?: unknown; tickets?: unknown }, to: Pick<Board, "width" | "height">): { stops: Stop[]; routes: Route[]; lineStyles: LineStyle[]; routeTypeStyles: RouteTypeStyle[]; stopTypeStyles: StopTypeStyle[]; wagonStyles: WagonStyle[]; tickets: Ticket[] } => { const moved = ontoBoard({ stops: Array.isArray(value.stops) ? value.stops as Stop[] : [], routes: Array.isArray(value.routes) ? value.routes as Route[] : [] }, value, to); return { stopTypeStyles: Array.isArray(value.stopTypeStyles) ? value.stopTypeStyles : [], wagonStyles: Array.isArray(value.wagonStyles) ? value.wagonStyles : [], tickets: Array.isArray(value.tickets) ? (value.tickets as Ticket[]).map((ticket, index) => ({ ...ticket, id: ticket.id || `t-import-${index}`, set: undefined })) : [], stops: moved.stops ?? [], routes: moved.routes ?? [], lineStyles: Array.isArray(value.lineStyles) ? value.lineStyles : [], routeTypeStyles: Array.isArray(value.routeTypeStyles) && value.routeTypeStyles.length ? value.routeTypeStyles : defaultRouteTypeStyles.map((style) => ({ ...style })) }; };
+export const normalizeNetworkFile = (value: { format?: unknown; panelMm?: unknown; orientation?: unknown; stops?: unknown; routes?: unknown; lineStyles?: unknown; routeTypeStyles?: unknown; stopTypeStyles?: unknown; wagonStyles?: unknown; tickets?: unknown }, to: Pick<Board, "width" | "height">): { stops: Stop[]; routes: Route[]; lineStyles: LineStyle[]; routeTypeStyles: RouteTypeStyle[]; stopTypeStyles: StopTypeStyle[]; wagonStyles: WagonStyle[]; tickets: Ticket[] } => { const moved = ontoBoard({ stops: Array.isArray(value.stops) ? value.stops as Stop[] : [], routes: Array.isArray(value.routes) ? value.routes as Route[] : [] }, value, to); return { stopTypeStyles: Array.isArray(value.stopTypeStyles) ? value.stopTypeStyles : [], wagonStyles: Array.isArray(value.wagonStyles) ? value.wagonStyles : [], tickets: Array.isArray(value.tickets) ? (value.tickets as Ticket[]).map((ticket, index) => ({ ...ticket, id: ticket.id || `t-import-${index}`, set: undefined })) : [], stops: moved.stops ?? [], routes: moved.routes ?? [], lineStyles: Array.isArray(value.lineStyles) ? value.lineStyles : [], routeTypeStyles: Array.isArray(value.routeTypeStyles) && value.routeTypeStyles.length ? value.routeTypeStyles : defaultRouteTypeStyles.map((style) => ({ ...style })) }; };
 // A ticket-only file. Endpoints travel as stop ids *and* stop names, so a deck can be moved to
 // another copy of the map where the ids differ but the cities are the same.
 export type TicketFile = { kind: "tickets"; map: string; sets: TicketSet[]; tickets: (Ticket & { aName: string; bName: string })[] };
@@ -634,8 +636,6 @@ export function formatTimestamp(date: Date = new Date()): string {
   return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}-${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
 }
 
-// One of the boards Settings offers (BOARD_PRESETS): the format and, for a small board, the profile and which way it stands, with what is on the map moved
-// as it is for any change of board (x kept, y by the height). Standard and Extended take a profile off and leave the way the board stands; an unknown id changes nothing.
 // A board for the map: a format and, for a small board, a profile and which way it stands, with what is on the map moved as it is for any change of board
 // (x kept, y by the height). Without a profile the board is of standard panels and the profile of a small board goes. `orientation` left out keeps the way
 // the board stands.
@@ -664,9 +664,11 @@ export function applyBoard(draft: MapData, choice: BoardChoice): MapData {
 // The game a board brings (BOARD_PRESETS: wagons a player and the table), set only where the person has not chosen: the wagons are the standard 45 or some board's own,
 // the table the standard one (or none) or some board's own. A board with no game of its own (the standard ones) brings the standard game back. Null when nothing would change.
 const sameRange = (a: PlayerRange | undefined, b: PlayerRange) => !!a && a.min === b.min && a.max === b.max;
-export function gameForPreset(map: Pick<MapData, "wagonsPerPlayer" | "players">, id: string): { wagonsPerPlayer: number; players: PlayerRange | undefined } | null {
+export function gameForPreset(map: Pick<MapData, "wagonsPerPlayer" | "players" | "format" | "panelMm">, id: string): { wagonsPerPlayer: number; players: PlayerRange | undefined } | null {
   const preset = BOARD_PRESETS.find((item) => item.id === id);
   if (!preset) return null;
+  // Going to a board with no game of its own (the standard ones) brings the standard game back only when the board left had one; on a standard board 15 wagons are a choice.
+  if (!preset.game && !hasPanelProfile(map as MapData)) return null;
   const wagons = map.wagonsPerPlayer ?? DEFAULT_WAGONS_PER_PLAYER;
   const wagonsUntouched = wagons === DEFAULT_WAGONS_PER_PLAYER || BOARD_PRESETS.some((item) => item.game?.wagonsPerPlayer === wagons);
   const playersUntouched = !map.players || sameRange(map.players, DEFAULT_PLAYERS) || BOARD_PRESETS.some((item) => item.game && sameRange(map.players, item.game.players));

@@ -91,12 +91,12 @@ const buildMap = (source) => {
     const stats = networkStats(map);
     const hubs = [...stats.hubDegree.values()];
     const setup = setupBalance(map, "main");
-    return { id: source.id, fillPct: 100 * setup.fill, crowded: report.bottlenecks.length, crowdedPct: 100 * report.bottlenecks.length / connectionCount(map), unusedPct: report.unusedPct, maxPerStop: report.maxPerStop, hubDegree: hubs.reduce((a, b) => a + b, 0) / hubs.length };
+    return { id: source.id, fillPct: 100 * setup.fill, crowded: report.bottlenecks.length, crowdedPct: 100 * report.bottlenecks.length / connectionCount(map), loadRatio: report.loadRatio, unusedPct: report.unusedPct, maxPerStop: report.maxPerStop, hubDegree: hubs.reduce((a, b) => a + b, 0) / hubs.length };
   });
   check("both small maps are in the reference data", small.length === 2);
   const smallSpan = (key, digits = 0) => { const v = small.map((m) => m[key]); const f = 10 ** digits; return [Math.round(Math.min(...v) * f) / f, Math.round(Math.max(...v) * f) / f]; };
   check("BALANCE_SMALL names the two maps it is measured on", BALANCE_SMALL && BALANCE_SMALL.maps === 2);
-  for (const [key, digits] of [["fillPct", 0], ["crowded", 0], ["crowdedPct", 0], ["unusedPct", 0], ["maxPerStop", 0], ["hubDegree", 1]]) {
+  for (const [key, digits] of [["fillPct", 0], ["crowded", 0], ["crowdedPct", 0], ["loadRatio", 1], ["unusedPct", 0], ["maxPerStop", 0], ["hubDegree", 1]]) {
     const quoted = BALANCE_SMALL[key === "fillPct" ? "wagonFill" : key];
     check(`${key}: the range quoted for small maps is what New York and Amsterdam measure`, JSON.stringify(smallSpan(key, digits)) === JSON.stringify(quoted), `${JSON.stringify(smallSpan(key, digits))} measured, ${JSON.stringify(quoted)} quoted`);
   }

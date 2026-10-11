@@ -134,8 +134,38 @@ for (const [commit, name] of [["18b5763", "0.4.1"], ["ce85e72", "1.6.0"]]) {
   check("each of the two is judged by itself: own wagons kept, the standard table replaced", m.wagonsPerPlayer === 20 && m.players && m.players.max === 4, JSON.stringify([m.wagonsPerPlayer, m.players]));
   const said = storage.gameForPreset(fresh(), "small-new-york");
   check("gameForPreset says what would change, for the message to the person", said && said.wagonsPerPlayer === 15 && said.players.max === 4 && storage.gameForPreset(own, "small-new-york") === null, JSON.stringify(said));
+  const choseOnStandard = fresh(); choseOnStandard.wagonsPerPlayer = 15; choseOnStandard.players = { min: 2, max: 4 };
+  m = storage.applyBoardPreset(choseOnStandard, "extended");
+  check("15 wagons and 2 to 4 players chosen on a standard board stay when it becomes the Extended one (only a board with a game of its own gives it back)", m.wagonsPerPlayer === 15 && m.players.max === 4, JSON.stringify([m.wagonsPerPlayer, m.players]));
   const custom = storage.applyBoard(fresh(), { format: "board-2x2", profile: { panelMm: { width: 214, height: 140 } } });
   check("a custom board leaves the game alone", custom.wagonsPerPlayer === 45 && !custom.players);
+}
+
+// ---------------------------------------------------------------- network and background files from a small board (found in review)
+{
+  const small = (panel, orientation) => {
+    const m = clone(initialMap);
+    m.format = "board-2x2"; m.panelMm = panel; if (orientation) m.orientation = orientation;
+    const board = boardOf(m);
+    m.stops = [{ id: "a", name: "A", x: 100, y: 80, type: "city" }, { id: "b", name: "B", x: board.width - 100, y: board.height - 90, type: "city" }];
+    m.routes = [{ id: "r", a: "a", b: "b", length: 2, type: initialMap.routeTypeStyles[0].id, color: "gray", points: [{ x: 300, y: 200 }] }];
+    m.background = [{ id: "bg", type: "water", points: [{ x: 50, y: 50 }, { x: board.width - 50, y: 60 }, { x: board.width / 2, y: board.height - 40 }] }];
+    return { m, board };
+  };
+  for (const [name, panel, orientation] of [["New York (standing)", { width: 214, height: 140 }, "portrait"], ["Amsterdam (lying)", { width: 214, height: 165 }, undefined]]) {
+    const { m, board } = small(panel, orientation);
+    const payload = storage.networkPayload(m);
+    check(`a network file from ${name} carries the panel, so the board it was drawn on can be told`, payload.panelMm && payload.panelMm.width === panel.width, JSON.stringify(payload.panelMm));
+    const back = storage.normalizeNetworkFile(clone(payload), board);
+    check(`and read into the same map ${name} puts every stop and bend where it was`, back.stops.every((st, i) => near(st.x, m.stops[i].x, 0.01) && near(st.y, m.stops[i].y, 0.01)) && back.routes[0].points.every((pt, i) => near(pt.x, m.routes[0].points[i].x, 0.01) && near(pt.y, m.routes[0].points[i].y, 0.01)), JSON.stringify(back.stops.map((st) => [st.x, st.y])));
+    const bg = storage.normalizeBackgroundFile({ format: m.format, panelMm: m.panelMm, orientation: m.orientation, background: m.background }, board);
+    check(`and a background file from ${name} comes back as it was`, bg.background[0].points.every((pt, i) => near(pt.x, m.background[0].points[i].x, 0.01) && near(pt.y, m.background[0].points[i].y, 0.01)));
+  }
+  const plain = clone(initialMap);
+  check("a network file from a standard board has no panel in it", !("panelMm" in storage.networkPayload(plain)));
+  const lying = small({ width: 214, height: 165 });
+  const fromOld = storage.normalizeNetworkFile({ format: "board-2x2", stops: lying.m.stops, routes: lying.m.routes }, lying.board);
+  check("a file with no panel, from a build that did not write it, still reads as it did: onto the standard panels' height", fromOld.stops[0].y !== lying.m.stops[0].y);
 }
 
 for (const line of ok) console.log(`  ok    ${line}`);
