@@ -255,6 +255,17 @@ export const STANDARD_NAME_MM = 6;
 export const nameMmOf = (source: { nameMm?: unknown }): number => normalizeMm(source.nameMm, 1.5, 20) ?? STANDARD_NAME_MM;
 /** The type size of a name: a capital is 0.7 of it. */
 export const nameTypeMm = (source: { nameMm?: unknown }): number => nameMmOf(source) / 0.7;
+/** What one map unit is on this map's board: the board's width in millimetres over the 1100 units across it. */
+export const unitMmOf = (source: { format?: unknown; panelMm?: unknown }): number => boardDefinition(source).widthMm / W;
+/** The radius of a stop in map units. With a profile it is worked out from the millimetres (so a stop of 18.5 mm is that on any board); without one it is
+ *  the size in units the editor has always drawn, so that the boards it has always had are drawn exactly as before. An unknown size is a medium one. */
+export const hasPanelProfile = (source: { format?: unknown; panelMm?: unknown }): boolean => validPanelFor(source.format, source.panelMm) !== undefined;
+export const stopRadiusUnits = (source: { format?: unknown; panelMm?: unknown; stopMm?: unknown }, size: unknown): number =>
+  normalizeMm(source.stopMm, 3, 40) === undefined && !hasPanelProfile(source) ? stopSizeMetaOf(size).radius : stopSizeMm(source, size) / 2 / unitMmOf(source);
+/** How much bigger (or smaller) a city's name is drawn than the 12 units of type of the standard board: 1 without a profile; with a panel profile the name size
+ *  (6 mm for a capital when none is given) over the board's own unit. */
+export const nameScale = (source: { format?: unknown; panelMm?: unknown; nameMm?: unknown }): number =>
+  normalizeMm(source.nameMm, 1.5, 20) === undefined && !hasPanelProfile(source) ? 1 : nameTypeMm(source) / unitMmOf(source) / 12;
 /** How far apart parallel lanes of a double route sit: the width of a wagon and a little over (more with a line style of its own). */
 export const parallelSpacingMm = (source: { wagonMm?: unknown }, styled = false): number => wagonOf(source).width + (styled ? 5.5 : 2.5);
 

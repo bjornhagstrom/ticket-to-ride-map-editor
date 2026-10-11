@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { DEFAULT_TICKET_MIX, lanesOpenFrom, colorLabelOf, type MapData, realWagon, type Stop, type Ticket, ticketsInSet, type TicketSet } from "./map-data";
+import { DEFAULT_TICKET_MIX, lanesOpenFrom, colorLabelOf, type MapData, wagonOf, type Stop, type Ticket, ticketsInSet, type TicketSet } from "./map-data";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -134,7 +134,7 @@ export function AnalysisPanel({ official, wide, onToggleWide, onAddParallel, len
       </div>
       <div className="analysis-section">
         <h3>Room per wagon</h3>
-        <p className="helper">Click a row to keep that route marked on the map, and click again to let go; double-click to pick the route for editing. How long each route is drawn against what a real board would use for the same wagon count: {realWagon.length + realWagon.gap} mm per space plus {realWagon.endMargin} mm of end margin, on a {scaleWidthMm.toLocaleString("en-GB")} mm board. Those figures are fitted from the published Ticket to Ride Europe map, which scores 97–106% against them throughout. Well under means the wagons are cramped; well over means the line looks roomier on screen than the finished board plays.</p>
+        <p className="helper">Click a row to keep that route marked on the map, and click again to let go; double-click to pick the route for editing. How long each route is drawn against what a real board would use for the same wagon count: {Math.round((wagonOf(data).length + wagonOf(data).gap) * 10) / 10} mm per space plus {Math.round(wagonOf(data).endMargin * 10) / 10} mm of end margin, on a {Math.round(scaleWidthMm).toLocaleString("en-GB")} mm board. {data.wagonMm ? "The map's own wagon is used (Settings → Map); the end margin and the gap follow its proportions unless they were given." : "Those figures are fitted from the published Ticket to Ride Europe map, which scores 97–106% against them throughout."} Well under means the wagons are cramped; well over means the line looks roomier on screen than the finished board plays.</p>
         {spacing.length === 0 ? <p className="helper">No card routes yet.</p> : <div className="analysis-table-scroll"><table className="analysis-table">
           <thead><tr><th>Route</th><th>Wagons</th><th>Drawn</th><th>Needs</th><th>Room</th></tr></thead>
           <tbody>{[...spacing].sort((a, b) => a.ratio - b.ratio).map((item) => <tr key={item.route.id} className={cn("analysis-row-link", item.verdict !== "ok" && "analysis-warning-row", pinKey === `route:${item.route.id}` && "pinned")} aria-pressed={pinKey === `route:${item.route.id}`} tabIndex={0} role="button" onPointerEnter={() => onPreviewRoutes([item.route.id])} onPointerLeave={() => onPreviewRoutes(null)} onClick={() => onPin(`route:${item.route.id}`, [item.route.id], null)} onDoubleClick={() => onSelectRoute(item.route.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onPin(`route:${item.route.id}`, [item.route.id], null); } }}>

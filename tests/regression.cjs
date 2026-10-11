@@ -5121,6 +5121,37 @@ const sectionStart = (n) => {
     await gp.context().close();
   }
 
+  // 72. The small boards drawn to scale (docs/PROPOSAL-SMALL-BOARDS.md, step 2): with a board profile the wagons, the stops and the capitals of the names are
+  // the sizes in millimetres the profile says, measured in the drawing itself; without one they are what they have always been.
+  if (wants(72)) {
+  sectionStart(72);
+    const sc = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
+    sc.on("pageerror", (e) => errors.push(String(e)));
+    await sc.goto(BASE, { waitUntil: "networkidle" });
+    await sc.getByRole("button", { name: "Load the example map" }).click();
+    await sc.waitForTimeout(600);
+    const base72 = await sc.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")));
+    const measure = async (map, longSideMm) => {
+      await sc.evaluate((m) => localStorage.setItem("ttr-map", JSON.stringify(m)), map);
+      await sc.reload({ waitUntil: "networkidle" }); await sc.waitForTimeout(700);
+      return sc.evaluate((mm) => { const unit = mm / 1100;
+        const stop = document.querySelector("g.stop > circle[fill]:not(.stop-symbol):not(.stop-hit)");
+        const label = document.querySelector("g.stop text:not(.stop-letter)");
+        const slot = document.querySelector("rect.wagon-slot-outline");
+        return { unit, stopMm: 2 * Number(stop.getAttribute("r")) * unit, capitalMm: parseFloat(getComputedStyle(label).fontSize) * 0.7 * unit, wagonMm: (Number(slot.getAttribute("width")) - 2) * unit }; }, longSideMm);
+    };
+    const near72 = (a, b, e) => Math.abs(a - b) <= e;
+    const std = await measure({ ...base72 }, 790);
+    check("on the standard board a wagon is 20 mm, a stop about 9 mm across and a capital about 5.5 mm (11 units of type on screen): what they have always been", near72(std.wagonMm, 20, 0.3) && near72(std.stopMm, 9, 0.3) && near72(std.capitalMm, 5.5, 0.15), JSON.stringify(std));
+    const ny72 = await measure({ ...base72, format: "board-2x2", orientation: "portrait", panelMm: { width: 214, height: 140 }, wagonMm: { length: 24 }, stopMm: 18.5, nameMm: 5.8 }, 428);
+    check("New York: a wagon is 24 mm, a stop 18.5 mm across and a capital 5.8 mm high, in the drawing", near72(ny72.wagonMm, 24, 0.3) && near72(ny72.stopMm, 18.5, 0.3) && near72(ny72.capitalMm, 5.8, 0.15), JSON.stringify(ny72));
+    const am72 = await measure({ ...base72, format: "board-2x2", panelMm: { width: 214, height: 165 }, wagonMm: { length: 24 }, stopMm: 14, nameMm: 4.3 }, 428);
+    check("Amsterdam: a wagon is 24 mm, a stop 14 mm across and a capital 4.3 mm high", near72(am72.wagonMm, 24, 0.3) && near72(am72.stopMm, 14, 0.3) && near72(am72.capitalMm, 4.3, 0.15), JSON.stringify(am72));
+    const half = await measure({ ...base72, format: "board-2x2", orientation: "portrait", panelMm: { width: 214, height: 140 } }, 428);
+    check("a board of its own size with nothing else given draws a stop 9 mm across, a capital 6 mm high and a wagon of 20 mm, the standard sizes in millimetres", near72(half.stopMm, 9, 0.3) && near72(half.capitalMm, 6, 0.15) && near72(half.wagonMm, 20, 0.3), JSON.stringify(half));
+    await sc.context().close();
+  }
+
   if (sectionOpen) sectionTimes[sectionOpen.n] = Math.round((Date.now() - sectionOpen.at) / 100) / 10;
   if (process.env.TTR_TIMES) fs.writeFileSync(process.env.TTR_TIMES, JSON.stringify(sectionTimes));
   console.log("PASS:"); ok.forEach((l) => console.log("  ✓ " + l));

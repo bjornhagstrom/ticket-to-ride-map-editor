@@ -35,7 +35,7 @@ import { distancesCsv, routesCsv, stopsCsv, templatesZip, ticketsCsv } from "./c
 import { decodeCsvBytes, readCsvImport, type CsvImport } from "./csv-import";
 import { planRebind, applyRebind, stopKeyOf, type RebindGroup } from "./ticket-rebind";
 import { APP_VERSION, moveLegacyStorage, repairMap, cloneForHistory, cloneMap, formatTimestamp, GUIDE_SEEN_KEY, HISTORY_LIMIT, MAX_IMAGE_WARN_BYTES, normalizeBackgroundFile, normalizeNetworkFile, normalizeTicketFile, buildTicketFile, readMapFile, writeMapFile, mapPayload, networkPayload, readBackgroundImage, rescaleMapToFormat, MAP_HINT_KEY, MAP_HINT_X_KEY } from "./map-storage";
-import { tensionOf, problemMap, colorLabels, defaultTicketSet, DEFAULT_PLAYERS, DEFAULT_WAGONS_PER_PLAYER, IMAGE_KEEP_ON_BOARD, type Ticket, type StopTypeStyle, type WagonStyle, ticketsInSet, type TicketSet, emptyMap, initialMap, type LineStyle, DEFAULT_END_GAP_MM, formatOrStandard, type BackgroundImage, type BackgroundShape, type BackgroundType, type MapData, type MapFormat, type Point, type Route, type RouteType, type RouteTypeStyle, routeColors, STORAGE_KEY, type Stop, type StopSize, stopSizeMeta, type StopSymbol, stopSymbolMeta, type StopType } from "./map-data";
+import { boardDefinition, wagonOf, tensionOf, problemMap, colorLabels, defaultTicketSet, DEFAULT_PLAYERS, DEFAULT_WAGONS_PER_PLAYER, IMAGE_KEEP_ON_BOARD, type Ticket, type StopTypeStyle, type WagonStyle, ticketsInSet, type TicketSet, emptyMap, initialMap, type LineStyle, DEFAULT_END_GAP_MM, type BackgroundImage, type BackgroundShape, type BackgroundType, type MapData, type MapFormat, type Point, type Route, type RouteType, type RouteTypeStyle, routeColors, STORAGE_KEY, type Stop, type StopSize, stopSizeMeta, type StopSymbol, stopSymbolMeta, type StopType } from "./map-data";
 
 type MeasureResult = { from: string; to: string; distance: number; routeIds: string[] } | { from: string; to: string; unreachable: true };
 type Danger = "reset" | "delete" | "load-blank" | "load-example" | "load-problems" | "import-background" | "import-network" | "import-image" | "import-csv" | null;
@@ -432,7 +432,7 @@ export function MapEditor() {
 
   // Wagons are measured against the board the map is for. Printing smaller or larger scales them
   // with everything else.
-  const scaleWidthMm = formatOrStandard(data.format).widthMm;
+  const scaleWidthMm = boardDefinition(data).widthMm;
   const crossings = useMemo(() => crossingList(data), [data]);
   // Pointing at the crossings card marks every route that crosses another and rings where they cross.
   const [crossingHover, setCrossingHover] = useState(false);
@@ -731,7 +731,7 @@ export function MapEditor() {
       if (!routeStart) { setRouteStart(id); setPickTo(null); setJustDrawn(null); return; }
       if (routeStart === id) { setRouteStart(null); return; }
       const from = stopById(data, routeStart), to = stopById(data, id);
-      const length = routeLength === "fit" ? fittingLength(from && to ? Math.hypot(from.x - to.x, from.y - to.y) : 0, scaleWidthMm) : routeLength;
+      const length = routeLength === "fit" ? fittingLength(from && to ? Math.hypot(from.x - to.x, from.y - to.y) : 0, scaleWidthMm, wagonOf(data)) : routeLength;
       const routeId = `r-${Date.now()}`;
       // Two stops that already have a route: it is drawn all the same, since there can be a reason for
       // it, but a second lane is usually meant, so the editor says how to add one and offers to.

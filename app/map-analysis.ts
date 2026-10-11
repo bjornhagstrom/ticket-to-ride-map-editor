@@ -1,6 +1,6 @@
 // The balance layer: everything derived from the stops and routes themselves. All of it is pure,
 // computed on demand from MapData, and none of it is stored in a map file.
-import { pairKeyOf, DEFAULT_WAGONS_PER_PLAYER, DEFAULT_STARTING_TICKETS, DEFAULT_TICKET_BANDS, DEFAULT_TICKET_MIX, type TicketBands, type TicketMix, DEFAULT_PLAYERS, lanesUsableAt, defaultLabelAngle, labelPush, stopSizeMetaOf, ticketsInSet, type MapData, type Ticket, type Point, realWagon, type Route, routeColors, type Stop, W } from "./map-data";
+import { pairKeyOf, stopRadiusUnits, nameScale, wagonOf, DEFAULT_WAGONS_PER_PLAYER, DEFAULT_STARTING_TICKETS, DEFAULT_TICKET_BANDS, DEFAULT_TICKET_MIX, type TicketBands, type TicketMix, DEFAULT_PLAYERS, lanesUsableAt, defaultLabelAngle, labelPush, ticketsInSet, type MapData, type Ticket, type Point, type Route, routeColors, type Stop, W } from "./map-data";
 import type { TicketDeckReport } from "./ticket-suggester";
 import { boardOf, rotateMap, type Orientation } from "./board";
 import { curvedSamples, isCurved, intersects, parallelPoints, pointsFor, polylineLength, stopById } from "./map-geometry";
@@ -9,20 +9,21 @@ export type RouteSpacing = { route: Route; drawnMm: number; neededMm: number; ra
 const SPACING_SHORT = .85, SPACING_LONG = 1.35;
 /** As many real wagons (and the gaps between them, and room at the ends) as a line this long holds on
  *  the board the map is for: what a new route gets unless a number is chosen. 1 to 8. */
-export function fittingLength(lengthUnits: number, scaleWidthMm: number): number {
+export function fittingLength(lengthUnits: number, scaleWidthMm: number, wagon: { length: number; gap: number; endMargin: number } = wagonOf({})): number {
   const drawnMm = lengthUnits * scaleWidthMm / W;
-  return Math.max(1, Math.min(8, Math.floor((drawnMm - realWagon.endMargin) / (realWagon.length + realWagon.gap))));
+  return Math.max(1, Math.min(8, Math.floor((drawnMm - wagon.endMargin) / (wagon.length + wagon.gap))));
 }
 
 export function routeSpacing(data: MapData, scaleWidthMm: number): RouteSpacing[] {
   const unitMm = scaleWidthMm / W;
-  const pitchMm = realWagon.length + realWagon.gap;
+  const wagon = wagonOf(data);
+  const pitchMm = wagon.length + wagon.gap;
   const infrastructureTypes = new Set(data.routeTypeStyles.filter((style) => style.infrastructure).map((style) => style.id));
   return data.routes.filter((route) => !infrastructureTypes.has(route.type)).map((route) => {
     const geometry = parallelPoints(data, route);
     const points = isCurved(route) && geometry.length > 2 ? curvedSamples(geometry) : geometry;
     const drawnMm = (polylineLength(points) || 1) * unitMm;
-    const neededMm = route.length * pitchMm + realWagon.endMargin;
+    const neededMm = route.length * pitchMm + wagon.endMargin;
     const ratio = drawnMm / neededMm;
     return { route, drawnMm, neededMm, ratio, verdict: ratio < SPACING_SHORT ? "short" : ratio > SPACING_LONG ? "long" : "ok" } as RouteSpacing;
   });
@@ -251,16 +252,16 @@ export function suggestRoutes(data: MapData, stats: NetworkStats, colourTable: C
 // it is a warning aid, not a typesetter, and errs slightly wide.
 const LABEL_CHAR_WIDTH = 6.2, LABEL_HEIGHT = 12, LABEL_PAD = 2;
 
-const labelBox = (stop: Stop, angle: number, radius: number) => {
-  const width = Math.max(1, stop.name.length) * LABEL_CHAR_WIDTH;
-  const rad = angle * Math.PI / 180, distance = radius + 9;
+const labelBox = (stop: Stop, angle: number, radius: number, scale = 1) => {
+  const width = Math.max(1, stop.name.length) * LABEL_CHAR_WIDTH * scale;
+  const rad = angle * Math.PI / 180, distance = radius + 9 * scale;
   const dx = Math.cos(rad) * distance, dy = Math.sin(rad) * distance;
   // As StopLabel draws it: centred on the point at this bearing, pushed out by cos × half the width
   // and sin × half the height, so the box slides round the stop without jumping.
   const push = labelPush(angle);
   const left = stop.x + dx - width / 2 + push.x * width / 2;
-  const top = stop.y + dy - LABEL_HEIGHT / 2 + push.y * LABEL_HEIGHT / 2;
-  return { left: left - LABEL_PAD, top: top - LABEL_PAD, right: left + width + LABEL_PAD, bottom: top + LABEL_HEIGHT + LABEL_PAD };
+  const top = stop.y + dy - LABEL_HEIGHT * scale / 2 + push.y * LABEL_HEIGHT * scale / 2;
+  return { left: left - LABEL_PAD, top: top - LABEL_PAD, right: left + width + LABEL_PAD, bottom: top + LABEL_HEIGHT * scale + LABEL_PAD };
 };
 
 export function routeSamplePoints(data: MapData): Point[] {
@@ -283,16 +284,16 @@ const overlapCount = (box: ReturnType<typeof labelBox>, samples: Point[]) =>
 export const labelAngleOf = (stop: Stop, boardWidth = W) => stop.labelAngle ?? defaultLabelAngle(stop, boardWidth);
 
 export function labelCovers(data: MapData, stop: Stop, samples: Point[]): boolean {
-  const radius = stopSizeMetaOf(stop.size).radius;
-  return overlapCount(labelBox(stop, labelAngleOf(stop, boardOf(data).width), radius), samples) > 0;
+  const radius = stopRadiusUnits(data, stop.size);
+  return overlapCount(labelBox(stop, labelAngleOf(stop, boardOf(data).width), radius, nameScale(data)), samples) > 0;
 }
 
 // Every bearing, with how much of a route each one would sit on. The caller picks the first clear
 // one, or the least bad when the stop is so hemmed in that nothing is clear.
 export function labelAngleOptions(data: MapData, stop: Stop, samples: Point[]): { angle: number; overlap: number }[] {
-  const radius = stopSizeMetaOf(stop.size).radius;
+  const radius = stopRadiusUnits(data, stop.size);
   const options = [];
-  for (let angle = 0; angle < 360; angle += 15) options.push({ angle, overlap: overlapCount(labelBox(stop, angle, radius), samples) });
+  for (let angle = 0; angle < 360; angle += 15) options.push({ angle, overlap: overlapCount(labelBox(stop, angle, radius, nameScale(data)), samples) });
   return options;
 }
 
@@ -305,7 +306,8 @@ const bearingGap = (a: number, b: number) => { const d = Math.abs(a - b) % 360; 
 // already fine stays where it is. Whatever cannot be placed is reported rather than shuffled.
 export function autoPlaceLabels(data: MapData): { placed: Map<string, number>; unresolved: string[]; locked: string[] } {
   const samples = routeSamplePoints(data);
-  const radiusOf = (stop: Stop) => stopSizeMetaOf(stop.size).radius;
+  const radiusOf = (stop: Stop) => stopRadiusUnits(data, stop.size);
+  const scale = nameScale(data);
   const scored = labelledStops(data).map((stop) => ({ stop, options: labelAngleOptions(data, stop, samples) }));
   scored.sort((a, b) => a.options.filter((o) => !o.overlap).length - b.options.filter((o) => !o.overlap).length);
   const taken: Box[] = [];
@@ -314,7 +316,7 @@ export function autoPlaceLabels(data: MapData): { placed: Map<string, number>; u
   // A locked name stays put, and others are placed around it. It is reported only if it covers a route.
   const locked: string[] = [];
   for (const { stop } of scored) if (stop.labelLocked) {
-    taken.push(labelBox(stop, labelAngleOf(stop, boardOf(data).width), radiusOf(stop)));
+    taken.push(labelBox(stop, labelAngleOf(stop, boardOf(data).width), radiusOf(stop), scale));
     if (labelCovers(data, stop, samples)) locked.push(stop.id);
   }
   for (const { stop, options } of scored) {
@@ -322,13 +324,13 @@ export function autoPlaceLabels(data: MapData): { placed: Map<string, number>; u
     const current = labelAngleOf(stop, boardOf(data).width);
     const free = options.filter((option) => option.overlap === 0)
       .sort((a, b) => bearingGap(a.angle, current) - bearingGap(b.angle, current));
-    const choice = free.find((option) => !taken.some((box) => boxesOverlap(box, labelBox(stop, option.angle, radiusOf(stop)))));
+    const choice = free.find((option) => !taken.some((box) => boxesOverlap(box, labelBox(stop, option.angle, radiusOf(stop), scale))));
     if (choice) {
-      taken.push(labelBox(stop, choice.angle, radiusOf(stop)));
+      taken.push(labelBox(stop, choice.angle, radiusOf(stop), scale));
       if (choice.angle !== current) placed.set(stop.id, choice.angle);
       continue;
     }
-    taken.push(labelBox(stop, current, radiusOf(stop)));
+    taken.push(labelBox(stop, current, radiusOf(stop), scale));
     if (labelCovers(data, stop, samples)) unresolved.push(stop.id);
   }
   return { placed, unresolved, locked };
