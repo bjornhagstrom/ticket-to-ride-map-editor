@@ -1784,7 +1784,7 @@ const sectionStart = (n) => {
   await page.waitForSelector(".suggest-dialog", { timeout: 20000 });
   await page.waitForTimeout(400);
   const styleCards = page.locator(".style-card");
-  check("every style is described side by side", (await styleCards.count()) === 3, (await page.locator(".style-card strong").allTextContents()).join(", "));
+  check("every style is described side by side: Generic, Classic, Europe and Small boards", (await styleCards.count()) === 4, (await page.locator(".style-card strong").allTextContents()).join(", "));
   const firstCard = (await styleCards.first().textContent()).toLowerCase();
   check("each says what its deck and its lengths are", /deck/.test(firstCard) && /lengths/.test(firstCard), firstCard.slice(0, 70));
   check("the chosen one is marked", (await page.locator(".style-card.chosen").count()) === 1, await page.locator(".style-card.chosen strong").textContent());
@@ -2273,7 +2273,7 @@ const sectionStart = (n) => {
   await page.waitForTimeout(800);
   // A card is found by its title: your own set's card also says which of ours it was made from.
   const styleCard = (name) => page.locator(".style-card").filter({ has: page.locator("strong", { hasText: new RegExp(`^${name}$`) }) });
-  check("the suggester offers your own set beside ours", (await styleCard("Sparse").count()) === 1 && (await page.locator(".style-card").count()) === 4);
+  check("the suggester offers your own set beside ours", (await styleCard("Sparse").count()) === 1 && (await page.locator(".style-card").count()) === 5);
   check("and starts on it, because the map chose it", (await styleCard("Sparse").getAttribute("aria-pressed")) === "true");
   // A deck is sized by the stops a ticket can end at: not a junction, and not a stop no route reaches.
   const endStops = await page.evaluate(() => { const m = JSON.parse(localStorage.getItem("ttr-map")); const junction = new Set(m.stopTypeStyles.filter((t) => t.junction).map((t) => t.id)); const touched = new Set(m.routes.flatMap((r) => [r.a, r.b])); return m.stops.filter((s) => touched.has(s.id) && !junction.has(s.type)).length; });
@@ -5290,7 +5290,7 @@ const sectionStart = (n) => {
     const heading = async () => (await gp.locator(".against-official h3").textContent()) || "";
     check("Map balance on a small board is set against the small official maps", /small official maps/.test(await heading()), await heading());
     check("and says which maps and how few", /New York and Amsterdam/.test(await gp.locator(".against-official").textContent()) && /narrow/.test(await gp.locator(".against-official").textContent()));
-    check("the unused-routes row quotes 19–33 %", /19–33 %/.test(await gp.locator(".official-table").textContent()), (await gp.locator(".official-table").textContent()).slice(0, 300));
+    check("the unused-routes row quotes 17–19 %", /17–19 %/.test(await gp.locator(".official-table").textContent()), (await gp.locator(".official-table").textContent()).slice(0, 300));
     await gp.keyboard.press("Escape"); await gp.waitForTimeout(300);
     await gp.getByRole("button", { name: "Settings" }).click(); await gp.waitForTimeout(300);
     await gp.locator('#settings-format input[value="board-2x3"]').check(); await gp.waitForTimeout(500);

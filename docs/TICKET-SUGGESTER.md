@@ -175,6 +175,15 @@ periphery(stop) = mean D from the stop to all others, rescaled so that the most 
 
 The lower bound is `max(3, round(0.15 × reach))`.
 
+**A fourth set, `small` ("Small boards").** Made from the two small official maps, New York and Amsterdam, and the start on a board whose long side is under
+500 mm (`isSmallBoard`); a map that has chosen rules keeps them. Its targets are what the two decks measure with every ticket counted: 1.3 tickets a stop
+(1.20 and 1.41), no long deck, shares .05 .41 .11 .19 .24 over the five length bins, most on a stop 5 (4 and 5), near-duplicates 7.5 % (4.6 and 10.1), the
+periphery term relative as Generic's. The longest regular ticket is 60 % of a player's wagons (the longest ticket is 9 spaces, of 15 and 16 wagons), against 47 % on the large maps: at 47 %
+four of New York's 18 tickets and two of Amsterdam's 24 are longer than the reach and are left out of the score. `TICKET_SUGGESTER.officialSmall` holds the four figures the
+dialog quotes beside a small board. **Two maps are a start and not a law:** on these rules New York's own deck scores 4.9 (official-like, against a random median of 26)
+and Amsterdam's 33.7 (a random deck 31): its deck has twice the near-duplicates and leans on its double routes more than any other map, so the average describes
+one of them. `tests/small-deck.cjs` checks all of this, and `tests/balance-official.cjs` measures the quoted figures again. London will widen the set.
+
 ### 4.3 Candidates
 
 A candidate is an unordered stop pair inside a pool. For each one, compute:

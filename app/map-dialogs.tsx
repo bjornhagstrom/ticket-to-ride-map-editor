@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { DEFAULT_TICKET_MIX, lanesOpenFrom, colorLabelOf, type MapData, wagonOf, type Stop, type Ticket, ticketsInSet, type TicketSet } from "./map-data";
+import { isSmallBoard, DEFAULT_TICKET_MIX, lanesOpenFrom, colorLabelOf, type MapData, wagonOf, type Stop, type Ticket, ticketsInSet, type TicketSet } from "./map-data";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -376,8 +376,10 @@ export function SuggestTicketsDialog({ tension, onTension, open, onOpenChange, d
   onApply: (mode: "new" | "replace") => void;
 }) {
   const report = suggestion?.report;
-  const official = TICKET_SUGGESTER.official;
-  const range = ([low, high]: [number, number], unit = "") => `official ${low}–${high}${unit}`;
+  // On a small board the figures beside the numbers are those of the two small official maps.
+  const small = isSmallBoard(data);
+  const official = small ? { ...TICKET_SUGGESTER.official, ...TICKET_SUGGESTER.officialSmall } : TICKET_SUGGESTER.official;
+  const range = ([low, high]: [number, number], unit = "") => `${small ? "small official maps" : "official"} ${low}–${high}${unit}`;
   const row = (label: string, now: string, next: string, hint: string) => <tr key={label}>
     <td>{label}</td><td>{now}</td><td>{next}</td><td className="suggest-range">{hint}</td>
   </tr>;

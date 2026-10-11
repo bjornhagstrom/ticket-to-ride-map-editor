@@ -6,10 +6,10 @@
 // scripts/ticket-suggester-reference.py is the Python original this was ported from. The two use
 // different random number generators, so they agree on the metrics, not on the ticket lists.
 import { valueTicket, type TicketPath } from "./ticket-valuation";
-import { pairKeyOf, DEFAULT_STARTING_TICKETS, DEFAULT_TENSION, TENSION_CALM, TENSION_TENSE, tensionOf, DEFAULT_TICKET_BANDS, DEFAULT_WAGONS_PER_PLAYER, DEFAULT_PLAYERS, lanesUsableAt, type LaneRule, type MapData, type Ticket, type TicketBands, type TicketMix, ticketsInSet } from "./map-data";
+import { isSmallBoard, pairKeyOf, DEFAULT_STARTING_TICKETS, DEFAULT_TENSION, TENSION_CALM, TENSION_TENSE, tensionOf, DEFAULT_TICKET_BANDS, DEFAULT_WAGONS_PER_PLAYER, DEFAULT_PLAYERS, lanesUsableAt, type LaneRule, type MapData, type Ticket, type TicketBands, type TicketMix, ticketsInSet } from "./map-data";
 
-/** Our three sets of deck rules. */
-export type BuiltInStyle = "generic" | "classic" | "europe";
+/** Our four sets of deck rules. */
+export type BuiltInStyle = "generic" | "classic" | "europe" | "small";
 /** The id of the rules a deck is suggested on: one of ours, or a set of the map's own (DeckRuleSet). */
 export type TicketStyle = string;
 
@@ -69,6 +69,24 @@ export const TICKET_SUGGESTER = {
       dupRate: .02,
       periphery: "point" as "relative" | "point",
     },
+    // The two small official maps, New York and Amsterdam (15 and 17 stops, 15 and 16 wagons each): their decks measured as the others are,
+    // with every ticket counted. Only two maps, so it is a start for a small board and not a law (tests/small-deck.cjs measures them again).
+    small: {
+      label: "Small boards",
+      blurb: "The average of New York and Amsterdam, for a board of its own size. The start on a small board.",
+      lengths: "Mostly short to middling tickets, with a quarter at the very limit of what a player can build, which is most of a player's wagons on a board this small.",
+      deck: "About 1.3 tickets per stop, all in one deck.",
+      after: "No bonus: a ticket is worth its distance.",
+      ticketsPerStop: 1.3,
+      longPerStop: 0,
+      bins: [.05, .41, .11, .19, .24],
+      longRange: null as [number, number] | null,
+      bonusFrom: null as number | null,
+      lengthCap: .6,
+      maxPerStop: 5,
+      dupRate: .075,
+      periphery: "relative" as "relative" | "point",
+    },
   },
   // What the official decks actually measure, for the dialog to show beside each number. The four that
   // are measured on a deck (tickets per stop, most on one stop, near-duplicates, routes no ticket uses) are
@@ -86,6 +104,15 @@ export const TICKET_SUGGESTER = {
     longEnds: [["USA", .21], ["India", .21], ["Europe", .20], ["Polska", .17], ["Switzerland", .16], ["Northern Lights", .11], ["Old West", .09], ["Nordic", .06]] as [string, number][],
     shortEnds: [["Northern Lights", .02], ["USA", -.03], ["India", -.06], ["Old West", -.06], ["Europe", -.07], ["Nordic", -.08], ["Switzerland", -.08], ["Polska", -.10]] as [string, number][],
     unusedPct: [7, 21] as [number, number],
+  },
+  // The same four figures on the two small official maps, New York and Amsterdam, read with the small board's rules (every ticket counted);
+  // what the deck builder quotes beside a small board's numbers. tests/balance-official.cjs measures them again.
+  officialSmall: {
+    lengthCap: [.56, .60] as [number, number],
+    maxPerStop: [4, 5] as [number, number],
+    perStop: [1.2, 1.41] as [number, number],
+    dupPct: [4.6, 10.1] as [number, number],
+    unusedPct: [17, 19] as [number, number],
   },
   // `load` was 0.5 when the targets were first fitted, which left suggestions spreading their
   // tickets more evenly over the map than the official decks do: they run the busy corridors along
@@ -661,12 +688,13 @@ function resolveOptions(data: MapData, options: Partial<TicketSuggestOptions>): 
 }
 
 // The rules the map has chosen come first, whether ours or its own; without a choice, Generic, the
-// average of the official maps. (It used to guess Europe from long tickets or a deal of four; the
+// average of the official maps, or on a small board the small ones. (It used to guess Europe from long tickets or a deal of four; the
 // owner wants one plain default, for the example map too.)
 export function defaultStyle(data: MapData, setId?: string): TicketStyle {
   void setId;
   if (data.deckRule && deckRules(data).some((rule) => rule.id === data.deckRule)) return data.deckRule;
-  return "generic";
+  // A small board is judged against the small official maps, not against decks made for four times the stops.
+  return isSmallBoard(data) ? "small" : "generic";
 }
 
 // Every set of rules the suggester can follow on this map: ours first, fixed, then the map's own.

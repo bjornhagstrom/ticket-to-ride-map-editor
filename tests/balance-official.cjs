@@ -85,13 +85,15 @@ const buildMap = (source) => {
 
   // The two small official maps have a set of their own (docs/PROPOSAL-SMALL-BOARDS.md): BALANCE_SMALL says what New York and Amsterdam measure, in the same way.
   const { BALANCE_SMALL, balanceRangesFor } = require(path.join(out, "map-analysis.js"));
+  // On a board of their own size, as the editor has them, so that the deck is read with the small board's rules (every ticket counted).
+  const smallPanel = { newyork: { width: 214, height: 140 }, amsterdam: { width: 214, height: 165 } };
   const small = reference.maps.filter((map) => ["newyork", "amsterdam"].includes(map.id)).map((source) => {
-    const map = buildMap(source);
+    const map = { ...buildMap(source), format: "board-2x2", panelMm: smallPanel[source.id] };
     const report = evaluateTicketDeck(map, { setId: "main", atTable: map.players.max });
     const stats = networkStats(map);
     const hubs = [...stats.hubDegree.values()];
     const setup = setupBalance(map, "main");
-    return { id: source.id, fillPct: 100 * setup.fill, crowded: report.bottlenecks.length, crowdedPct: 100 * report.bottlenecks.length / connectionCount(map), loadRatio: report.loadRatio, unusedPct: report.unusedPct, maxPerStop: report.maxPerStop, hubDegree: hubs.reduce((a, b) => a + b, 0) / hubs.length };
+    return { id: source.id, fillPct: 100 * setup.fill, crowded: report.bottlenecks.length, crowdedPct: 100 * report.bottlenecks.length / connectionCount(map), loadRatio: report.loadRatio, unusedPct: report.unusedPct, maxPerStop: report.maxPerStop, perStop: report.perStop, dupPct: report.dupPct, skipped: report.skipped, hubDegree: hubs.reduce((a, b) => a + b, 0) / hubs.length };
   });
   check("both small maps are in the reference data", small.length === 2);
   const smallSpan = (key, digits = 0) => { const v = small.map((m) => m[key]); const f = 10 ** digits; return [Math.round(Math.min(...v) * f) / f, Math.round(Math.max(...v) * f) / f]; };
@@ -99,6 +101,12 @@ const buildMap = (source) => {
   for (const [key, digits] of [["fillPct", 0], ["crowded", 0], ["crowdedPct", 0], ["loadRatio", 1], ["unusedPct", 0], ["maxPerStop", 0], ["hubDegree", 1]]) {
     const quoted = BALANCE_SMALL[key === "fillPct" ? "wagonFill" : key];
     check(`${key}: the range quoted for small maps is what New York and Amsterdam measure`, JSON.stringify(smallSpan(key, digits)) === JSON.stringify(quoted), `${JSON.stringify(smallSpan(key, digits))} measured, ${JSON.stringify(quoted)} quoted`);
+  }
+  check("on their own board no ticket of either small deck is left out", small.every((m) => m.skipped === 0), small.map((m) => `${m.id} ${m.skipped}`).join(", "));
+  // What the deck builder quotes beside its numbers on a small board.
+  const { TICKET_SUGGESTER: TS } = require(path.join(out, "ticket-suggester.js"));
+  for (const [key, digits] of [["perStop", 2], ["maxPerStop", 0], ["dupPct", 1], ["unusedPct", 0]]) {
+    check(`${key}: Build a full deck quotes what New York and Amsterdam measure on a small board`, JSON.stringify(smallSpan(key, digits)) === JSON.stringify(TS.officialSmall[key]), `${JSON.stringify(smallSpan(key, digits))} measured, ${JSON.stringify(TS.officialSmall[key])} quoted`);
   }
   const small2 = balanceRangesFor({ format: "board-2x2", panelMm: { width: 214, height: 140 } });
   check("a small board (long side under 500 mm) gets the small ranges", small2.small === true && small2.ranges.unusedPct[1] === BALANCE_SMALL.unusedPct[1] && small2.crowded[1] === BALANCE_SMALL.crowded[1]);

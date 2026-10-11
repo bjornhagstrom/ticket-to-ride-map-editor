@@ -126,7 +126,7 @@ export type DeckRuleValues = {
 };
 export type DeckRuleSet = DeckRuleValues & { id: string; label: string; basedOn: string };
 /** Our sets, by the id a map chooses them with. Their values are in TICKET_SUGGESTER.styles. */
-export const BUILT_IN_DECK_RULES = ["generic", "classic", "europe"] as const;
+export const BUILT_IN_DECK_RULES = ["generic", "classic", "europe", "small"] as const;
 
 /** One number handed out: when, and how the map left the editor (print, export, image). */
 export type MapVersionEntry = { number: number; date: string; by: string; [key: string]: unknown };
@@ -259,6 +259,9 @@ export const nameTypeMm = (source: { nameMm?: unknown }): number => nameMmOf(sou
 export const unitMmOf = (source: { format?: unknown; panelMm?: unknown }): number => boardDefinition(source).widthMm / W;
 /** The radius of a stop in map units. With a profile it is worked out from the millimetres (so a stop of 18.5 mm is that on any board); without one it is
  *  the size in units the editor has always drawn, so that the boards it has always had are drawn exactly as before. An unknown size is a medium one. */
+/** A board whose long side is under this many millimetres is a small one: the small official maps are 428 mm, the standard board 790. */
+export const SMALL_BOARD_MM = 500;
+export const isSmallBoard = (source: { format?: unknown; panelMm?: unknown }): boolean => boardDefinition(source).widthMm < SMALL_BOARD_MM;
 export const hasPanelProfile = (source: { format?: unknown; panelMm?: unknown }): boolean => validPanelFor(source.format, source.panelMm) !== undefined;
 export const stopRadiusUnits = (source: { format?: unknown; panelMm?: unknown; stopMm?: unknown }, size: unknown): number =>
   normalizeMm(source.stopMm, 3, 40) === undefined && !hasPanelProfile(source) ? stopSizeMetaOf(size).radius : stopSizeMm(source, size) / 2 / unitMmOf(source);
