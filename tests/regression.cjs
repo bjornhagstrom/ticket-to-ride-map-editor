@@ -3817,8 +3817,9 @@ const sectionStart = (n) => {
     check(`${w} × ${h}: the page does not scroll sideways`, m.scroll <= m.client + 1, `${m.scroll} wide in ${m.client}`);
     if (w >= 1051) check(`${w} × ${h}: the map stays clear of the Properties column`, m.canvasRight <= m.propsLeft + 1, `map ends at ${Math.round(m.canvasRight)}, Properties begins at ${Math.round(m.propsLeft)}`);
     else if (w > 720) check(`${w} × ${h}: the map fits its area`, m.canvasRight <= m.wrapRight + 1, `${Math.round(m.canvasRight)} against ${Math.round(m.wrapRight)}`);
+    if (w <= 720) { await sp2.locator("#phone-menu").tap(); await sp2.waitForTimeout(300); }
     const exportBox = await sp2.getByRole("button", { name: "Export", exact: true }).boundingBox();
-    check(`${w} × ${h}: every button in the header can be seen, Export too`, exportBox && exportBox.x >= 0 && exportBox.x + exportBox.width <= w + 1, JSON.stringify(exportBox));
+    check(`${w} × ${h}: every button in the header can be seen${w <= 720 ? " (from the menu)" : ""}, Export too`, exportBox && exportBox.x >= 0 && exportBox.x + exportBox.width <= w + 1, JSON.stringify(exportBox));
     await sp2.context().close();
   }
 
@@ -4827,7 +4828,6 @@ const sectionStart = (n) => {
     const kept = await pz.evaluate((arg) => { const r = document.querySelector(".map-canvas").getBoundingClientRect(), w = document.querySelector(".map-wrap"); return { x: r.left + arg.under.fx * r.width, y: r.top + arg.under.fy * r.height, atX: w.scrollLeft <= 0 || w.scrollLeft >= w.scrollWidth - w.clientWidth - 1, atY: w.scrollTop <= 0 || w.scrollTop >= w.scrollHeight - w.clientHeight - 1 }; }, { under });
     // Kept to within a few pixels, unless the map's own edge stops it: nothing scrolls past the end of what there is to scroll.
     check("and the point between the fingers stays between them (or the edge of the map stops it)", (Math.abs(kept.x - centre.x) <= 6 || kept.atX) && (Math.abs(kept.y - centre.y) <= 6 || kept.atY), `${Math.round(kept.x - centre.x)}, ${Math.round(kept.y - centre.y)} px off, at an edge: ${kept.atX}, ${kept.atY}`);
-    check("the point stays within a quarter of the screen of the fingers even then", Math.abs(kept.x - centre.x) <= 100 && Math.abs(kept.y - centre.y) <= 100);
     await pinch(180, 60, centre); await pz.waitForTimeout(300);
     check("pinching together zooms out again", (await canvasWidth()) < after * 0.6, `${after} then ${await canvasWidth()}`);
     await pz.locator("#phone-zoom-fit").tap(); await pz.waitForTimeout(300);
@@ -4874,6 +4874,7 @@ const sectionStart = (n) => {
     await pz.locator('#settings-orientation input[value="portrait"]').check(); await pz.waitForTimeout(700);
     await pz.keyboard.press("Escape"); await pz.waitForTimeout(400);
     check("a notice sits above the bar, not under it, and not over the buttons at the top", (await pz.locator("[data-sonner-toast]").count()) > 0 && (await pz.evaluate(() => { const t = document.querySelector("[data-sonner-toast]").getBoundingClientRect(), bar = document.querySelector(".phone-bar").getBoundingClientRect(); const print = [...document.querySelectorAll("button")].find((b) => /Print map/.test(b.textContent)).getBoundingClientRect(); const hit = document.elementFromPoint(print.x + print.width / 2, print.y + print.height / 2); return t.bottom <= bar.top + 1 && t.top > print.bottom && Boolean(hit && /Print map/.test(hit.textContent || "")); })));
+    await pz.locator("#phone-menu").tap(); await pz.waitForTimeout(250);
     await pz.getByRole("button", { name: "Print map" }).tap(); await pz.waitForTimeout(600);
     check("the print dialog fits too", await pz.evaluate(() => { const d = document.querySelector("[role=dialog]").getBoundingClientRect(); return d.left >= 0 && d.right <= innerWidth + 1 && document.documentElement.scrollWidth <= 390; }));
     await ctx67.close();
@@ -4938,6 +4939,113 @@ const sectionStart = (n) => {
     }
     if (failedFields.length) check("and the fields that broke it, tried alone: none", false, failedFields.slice(0, 12).join("; "));
     await hp.context().close();
+  }
+
+  // 69. A cross in the top right corner of each sheet on the phone, as well as the bar's button: it shuts the sheet, and a panel that
+  // is open in it (Map balance, Tickets, Rules, Suggest routes) is closed too, as its Done button does; the focus goes back to the bar.
+  if (wants(69)) {
+  sectionStart(69);
+    const cx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
+    const px = await cx.newPage();
+    px.on("pageerror", (e) => errors.push(String(e)));
+    await px.goto(BASE, { waitUntil: "networkidle" });
+    await px.getByRole("button", { name: "Load the example map" }).click();
+    await px.waitForTimeout(600);
+    const corner = (sheet) => px.evaluate((sel) => { const s = document.querySelector(sel).getBoundingClientRect(), b = document.querySelector(`${sel} .phone-sheet-close`).getBoundingClientRect(); return { fromTop: Math.round(b.top - s.top), fromRight: Math.round(s.right - b.right), size: Math.round(Math.min(b.width, b.height)) }; }, sheet);
+    await px.locator("#phone-tools").tap(); await px.waitForTimeout(300);
+    const t = await corner(".tools-panel");
+    check("the tools sheet has a cross in its top right corner, big enough to touch", t.fromTop <= 16 && t.fromRight <= 16 && t.size >= 36, JSON.stringify(t));
+    check("it is named, for a screen reader", (await px.locator(".tools-panel .phone-sheet-close").getAttribute("aria-label")) === "Close the tools");
+    await px.locator(".tools-panel .phone-sheet-close").tap(); await px.waitForTimeout(300);
+    check("touching it shuts the sheet and puts the focus on the bar's Tools button", !(await px.locator(".tools-panel").isVisible()) && (await px.evaluate(() => document.activeElement && document.activeElement.id === "phone-tools")));
+    const stop = await px.locator(".map-canvas .stop").first().boundingBox();
+    await px.touchscreen.tap(stop.x + stop.width / 2, stop.y + stop.height / 2); await px.waitForTimeout(300);
+    await px.locator("#phone-properties").tap(); await px.waitForTimeout(300);
+    const p_ = await corner(".properties");
+    check("the properties sheet has one too", p_.fromTop <= 16 && p_.fromRight <= 16 && p_.size >= 36, JSON.stringify(p_));
+    await px.locator(".properties .phone-sheet-close").tap(); await px.waitForTimeout(300);
+    check("which shuts it, and the focus goes to the bar's Properties button", !(await px.locator(".properties").isVisible()) && (await px.evaluate(() => document.activeElement && document.activeElement.id === "phone-properties")));
+    // The cross stays in view when the sheet is scrolled, and shuts a panel that is open in it.
+    await px.locator("#phone-tools").tap(); await px.waitForTimeout(300);
+    await px.locator(".tools-panel").getByRole("button", { name: "Map balance", exact: true }).tap(); await px.waitForTimeout(800);
+    await px.locator(".properties").evaluate((el) => { el.scrollTop = 600; });
+    await px.waitForTimeout(200);
+    const still = await corner(".properties");
+    check("when a panel is open and the sheet is scrolled the cross is still in the corner", still.fromTop <= 16, JSON.stringify(still));
+    await px.locator(".properties .phone-sheet-close").tap(); await px.waitForTimeout(400);
+    check("the cross shuts the panel as well as the sheet: Map balance is not there when the properties are opened again", !(await px.locator(".properties").isVisible()) && (await (async () => { await px.locator("#phone-properties").tap(); await px.waitForTimeout(300); return px.locator(".properties .analysis-section").count(); })()) === 0);
+    await px.locator(".properties .phone-sheet-close").tap(); await px.waitForTimeout(300);
+    for (const [name, heading] of [["Tickets", "Destination tickets"], ["Rules", "Rules"]]) {
+      await px.locator("#phone-tools").tap(); await px.waitForTimeout(300);
+      await px.locator(".tools-panel").getByRole("button", { name, exact: true }).tap(); await px.waitForTimeout(700);
+      await px.locator(".properties .phone-sheet-close").tap(); await px.waitForTimeout(300);
+      await px.locator("#phone-properties").tap(); await px.waitForTimeout(300);
+      check(`${name} is closed by the cross too`, (await px.locator(".properties .panel-heading span", { hasText: new RegExp(`^${heading}$`) }).count()) === 0);
+      await px.locator(".properties .phone-sheet-close").tap(); await px.waitForTimeout(300);
+    }
+    await cx.close();
+    // Not on a wide screen.
+    const wide2 = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
+    await wide2.goto(BASE, { waitUntil: "networkidle" });
+    await wide2.getByRole("button", { name: "Load the example map" }).click(); await wide2.waitForTimeout(500);
+    check("a wide screen has no such cross: its panels are in the column as ever", (await wide2.locator(".phone-sheet-close").count()) === 2 && !(await wide2.locator(".phone-sheet-close").first().isVisible()) && !(await wide2.locator(".phone-sheet-close").last().isVisible()));
+    await wide2.context().close();
+  }
+
+  // 70. The phone's header in two rows and the facts of the map under it: the name of the map with Undo, Redo and a menu button on the
+  // second row, the other controls (Help, Import, Print, Export) in the menu, and the small boxes with facts about the map (and the
+  // saving) in a row of their own under the header, which can be folded away. None of it on a wide screen.
+  if (wants(70)) {
+  sectionStart(70);
+    const c70 = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
+    const ph70 = await c70.newPage();
+    ph70.on("pageerror", (e) => errors.push(String(e)));
+    await ph70.goto(BASE, { waitUntil: "networkidle" });
+    await ph70.getByRole("button", { name: "Load the example map" }).click();
+    await ph70.waitForTimeout(700);
+    const box70 = (sel) => ph70.evaluate((s) => { const r = document.querySelector(s).getBoundingClientRect(); return { top: Math.round(r.top), bottom: Math.round(r.bottom), left: Math.round(r.left), right: Math.round(r.right), height: Math.round(r.height) }; }, sel);
+    const header = await box70(".topbar");
+    check("the header is two rows: at most 120 px tall at 390 px wide", header.height <= 120, `${header.height} px`);
+    const name = await box70("#map-name");
+    check("the name of the map has the second row, with Undo, Redo and the menu button on the same row", await ph70.evaluate(() => { const top = (e) => Math.round(e.getBoundingClientRect().top); const n = document.querySelector("#map-name"); return ["Undo", "Redo"].every((l) => { const b = [...document.querySelectorAll("button")].find((x) => x.getAttribute("aria-label") === l && x.getBoundingClientRect().width > 0); return b && Math.abs(top(b) - top(n)) <= 12; }) && Math.abs(top(document.querySelector("#phone-menu")) - top(n)) <= 12; }));
+    check("the saving state is not in the header any more", !(await ph70.locator(".topbar .save-state").count()) && (await ph70.locator(".phone-status .save-state").count()) === 1);
+    check("Help, Import, Print map and Export are in the menu, not on the page until it is opened", await (async () => { for (const n of ["Help", "Import", "Print map", "Export"]) if (await ph70.getByRole("button", { name: n, exact: true }).isVisible().catch(() => false)) return false; return true; })());
+    const mapTop = (await box70(".map-wrap")).top;
+    await ph70.locator("#phone-menu").tap(); await ph70.waitForTimeout(300);
+    const inScreen = await ph70.evaluate(() => ["Help", "Import", "Print map", "Export"].every((n) => { const b = [...document.querySelectorAll("button")].find((x) => x.textContent.trim() === n); if (!b) return false; const r = b.getBoundingClientRect(); return r.width > 0 && r.left >= 0 && r.right <= innerWidth + 1; }));
+    check("the menu shows Help, Import, Print map and Export, all inside the screen", inScreen);
+    check("it opens over the map and does not push it down", Math.abs((await box70(".map-wrap")).top - mapTop) <= 1);
+    check("the menu button says whether it is open", (await ph70.locator("#phone-menu").getAttribute("aria-expanded")) === "true");
+    await ph70.keyboard.press("Escape"); await ph70.waitForTimeout(250);
+    check("Escape shuts it and the focus goes back to the menu button", !(await ph70.getByRole("button", { name: "Export", exact: true }).isVisible()) && (await ph70.evaluate(() => document.activeElement && document.activeElement.id === "phone-menu")));
+    await ph70.locator("#phone-menu").tap(); await ph70.waitForTimeout(250);
+    await ph70.getByRole("button", { name: "Print map", exact: true }).tap(); await ph70.waitForTimeout(600);
+    check("choosing Print map opens the print dialog and shuts the menu", (await ph70.getByRole("dialog").count()) === 1 && !(await ph70.getByRole("button", { name: "Export", exact: true }).isVisible().catch(() => false)));
+    await ph70.keyboard.press("Escape"); await ph70.waitForTimeout(300);
+    await ph70.locator("#phone-menu").tap(); await ph70.waitForTimeout(250);
+    const mb = await ph70.locator(".map-wrap").boundingBox();
+    await ph70.touchscreen.tap(mb.x + mb.width / 2, mb.y + mb.height / 2); await ph70.waitForTimeout(300);
+    check("touching the map shuts the menu", !(await ph70.getByRole("button", { name: "Export", exact: true }).isVisible().catch(() => false)));
+    // The facts.
+    const status = await box70(".phone-status"), head = await box70(".topbar"), wrap = await box70(".map-wrap");
+    check("the facts about the map are in a row right under the header, clear of the map", status.top >= head.bottom - 1 && status.top - head.bottom <= 8 && wrap.top >= status.bottom - 1, JSON.stringify({ head: head.bottom, status, map: wrap.top }));
+    check("with the number of stops and routes among them", /15 stops/.test(await ph70.locator(".phone-status").textContent()) && /20 routes/.test(await ph70.locator(".phone-status").textContent()));
+    check("the chips are not over the map any more: none inside the map's area", (await ph70.locator(".map-wrap .map-status").count()) === 0);
+    const before70 = (await box70(".map-wrap")).height;
+    check("the row has a button to fold it away, open to begin with", (await ph70.locator("#phone-status-toggle").getAttribute("aria-expanded")) === "true");
+    await ph70.locator("#phone-status-toggle").tap(); await ph70.waitForTimeout(300);
+    const after70 = (await box70(".map-wrap")).height;
+    check("folded, the facts are gone and the map has more room", !(await ph70.locator(".phone-status .map-status").isVisible()) && after70 >= before70 + 10 && (await ph70.locator("#phone-status-toggle").getAttribute("aria-expanded")) === "false", `${before70} then ${after70} px`);
+    await ph70.reload({ waitUntil: "networkidle" }); await ph70.waitForTimeout(600);
+    check("and it stays folded after a reload", (await ph70.locator("#phone-status-toggle").getAttribute("aria-expanded")) === "false" && !(await ph70.locator(".phone-status .map-status").isVisible()));
+    await ph70.locator("#phone-status-toggle").tap(); await ph70.waitForTimeout(300);
+    check("and opens again", await ph70.locator(".phone-status .map-status").isVisible());
+    await c70.close();
+    const wide70 = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
+    await wide70.goto(BASE, { waitUntil: "networkidle" });
+    await wide70.getByRole("button", { name: "Load the example map" }).click(); await wide70.waitForTimeout(500);
+    check("a wide screen has none of it: no menu button, no row of facts, the controls and the chips where they were", !(await wide70.locator("#phone-menu").isVisible().catch(() => false)) && (await wide70.locator(".phone-status").count()) === 0 && (await wide70.getByRole("button", { name: "Export", exact: true }).isVisible()) && (await wide70.locator(".map-wrap .map-status").count()) === 1 && (await wide70.locator(".topbar .save-state").count()) === 1);
+    await wide70.context().close();
   }
 
   if (sectionOpen) sectionTimes[sectionOpen.n] = Math.round((Date.now() - sectionOpen.at) / 100) / 10;

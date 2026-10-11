@@ -232,7 +232,7 @@
 .column-resizer{position:absolute;top:0;bottom:0;right:calc(var(--right-width,400px) - 4px);width:8px;cursor:col-resize;z-index:5;touch-action:none}
 .column-resizer:hover,.column-resizer:focus-visible,.column-resizer:active{background:rgba(114,28,36,.28);outline:none}
 @media(max-width:1050px){.column-resizer{display:none}}
-.properties.showing-balance>:not(.balance-panel){display:none}
+.properties.showing-balance>:not(.balance-panel):not(.phone-sheet-bar){display:none}
 .balance-panel{display:grid;gap:12px;align-content:start;min-width:0}
 .balance-panel>*,.balance-panel .analysis-section{min-width:0}
 .balance-panel tbody tr,.balance-panel .bottleneck-row{cursor:pointer}
@@ -508,23 +508,42 @@
 
 /* The phone (below 721 px): the map first, the tools and the properties in sheets from a bar at the foot of the screen. */
 .phone-bar { display: none; }
+.phone-sheet-bar { display: none; }
 @media screen and (max-width: 720px) {
-  .topbar { padding: 8px 12px; gap: 6px; }
+  /* The header in two rows: the name of the programme, then the name of the map with Undo, Redo and the menu. The rest is in the menu. */
+  .topbar { position: relative !important; padding: 6px 12px 8px !important; gap: 6px !important; min-height: 0 !important; }
   .brand p { display: none; }
   .brand h1 { font-size: 16px; }
-  .brand-mark { width: 30px; height: 30px; }
-  .header-actions { gap: 6px; padding-top: 6px; }
-  .header-actions > * { flex-shrink: 0; }
+  .brand-mark { width: 28px; height: 28px; }
+  .map-title { display: flex !important; align-items: center; gap: 4px; width: 100% !important; max-width: none !important; }
+  .map-title input { flex: 1 1 auto; min-width: 0; }
+  .map-title > button { flex: none; }
+  .header-actions { display: none !important; }
+  .header-actions.open { display: flex !important; flex-wrap: wrap; gap: 8px; position: absolute; left: 0; right: 0; top: 100%; z-index: 35; padding: 10px 12px 12px; background: #fbf8f1; border-bottom: 1px solid #ccc2b3; box-shadow: 0 10px 24px rgba(40, 30, 20, .22); overflow: visible !important; }
+  .header-actions.open > * { flex-shrink: 0; }
+  /* The facts of the map: a row of their own under the header, folded away with one touch. */
+  .phone-status { order: -2; display: flex; align-items: center; gap: 4px; padding: 2px 8px; background: #faf6ef; border-bottom: 1px solid #e1d8ca; min-height: 40px; }
+  .phone-status > button { flex: none; width: 36px; height: 36px; }
+  .phone-status .map-status { position: static !important; display: flex; flex-wrap: nowrap; align-items: center; gap: 6px; flex: 1 1 auto; min-width: 0; width: auto; overflow-x: auto; scrollbar-width: none; padding: 0; margin: 0; }
+  .phone-status .map-status > * { flex: none; white-space: nowrap; }
+  .phone-status .map-status .save-state { font-size: 12px; }
+  .phone-status.folded { min-height: 26px; padding-top: 0; padding-bottom: 0; }
+  .phone-status.folded > button { height: 26px; }
+  .phone-status-folded { font-size: 12px; color: #5d554a; }
   /* The page is the screen: the map scrolls inside its own area, which takes what the top and the bar leave. */
   .app-shell { height: 100svh; min-height: 0; }
   .workspace { flex: 1; min-height: 0; padding-bottom: 56px; }
-  .map-wrap { order: -1; flex: 1 1 auto; height: auto; min-height: 0; max-height: none !important; }
+  .map-wrap { padding-top: 8px !important; order: -1; flex: 1 1 auto; height: auto; min-height: 0; max-height: none !important; }
   .tools-panel, .properties { position: fixed; left: 0; right: 0; bottom: 56px; z-index: 30; max-height: 64svh; min-height: 0; overflow-y: auto; border: 0; border-top: 1px solid #ccc2b3; background: var(--background, #faf6ef); box-shadow: 0 -8px 24px rgba(40, 30, 20, .2); -webkit-overflow-scrolling: touch; }
   .tools-panel:not(.phone-open), .properties:not(.phone-open) { display: none !important; }
   .phone-bar { display: flex; gap: 8px; position: fixed; left: 0; right: 0; bottom: 0; height: 56px; z-index: 40; padding: 8px 12px; background: #faf6ef; border-top: 1px solid #ccc2b3; }
   .phone-bar button { flex: 1; height: 40px; position: relative; }
   .properties .property-form { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
   .properties .property-form > * { min-width: 0; }
+  /* The cross in a sheet's corner, kept in view when the sheet scrolls. */
+  .phone-sheet-bar { display: flex; justify-content: flex-end; position: sticky; top: -12px; z-index: 5; margin: -12px -12px 0; padding: 4px 6px; height: 44px; align-items: center; background: linear-gradient(var(--background, #faf6ef) 75%, transparent); pointer-events: none; }
+  .phone-sheet-bar { flex: none; }
+  .phone-sheet-close { pointer-events: auto; width: 40px; height: 40px; flex: none; }
   .phone-zoom { display: flex; gap: 4px; flex: none; }
   .phone-zoom button { flex: none; width: 40px; padding: 0; }
   /* Settings in one column: the pages in a row on top, the settings under them using the width. */

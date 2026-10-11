@@ -8,6 +8,9 @@ This file is written from `app/version.ts` by `npm run changelog`; edit the note
 
 Changes since the last release, to go into the next version.
 
+- On a phone the header is two rows: the name of the map with Undo, Redo and a menu button, and Help, Import, Print map and Export in the menu, which opens over the map and shuts when you choose, press Escape or touch the map.
+- On a phone the boxes with facts about the map are a row of their own right under the header, with the saving state, and one button folds the row away, which is remembered.
+- On a phone each sheet has a cross in its top right corner, in view as the sheet scrolls, which shuts it, and shuts the panel open in it (Map balance, Tickets, Rules, Suggest routes) as Done does.
 - A map whose stops, routes or styles hold a value the editor does not know, such as a stop size from a newer version, or an object where a name belongs, now opens instead of stopping the drawing: a value in a field of choice is kept, and a field of the wrong kind is mended and said.
 
 ## 1.6.0 · 2026-10-11
