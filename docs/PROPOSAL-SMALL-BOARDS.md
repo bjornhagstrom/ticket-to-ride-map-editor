@@ -11,6 +11,10 @@ to the questions at the end.
 - The data of the New York map (stops, routes, tickets) is coming, and the other two after it. They are official maps, so they go into the private reference data like the
   other eight and never into the repository.
 - **Decided by the owner (2026-10-11):** the wagon's gap, margin and width follow the **standard proportions** of the 20 mm wagon scaled to 24 mm (width 10.8, gap 6.6, end margin 18 mm), said in the map's notes; the **ticket cards may be smaller on small boards** (it does not matter for a prototype), so that more fit on a print.
+- **New York and Amsterdam are in the private reference data** (commit `d21f3c8` in `~/Developer/ttr-reference-data`, read from the owner's photos of the boards and the cards on 2026-10-11; London has the same board as Amsterdam and is not entered).
+  Aggregated figures (the maps themselves stay in that repository): New York, 15 stops, 41 lanes (11 of them double), 84 spaces of length 1–4, 15 wagons a player, 2–4 players, 18 tickets (every one worth its shortest path); Amsterdam, 17 stops, 45 lanes (13 double), 89 spaces of length 1–4,
+  16 wagons a player, 2–4 players, 24 tickets (every one worth its shortest path). Route points are 1, 2, 4 and 7 for lengths 1 to 4. New York **stands** (280 × 428 mm), Amsterdam **lies** (428 × 330 mm), as measured; both kept out of the calibration for now. Two rules the editor has no field for, but that a custom
+  stop type and a custom route type can mark: New York's nine tourist attractions (a stop that scores a point if on a player's network) and Amsterdam's merchandise lanes.
 - San Francisco was named before; it is not among the three described, so it is left until the owner says otherwise.
 
 What that makes (a panel upright, 14 or 16.5 cm wide and 21.4 cm tall, two panels across and two down; the board is then taller than wide, which the editor calls **standing**, and the same
@@ -77,6 +81,21 @@ Values read from a file are held to rule 8: numbers that are not numbers, or out
 3. **Analysis.** `fittingLength`, `routeSpacing`, "Room per wagon" and the text of Map balance use `wagonOf(data)` and say the real millimetres. **Map balance for small maps** (the owner's question, answered yes): the figures it works out are mostly ratios and
    need no page of their own, but the *ranges they are set against* (`BALANCE_OFFICIAL`, measured on eight big maps) should not be the ones for a board of 428 mm. A second set, "Against the small official maps", is measured on New York, Amsterdam and London (three maps: thin evidence,
    said on the page), and a map is set against it when its board is small (its long side under 500 mm, which all three are). The wagon-fill measure (what a full table holds against the spaces it can claim) is a ratio too, and gets its own range there. Built after the data of all three is in.
+
+   **What the two maps in the reference data already show** (the editor's own figures, at a table of four, against the ranges of the eight big maps; aggregated):
+
+   | Figure | The eight official maps | New York | Amsterdam |
+   |---|---|---|---|
+   | Wagons a full table holds, of the spaces it can claim | 57–76 % | 71 % | 72 % |
+   | Tickets that no other ticket needs the route of (unused routes' share of tickets) | 7–21 % | 33 % | 19 % |
+   | Ticket traffic on double routes against single ones | 1.3–3.1 × | 2.8 × | 5.4 × |
+   | Average number of routes at a stop | 7.6–10.8 | 9.5 | 9.1 |
+   | Most tickets on one stop | 4–9 | 3 | 5 |
+   | Routes more tickets want than they can carry, at a full table | 8–19 | 6 | 3 |
+
+   So **the ratios that do not depend on the size of the map (the wagon fill, the routes at a stop) already fit the official ranges**, and the numbers that count things on a map of 15–17 stops and 18–24 tickets (the most tickets on one stop, the crowded routes) fall below ranges
+   measured on maps with 30–40 stops, as they must. The two small maps also differ from each other (a third of New York's tickets are unneeded, Amsterdam's traffic on doubles is nearly twice the upper range). That is the argument for **a second set kept as shares, not counts, with the
+   thin evidence said on the page**, and for waiting for London before the ranges are written down.
 4. **Printing.** Board sizes from the profile (428 × 280 mm and 428 × 330 mm). A panel is 214 × 140 (or 214 × 165) mm, so **a sheet per panel at full size is one A4 sheet each**, four in all, on the paper the real panels are; the whole board at full size is four A4 sheets, or two A3. The ticket cards get a second size, **small (50 × 36 mm, four-fifths of 62 × 45)**, as a choice in the print dialog that the browser remembers (not stored in the map, so no file change): standard 62 × 45 for the standard boards and small for the small ones to begin with, so that more cards fit on a sheet.
 5. **Settings.** The presets and the advanced fields, and the welcome guide's mention of the choices.
 6. **The three maps as reference data.** Converted as the other eight were (private, never committed), run through the calibration, their figures set beside the official ones; whether they become official maps in `BALANCE_OFFICIAL` (and how the ranges are kept for big and small maps) is decided with the figures in front of us.
@@ -93,7 +112,7 @@ Values read from a file are held to rule 8: numbers that are not numbers, or out
 
 ## Questions for the owner (the open ones; the answered are in the first part)
 
-1. **Confirm the board**: a panel is 14 (or 16.5) cm wide and 21.4 cm tall, and the board is 2 panels across and 2 down, so **28 × 42.8 cm** for New York and **33 × 42.8 cm** for Amsterdam and London (standing; the same boards lying are 42.8 × 28 and 42.8 × 33 cm)? And do the boards stand (taller than wide) when played, so that the presets should set the map to standing?
+1. **Confirm the board**: a panel is 14 (or 16.5) cm wide and 21.4 cm tall, and the board is 2 panels across and 2 down, so **28 × 42.8 cm** for New York and **33 × 42.8 cm** for Amsterdam and London. *(Answered by the reference data: New York stands, 280 × 428 mm; Amsterdam lies, 428 × 330 mm; London is the same as Amsterdam. The presets set the map to standing for New York and lying for the other two. Still to confirm by the owner: that the lying panel of Amsterdam and London is 214 wide and 165 tall, as the board's 428 × 330 mm says.)*
 2. **Stops and names**: how big is a **stop circle** (its diameter, in mm), and how tall are the **capital letters of a city's name** as printed on the board (in mm)? One measurement of each is enough; the three boards are probably alike. (By "name lettering" I mean the printed city names, not the letter you can put on a stop in the editor.)
-3. **The data**: wagons per player, number of players, the numbers of tickets (short and long), the points per route length if they differ from the standard, the rule for double routes by player count, and the board and the cards as photographs or lists (formats in the conversation of 2026-10-11).
+3. **The data** *(New York and Amsterdam are in; London is not entered because its board is the same as Amsterdam's: does it come, or does Amsterdam stand for both?)*: wagons per player, number of players, the numbers of tickets (short and long), the points per route length if they differ from the standard, the rule for double routes by player count, and the board and the cards as photographs or lists (formats in the conversation of 2026-10-11).
 4. **San Francisco**: is it the same kind of board (and does it get a preset), or something else?
