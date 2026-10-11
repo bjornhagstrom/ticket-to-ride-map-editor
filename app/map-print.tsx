@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { useId } from "react";
-import { colorLabelOf, formatOrStandard, pairKeyOf, ticketsInSet, type MapData, type MapFormat } from "./map-data";
+import { colorLabelOf, formatOrStandard, pairKeyOf, ticketsInSet, type MapData } from "./map-data";
 import { boardOf, type Orientation } from "./board";
 import { curvedPath, isCurved, pathFromPoints, pointsFor } from "./map-geometry";
 import { MapArtwork } from "./map-artwork";
@@ -14,7 +14,7 @@ import { RulesText } from "./rules-text";
 import { versionLabel, versionStatus, type VersionStatus } from "./map-version";
 import { BALANCE_OFFICIAL, colourLengthTable, connectionCount, crossings, networkShape } from "./map-analysis";
 import { evaluateTicketDeck } from "./ticket-suggester";
-import { CUT_MARK_GAP_MM, CUT_MARK_REACH_MM, papers, PRINT_CAPTION_MM, PRINT_MARGIN_MM, printChoices, type PrintChoice, printPlan, type PrintPlan, type PrintProfile, sameChoice, splits, cardSize, cardsPerRow } from "./print-plan";
+import { CUT_MARK_GAP_MM, CUT_MARK_REACH_MM, papers, PRINT_CAPTION_MM, PRINT_MARGIN_MM, printChoices, CARD_MM, boardSource, type BoardSource, type PrintChoice, printPlan, type PrintPlan, type PrintProfile, sameChoice, splits, cardSize, cardsPerRow } from "./print-plan";
 
 // Tickets print as cut-out cards on plain paper. The same print-and-cut workflow as the board
 // itself: no bleed, a thin cut line, and nothing that needs colour to be readable. A card lies the way
@@ -41,13 +41,13 @@ function TicketMapSymbol({ data, id }: { data: MapData; id: string }) {
 // The rings round a ticket's two stops, in map units.
 const RING = 30;
 
-export function TicketCards({ data, setId, perRow }: { data: MapData; setId: string; perRow: number }) {
+export function TicketCards({ data, setId, perRow, small = false }: { data: MapData; setId: string; perRow: number; small?: boolean }) {
   const set = data.ticketSets.find((item) => item.id === setId) ?? data.ticketSets[0];
   const stop = (id: string) => data.stops.find((item) => item.id === id);
   const name = (id: string) => stop(id)?.name ?? "—";
   const tickets = ticketsInSet(data, set?.id ?? "");
   const board = boardOf(data);
-  const card = cardSize(data.format, board.orientation);
+  const card = cardSize(data, board.orientation, small);
   const { width, height } = board;
   const symbolId = `ticket-map-${useId().replace(/:/g, "")}`;
   // One continuous run of cards rather than sheets of a fixed height. Any arithmetic that assumes
@@ -109,7 +109,7 @@ export function printTitle(data: Pick<MapData, "name" | "mapVersion">, parts: Pr
 // The width of the frame round a printed sheet, in mm; editor-additions.css draws it at this width.
 const FRAME_LINE_MM = 0.3;
 
-export function PrintPages({ data, plan, parts, setId }: { data: MapData; plan: PrintPlan; parts: PrintParts; setId: string }) {
+export function PrintPages({ data, plan, parts, setId, smallCards = false }: { data: MapData; plan: PrintPlan; parts: PrintParts; setId: string; smallCards?: boolean }) {
   const format = boardOf(data);
   const full = plan.choice.split === "full";
   // "Version 8 · 4 Oct 2026" on every sheet: the run has its number by the time it prints.
@@ -159,7 +159,7 @@ export function PrintPages({ data, plan, parts, setId }: { data: MapData; plan: 
     })}
     {/* The rules, if asked for, on pages of their own after the board: as many as the text needs,
         flowing in the same page box as the board's pages. */}
-    {parts.tickets && <TicketCards data={data} setId={setId} perRow={cardsPerRow(plan.pageMm, cardSize(data.format, format.orientation))} />}
+    {parts.tickets && <TicketCards data={data} setId={setId} small={smallCards} perRow={cardsPerRow(plan.pageMm, cardSize(data, format.orientation, smallCards))} />}
     {parts.balance && <PrintBalance data={data} setId={setId} />}
     {parts.rules && data.rules?.trim() && <section className="print-rules">
       <p className="print-rules-name">{data.name} · rules{data.mapVersion ? ` · version ${data.mapVersion.number}` : ""}</p>
@@ -202,12 +202,14 @@ function PrintBalance({ data, setId }: { data: MapData; setId: string }) {
 
 // Printing is decided per run. Nothing chosen here is written to the map; the last choice is kept
 // in this browser only, for convenience.
-export function PrintDialog({ open, onOpenChange, format, orientation = "landscape", profile, choice, onChoice, parts, onPrint, version }: {
+export function PrintDialog({ open, onOpenChange, format, orientation = "landscape", profile, choice, onChoice, parts, onPrint, version, cards }: {
   version: VersionStatus;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  format: MapFormat;
+  format: BoardSource;
   orientation?: Orientation;
+  /** The size of the ticket cards: small (50 × 36 mm) or the standard 62 × 45 mm. */
+  cards: { small: boolean; onChange: (small: boolean) => void };
   profile: PrintProfile;
   choice: PrintChoice;
   onChoice: (choice: PrintChoice) => void;
@@ -229,7 +231,7 @@ export function PrintDialog({ open, onOpenChange, format, orientation = "landsca
     <DialogContent className="print-dialog">
       <DialogHeader>
         <DialogTitle>Print the map</DialogTitle>
-        <DialogDescription>How this print run comes out. None of it changes the map: the board stays a {boardOf({ format, orientation }).label}.</DialogDescription>
+        <DialogDescription>How this print run comes out. None of it changes the map: the board stays a {boardOf({ ...boardSource(format), orientation }).label}.</DialogDescription>
       </DialogHeader>
       <div className="print-choices">
         <fieldset><legend>What to print</legend>
@@ -248,6 +250,10 @@ export function PrintDialog({ open, onOpenChange, format, orientation = "landsca
               checked={parts.value.tickets} onChange={(event) => parts.onChange({ ...parts.value, tickets: event.target.checked })} />
             <span><strong>The tickets</strong><small id="print-tickets-note">{parts.ticketCount === 0 ? "This deck has no tickets yet." : `${parts.deckLabel}, ${parts.ticketCount} ticket${parts.ticketCount === 1 ? "" : "s"}, as cut-out cards.`}</small></span>
           </label>
+          {parts.value.tickets && parts.ticketCount > 0 && !onePage && <fieldset className="print-cards" aria-label="Size of the ticket cards">
+            <label className="print-option print-option-sub"><input type="radio" name="print-cards" checked={!cards.small} onChange={() => cards.onChange(false)} /><span><strong>Standard cards</strong><small>{CARD_MM.standard.width} × {CARD_MM.standard.height} mm</small></span></label>
+            <label className="print-option print-option-sub"><input type="radio" name="print-cards" checked={cards.small} onChange={() => cards.onChange(true)} /><span><strong>Small cards</strong><small>{CARD_MM.small.width} × {CARD_MM.small.height} mm: more on a sheet, for a prototype</small></span></label>
+          </fieldset>}
           <label className="print-option">
             <input type="checkbox" name="print-rules" aria-label="Print the rules" aria-describedby="print-rules-note" disabled={!parts.rulesWritten || onePage}
               checked={parts.value.rules} onChange={(event) => parts.onChange({ ...parts.value, rules: event.target.checked })} />

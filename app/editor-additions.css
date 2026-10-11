@@ -555,3 +555,10 @@
   .phone-dot { position: absolute; top: 6px; right: 14px; width: 9px; height: 9px; border-radius: 50%; background: #721c24; box-shadow: 0 0 0 2px #faf6ef; }
 }
 .tools-panel:focus, .properties:focus { outline: none; }
+
+/* Real sizes in the custom board dialog, and the choice of the ticket cards' size in the print dialog. */
+.custom-board-real { margin-top: 4px; }
+.custom-board-real summary { cursor: pointer; font-size: 13px; font-weight: 600; padding: 4px 0; }
+.custom-board-real .custom-board-fields { grid-template-columns: 1fr 1fr; margin-top: 6px; }
+.print-cards { border: 0; margin: 0 0 0 26px; padding: 0; display: grid; gap: 2px; }
+.print-option-sub strong { font-weight: 600; }

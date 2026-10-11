@@ -465,7 +465,7 @@ const sectionStart = (n) => {
   // Settings holds the board's shape and nothing else: paper and splitting are print choices.
   const formatOptions = await page.locator('#settings-format input[type="radio"]').evaluateAll((els) => els.map((el) => el.value));
   check("the board format is a choice of radio buttons, each named by its board", (await page.getByRole("radio", { name: /Standard board 2×3/ }).count()) === 1 && (await page.getByRole("radio", { name: /Extended board 2×4/ }).count()) === 1);
-  check("Settings offers only the two board shapes", JSON.stringify(formatOptions) === JSON.stringify(["board-2x3", "board-2x4"]), formatOptions.join(", "));
+  check("Settings offers the two boards it began with and the two small ones (the custom size is a button)", JSON.stringify(formatOptions) === JSON.stringify(["board-2x3", "board-2x4", "small-new-york", "small-amsterdam"]), formatOptions.join(", "));
   check("and no longer asks which board a test sheet stands in for", (await page.locator("#settings-proof").count()) === 0);
   await page.locator('#settings-format input[value="board-2x4"]').check();
   await page.waitForTimeout(500);
@@ -4593,7 +4593,7 @@ const sectionStart = (n) => {
     const stored = () => cb.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")));
     const before = await stored();
     await cb.getByRole("button", { name: "Settings" }).click(); await cb.waitForTimeout(400);
-    check("Settings offers the two boards it had, and one button for another size", (await cb.locator('#settings-format input[type="radio"]').count()) === 2 && (await cb.locator("#settings-custom-board").textContent()).trim() === "Custom size…");
+    check("Settings offers the boards it has, and one button for another size", (await cb.locator('#settings-format input[type="radio"]').count()) === 4 && (await cb.locator("#settings-custom-board").textContent()).trim() === "Custom size…");
     await cb.locator("#settings-custom-board").click(); await cb.waitForTimeout(300);
     check("the button opens a dialog with the panels along each side", (await cb.locator("#custom-board-long").isVisible()) && (await cb.locator("#custom-board-short").isVisible()));
     await cb.locator("#custom-board-long").fill("3"); await cb.locator("#custom-board-short").fill("3"); await cb.waitForTimeout(200);
@@ -4612,13 +4612,13 @@ const sectionStart = (n) => {
     const after = await stored();
     check("Use this size gives the map a 3 × 4 board, in the map as it is saved", after.format === "board-3x4", after.format);
     check("everything on the map keeps x and has its y stretched to the new height", after.stops.every((st, i) => Math.abs(st.x - before.stops[i].x) < 1e-6 && Math.abs(st.y - before.stops[i].y * (Math.round(1100 * 788 / 1053) / Math.round(1100 * 525 / 790))) < 1e-6));
-    check("Settings then shows the custom board, chosen, and the button changes it", (await cb.locator('#settings-format input[value="board-3x4"]').isChecked()) && (await cb.locator("#settings-custom-board").textContent()).trim() === "Change custom size…" && /Custom board 3×4/.test(await cb.locator("#settings-format").textContent()), await cb.locator("#settings-format").textContent());
+    check("Settings then shows the custom board, chosen, and the button changes it", (await cb.locator('#settings-format input[value="custom"]').isChecked()) && (await cb.locator("#settings-custom-board").textContent()).trim() === "Change custom size…" && /Custom board 3×4/.test(await cb.locator("#settings-format").textContent()), await cb.locator("#settings-format").textContent());
     await cb.locator("#settings-custom-board").click(); await cb.waitForTimeout(300);
     check("which opens with the board's own numbers", (await cb.locator("#custom-board-long").inputValue()) === "4" && (await cb.locator("#custom-board-short").inputValue()) === "3");
     await cb.getByRole("button", { name: "Cancel" }).click(); await cb.waitForTimeout(300);
     await cb.locator('#settings-format input[value="board-2x3"]').check(); await cb.waitForTimeout(500);
     const back = await stored();
-    check("choosing the standard board again takes the map back, and the custom board is no longer listed", back.format === "board-2x3" && (await cb.locator('#settings-format input[type="radio"]').count()) === 2 && back.stops.every((st, i) => Math.abs(st.y - before.stops[i].y) < 0.01));
+    check("choosing the standard board again takes the map back, and the custom board is no longer listed", back.format === "board-2x3" && (await cb.locator('#settings-format input[type="radio"]').count()) === 4 && back.stops.every((st, i) => Math.abs(st.y - before.stops[i].y) < 0.01));
     await cb.keyboard.press("Escape"); await cb.waitForTimeout(300);
     // The custom board in the print dialog: twelve panels, a sheet each.
     await cb.getByRole("button", { name: "Settings" }).click(); await cb.waitForTimeout(400);
@@ -5150,6 +5150,91 @@ const sectionStart = (n) => {
     const half = await measure({ ...base72, format: "board-2x2", orientation: "portrait", panelMm: { width: 214, height: 140 } }, 428);
     check("a board of its own size with nothing else given draws a stop 9 mm across, a capital 6 mm high and a wagon of 20 mm, the standard sizes in millimetres", near72(half.stopMm, 9, 0.3) && near72(half.capitalMm, 6, 0.15) && near72(half.wagonMm, 20, 0.3), JSON.stringify(half));
     await sc.context().close();
+  }
+
+  // 73. The small boards in Settings (docs/PROPOSAL-SMALL-BOARDS.md, step 5): New York and Amsterdam (and London) as boards beside Standard and Extended, each
+  // setting the board, its profile and which way it stands as one undoable step; and real sizes (panel, wagon, stop, name, in millimetres) in Custom size.
+  if (wants(73)) {
+  sectionStart(73);
+    const sb = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
+    sb.on("pageerror", (e) => errors.push(String(e)));
+    await sb.goto(BASE, { waitUntil: "networkidle" });
+    await sb.getByRole("button", { name: "Load the example map" }).click();
+    await sb.waitForTimeout(600);
+    const stored73 = () => sb.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")));
+    await sb.getByRole("button", { name: "Settings" }).click(); await sb.waitForTimeout(400);
+    const values = await sb.locator('#settings-format input[type="radio"]').evaluateAll((els) => els.map((el) => el.value));
+    check("Settings lists the standard board, the extended, and the two small boards", JSON.stringify(values) === JSON.stringify(["board-2x3", "board-2x4", "small-new-york", "small-amsterdam"]), values.join(", "));
+    check("the standard board is the one chosen", await sb.locator('#settings-format input[value="board-2x3"]').isChecked());
+    await sb.locator('#settings-format input[value="small-new-york"]').check(); await sb.waitForTimeout(600);
+    const ny = await stored73();
+    check("New York sets the board: 2 × 2 panels of 214 × 140 mm, 24 mm wagons, stops of 18.5 mm, capitals of 5.8 mm, the map standing", ny.format === "board-2x2" && ny.orientation === "portrait" && ny.panelMm.width === 214 && ny.panelMm.height === 140 && ny.wagonMm.length === 24 && ny.stopMm === 18.5 && ny.nameMm === 5.8, JSON.stringify([ny.format, ny.orientation, ny.panelMm, ny.wagonMm, ny.stopMm, ny.nameMm]));
+    check("it is the one chosen, and Orientation says Portrait", (await sb.locator('#settings-format input[value="small-new-york"]').isChecked()) && (await sb.locator('#settings-orientation input[value="portrait"]').isChecked()));
+    check("the picture of the board says 280 × 428 mm", /280 × 428 mm/.test(await sb.locator(".board-preview").textContent()) || /280 × 428 mm/.test(await sb.locator(".board-preview svg").getAttribute("aria-label")));
+    check("what is on the map is on the standing board", ny.stops.every((st) => st.x >= 0 && st.x <= 720 && st.y >= 0 && st.y <= 1100));
+    await sb.locator('#settings-format input[value="small-amsterdam"]').check(); await sb.waitForTimeout(600);
+    const am = await stored73();
+    check("Amsterdam and London: the map lies, panels of 214 × 165 mm, stops of 14 mm, capitals of 4.3 mm", am.format === "board-2x2" && !am.orientation && am.panelMm.height === 165 && am.stopMm === 14 && am.nameMm === 4.3, JSON.stringify([am.format, am.orientation, am.panelMm, am.stopMm, am.nameMm]));
+    check("and the picture says 428 × 330 mm", /428 × 330 mm/.test(await sb.locator(".board-preview svg").getAttribute("aria-label")));
+    await sb.locator('#settings-format input[value="board-2x3"]').check(); await sb.waitForTimeout(600);
+    const back73 = await stored73();
+    check("Standard takes the profile off again", back73.format === "board-2x3" && back73.panelMm === undefined && back73.wagonMm === undefined && back73.stopMm === undefined && back73.nameMm === undefined);
+    await sb.keyboard.press("Escape"); await sb.waitForTimeout(300);
+    await sb.getByRole("button", { name: "Undo" }).click(); await sb.waitForTimeout(500);
+    check("one Undo takes the board back to Amsterdam's, profile and all", (await stored73()).panelMm && (await stored73()).panelMm.height === 165);
+    // Real sizes in Custom size.
+    await sb.getByRole("button", { name: "Settings" }).click(); await sb.waitForTimeout(400);
+    await sb.locator("#settings-custom-board").click(); await sb.waitForTimeout(300);
+    check("Custom size has fields for the real sizes: a panel, a wagon, a stop and the capitals of the names, in millimetres", await sb.locator("#custom-board-panel-long, #custom-board-panel-short, #custom-board-wagon, #custom-board-stop, #custom-board-name").count() === 5);
+    await sb.locator("#custom-board-long").fill("2"); await sb.locator("#custom-board-short").fill("2");
+    await sb.locator("#custom-board-panel-long").fill("200"); await sb.locator("#custom-board-panel-short").fill("300"); await sb.waitForTimeout(200);
+    check("a panel whose short side is longer than its long side is said so, and cannot be used", /short side cannot be longer/i.test(await sb.locator(".custom-board-result").textContent()) && (await sb.locator("#custom-board-apply").isDisabled()));
+    await sb.locator("#custom-board-panel-short").fill("150"); await sb.locator("#custom-board-wagon").fill("100"); await sb.waitForTimeout(200);
+    check("a wagon of 100 mm is said to be out of 5–60 mm", /5 to 60 mm/.test(await sb.locator(".custom-board-result").textContent()) && (await sb.locator("#custom-board-apply").isDisabled()));
+    await sb.locator("#custom-board-wagon").fill("22"); await sb.locator("#custom-board-stop").fill("12"); await sb.waitForTimeout(200);
+    check("it says the size that makes: 2 × 2 panels of 200 × 150 mm is 400 × 300 mm", /400 × 300 mm/.test(await sb.locator(".custom-board-result").textContent()), await sb.locator(".custom-board-result").textContent());
+    await sb.locator("#custom-board-apply").click(); await sb.waitForTimeout(600);
+    const cu = await stored73();
+    check("and applying it gives the map that board and those sizes (the capitals were filled in from Amsterdam's and stay)", cu.format === "board-2x2" && cu.panelMm.width === 200 && cu.panelMm.height === 150 && cu.wagonMm.length === 22 && cu.stopMm === 12 && cu.nameMm === 4.3, JSON.stringify([cu.format, cu.panelMm, cu.wagonMm, cu.stopMm, cu.nameMm]));
+    check("the board is then a custom one in the list, chosen", (await sb.locator('#settings-format input[value="custom"]').count()) === 1 && (await sb.locator('#settings-format input[value="custom"]').isChecked()));
+    await sb.context().close();
+  }
+
+  // 74. Printing a small board (docs/PROPOSAL-SMALL-BOARDS.md, step 4): a sheet per panel is one A4 sheet each, and the ticket cards come in two sizes, standard (62 × 45 mm)
+  // and small (50 × 36 mm), small to begin with on a small board, and what is chosen is remembered in this browser.
+  if (wants(74)) {
+  sectionStart(74);
+    const pp = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
+    pp.on("pageerror", (e) => errors.push(String(e)));
+    await pp.goto(BASE, { waitUntil: "networkidle" });
+    await pp.getByRole("button", { name: "Load the example map" }).click();
+    await pp.waitForTimeout(600);
+    const cardWidth = () => pp.evaluate(() => { const c = document.querySelector(".ticket-card"); return c ? c.style.width : null; });
+    const openPrint = async () => { await pp.getByRole("button", { name: "Print map", exact: true }).click(); await pp.waitForTimeout(500); };
+    const tickets = pp.getByRole("checkbox", { name: "Print the tickets" });
+    await openPrint();
+    if (!(await tickets.isChecked())) await tickets.check();
+    await pp.waitForTimeout(300);
+    check("on the standard board the ticket cards are standard to begin with: 62 × 45 mm", (await pp.getByRole("radio", { name: /Standard cards/ }).isChecked()) && (await cardWidth()) === "62mm", String(await cardWidth()));
+    await pp.getByRole("radio", { name: /Small cards/ }).check(); await pp.waitForTimeout(300);
+    check("choosing small cards makes them 50 mm wide, and it is remembered in this browser", (await cardWidth()) === "50mm" && (await pp.evaluate(() => localStorage.getItem("ttr-print-cards"))) === "small");
+    await pp.getByRole("radio", { name: /Standard cards/ }).check(); await pp.waitForTimeout(300);
+    check("and standard again makes them 62", (await cardWidth()) === "62mm" && (await pp.evaluate(() => localStorage.getItem("ttr-print-cards"))) === "standard");
+    await pp.keyboard.press("Escape"); await pp.waitForTimeout(300);
+    // A small board: small cards unless the person has chosen, one A4 sheet for a panel.
+    await pp.evaluate(() => localStorage.removeItem("ttr-print-cards")); await pp.reload({ waitUntil: "networkidle" }); await pp.waitForTimeout(500);
+    await pp.getByRole("button", { name: "Settings" }).click(); await pp.waitForTimeout(300);
+    await pp.locator('#settings-format input[value="small-new-york"]').check(); await pp.waitForTimeout(500);
+    await pp.keyboard.press("Escape"); await pp.waitForTimeout(300);
+    await openPrint();
+    if (!(await tickets.isChecked())) await tickets.check();
+    await pp.waitForTimeout(300);
+    check("on a small board the ticket cards are small to begin with: 50 × 36 mm", (await pp.getByRole("radio", { name: /Small cards/ }).isChecked()) && (await cardWidth()) === "36mm", String(await cardWidth()));
+    const panelCell = pp.locator('.print-table tbody tr[data-paper="a4"] td:nth-of-type(2) button');
+    check("a sheet per panel is four A4 sheets on the standing New York board", (await panelCell.getAttribute("data-pages")) === "4", String(await panelCell.getAttribute("data-pages")));
+    check("and there is no Anniversary size to offer", (await pp.locator(".print-table thead").textContent()).indexOf("Anniversary") === -1);
+    check("the dialog says the board stays a custom one of the size it is", /Custom board 2×2/.test(await pp.locator(".print-dialog").textContent()), (await pp.locator(".print-dialog").textContent()).slice(0, 160));
+    await pp.context().close();
   }
 
   if (sectionOpen) sectionTimes[sectionOpen.n] = Math.round((Date.now() - sectionOpen.at) / 100) / 10;

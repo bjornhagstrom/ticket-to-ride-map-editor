@@ -173,6 +173,25 @@ check("every cell says what printPlan says", printChoices("board-2x3").table.eve
   check("cards lie on a lying board and stand on a standing one", JSON.stringify(cardSize("board-2x3")) === JSON.stringify({ width: 62, height: 45 }) && JSON.stringify(cardSize("board-2x3", "portrait")) === JSON.stringify({ width: 45, height: 62 }));
 }
 
+// ---------------------------------------------------------------- a board with a profile (docs/PROPOSAL-SMALL-BOARDS.md, step 4)
+{
+  const ny = { format: "board-2x2", panelMm: { width: 214, height: 140 } };
+  const am = { format: "board-2x2", panelMm: { width: 214, height: 165 } };
+  const panels = printPlan(ny, { split: "panel", paper: "a4" }, undefined, "portrait");
+  check("New York standing, a sheet per panel: four A4 sheets, each a panel of 140 × 214 mm at full size", panels.pages.length === 4 && panels.scale === 1 && panels.pages.every((p) => Math.abs(p.contentMm.width - 140) < 0.01 && Math.abs(p.contentMm.height - 214) < 0.01), JSON.stringify([panels.pages.length, panels.scale, panels.pages[0].contentMm]));
+  const amPanels = printPlan(am, { split: "panel", paper: "a4" });
+  check("Amsterdam lying, a sheet per panel: four A4 sheets, each a panel of 214 × 165 mm at full size", amPanels.pages.length === 4 && amPanels.scale === 1 && Math.abs(amPanels.pages[0].contentMm.width - 214) < 0.01 && Math.abs(amPanels.pages[0].contentMm.height - 165) < 0.01, JSON.stringify([amPanels.pages.length, amPanels.scale, amPanels.pages[0].contentMm]));
+  const whole = printPlan(ny, { split: "sheet", paper: "a3" }, undefined, "portrait");
+  check("the whole New York board on one A3 sheet is shrunk a little, and is one page", whole.pages.length === 1 && whole.scale < 1 && whole.scale > 0.5, String(whole.scale));
+  check("the board's size is the profile's: 280 × 428 mm standing, 428 × 330 mm lying", panels.boardMm.width === 280 && panels.boardMm.height === 428 && amPanels.boardMm.width === 428 && amPanels.boardMm.height === 330, JSON.stringify([panels.boardMm, amPanels.boardMm]));
+  const full = printPlan(ny, { split: "full", paper: "a4", size: "standard" }, undefined, "portrait");
+  check("full size on A4 covers 280 × 428 mm with whole sheets at 100 %: between four and nine", full.scale === 1 && full.pages.length >= 4 && full.pages.length <= 9, String(full.pages.length));
+  check("only the standard 2×3 has an Anniversary size: a board with a profile has one size", printChoices(ny).sizes.map((s) => s.id).join() === "standard" && printChoices("board-2x3").sizes.map((s) => s.id).join() === "standard,anniversary");
+  check("a board named as before (a string) is planned as before", printPlan("board-2x3", { split: "panel", paper: "a4" }).pages.length === 6);
+  check("tickets: a card is 62 × 45 mm, or small, 50 × 36 mm, lying on a lying board and standing on a standing one", JSON.stringify(cardSize(am)) === JSON.stringify({ width: 62, height: 45 }) && JSON.stringify(cardSize(am, "landscape", true)) === JSON.stringify({ width: 50, height: 36 }) && JSON.stringify(cardSize(ny, "portrait", true)) === JSON.stringify({ width: 36, height: 50 }) && JSON.stringify(cardSize(ny, "portrait")) === JSON.stringify({ width: 45, height: 62 }));
+  check("the small card is four-fifths of the standard, so more fit on a sheet: an A4 holds 5 across instead of 4", Math.floor((210 - 20) / 36) === 5 && Math.floor((297 - 20) / 50) === 5 && Math.floor((297 - 20) / 62) === 4);
+}
+
 console.log(ok.map((line) => `  ✓ ${line}`).join("\n"));
 if (bad.length) console.log(bad.map((line) => `  ✗ ${line}`).join("\n"));
 console.log(`\n${ok.length} passed, ${bad.length} failed`);

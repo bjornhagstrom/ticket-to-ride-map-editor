@@ -1,4 +1,4 @@
-import { formatOrStandard, type MapFormat } from "./map-data";
+import { boardDefinition, validPanelFor, type MapFormat } from "./map-data";
 import { boardOf, type Orientation } from "./board";
 
 // How a board is cut into printed sheets. The board's shape belongs to the map; everything here is
@@ -29,12 +29,17 @@ export const splits: { id: SplitId; label: string; note: string }[] = [
   { id: "page", label: "One page, real size", note: "The whole board on one page as big as the board: for a large-format printer, or to save as a PDF" },
 ];
 
-/** The real boards a full-size print can add up to. Anniversary exists only for the standard 2×3; every other board has its own size. */
+/** The board a print is of: a format by name (the standard panels), or a map's format with its panel profile. */
+export type BoardSource = MapFormat | { format: MapFormat; panelMm?: unknown };
+export const boardSource = (board: BoardSource): { format: MapFormat; panelMm?: unknown } => (typeof board === "string" ? { format: board } : board);
+
+/** The real boards a full-size print can add up to. Anniversary exists only for the standard 2×3 on its standard panels; every other board has its own size. */
 type BoardSize = { id: SizeId; label: string; widthMm: number; heightMm: number };
-const boardSizes = (format: MapFormat): BoardSize[] => {
-  const board = formatOrStandard(format);
-  const standard: BoardSize = { id: "standard", label: "Standard", widthMm: board.widthMm, heightMm: board.heightMm };
-  return format === "board-2x3" ? [standard, { id: "anniversary", label: "Anniversary", widthMm: 972, heightMm: 648 }] : [standard];
+const boardSizes = (board: BoardSource): BoardSize[] => {
+  const source = boardSource(board);
+  const definition = boardDefinition(source);
+  const standard: BoardSize = { id: "standard", label: "Standard", widthMm: definition.widthMm, heightMm: definition.heightMm };
+  return source.format === "board-2x3" && !validPanelFor(source.format, source.panelMm) ? [standard, { id: "anniversary", label: "Anniversary", widthMm: 972, heightMm: 648 }] : [standard];
 };
 
 /** What no home printer reaches, on every side. */
@@ -105,7 +110,7 @@ const orientations = (paperId: PaperId, profile: PrintProfile, standing = false)
 // Division that does not count a sheet for floating-point dust.
 const sheetsFor = (length: number, room: number) => Math.max(1, Math.ceil(length / room - 1e-9));
 
-export function printChoiceFor(format: MapFormat, choice: PrintChoice): Required<PrintChoice> {
+export function printChoiceFor(format: BoardSource, choice: PrintChoice): Required<PrintChoice> {
   const sizes = boardSizes(format);
   const size = choice.split === "full" && sizes.some((item) => item.id === choice.size) ? choice.size! : "standard";
   const paper = papers.some((item) => item.id === choice.paper) ? choice.paper : "a4";
@@ -113,9 +118,9 @@ export function printChoiceFor(format: MapFormat, choice: PrintChoice): Required
   return { split, paper, size };
 }
 
-export function printPlan(format: MapFormat, raw: PrintChoice, profile: PrintProfile = PRINT_PROFILES.standard, orientation: Orientation = "landscape"): PrintPlan {
+export function printPlan(format: BoardSource, raw: PrintChoice, profile: PrintProfile = PRINT_PROFILES.standard, orientation: Orientation = "landscape"): PrintPlan {
   const choice = printChoiceFor(format, raw);
-  const board = boardOf({ format, orientation });
+  const board = boardOf({ ...boardSource(format), orientation });
   const standing = board.orientation === "portrait";
   const size = boardSizes(format).find((item) => item.id === choice.size)!;
   const boardMm = choice.split === "full" ? (standing ? { width: size.heightMm, height: size.widthMm } : { width: size.widthMm, height: size.heightMm }) : { width: board.widthMm, height: board.heightMm };
@@ -157,7 +162,7 @@ export function printPlan(format: MapFormat, raw: PrintChoice, profile: PrintPro
 
 export type PrintTableCell = { choice: Required<PrintChoice>; label: string; pages: number; scale: number };
 /** Every way this board can be printed: the sizes on offer, and a row per paper to compare them by. */
-export function printChoices(format: MapFormat, profile: PrintProfile = PRINT_PROFILES.standard, orientation: Orientation = "landscape") {
+export function printChoices(format: BoardSource, profile: PrintProfile = PRINT_PROFILES.standard, orientation: Orientation = "landscape") {
   const sizes = boardSizes(format);
   const columns: { label: string; choice: (paper: PaperId) => PrintChoice }[] = [
     { label: "One sheet", choice: (paper) => ({ split: "sheet", paper }) },
@@ -176,11 +181,14 @@ export function printChoices(format: MapFormat, profile: PrintProfile = PRINT_PR
 
 export const sameChoice = (a: PrintChoice, b: PrintChoice) => a.split === b.split && a.paper === b.paper && (a.split !== "full" || (a.size ?? "standard") === (b.size ?? "standard"));
 
-/** Cut-out ticket cards, 62 x 45 mm, lying the way the board lies: a landscape board gives landscape
- *  cards, a portrait one upright cards. As many to a row, and as many rows, as the page holds. */
-export function cardSize(format: MapFormat, orientation: Orientation = "landscape"): { width: number; height: number } {
-  const board = boardOf({ format, orientation });
-  return board.width >= board.height ? { width: 62, height: 45 } : { width: 45, height: 62 };
+/** Cut-out ticket cards, 62 x 45 mm (or small, 50 x 36 mm: four-fifths, so that more fit on a sheet), lying the way the board lies: a landscape board gives
+ *  landscape cards, a portrait one upright cards. As many to a row, and as many rows, as the page holds. */
+export const CARD_MM = { standard: { width: 62, height: 45 }, small: { width: 50, height: 36 } } as const;
+export type CardSizeChoice = keyof typeof CARD_MM;
+export function cardSize(format: BoardSource, orientation: Orientation = "landscape", small = false): { width: number; height: number } {
+  const board = boardOf({ ...boardSource(format), orientation });
+  const card = small ? CARD_MM.small : CARD_MM.standard;
+  return board.width >= board.height ? { width: card.width, height: card.height } : { width: card.height, height: card.width };
 }
 export function cardsPerRow(pageMm: { width: number; height: number }, card: { width: number; height: number }): number {
   return Math.max(1, Math.floor((pageMm.width - 2 * PRINT_MARGIN_MM) / card.width));

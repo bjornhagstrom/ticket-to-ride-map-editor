@@ -7,9 +7,9 @@ import type { MapData } from "./map-data";
 
 const LONG = 120, CARD_LONG = 30, GAP = 10, TEXT = 14, PAD = 1.5;
 
-export function BoardPreview({ data }: { data: Pick<MapData, "format" | "orientation"> }) {
+export function BoardPreview({ data }: { data: Pick<MapData, "format" | "orientation" | "panelMm"> }) {
   const board = boardOf(data);
-  const card = cardSize(board.format, board.orientation);
+  const card = cardSize(data, board.orientation);
   const scale = LONG / Math.max(board.widthMm, board.heightMm);
   const w = board.widthMm * scale, h = board.heightMm * scale;
   const cardScale = CARD_LONG / Math.max(card.width, card.height);

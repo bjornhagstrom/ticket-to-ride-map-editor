@@ -34,8 +34,8 @@ import { boardOf, type Orientation } from "./board";
 import { distancesCsv, routesCsv, stopsCsv, templatesZip, ticketsCsv } from "./csv-export";
 import { decodeCsvBytes, readCsvImport, type CsvImport } from "./csv-import";
 import { planRebind, applyRebind, stopKeyOf, type RebindGroup } from "./ticket-rebind";
-import { APP_VERSION, moveLegacyStorage, repairMap, cloneForHistory, cloneMap, formatTimestamp, GUIDE_SEEN_KEY, HISTORY_LIMIT, MAX_IMAGE_WARN_BYTES, normalizeBackgroundFile, normalizeNetworkFile, normalizeTicketFile, buildTicketFile, readMapFile, writeMapFile, mapPayload, networkPayload, readBackgroundImage, rescaleMapToFormat, MAP_HINT_KEY, MAP_HINT_X_KEY } from "./map-storage";
-import { boardDefinition, wagonOf, tensionOf, problemMap, colorLabels, defaultTicketSet, DEFAULT_PLAYERS, DEFAULT_WAGONS_PER_PLAYER, IMAGE_KEEP_ON_BOARD, type Ticket, type StopTypeStyle, type WagonStyle, ticketsInSet, type TicketSet, emptyMap, initialMap, type LineStyle, DEFAULT_END_GAP_MM, type BackgroundImage, type BackgroundShape, type BackgroundType, type MapData, type MapFormat, type Point, type Route, type RouteType, type RouteTypeStyle, routeColors, STORAGE_KEY, type Stop, type StopSize, stopSizeMeta, type StopSymbol, stopSymbolMeta, type StopType } from "./map-data";
+import { APP_VERSION, applyBoard, applyBoardPreset, type BoardChoice, moveLegacyStorage, repairMap, cloneForHistory, cloneMap, formatTimestamp, GUIDE_SEEN_KEY, HISTORY_LIMIT, MAX_IMAGE_WARN_BYTES, normalizeBackgroundFile, normalizeNetworkFile, normalizeTicketFile, buildTicketFile, readMapFile, writeMapFile, mapPayload, networkPayload, readBackgroundImage, MAP_HINT_KEY, MAP_HINT_X_KEY } from "./map-storage";
+import { boardDefinition, hasPanelProfile, wagonOf, tensionOf, problemMap, colorLabels, defaultTicketSet, DEFAULT_PLAYERS, DEFAULT_WAGONS_PER_PLAYER, IMAGE_KEEP_ON_BOARD, type Ticket, type StopTypeStyle, type WagonStyle, ticketsInSet, type TicketSet, emptyMap, initialMap, type LineStyle, DEFAULT_END_GAP_MM, type BackgroundImage, type BackgroundShape, type BackgroundType, type MapData, type Point, type Route, type RouteType, type RouteTypeStyle, routeColors, STORAGE_KEY, type Stop, type StopSize, stopSizeMeta, type StopSymbol, stopSymbolMeta, type StopType } from "./map-data";
 
 type MeasureResult = { from: string; to: string; distance: number; routeIds: string[] } | { from: string; to: string; unreachable: true };
 type Danger = "reset" | "delete" | "load-blank" | "load-example" | "load-problems" | "import-background" | "import-network" | "import-image" | "import-csv" | null;
@@ -658,6 +658,11 @@ export function MapEditor() {
   }; });
   // Ticket cards print on their own paper, so the print tree swaps to them, prints, and swaps back.
   useEffect(() => { queueMicrotask(() => { try { const stored = localStorage.getItem(PRINT_CHOICE_KEY); if (stored) setPrintChoice(JSON.parse(stored)); } catch { /* keep the default */ } }); }, []);
+  // The ticket cards: small (50 × 36 mm) or standard, remembered in this browser; until chosen a board with a profile (a small board) prints small cards.
+  const [cardsChoice, setCardsChoice] = useState<"small" | "standard" | null>(null);
+  useEffect(() => { queueMicrotask(() => { try { const stored = localStorage.getItem("ttr-print-cards"); if (stored === "small" || stored === "standard") setCardsChoice(stored); } catch { /* the automatic choice stands */ } }); }, []);
+  const smallCards = cardsChoice ? cardsChoice === "small" : hasPanelProfile(data);
+  const chooseCards = (small: boolean) => { const next = small ? "small" : "standard"; setCardsChoice(next); try { localStorage.setItem("ttr-print-cards", next); } catch { /* not remembered, still used */ } };
   const choosePrint = (choice: PrintChoice) => { setPrintChoice(choice); try { localStorage.setItem(PRINT_CHOICE_KEY, JSON.stringify(choice)); } catch { /* not remembered, still used */ } };
   // The dialog closes first, and print() waits until it has finished animating out and the page is no
   // longer locked for scrolling. Safari lays out its first preview the moment print() is called: with
@@ -1120,14 +1125,9 @@ export function MapEditor() {
     if (turned.moved) toast.success(`Turned the board, and moved ${turned.moved} name${turned.moved === 1 ? "" : "s"} clear of the routes.`);
     if (turned.unresolved.length) toast.warning(`${turned.unresolved.length} name${turned.unresolved.length === 1 ? " is" : "s are"} still on a route after the turn: ${turned.unresolved.map((id) => stopById(data, id)?.name).filter(Boolean).slice(0, 4).join(", ")}${turned.unresolved.length > 4 ? ` and ${turned.unresolved.length - 4} more` : ""}. Use Move names clear, or move the stop or bend the route.`);
   };
-  const changeFormat = (nextFormat: MapFormat) => {
-    if (nextFormat === data.format) return;
-    change((draft) => {
-      return rescaleMapToFormat(draft, nextFormat);
-    });
-    setDraftPoints([]);
-    clearSelection();
-  };
+  // A board from the list in Settings, or the odd one from Custom size: one step, and what is on the map moves with it.
+  const choosePreset = (id: string) => { change((draft) => applyBoardPreset(draft, id)); setDraftPoints([]); clearSelection(); };
+  const applyBoardChoice = (choice: BoardChoice) => { change((draft) => applyBoard(draft, choice)); setDraftPoints([]); clearSelection(); };
 
   // Help on hover waits a moment, and each one waits afresh: the pointer passing over the tools on its
   // way somewhere opens nothing, and resting on one opens its help.
@@ -1281,8 +1281,8 @@ export function MapEditor() {
       busy={suggestBusy} deckName={suggestName} onDeckName={setSuggestName} currentDeck={activeTicketSet.label}
       onShuffle={() => setSuggestSeed((seed) => seed + 1)} onApply={(mode) => applySuggestion(mode, `ts-${Date.now()}`)} />
     <WelcomeGuide open={showGuide} onOpenChange={(open) => !open && dismissGuide()} onChooseBlank={() => chooseFromGuide("blank")} onChooseExample={() => chooseFromGuide("example")} onChooseProblems={() => chooseFromGuide("problems")} />
-    <SettingsDialog onStartOver={() => { setShowStyles(false); setDanger("reset"); }} onExport={exportMap} open={showStyles} onOpenChange={setShowStyles} target={styleTarget} onTarget={setStyleTarget} data={data} change={change} onChangeFormat={changeFormat} onChangeOrientation={changeOrientation} exportReminder={{ on: !reminder.off, onChange: (on) => setReminder((r) => (on ? turnOn(r) : stopReminding(r))) }} defaults={{ stopType, setStopType, stopSize, setStopSize: (value) => setStopSize(value as StopSize), routeType, setRouteType, routeColor, setRouteColor, routeCurved, setRouteCurved, routeLineStyle, setRouteLineStyle, linkParallel, setLinkParallel }} />
-    <PrintPages data={data} plan={printPlan(data.format, (printScope !== "map" || !printParts.board) && printChoice.split === "page" ? { ...printChoice, split: "panel" } : printChoice, printProfile, format.orientation)} parts={runParts} setId={activeTicketSet.id} />
+    <SettingsDialog onStartOver={() => { setShowStyles(false); setDanger("reset"); }} onExport={exportMap} open={showStyles} onOpenChange={setShowStyles} target={styleTarget} onTarget={setStyleTarget} data={data} change={change} onChoosePreset={choosePreset} onApplyBoard={applyBoardChoice} onChangeOrientation={changeOrientation} exportReminder={{ on: !reminder.off, onChange: (on) => setReminder((r) => (on ? turnOn(r) : stopReminding(r))) }} defaults={{ stopType, setStopType, stopSize, setStopSize: (value) => setStopSize(value as StopSize), routeType, setRouteType, routeColor, setRouteColor, routeCurved, setRouteCurved, routeLineStyle, setRouteLineStyle, linkParallel, setLinkParallel }} />
+    <PrintPages data={data} smallCards={smallCards} plan={printPlan(data, (printScope !== "map" || !printParts.board) && printChoice.split === "page" ? { ...printChoice, split: "panel" } : printChoice, printProfile, format.orientation)} parts={runParts} setId={activeTicketSet.id} />
     {makingImage && <ImageStage data={data} onDone={saveImage} onFail={() => setMakingImage(false)} />}
     <ImportSpreadsheetsDialog open={showCsvImport} onOpenChange={setShowCsvImport} guideUrl={`${REPO_URL}/blob/main/docs/CSV.md`}
       onChoose={() => { setShowCsvImport(false); csvFileRef.current?.click(); }} />
@@ -1291,7 +1291,7 @@ export function MapEditor() {
       onApply={() => rebind && applyRebindChoices(rebind.choices)}
       onRemoveAll={() => rebind && applyRebindChoices(new Map(rebind.groups.map((group) => [group.oldId, null])))}
       onUndoImport={() => { setRebind(null); undoRef.current(); }} />
-    <PrintDialog open={showPrint} onOpenChange={setShowPrint} format={data.format} orientation={format.orientation} profile={printProfile} choice={printChoice} onChoice={choosePrint} parts={{ value: printPartsNow, onChange: choosePrintParts, rulesWritten: Boolean(data.rules?.trim()), ticketCount: ticketsHere.length, deckLabel: activeTicketSet.label }} version={versionNow} onPrint={printRun} />
+    <PrintDialog open={showPrint} onOpenChange={setShowPrint} format={data} cards={{ small: smallCards, onChange: chooseCards }} orientation={format.orientation} profile={printProfile} choice={printChoice} onChoice={choosePrint} parts={{ value: printPartsNow, onChange: choosePrintParts, rulesWritten: Boolean(data.rules?.trim()), ticketCount: ticketsHere.length, deckLabel: activeTicketSet.label }} version={versionNow} onPrint={printRun} />
   </main></TooltipProvider>;
 }
 
