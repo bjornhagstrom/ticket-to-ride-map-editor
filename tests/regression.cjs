@@ -4749,8 +4749,12 @@ const sectionStart = (n) => {
     await ph.locator("#phone-properties").tap(); await ph.waitForTimeout(300);
     check("which opens the properties of that stop in a sheet", (await shown(".properties")) && /Name|Stop/i.test(await ph.locator(".properties").textContent()));
     const box = await ph.locator(".map-wrap").boundingBox();
+    // The properties of a stop fill the room up to the header, so the map is under them: the cross shuts it. A sheet that leaves part of the map
+    // in view, the tools, is shut by touching the map.
+    await ph.locator(".properties .phone-sheet-close").tap(); await ph.waitForTimeout(300);
+    await ph.locator("#phone-tools").tap(); await ph.waitForTimeout(300);
     await ph.touchscreen.tap(box.x + 12, box.y + 12); await ph.waitForTimeout(300);
-    check("touching the map shuts the sheet", !(await shown(".properties")));
+    check("touching the map shuts a sheet that leaves some of it in view", !(await shown(".tools-panel")));
     // A panel opened from the tools shows in the sheet of the properties.
     await ph.locator("#phone-tools").tap(); await ph.waitForTimeout(300);
     await ph.locator(".tools-panel").getByRole("button", { name: "Map balance", exact: true }).tap(); await ph.waitForTimeout(700);
@@ -4759,7 +4763,7 @@ const sectionStart = (n) => {
     // Keyboard focus follows the sheets (a keyboard, a switch and a screen reader reach the phone too): into a sheet when it opens,
     // into the opened panel when a button of the tools opens one, back to the bar's button when a sheet shuts after a choice.
     const within = (selector) => ph.evaluate((sel) => { const a = document.activeElement; return Boolean(a && a.closest(sel)); }, selector);
-    await ph.touchscreen.tap(box.x + 12, box.y + 12); await ph.waitForTimeout(300);
+    await ph.locator(".properties .phone-sheet-close").tap(); await ph.waitForTimeout(300);
     await ph.locator("#phone-tools").tap(); await ph.waitForTimeout(300);
     check("opening the tools puts keyboard focus in them, not left on the bar", await within(".tools-panel"));
     await ph.locator(".tools-panel").getByRole("button", { name: "Tickets", exact: true }).focus();
@@ -4983,6 +4987,23 @@ const sectionStart = (n) => {
       check(`${name} is closed by the cross too`, (await px.locator(".properties .panel-heading span", { hasText: new RegExp(`^${heading}$`) }).count()) === 0);
       await px.locator(".properties .phone-sheet-close").tap(); await px.waitForTimeout(300);
     }
+    // A tall sheet takes all the room up to the header, no less: it is where the long panels are read.
+    await px.locator("#phone-tools").tap(); await px.waitForTimeout(300);
+    await px.locator(".tools-panel").getByRole("button", { name: "Map balance", exact: true }).tap(); await px.waitForTimeout(900);
+    const tall = await px.evaluate(() => { const s = document.querySelector(".properties").getBoundingClientRect(), h = document.querySelector(".topbar").getBoundingClientRect(), bar = document.querySelector(".phone-bar").getBoundingClientRect(); return { top: Math.round(s.top), headerBottom: Math.round(h.bottom), bottom: Math.round(s.bottom), barTop: Math.round(bar.top), height: Math.round(s.height) }; });
+    check("a long panel's sheet reaches up to the header (not beyond it, not short of it)", Math.abs(tall.top - tall.headerBottom) <= 2 && Math.abs(tall.bottom - tall.barTop) <= 1, JSON.stringify(tall));
+    check("and that is more than the 64 % of the screen it had", tall.height > 0.64 * 844, `${tall.height} px of 844`);
+    await px.locator(".properties .phone-sheet-close").tap(); await px.waitForTimeout(300);
+    await px.locator("#phone-tools").tap(); await px.waitForTimeout(300);
+    const short = await px.evaluate(() => { const s = document.querySelector(".tools-panel").getBoundingClientRect(), h = document.querySelector(".topbar").getBoundingClientRect(); return { top: Math.round(s.top), headerBottom: Math.round(h.bottom) }; });
+    check("a short sheet is as tall as what is in it, not stretched up to the header", short.top > short.headerBottom + 40, JSON.stringify(short));
+    // The room follows the header: with the menu open nothing moves, and after the screen is turned the sheet still ends at the header.
+    await px.locator(".tools-panel .phone-sheet-close").tap(); await px.waitForTimeout(300);
+    await px.setViewportSize({ width: 667, height: 390 }); await px.waitForTimeout(400);
+    await px.locator("#phone-tools").tap(); await px.waitForTimeout(300);
+    await px.locator(".tools-panel").getByRole("button", { name: "Map balance", exact: true }).tap(); await px.waitForTimeout(800);
+    const turned = await px.evaluate(() => { const s = document.querySelector(".properties").getBoundingClientRect(), h = document.querySelector(".topbar").getBoundingClientRect(); return { top: Math.round(s.top), headerBottom: Math.round(h.bottom) }; });
+    check("turned on its side, the sheet still reaches up to the header and not past it", turned.top >= turned.headerBottom - 2 && turned.top <= turned.headerBottom + 4, JSON.stringify(turned));
     await cx.close();
     // Not on a wide screen.
     const wide2 = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();

@@ -317,6 +317,17 @@ export function MapEditor() {
     document.addEventListener("keydown", escape);
     return () => { document.removeEventListener("pointerdown", outside, true); document.removeEventListener("keydown", escape); };
   }, [menuOpen]);
+  // How far up a sheet may reach on a phone: to the foot of the header, whatever its height is (it changes with the width and the menu).
+  useEffect(() => {
+    const bar = document.querySelector(".topbar");
+    if (!bar) return;
+    const set = () => document.documentElement.style.setProperty("--phone-top", `${bar.getBoundingClientRect().top + window.scrollY + bar.getBoundingClientRect().height}px`);
+    set();
+    const observer = new ResizeObserver(set);
+    observer.observe(bar);
+    window.addEventListener("resize", set);
+    return () => { observer.disconnect(); window.removeEventListener("resize", set); };
+  }, []);
   const [wasStylesOpen, setWasStylesOpen] = useState(showStyles);
   if (showStyles !== wasStylesOpen) { setWasStylesOpen(showStyles); if (showStyles) setPhoneSheet(null); }
   // The suggested route the pointer is on, drawn on the map while it is there.

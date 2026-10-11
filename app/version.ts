@@ -10,6 +10,7 @@ export type Release = { version: string; date: string; title: string; changes: s
 // the top of CHANGELOG.md under Unreleased, and become the notes of the next version when it is
 // decided; the What's new page in the editor shows released versions only.
 export const UNRELEASED: string[] = [
+  "On a phone the tools and the properties sheets take all the room up to the header when they have enough in them, and no more than they need when they have less, also with the phone on its side.",
   "On a phone the header is two rows: the name of the map with Undo, Redo and a menu button, and Help, Import, Print map and Export in the menu, which opens over the map and shuts when you choose, press Escape or touch the map.",
   "On a phone the boxes with facts about the map are a row of their own right under the header, with the saving state, and one button folds the row away, which is remembered.",
   "On a phone each sheet has a cross in its top right corner, in view as the sheet scrolls, which shuts it, and shuts the panel open in it (Map balance, Tickets, Rules, Suggest routes) as Done does.",
