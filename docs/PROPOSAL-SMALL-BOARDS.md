@@ -15,6 +15,9 @@ to the questions at the end.
   Aggregated figures (the maps themselves stay in that repository): New York, 15 stops, 41 lanes (11 of them double), 84 spaces of length 1–4, 15 wagons a player, 2–4 players, 18 tickets (every one worth its shortest path); Amsterdam, 17 stops, 45 lanes (13 double), 89 spaces of length 1–4,
   16 wagons a player, 2–4 players, 24 tickets (every one worth its shortest path). Route points are 1, 2, 4 and 7 for lengths 1 to 4. New York **stands** (280 × 428 mm), Amsterdam **lies** (428 × 330 mm), as measured; both kept out of the calibration for now. Two rules the editor has no field for, but that a custom
   stop type and a custom route type can mark: New York's nine tourist attractions (a stop that scores a point if on a player's network) and Amsterdam's merchandise lanes.
+- **Stop circles, measured in photos on 2026-10-11 (± 1 mm; a diameter):** New York, an ordinary stop (a red ball in a white ring) 12 mm for the ball and **18.5 mm** across the ring (48 map units); a tourist attraction (a copper coin with a "1" in a white ring)
+  15 mm for the coin and 18 mm for the ring; Amsterdam, a stop (a compass rose) 11 mm for the silver disc, **14 mm** for the dark ring round it and 22 mm across the points of the rose. London is not measured, but its board is Amsterdam's. The assumption in the first version of this plan,
+  that a stop is about 4 mm across, was wrong: on the standard board a medium stop is 9 mm across (radius 4.5), and on these boards it is **14–18.5 mm**, which is 3–4 % of the long side against 1.1 % on the standard board. Stops grow more than the wagons do (24 against 20 mm).
 - San Francisco was named before; it is not among the three described, so it is left until the owner says otherwise.
 
 What that makes (a panel upright, 14 or 16.5 cm wide and 21.4 cm tall, two panels across and two down; the board is then taller than wide, which the editor calls **standing**, and the same
@@ -40,14 +43,14 @@ The whole editor measures against one kind of board. Where, in the code (read on
 | A wagon, its gap and the margin at a route's ends | `realWagon` in `app/map-data.ts`, used by `fittingLength`, `routeSpacing` (`app/map-analysis.ts`) and the text of Map balance | 20 × 9 mm, gap 5.5, margin 15 (fitted over the 101 routes of Europe) |
 | How far apart parallel lanes sit | `PARALLEL_SPACING_MM`, `PARALLEL_SPACING_STYLED_MM` (both built from `realWagon.width`) | 11.5 and 14.5 mm |
 | What a map unit is | `W = 1100` units across the long side; `unitMm = board width mm / 1100` | 0.718 mm on the standard board; 0.389 on all three small boards |
-| How big a stop, a name, a stroke is | `stopSizeMeta` and the font sizes and strokes in `app/map-artwork.tsx`: **in map units**, tuned so that on the 790 mm board they are 3 to 6.5 mm | does not follow the board's real size |
+| How big a stop, a name, a stroke is | `stopSizeMeta` and the font sizes and strokes in `app/map-artwork.tsx`: **in map units**, tuned so that on the 790 mm board a stop is 6.5, 9 or 13 mm across (small, medium, large) | does not follow the board's real size |
 | A ticket card | `cardSize` in `app/print-plan.ts` | 62 × 45 mm |
 | The ranges Map balance sets a map against | `BALANCE_OFFICIAL` | measured on eight big official maps |
 
 On a 428 × 280 mm board (or 428 × 330) with 24 mm wagons the assumptions that matter break, in two different ways:
 
 1. **Wagons are in millimetres, stops and names are in map units.** On the standard board they happen to agree (a medium stop has a radius of 6.3 units = 4.5 mm). Here a map unit is 0.389 mm, so the same
-   6.3 units would be a stop with a radius of 2.5 mm instead of 4.5, next to a wagon 24 mm long (62 units instead of 28). Names and strokes shrink the same way. Everything that has a physical size has to be in
+   6.3 units would be a stop 5 mm across, where the real ones are **14 to 18.5 mm** across (36 to 48 units), next to a wagon 24 mm long (62 units instead of 28). Names and strokes shrink the same way. Everything that has a physical size has to be in
    millimetres and be turned into units with the board's own `unitMm`: this is the largest step of the work and the one that must not change how the standard boards look.
 2. **A panel is not a standard panel, and the wagon is bigger against the board**, so the numbers in Map balance that depend on room per wagon mean something else, and the official ranges (from the big maps) may not fit a small
    map. Which ranges to show for the three small maps waits for their data (below).
@@ -59,16 +62,17 @@ On a 428 × 280 mm board (or 428 × 330) with 24 mm wagons the assumptions that 
 ```
 panelMm: { width: 214, height: 140 }          // one panel as the board LIES (long side first; a standing board is the lying one turned); absent = 263.3 × 262.5
 wagonMm: { length: 24, width: 10.8, gap: 6.6, endMargin: 18 }   // the standard proportions of 20 × 9, gap 5.5, margin 15; absent = 20 × 9, 5.5, 15
+stopMm: 18.5                                  // across a medium stop, its ring included (small and large in the standard ratios 0.72 and 1.44); absent = 9
 ```
 
 - The board is still named by its panels, and **all three small maps are `board-2x2`**: 2 rows of 2 panels. Its size in millimetres is the panels times `panelMm`: for New York 2 × 214 = 428 across and 2 × 140 = 280 down.
   No change to the rule for a board's name is needed (`board-2x2` is already a board; with the standard panel it is 527 × 525 mm, and with the profile 428 × 280). **The profile is kept as the board lies**, because the editor keeps a board lying and
   turns it to stand (the owner's upright 14 × 21.4 cm panel is `panelMm` 214 × 140 with the map's orientation set to standing). Which way each board stands when played is for the owner to say (question 1); it is the map's orientation, not a new field.
-- **Presets** in Settings beside Standard and Extended: "Small, New York" (panel 214 × 140 lying), "Small, Amsterdam and London" (panel 214 × 165 lying); both set the same wagon (24 mm). "Custom size…" gets the panel and wagon
+- **Presets** in Settings beside Standard and Extended: "Small, New York" (panel 214 × 140 lying, stops 18.5 mm, the map standing), "Small, Amsterdam and London" (panel 214 × 165 lying, stops 14 mm, the map lying); both set the same wagon (24 mm). "Custom size…" gets the panel and wagon
   numbers as advanced fields. It is one choice in the board part of Settings, not a new page: small boards will be used rarely.
 - **Rejected:** a new format name per kind of board (`board-ny`: a name for each map, and an older build reads every unknown name as the standard board); a single scale factor (these panels are not standard panels made smaller or larger).
 
-**Files.** Both fields are additions within versions 3 and 4, so the file version does not move. A build before the change keeps unknown fields (rule 3), but it reads `board-2x2` as the board of two standard panels (527 × 525 mm) and draws the map on that:
+**Files.** All three fields are additions within versions 3 and 4, so the file version does not move. A build before the change keeps unknown fields (rule 3), but it reads `board-2x2` as the board of two standard panels (527 × 525 mm) and draws the map on that:
 the positions as they were, on a board of another shape; from 1.3.0 it says that the file is from a newer editor (rule 7). `docs/FILE-FORMAT.md` gets the fields and what an older build does, as for the boards in 1.4.0 and the lane rule in 1.5.0.
 Values read from a file are held to rule 8: numbers that are not numbers, or outside 40–1500 mm, are mended; the hostile-maps test covers them. **This needs the owner's OK before it is built** (AGENTS.md: a change to what files carry).
 
@@ -104,8 +108,8 @@ Values read from a file are held to rule 8: numbers that are not numbers, or out
 ## What a test of it must show
 
 - The standard boards draw as before (the golden test in step 2).
-- On a 428 × 280 board with 24 mm wagons: a route of 3 spaces is drawn long enough for three wagons and its margin, and `fittingLength` and `routeSpacing` agree with the drawing; a stop is about 4.5 mm across and a name about 2.5 mm high **in millimetres**,
-  whatever the zoom, on New York and on Amsterdam alike.
+- On a 428 × 280 board with 24 mm wagons: a route of 3 spaces is drawn long enough for three wagons and its margin, and `fittingLength` and `routeSpacing` agree with the drawing; a medium stop is 18.5 mm across on the New York profile and 14 mm on the Amsterdam one, and a name has the height the profile says, **in millimetres**,
+  whatever the zoom.
 - The printed board is 428 × 280 mm (or 428 × 330) at full size (measured in the print plan), and a stop is the same size on paper as on the board.
 - An older build (1.7.0 and before) opens the file, keeps the profile through a round trip, and says that the file is from a newer editor (compiled from the commits, as in `tests/lane-rule.cjs`).
 - The hostile-maps test sets every odd value in `panelMm` and `wagonMm` without a throw.
@@ -113,6 +117,6 @@ Values read from a file are held to rule 8: numbers that are not numbers, or out
 ## Questions for the owner (the open ones; the answered are in the first part)
 
 1. **Confirm the board**: a panel is 14 (or 16.5) cm wide and 21.4 cm tall, and the board is 2 panels across and 2 down, so **28 × 42.8 cm** for New York and **33 × 42.8 cm** for Amsterdam and London. *(Answered by the reference data: New York stands, 280 × 428 mm; Amsterdam lies, 428 × 330 mm; London is the same as Amsterdam. The presets set the map to standing for New York and lying for the other two. Still to confirm by the owner: that the lying panel of Amsterdam and London is 214 wide and 165 tall, as the board's 428 × 330 mm says.)*
-2. **Stops and names**: how big is a **stop circle** (its diameter, in mm), and how tall are the **capital letters of a city's name** as printed on the board (in mm)? One measurement of each is enough; the three boards are probably alike. (By "name lettering" I mean the printed city names, not the letter you can put on a stop in the editor.)
+2. **Names**: how tall are the **capital letters of a city's name** as printed on the board (in mm), on New York and on Amsterdam? (The stop circles are measured, above.) By "name lettering" I mean the printed city names, not the letter you can put on a stop in the editor.
 3. **The data** *(New York and Amsterdam are in; London is not entered because its board is the same as Amsterdam's: does it come, or does Amsterdam stand for both?)*: wagons per player, number of players, the numbers of tickets (short and long), the points per route length if they differ from the standard, the rule for double routes by player count, and the board and the cards as photographs or lists (formats in the conversation of 2026-10-11).
 4. **San Francisco**: is it the same kind of board (and does it get a preset), or something else?
