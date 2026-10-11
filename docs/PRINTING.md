@@ -229,6 +229,13 @@ them. So the layout is made to fit with them on.
 - **The percentage is explained where it is shown.** The note under "Sheets for every choice" says
   that 100 % is real size and 50 % is half as wide and half as tall.
 
+## Small boards
+
+A map with a board profile (`panelMm`, docs/FILE-FORMAT.md) prints on its own measurements: the panels are 214 x 140 mm (New York) or 214 x 165 mm
+(Amsterdam), so a sheet per panel is one A4 sheet each, four for the board, and no Anniversary size is offered (it is for the standard board).
+The ticket cards come in two sizes, standard 62 x 45 mm and small 50 x 36 mm; small is the start on a board with a profile, and the choice is kept in this
+browser (`ttr-print-cards`). `tests/print-plan.cjs` counts the sheets, regression section 74 drives the dialog.
+
 ## Old maps
 
 Maps saved on a format that is now a print choice — test sheets, boards measured in sheets of paper,

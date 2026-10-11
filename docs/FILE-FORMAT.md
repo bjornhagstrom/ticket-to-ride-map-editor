@@ -264,6 +264,28 @@ until its page is reloaded. 1.5.0 reads it back, so a map kept in the browser ho
 none is in the wild; a file that does carry it is kept as an unknown field (and, from 1.5.0, through a reload of the map kept in the browser). 1.3.0 and 1.4.0, which have the editor-version note (rule 7),
 say that a file from a newer editor opens with that note; earlier builds say nothing, and read the map with the standard rule.
 
+### The board profile (small boards)
+
+Added with the small boards, within versions 3 and 4: additions, so the file version did not move. A map may carry four optional fields that say how big
+its board and the things on it really are, so that a small board (New York, Amsterdam, London) can be drawn to scale. All are in millimetres.
+
+- `panelMm` `{ width, height }`: one panel as the board **lies**, long side first, each 40 to 1500 mm. The board is the panels of its format times
+  this; it must come out wider than tall (a standing board is `orientation: "portrait"`, as before). Absent: the standard panels of the format.
+- `wagonMm` `{ length [, width, gap, endMargin] }`: length 5 to 60, width 2 to 30, gap 0 to 30, end margin 0 to 60. A part left out follows the standard
+  proportions of the 20 mm wagon (width 9, gap 5.5, margin 15, scaled to the length).
+- `stopMm`: across a medium stop, ring included, 3 to 40; small and large follow in the standard ratios. Absent: 9.
+- `nameMm`: the height of a capital letter in a stop's name, 1.5 to 20; the type is that over 0.7. Absent: 6.
+
+A field outside its limits is left out when the file is read (the reader says so), and a profile on a board of the editor's own measured sizes
+(2 x 3, 2 x 4) is used all the same: the profile wins. Choosing Standard or Extended in Settings, or any other format, takes the profile off.
+Without a profile every board is drawn exactly as before (`tests/golden-drawing.json` pins six maps).
+
+Older builds keep the four fields as unknown names under rule 3, so a small map passes through them and comes out with its profile; they draw it on
+standard panels. From 1.3.0 they say a newer editor wrote the file (rule 7). `tests/board-profile.cjs` reads files through the compiled 0.4.1 and 1.6.0 builds.
+
+A board preset also brings **a game**: Settings sets `wagonsPerPlayer` and `players` (New York 15 and 2 to 4, Amsterdam 16 and 2 to 4) when the person has not
+chosen them; no new field, those two were always in the file.
+
 ### Board formats that became print choices
 
 Within version 3, `format` narrowed to the board's shape: `board-2x3` or `board-2x4`. Test sheets,

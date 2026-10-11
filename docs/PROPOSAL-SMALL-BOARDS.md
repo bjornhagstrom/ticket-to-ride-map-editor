@@ -1,6 +1,6 @@
 # Proposal: small boards (New York, Amsterdam and London)
 
-Status: **plan**, 2026-10-11, updated the same evening with the owner's second and third sets of measurements (all three boards are 2 × 2 panels). Nothing is built. It waits for the owner's data and the answers
+Status: **built**, 2026-10-11 (not released): steps 1 to 5 are on the branch `small-boards`: the profile in the map and the file, drawing in millimetres (the standard boards draw as before), analysis and printing (a sheet per panel, small ticket cards), Settings presets and real sizes, and a game that follows the board with Map balance ranges of its own measured on New York and Amsterdam. Left: London (when its data comes), San Francisco, the Deck builder's targets for small maps. What follows is the plan as it was.
 to the questions at the end.
 
 ## What the owner has given so far
