@@ -12,6 +12,7 @@ export type Release = { version: string; date: string; title: string; changes: s
 export const UNRELEASED: string[] = [
   "Small boards: Settings offers New York (standing, 280 by 428 mm), Amsterdam and London (lying, 428 by 330 mm) as boards, with wagons, stops and names drawn at the size they are on the real board, and the map you have moves to the new board.",
   "Custom size has a part called Real sizes, where you give the size of a panel, a wagon, a stop and the capitals of the names in millimetres, for a small board of your own.",
+  "In the print table a small board has no Full size column: a panel fits a sheet at full size, so it is the same four sheets as Per panel and is shown once.",
   "Printing a small board takes one A4 sheet for each panel, and the ticket cards can be small (50 by 36 mm) so that more of them fit on a sheet; small is the start on a small board, and your choice is remembered.",
   "Choosing New York or Amsterdam also sets 15 or 16 wagons a player and two to four players, if you have not chosen those yourself, and a message tells you so; going back to a standard board puts the standard game back in the same way.",
   "On a small board Map balance sets the map against the two small official maps, New York and Amsterdam, instead of the eight large ones, and says that two maps make a narrow range.",

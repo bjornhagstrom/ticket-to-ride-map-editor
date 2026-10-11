@@ -5247,6 +5247,7 @@ const sectionStart = (n) => {
     await pp.waitForTimeout(300);
     check("on a small board the ticket cards are small to begin with: 50 × 36 mm", (await pp.getByRole("radio", { name: /Small cards/ }).isChecked()) && (await cardWidth()) === "36mm", String(await cardWidth()));
     const panelCell = pp.locator('.print-table tbody tr[data-paper="a4"] td:nth-of-type(2) button');
+    check("the table has One sheet and Per panel only: Full size would be the same four sheets", (await pp.locator(".print-table thead th").allTextContents()).join("|") === "Paper|One sheet|Per panel", (await pp.locator(".print-table thead th").allTextContents()).join("|"));
     check("a sheet per panel is four A4 sheets on the standing New York board", (await panelCell.getAttribute("data-pages")) === "4", String(await panelCell.getAttribute("data-pages")));
     // The sheets are in the page though out of sight: a wagon of the printed board is 24 mm of the board's 428 (found in review: it printed at 19.5 on a small board).
     await pp.keyboard.press("Escape"); await pp.waitForTimeout(300);

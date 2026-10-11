@@ -192,6 +192,15 @@ check("every cell says what printPlan says", printChoices("board-2x3").table.eve
   check("the small card is four-fifths of the standard, so more fit on a sheet: an A4 holds 5 across instead of 4", Math.floor((210 - 20) / 36) === 5 && Math.floor((297 - 20) / 50) === 5 && Math.floor((297 - 20) / 62) === 4);
 }
 
+// Full size and Per panel that come out the same on every paper are one choice: the table keeps the one that says what is cut (found by the owner on 2026-10-11).
+{
+  const ny = printChoices({ format: "board-2x2", panelMm: { width: 214, height: 140 } }, undefined, "portrait");
+  const am = printChoices({ format: "board-2x2", panelMm: { width: 214, height: 165 } });
+  check("on New York and Amsterdam, where Full size is Per panel on every paper, the table has no Full size column", [ny, am].every((t) => t.columns.join() === "One sheet,Per panel" && t.table.every((row) => row.cells.length === 2)), JSON.stringify([ny.columns, am.columns]));
+  check("and a printed choice of full size still plans, as the same sheets", printPlan({ format: "board-2x2", panelMm: { width: 214, height: 140 } }, { split: "full", paper: "a4" }, undefined, "portrait").pages.length === 4);
+  check("the standard and extended boards keep their Full size columns", printChoices("board-2x3").columns.length === 4 && printChoices("board-2x4").columns.includes("Full size"), JSON.stringify([printChoices("board-2x3").columns, printChoices("board-2x4").columns]));
+}
+
 console.log(ok.map((line) => `  ✓ ${line}`).join("\n"));
 if (bad.length) console.log(bad.map((line) => `  ✗ ${line}`).join("\n"));
 console.log(`\n${ok.length} passed, ${bad.length} failed`);

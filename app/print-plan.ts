@@ -169,6 +169,10 @@ export function printChoices(format: BoardSource, profile: PrintProfile = PRINT_
     { label: "Per panel", choice: (paper) => ({ split: "panel", paper }) },
     ...sizes.map((size) => ({ label: sizes.length > 1 ? `Full size, ${size.label}` : "Full size", choice: (paper: PaperId): PrintChoice => ({ split: "full", paper, size: size.id }) })),
   ];
+  // Full size that is Per panel on every paper (the small boards: a panel fits an A4 at 100 %) is the same choice twice; the one that says what is cut stays.
+  const panelAt = columns.findIndex((column) => column.label === "Per panel");
+  const same = (index: number) => papers.every((paper) => { const a = printPlan(format, columns[panelAt].choice(paper.id), profile, orientation), b = printPlan(format, columns[index].choice(paper.id), profile, orientation); return a.pages.length === b.pages.length && a.scale === b.scale; });
+  for (let i = columns.length - 1; i > panelAt; i--) if (same(i)) columns.splice(i, 1);
   const table = papers.map((paper) => ({
     paper,
     cells: columns.map((column): PrintTableCell => {

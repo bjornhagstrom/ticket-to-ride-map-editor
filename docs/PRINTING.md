@@ -234,7 +234,7 @@ them. So the layout is made to fit with them on.
 A map with a board profile (`panelMm`, docs/FILE-FORMAT.md) prints on its own measurements: the panels are 214 x 140 mm (New York) or 214 x 165 mm
 (Amsterdam), so a sheet per panel is one A4 sheet each, four for the board, and no Anniversary size is offered (it is for the standard board).
 The ticket cards come in two sizes, standard 62 x 45 mm and small 50 x 36 mm; small is the start on a board with a profile, and the choice is kept in this
-browser (`ttr-print-cards`). `tests/print-plan.cjs` counts the sheets, regression section 74 drives the dialog.
+browser (`ttr-print-cards`). The table drops a Full size column that gives the same sheets at the same scale as Per panel on every paper, as it does here (4 sheets at 100 %); a saved Full size shows as Per panel. `tests/print-plan.cjs` counts the sheets, regression section 74 drives the dialog.
 
 ## Old maps
 

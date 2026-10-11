@@ -221,7 +221,9 @@ export function PrintDialog({ open, onOpenChange, format, orientation = "landsca
 }) {
   const plan = printPlan(format, choice, profile, orientation);
   const { sizes, columns, table } = printChoices(format, profile, orientation);
-  const current = plan.choice;
+  // A saved Full size that the table no longer offers (it is Per panel here) shows as the Per panel it comes out as.
+  const hasFull = columns.some((label) => label.startsWith("Full size"));
+  const current = plan.choice.split === "full" && !hasFull ? { ...plan.choice, split: "panel" as const } : plan.choice;
   const anniversary = sizes.find((size) => size.id === "anniversary");
   // Without the board in the run, how it is split, its size and its sheet table do not apply.
   const boardIn = parts.value.board;
@@ -302,7 +304,7 @@ export function PrintDialog({ open, onOpenChange, format, orientation = "landsca
         </table>
       </div>
       <dl className="print-split-notes">
-        {splits.filter((split) => split.id !== "page").map((split) => <div key={split.id}><dt>{split.label}</dt><dd>{split.note}</dd></div>)}
+        {splits.filter((split) => split.id !== "page" && (split.id !== "full" || hasFull)).map((split) => <div key={split.id}><dt>{split.label}</dt><dd>{split.note}</dd></div>)}
         {anniversary && <div><dt>Full size, Anniversary</dt><dd>{anniversary.widthMm} × {anniversary.heightMm} mm, bigger wagons too. Always printed full size.</dd></div>}
       </dl></>}
       {!boardIn && <p className="helper print-dialog-foot">Pages print upright (portrait), the default in every browser. The page is the paper less a margin.</p>}
