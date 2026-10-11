@@ -2,7 +2,7 @@
 // files open, board-format rescaling, and image reading.
 import { APP_VERSION } from "./version";
 import { boardOf, rotateMap, turnBetween, turnContents, type Board } from "./board";
-import { W, formatOrStandard, isMapFormat, normalizeTension, normalizeLaneRule, BUILT_IN_DECK_RULES, type DeckRuleSet, type PlayerRange, DEFAULT_WAGONS_PER_PLAYER, DEFAULT_STARTING_TICKETS, DEFAULT_KEPT_TICKETS, defaultTicketSet, type Ticket, type TicketSet, defaultStopTypeStyles, fallbackStopTypeStyle, type StopTypeStyle, defaultWagonStyles, type WagonStyle, defaultRouteTypeStyles, type LineStyle, type RouteTypeStyle, type BackgroundImage, type BackgroundShape, type ImageCrop, type MapData, type MapFormat, type MapVersion, type MapVersionEntry, type NoteBox, type Point, type Route, type Stop, STORAGE_KEY, LEGACY_STORAGE_KEY } from "./map-data";
+import { W, formatOrStandard, boardDefinition, validPanelFor, normalizeWagonMm, normalizeMm, BOARD_PRESETS, isMapFormat, normalizeTension, normalizeLaneRule, BUILT_IN_DECK_RULES, type DeckRuleSet, type PlayerRange, DEFAULT_WAGONS_PER_PLAYER, DEFAULT_STARTING_TICKETS, DEFAULT_KEPT_TICKETS, defaultTicketSet, type Ticket, type TicketSet, defaultStopTypeStyles, fallbackStopTypeStyle, type StopTypeStyle, defaultWagonStyles, type WagonStyle, defaultRouteTypeStyles, type LineStyle, type RouteTypeStyle, type BackgroundImage, type BackgroundShape, type ImageCrop, type MapData, type MapFormat, type MapVersion, type MapVersionEntry, type NoteBox, type Point, type Route, type Stop, STORAGE_KEY, LEGACY_STORAGE_KEY } from "./map-data";
 
 export const GUIDE_SEEN_KEY = "ttr-guide-seen";
 export const MAX_IMAGE_WARN_BYTES = 2 * 1024 * 1024;
@@ -203,7 +203,7 @@ const MAP_KEYS = new Set([
   "name", "format", "orientation", "background", "backgroundImage", "stops", "routes", "notes",
   "lineStyles", "routeTypeStyles", "wagonStyles", "stopTypeStyles", "tickets", "ticketSets",
   "wagonsPerPlayer", "startingTickets", "keptTickets", "players", "ticketBands", "ticketMix",
-  "ticketValuation", "laneRule", "endGapMm", "deckRules", "deckRule", "deckTension", "rules", "mapVersion", "unknown",
+  "ticketValuation", "laneRule", "panelMm", "wagonMm", "stopMm", "nameMm", "endGapMm", "deckRules", "deckRule", "deckTension", "rules", "mapVersion", "unknown",
 ]);
 
 const unknownKeys = (value: Record<string, unknown>): Record<string, unknown> | undefined => {
@@ -458,6 +458,9 @@ export function repairMap(raw: unknown): { map: MapData; repairs: string[] } {
   mend(map.background, { label: "string", fill: "string", stroke: "string", opacity: "number", strokeWidth: "number", locked: "boolean" });
   mend(map.notes, { text: "string", locked: "boolean", collapsed: "boolean" });
   if (map.endGapMm !== undefined && !(typeof map.endGapMm === "number" && Number.isFinite(map.endGapMm))) { delete map.endGapMm; mended++; }
+  // The board profile is whole or not there: a part that cannot be used is left out, and said.
+  const profileLeftOut = (["panelMm", "wagonMm", "stopMm", "nameMm"] as const).filter((key) => value[key] !== undefined && map[key] === undefined).length;
+  say(profileLeftOut, "part of the board's profile (panel, wagon, stop or name size) could not be used and has been left out.", "parts of the board's profile (panel, wagon, stop or name size) could not be used and have been left out.");
   say(mended, "field of a stop, route, style, deck, note or background shape was not of the kind it should be and has been mended.", "fields of stops, routes, styles, decks, notes or background shapes were not of the kind they should be and have been mended.");
   return { map, repairs };
 }
@@ -487,6 +490,11 @@ const normalizeMapFields = (raw: Partial<MapData>): MapData => { const value = l
   keptTickets: Math.min(countOr(value.keptTickets, DEFAULT_KEPT_TICKETS), countOr(value.startingTickets, DEFAULT_STARTING_TICKETS)),
   players: normalizePlayers(value.players),
   laneRule: normalizeLaneRule(value.laneRule),
+  // The board profile: only what is usable, and nothing at all when there is none, so a map without one is the file it always was.
+  ...(validPanelFor(value.format, value.panelMm) ? { panelMm: validPanelFor(value.format, value.panelMm) } : {}),
+  ...(normalizeWagonMm(value.wagonMm) ? { wagonMm: normalizeWagonMm(value.wagonMm) } : {}),
+  ...(normalizeMm(value.stopMm, 3, 40) !== undefined ? { stopMm: normalizeMm(value.stopMm, 3, 40) } : {}),
+  ...(normalizeMm(value.nameMm, 1.5, 20) !== undefined ? { nameMm: normalizeMm(value.nameMm, 1.5, 20) } : {}),
   ticketBands: value.ticketBands,
   ticketMix: value.ticketMix,
   ...normalizeDeckRules(value),
@@ -626,13 +634,40 @@ export function formatTimestamp(date: Date = new Date()): string {
   return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}-${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
 }
 
+// One of the boards Settings offers (BOARD_PRESETS): the format and, for a small board, the profile and which way it stands, with what is on the map moved
+// as it is for any change of board (x kept, y by the height). Standard and Extended take a profile off and leave the way the board stands; an unknown id changes nothing.
+export function applyBoardPreset(draft: MapData, id: string): MapData {
+  const preset = BOARD_PRESETS.find((item) => item.id === id);
+  if (!preset) return draft;
+  const standing = draft.orientation === "portrait";
+  const moved = rescaleMapToFormat(standing ? rotateMap(draft, "landscape") : draft, preset.format);
+  if (preset.profile) {
+    // The new board's height with the profile on, then the contents are moved to it (rescale above went to the standard panels of the format).
+    const target = boardDefinition({ format: preset.format, panelMm: preset.profile.panelMm });
+    const standard = formatOrStandard(preset.format);
+    moved.stops = scaleStopsToHeight(moved.stops, standard.height, target.height);
+    moved.routes = scaleRoutesToHeight(moved.routes, standard.height, target.height);
+    moved.background = scaleBackgroundToHeight(moved.background, standard.height, target.height);
+    moved.backgroundImage = moved.backgroundImage ? scaleImageToHeight(moved.backgroundImage, standard.height, target.height) : moved.backgroundImage;
+    moved.notes = scaleNotesToHeight(moved.notes, standard.height, target.height);
+    moved.panelMm = { ...preset.profile.panelMm };
+    moved.wagonMm = { ...preset.profile.wagonMm };
+    moved.stopMm = preset.profile.stopMm;
+    moved.nameMm = preset.profile.nameMm;
+  }
+  const wantStanding = preset.orientation ? preset.orientation === "portrait" : standing;
+  return wantStanding ? rotateMap(moved, "portrait") : moved;
+}
+
 // Moving a map to another board format keeps x as-is and scales y by the height ratio, so objects
 // stay in the same relative positions.
 export function rescaleMapToFormat(draft: MapData, nextFormat: MapFormat): MapData {
   // A standing map is laid down, moved to the other board, and stood up again.
   if (draft.orientation === "portrait") return rotateMap(rescaleMapToFormat(rotateMap(draft, "landscape"), nextFormat), "portrait");
-  const fromHeight = formatOrStandard(draft.format).height;
+  const fromHeight = boardDefinition(draft).height;
   const toHeight = formatOrStandard(nextFormat).height;
+  // A board of a format is of standard panels: the profile of a small board goes with the move.
+  delete draft.panelMm; delete draft.wagonMm; delete draft.stopMm; delete draft.nameMm;
   draft.stops = scaleStopsToHeight(draft.stops, fromHeight, toHeight);
   draft.routes = scaleRoutesToHeight(draft.routes, fromHeight, toHeight);
   draft.background = scaleBackgroundToHeight(draft.background, fromHeight, toHeight);

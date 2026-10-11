@@ -46,7 +46,7 @@ Object.assign(sample.routeTypeStyles[0], { shape: "plain", glyph: "R" });
 if (sample.wagonStyles && sample.wagonStyles[0]) sample.wagonStyles[0].glyph = "W";
 Object.assign(sample.stopTypeStyles[0], { square: true, junction: false });
 Object.assign(sample, { orientation: "portrait", rules: "Some rules.", endGapMm: 2, deckTension: 50, ticketBands: { medium: 0.35, long: 0.6 }, ticketMix: { short: 30, medium: 47, long: 23 },
-  ticketValuation: { longBonus: true, ferryPremium: 1 }, laneRule: { "2+": 1, "3+": "all" }, players: { min: 2, max: 3 }, wagonsPerPlayer: 28, startingTickets: 3, keptTickets: 2,
+  ticketValuation: { longBonus: true, ferryPremium: 1 }, laneRule: { "2+": 1, "3+": "all" }, panelMm: { width: 214, height: 140 }, wagonMm: { length: 24, width: 11, gap: 7, endMargin: 18 }, stopMm: 18.5, nameMm: 5.8, players: { min: 2, max: 3 }, wagonsPerPlayer: 28, startingTickets: 3, keptTickets: 2,
   mapVersion: { number: 1, fingerprint: "x", issued: [] },
   backgroundImage: { dataUrl: "data:image/png;base64,AAAA", naturalWidth: 10, naturalHeight: 10, x: 0, y: 0, width: 100, height: 100, rotation: 0, opacity: 1, crop: { top: 0, right: 0, bottom: 0, left: 0 } } });
 sample.unknown = { somethingNew: { a: 1 } };

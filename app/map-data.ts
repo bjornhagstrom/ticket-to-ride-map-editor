@@ -135,7 +135,7 @@ export type MapVersionEntry = { number: number; date: string; by: string; [key: 
  *  are kept. See docs/FILE-FORMAT.md. */
 export type MapVersion = { number: number; fingerprint: string; issued: MapVersionEntry[]; [key: string]: unknown };
 
-export type MapData = { name: string; mapVersion?: MapVersion; deckTension?: number; format: MapFormat; orientation?: "landscape" | "portrait"; rules?: string; endGapMm?: number; background: BackgroundShape[]; stops: Stop[]; routes: Route[]; backgroundImage?: BackgroundImage; notes: NoteBox[]; lineStyles: LineStyle[]; routeTypeStyles: RouteTypeStyle[]; wagonStyles: WagonStyle[]; stopTypeStyles: StopTypeStyle[]; tickets: Ticket[]; ticketSets: TicketSet[]; wagonsPerPlayer?: number; startingTickets?: number; keptTickets?: number; players?: PlayerRange; laneRule?: LaneRule; ticketBands?: TicketBands; ticketMix?: TicketMix; ticketValuation?: { longBonus?: boolean; ferryPremium?: number }; deckRules?: DeckRuleSet[]; deckRule?: string;
+export type MapData = { name: string; mapVersion?: MapVersion; deckTension?: number; format: MapFormat; panelMm?: PanelMm; wagonMm?: WagonMm; stopMm?: number; nameMm?: number; orientation?: "landscape" | "portrait"; rules?: string; endGapMm?: number; background: BackgroundShape[]; stops: Stop[]; routes: Route[]; backgroundImage?: BackgroundImage; notes: NoteBox[]; lineStyles: LineStyle[]; routeTypeStyles: RouteTypeStyle[]; wagonStyles: WagonStyle[]; stopTypeStyles: StopTypeStyle[]; tickets: Ticket[]; ticketSets: TicketSet[]; wagonsPerPlayer?: number; startingTickets?: number; keptTickets?: number; players?: PlayerRange; laneRule?: LaneRule; ticketBands?: TicketBands; ticketMix?: TicketMix; ticketValuation?: { longBonus?: boolean; ferryPremium?: number }; deckRules?: DeckRuleSet[]; deckRule?: string;
   // Fields from a file this build does not know about. Kept so that opening and re-exporting a map
   // written by a newer version never quietly throws its work away.
   unknown?: Record<string, unknown> };
@@ -192,6 +192,81 @@ export const pairKeyOf = (a: string, b: string): string => { const [x, y] = a <=
 export const isMapFormat = (value: unknown): value is MapFormat => formatOf(value) !== null;
 /** The board a name means; the standard board when it is none. */
 export const formatOrStandard = (value: unknown): MapFormatDefinition => formatOf(value) ?? PRESET_DEFINITIONS["board-2x3"];
+
+// ---------------------------------------------------------------------------------------------------------------------------
+// The board profile (docs/PROPOSAL-SMALL-BOARDS.md): four optional fields of a map that say how big its panel, wagons, stops and the
+// capitals of its names really are, so that a small board (New York, Amsterdam, London) can be drawn to scale. With none of them a map is
+// what it always was: 263.3 × 262.5 mm panels (or the two measured boards), wagons of 20 × 9 mm, stops 9 mm across, capitals of 6 mm.
+export type PanelMm = { width: number; height: number };
+/** A wagon in millimetres: the length is needed; width, gap and end margin follow the standard proportions of the 20 mm wagon when left out. */
+export type WagonMm = { length: number; width?: number; gap?: number; endMargin?: number };
+
+const inRange = (value: unknown, low: number, high: number): value is number => typeof value === "number" && Number.isFinite(value) && value >= low && value <= high;
+/** A number a profile may hold, or nothing. */
+export const normalizeMm = (value: unknown, low: number, high: number): number | undefined => (inRange(value, low, high) ? value : undefined);
+/** A panel as the board lies, each side 40 to 1500 mm, or nothing. (Whether the board of such panels is wider than tall is for `boardDefinition`.) */
+export function normalizePanelMm(value: unknown): PanelMm | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const { width, height } = value as Record<string, unknown>;
+  return inRange(width, 40, 1500) && inRange(height, 40, 1500) ? { width, height } : undefined;
+}
+/** A wagon: the length 5 to 60 mm is needed; a width (2–30), gap (0–30) or end margin (0–60) that is not a number in range is left to the proportion. */
+export function normalizeWagonMm(value: unknown): WagonMm | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const v = value as Record<string, unknown>;
+  if (!inRange(v.length, 5, 60)) return undefined;
+  const wagon: WagonMm = { length: v.length };
+  const width = normalizeMm(v.width, 2, 30), gap = normalizeMm(v.gap, 0, 30), endMargin = normalizeMm(v.endMargin, 0, 60);
+  if (width !== undefined) wagon.width = width;
+  if (gap !== undefined) wagon.gap = gap;
+  if (endMargin !== undefined) wagon.endMargin = endMargin;
+  return wagon;
+}
+/** The profile of a map's board is one panel; the board is the panels times it, and a board taller than wide is none (the editor keeps boards lying and turns them to stand). */
+export function validPanelFor(format: unknown, panel: unknown): PanelMm | undefined {
+  const p = normalizePanelMm(panel);
+  const base = formatOf(format);
+  if (!p || !base) return undefined;
+  return base.rows * p.height > base.columns * p.width ? undefined : p;
+}
+/** The board a map has: the panels its format says, of the size its profile says or the standard. */
+export function boardDefinition(source: { format?: unknown; panelMm?: unknown }): MapFormatDefinition {
+  const base = formatOrStandard(source.format);
+  const panel = validPanelFor(source.format, source.panelMm);
+  if (!panel) return base;
+  const widthMm = base.columns * panel.width, heightMm = base.rows * panel.height;
+  const label = `Custom board ${base.rows}×${base.columns}`;
+  return { label, shortLabel: label, note: `${base.columns} panels across, ${base.rows} down, panels of ${panel.width} × ${panel.height} mm`, width: W, height: Math.round(W * heightMm / widthMm), widthMm, heightMm, columns: base.columns, rows: base.rows, custom: true };
+}
+/** The wagon a map is measured with: its own, with the standard proportions where a part is left out, or the editor's own 20 × 9 mm. */
+export function wagonOf(source: { wagonMm?: unknown }): { length: number; width: number; gap: number; endMargin: number } {
+  const w = normalizeWagonMm(source.wagonMm);
+  if (!w) return { ...realWagon };
+  const k = w.length / realWagon.length;
+  return { length: w.length, width: w.width ?? realWagon.width * k, gap: w.gap ?? realWagon.gap * k, endMargin: w.endMargin ?? realWagon.endMargin * k };
+}
+/** Across a medium stop, its ring included: the profile's, or 9 mm. */
+export const STANDARD_STOP_MM = 9;
+export const stopMmOf = (source: { stopMm?: unknown }): number => normalizeMm(source.stopMm, 3, 40) ?? STANDARD_STOP_MM;
+/** Across a stop of this size; an unknown size is a medium one. Small and large keep the ratios of the standard sizes (4.5 and 9 against 6.3). */
+export const stopSizeMm = (source: { stopMm?: unknown }, size: unknown): number => stopMmOf(source) * (size === "small" ? 4.5 / 6.3 : size === "large" ? 9 / 6.3 : 1);
+/** The height of a capital letter in a city's name: the profile's, or 6 mm (12 units of type on the standard board). */
+export const STANDARD_NAME_MM = 6;
+export const nameMmOf = (source: { nameMm?: unknown }): number => normalizeMm(source.nameMm, 1.5, 20) ?? STANDARD_NAME_MM;
+/** The type size of a name: a capital is 0.7 of it. */
+export const nameTypeMm = (source: { nameMm?: unknown }): number => nameMmOf(source) / 0.7;
+/** How far apart parallel lanes of a double route sit: the width of a wagon and a little over (more with a line style of its own). */
+export const parallelSpacingMm = (source: { wagonMm?: unknown }, styled = false): number => wagonOf(source).width + (styled ? 5.5 : 2.5);
+
+/** The boards Settings offers first. The small ones set the whole profile and which way the board stands, as measured on the real boards (2026-10-11):
+ *  New York stands on 280 × 428 mm; Amsterdam, and London which has the same board, lie on 428 × 330 mm; the wagons are 24 mm on all three. */
+export type BoardPreset = { id: string; label: string; note: string; format: MapFormat; orientation?: "landscape" | "portrait"; profile?: { panelMm: PanelMm; wagonMm: WagonMm; stopMm: number; nameMm: number } };
+export const BOARD_PRESETS: BoardPreset[] = [
+  { id: "standard", label: "Standard board 2×3", note: "790 × 525 mm, 6 panels", format: "board-2x3" },
+  { id: "extended", label: "Extended board 2×4", note: "1,053 × 526 mm, 8 panels", format: "board-2x4" },
+  { id: "small-new-york", label: "Small board, New York", note: "280 × 428 mm standing, 4 panels of 140 × 214 mm, 24 mm wagons", format: "board-2x2", orientation: "portrait", profile: { panelMm: { width: 214, height: 140 }, wagonMm: { length: 24 }, stopMm: 18.5, nameMm: 5.8 } },
+  { id: "small-amsterdam", label: "Small board, Amsterdam and London", note: "428 × 330 mm lying, 4 panels of 165 × 214 mm, 24 mm wagons", format: "board-2x2", orientation: "landscape", profile: { panelMm: { width: 214, height: 165 }, wagonMm: { length: 24 }, stopMm: 14, nameMm: 4.3 } },
+];
 
 // Footprint of a real plastic train and the spacing a real board gives it, in millimetres.
 // `gap` and `endMargin` are not guesses: they come from a least-squares fit over all 101 routes of
