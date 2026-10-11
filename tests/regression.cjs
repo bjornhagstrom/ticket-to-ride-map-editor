@@ -5237,6 +5237,47 @@ const sectionStart = (n) => {
     await pp.context().close();
   }
 
+  // 75. The game follows a small board (docs/PROPOSAL-SMALL-BOARDS.md): a preset brings its wagons and its table unless the person chose them, says so, and Map balance quotes
+  // the small official maps beside a small board and the eight classic ones beside the others.
+  if (wants(75)) {
+  sectionStart(75);
+    const gp = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
+    gp.on("pageerror", (e) => errors.push(String(e)));
+    await gp.goto(BASE, { waitUntil: "networkidle" });
+    await gp.getByRole("button", { name: "Load the example map" }).click();
+    await gp.waitForTimeout(600);
+    const openSettings = async () => { await gp.getByRole("button", { name: "Settings" }).click(); await gp.waitForTimeout(300); };
+    const setNumber = async (id, value) => { await gp.locator(id).fill(String(value)); await gp.locator(id).blur(); };
+    const game = async () => [await gp.locator("#settings-wagons").inputValue(), await gp.locator("#settings-players-max").inputValue()].join("/");
+    await openSettings();
+    await setNumber("#settings-wagons", 45); await setNumber("#settings-players-max", 5);
+    await gp.locator('#settings-format input[value="small-new-york"]').check(); await gp.waitForTimeout(500);
+    check("choosing New York on a map with the standard game gives 15 wagons and up to 4 players", (await game()) === "15/4", await game());
+    check("and a message says the game followed the board", (await gp.getByText(/The game follows the board: 15 wagons a player, 2 to 4 players/).count()) > 0);
+    await gp.locator('#settings-format input[value="small-amsterdam"]').check(); await gp.waitForTimeout(500);
+    check("Amsterdam after it gives 16", (await game()) === "16/4", await game());
+    await setNumber("#settings-wagons", 20);
+    await gp.locator('#settings-format input[value="small-new-york"]').check(); await gp.waitForTimeout(500);
+    check("wagons the person set (20) are kept when the board changes", (await game()) === "20/4", await game());
+    await gp.locator('#settings-format input[value="board-2x3"]').check(); await gp.waitForTimeout(500);
+    check("back on the standard board the wagons are still the person's, and the table a board set goes back to the standard one", (await game()) === "20/5", await game());
+    // Map balance: the small maps' ranges beside a small board.
+    await gp.locator('#settings-format input[value="small-new-york"]').check(); await gp.waitForTimeout(500);
+    await gp.keyboard.press("Escape"); await gp.waitForTimeout(300);
+    await gp.getByRole("button", { name: "Map balance", exact: true }).click(); await gp.waitForTimeout(600);
+    const heading = async () => (await gp.locator(".against-official h3").textContent()) || "";
+    check("Map balance on a small board is set against the small official maps", /small official maps/.test(await heading()), await heading());
+    check("and says which maps and how few", /New York and Amsterdam/.test(await gp.locator(".against-official").textContent()) && /narrow/.test(await gp.locator(".against-official").textContent()));
+    check("the unused-routes row quotes 19–33 %", /19–33 %/.test(await gp.locator(".official-table").textContent()), (await gp.locator(".official-table").textContent()).slice(0, 300));
+    await gp.keyboard.press("Escape"); await gp.waitForTimeout(300);
+    await gp.getByRole("button", { name: "Settings" }).click(); await gp.waitForTimeout(300);
+    await gp.locator('#settings-format input[value="board-2x3"]').check(); await gp.waitForTimeout(500);
+    await gp.keyboard.press("Escape"); await gp.waitForTimeout(300);
+    if (await gp.locator(".against-official").count() === 0) { await gp.getByRole("button", { name: "Map balance", exact: true }).click(); await gp.waitForTimeout(600); }
+    check("and on the standard board against the eight official maps, 7–21 % for routes no ticket needs", (await heading()) === "Against the official maps" && /7–21 %/.test(await gp.locator(".official-table").textContent()), await heading());
+    await gp.context().close();
+  }
+
   if (sectionOpen) sectionTimes[sectionOpen.n] = Math.round((Date.now() - sectionOpen.at) / 100) / 10;
   if (process.env.TTR_TIMES) fs.writeFileSync(process.env.TTR_TIMES, JSON.stringify(sectionTimes));
   console.log("PASS:"); ok.forEach((l) => console.log("  ✓ " + l));

@@ -271,12 +271,12 @@ export const parallelSpacingMm = (source: { wagonMm?: unknown }, styled = false)
 
 /** The boards Settings offers first. The small ones set the whole profile and which way the board stands, as measured on the real boards (2026-10-11):
  *  New York stands on 280 × 428 mm; Amsterdam, and London which has the same board, lie on 428 × 330 mm; the wagons are 24 mm on all three. */
-export type BoardPreset = { id: string; label: string; note: string; format: MapFormat; orientation?: "landscape" | "portrait"; profile?: { panelMm: PanelMm; wagonMm: WagonMm; stopMm: number; nameMm: number } };
+export type BoardPreset = { id: string; label: string; note: string; format: MapFormat; orientation?: "landscape" | "portrait"; profile?: { panelMm: PanelMm; wagonMm: WagonMm; stopMm: number; nameMm: number }; game?: { wagonsPerPlayer: number; players: PlayerRange } };
 export const BOARD_PRESETS: BoardPreset[] = [
   { id: "standard", label: "Standard board 2×3", note: "790 × 525 mm, 6 panels", format: "board-2x3" },
   { id: "extended", label: "Extended board 2×4", note: "1,053 × 526 mm, 8 panels", format: "board-2x4" },
-  { id: "small-new-york", label: "Small board, New York", note: "280 × 428 mm standing, 4 panels of 140 × 214 mm, 24 mm wagons", format: "board-2x2", orientation: "portrait", profile: { panelMm: { width: 214, height: 140 }, wagonMm: { length: 24 }, stopMm: 18.5, nameMm: 5.8 } },
-  { id: "small-amsterdam", label: "Small board, Amsterdam and London", note: "428 × 330 mm lying, 4 panels of 165 × 214 mm, 24 mm wagons", format: "board-2x2", orientation: "landscape", profile: { panelMm: { width: 214, height: 165 }, wagonMm: { length: 24 }, stopMm: 14, nameMm: 4.3 } },
+  { id: "small-new-york", label: "Small board, New York", note: "280 × 428 mm standing, 4 panels of 140 × 214 mm, 24 mm wagons", format: "board-2x2", orientation: "portrait", profile: { panelMm: { width: 214, height: 140 }, wagonMm: { length: 24 }, stopMm: 18.5, nameMm: 5.8 }, game: { wagonsPerPlayer: 15, players: { min: 2, max: 4 } } },
+  { id: "small-amsterdam", label: "Small board, Amsterdam and London", note: "428 × 330 mm lying, 4 panels of 165 × 214 mm, 24 mm wagons", format: "board-2x2", orientation: "landscape", profile: { panelMm: { width: 214, height: 165 }, wagonMm: { length: 24 }, stopMm: 14, nameMm: 4.3 }, game: { wagonsPerPlayer: 16, players: { min: 2, max: 4 } } },
 ];
 
 // Footprint of a real plastic train and the spacing a real board gives it, in millimetres.

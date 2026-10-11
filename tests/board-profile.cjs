@@ -111,6 +111,33 @@ for (const [commit, name] of [["18b5763", "0.4.1"], ["ce85e72", "1.6.0"]]) {
   fs.rmSync(old, { recursive: true, force: true });
 }
 
+// ---------------------------------------------------------------- the game set up with the board (a preset brings its wagons and its table)
+{
+  const game = (id) => (data.BOARD_PRESETS.find((p) => p.id === id) || {}).game;
+  check("New York brings 15 wagons a player and 2 to 4 players", game("small-new-york") && game("small-new-york").wagonsPerPlayer === 15 && game("small-new-york").players.min === 2 && game("small-new-york").players.max === 4);
+  check("Amsterdam brings 16 wagons and 2 to 4 players", game("small-amsterdam") && game("small-amsterdam").wagonsPerPlayer === 16 && game("small-amsterdam").players.max === 4);
+  check("the standard boards bring nothing of their own", !game("standard") && !game("extended"));
+  const fresh = () => { const m = clone(initialMap); m.wagonsPerPlayer = 45; delete m.players; return m; };
+  let m = storage.applyBoardPreset(fresh(), "small-new-york");
+  check("a map with the standard game takes New York's: 15 wagons, 2 to 4 players", m.wagonsPerPlayer === 15 && m.players && m.players.min === 2 && m.players.max === 4, JSON.stringify([m.wagonsPerPlayer, m.players]));
+  m = storage.applyBoardPreset(m, "small-amsterdam");
+  check("and then Amsterdam's, since 15 is a number a preset set", m.wagonsPerPlayer === 16);
+  m = storage.applyBoardPreset(m, "standard");
+  check("back on the standard board the game is the standard one again: 45 wagons and the standard table (no range of its own)", m.wagonsPerPlayer === 45 && (!m.players || (m.players.min === 2 && m.players.max === 5)), JSON.stringify([m.wagonsPerPlayer, m.players]));
+  const own = fresh(); own.wagonsPerPlayer = 28; own.players = { min: 2, max: 3 };
+  m = storage.applyBoardPreset(own, "small-new-york");
+  check("wagons and players a person has chosen are kept when the board changes", m.wagonsPerPlayer === 28 && m.players.max === 3, JSON.stringify([m.wagonsPerPlayer, m.players]));
+  m = storage.applyBoardPreset(m, "standard");
+  check("and kept on the way back", m.wagonsPerPlayer === 28 && m.players.max === 3);
+  const half = fresh(); half.wagonsPerPlayer = 20;
+  m = storage.applyBoardPreset(half, "small-amsterdam");
+  check("each of the two is judged by itself: own wagons kept, the standard table replaced", m.wagonsPerPlayer === 20 && m.players && m.players.max === 4, JSON.stringify([m.wagonsPerPlayer, m.players]));
+  const said = storage.gameForPreset(fresh(), "small-new-york");
+  check("gameForPreset says what would change, for the message to the person", said && said.wagonsPerPlayer === 15 && said.players.max === 4 && storage.gameForPreset(own, "small-new-york") === null, JSON.stringify(said));
+  const custom = storage.applyBoard(fresh(), { format: "board-2x2", profile: { panelMm: { width: 214, height: 140 } } });
+  check("a custom board leaves the game alone", custom.wagonsPerPlayer === 45 && !custom.players);
+}
+
 for (const line of ok) console.log(`  ok    ${line}`);
 for (const line of bad) console.log(`  FAIL  ${line}`);
 console.log(`\n${ok.length} passed, ${bad.length} failed`);

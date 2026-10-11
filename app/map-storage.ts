@@ -2,7 +2,7 @@
 // files open, board-format rescaling, and image reading.
 import { APP_VERSION } from "./version";
 import { boardOf, rotateMap, turnBetween, turnContents, type Board } from "./board";
-import { W, formatOrStandard, boardDefinition, validPanelFor, normalizeWagonMm, normalizeMm, BOARD_PRESETS, type PanelMm, type WagonMm, isMapFormat, normalizeTension, normalizeLaneRule, BUILT_IN_DECK_RULES, type DeckRuleSet, type PlayerRange, DEFAULT_WAGONS_PER_PLAYER, DEFAULT_STARTING_TICKETS, DEFAULT_KEPT_TICKETS, defaultTicketSet, type Ticket, type TicketSet, defaultStopTypeStyles, fallbackStopTypeStyle, type StopTypeStyle, defaultWagonStyles, type WagonStyle, defaultRouteTypeStyles, type LineStyle, type RouteTypeStyle, type BackgroundImage, type BackgroundShape, type ImageCrop, type MapData, type MapFormat, type MapVersion, type MapVersionEntry, type NoteBox, type Point, type Route, type Stop, STORAGE_KEY, LEGACY_STORAGE_KEY } from "./map-data";
+import { W, formatOrStandard, boardDefinition, validPanelFor, normalizeWagonMm, normalizeMm, BOARD_PRESETS, DEFAULT_PLAYERS, type PanelMm, type WagonMm, isMapFormat, normalizeTension, normalizeLaneRule, BUILT_IN_DECK_RULES, type DeckRuleSet, type PlayerRange, DEFAULT_WAGONS_PER_PLAYER, DEFAULT_STARTING_TICKETS, DEFAULT_KEPT_TICKETS, defaultTicketSet, type Ticket, type TicketSet, defaultStopTypeStyles, fallbackStopTypeStyle, type StopTypeStyle, defaultWagonStyles, type WagonStyle, defaultRouteTypeStyles, type LineStyle, type RouteTypeStyle, type BackgroundImage, type BackgroundShape, type ImageCrop, type MapData, type MapFormat, type MapVersion, type MapVersionEntry, type NoteBox, type Point, type Route, type Stop, STORAGE_KEY, LEGACY_STORAGE_KEY } from "./map-data";
 
 export const GUIDE_SEEN_KEY = "ttr-guide-seen";
 export const MAX_IMAGE_WARN_BYTES = 2 * 1024 * 1024;
@@ -661,10 +661,34 @@ export function applyBoard(draft: MapData, choice: BoardChoice): MapData {
   return wantStanding ? rotateMap(moved, "portrait") : moved;
 }
 
-// One of the boards Settings offers (BOARD_PRESETS); an unknown id changes nothing.
+// The game a board brings (BOARD_PRESETS: wagons a player and the table), set only where the person has not chosen: the wagons are the standard 45 or some board's own,
+// the table the standard one (or none) or some board's own. A board with no game of its own (the standard ones) brings the standard game back. Null when nothing would change.
+const sameRange = (a: PlayerRange | undefined, b: PlayerRange) => !!a && a.min === b.min && a.max === b.max;
+export function gameForPreset(map: Pick<MapData, "wagonsPerPlayer" | "players">, id: string): { wagonsPerPlayer: number; players: PlayerRange | undefined } | null {
+  const preset = BOARD_PRESETS.find((item) => item.id === id);
+  if (!preset) return null;
+  const wagons = map.wagonsPerPlayer ?? DEFAULT_WAGONS_PER_PLAYER;
+  const wagonsUntouched = wagons === DEFAULT_WAGONS_PER_PLAYER || BOARD_PRESETS.some((item) => item.game?.wagonsPerPlayer === wagons);
+  const playersUntouched = !map.players || sameRange(map.players, DEFAULT_PLAYERS) || BOARD_PRESETS.some((item) => item.game && sameRange(map.players, item.game.players));
+  const next = {
+    wagonsPerPlayer: wagonsUntouched ? (preset.game?.wagonsPerPlayer ?? DEFAULT_WAGONS_PER_PLAYER) : wagons,
+    players: playersUntouched ? (preset.game ? { ...preset.game.players } : undefined) : map.players,
+  };
+  const unchanged = next.wagonsPerPlayer === wagons && (next.players === map.players || (!next.players && (!map.players || sameRange(map.players, DEFAULT_PLAYERS))) || (!!next.players && sameRange(map.players, next.players)));
+  return unchanged ? null : next;
+}
+
+// One of the boards Settings offers (BOARD_PRESETS), with the game it brings; an unknown id changes nothing.
 export function applyBoardPreset(draft: MapData, id: string): MapData {
   const preset = BOARD_PRESETS.find((item) => item.id === id);
-  return preset ? applyBoard(draft, preset) : draft;
+  if (!preset) return draft;
+  const game = gameForPreset(draft, id);
+  const moved = applyBoard(draft, preset);
+  if (game) {
+    moved.wagonsPerPlayer = game.wagonsPerPlayer;
+    if (game.players) moved.players = game.players; else delete moved.players;
+  }
+  return moved;
 }
 
 // Moving a map to another board format keeps x as-is and scales y by the height ratio, so objects

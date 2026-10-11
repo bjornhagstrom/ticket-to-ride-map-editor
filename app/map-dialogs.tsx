@@ -15,7 +15,7 @@ import { TicketLengths, type TicketLengthsView } from "./ticket-lengths";
 import { DeckCompare, type DeckCompareView } from "./deck-compare";
 import { TensionSlider } from "./tension-slider";
 import type { RebindGroup } from "./ticket-rebind";
-import { type DeckTension, BALANCE_OFFICIAL, CROWDING_OFFICIAL, networkShape, SHAPE_OFFICIAL, colourRouteIds, compareWithClassics, CLASSIC_ROUTE_MAPS, type Bottleneck, dealtToFullTable, deckRuleFor, deckRules, TICKET_SUGGESTER, type TicketDeckReport, type TicketStyle, type SetupBalance, type TicketReview, type ColourLengthTable, type NetworkStats, type RouteSpacing, type RouteSuggestion } from "./map-analysis";
+import { type DeckTension, BALANCE_OFFICIAL, balanceRangesFor, networkShape, SHAPE_OFFICIAL, colourRouteIds, compareWithClassics, CLASSIC_ROUTE_MAPS, type Bottleneck, dealtToFullTable, deckRuleFor, deckRules, TICKET_SUGGESTER, type TicketDeckReport, type TicketStyle, type SetupBalance, type TicketReview, type ColourLengthTable, type NetworkStats, type RouteSpacing, type RouteSuggestion } from "./map-analysis";
 
 // The tour on YouTube, as a picture with a play button until someone asks for it: nothing is loaded
 // from YouTube before then, so no cookie is set and no script runs for anyone who does not watch. The
@@ -75,6 +75,7 @@ const tableWord = (count: number) => NUMBER_WORDS[count] ?? String(count);
 
 export function AnalysisPanel({ official, wide, onToggleWide, onAddParallel, lengthView, pinKey, onPin, bottleneckShown, onClose, onPreviewRoutes, onPreviewStop, data, stats, colourTable, spacing, scaleWidthMm, setup, bottlenecks, atTable, onAtTable, onShowBottleneck, onSelectRoute, onSelectStop }: { official: { players: number; crowded: number; connections: number; loadRatio: number | null; unusedPct: number; maxPerStop: number }; wide: boolean; onToggleWide: () => void; onAddParallel: (routeId: string) => void; lengthView: TicketLengthsView; pinKey: string | null; onPin: (key: string, routes: string[] | null, stop: string | null) => void; bottleneckShown: Set<string>; setup: SetupBalance; bottlenecks: Bottleneck[]; atTable: number; onAtTable: (players: number) => void; onShowBottleneck: (routeIds: string[]) => void; onClose: () => void; onPreviewRoutes: (routeIds: string[] | null) => void; onPreviewStop: (stopId: string | null) => void; onSelectRoute: (routeId: string) => void; onSelectStop: (stopId: string) => void; data: MapData; stats: NetworkStats; colourTable: ColourLengthTable; spacing: RouteSpacing[]; scaleWidthMm: number }) {
   const stopName = (id: string) => data.stops.find((stop) => stop.id === id)?.name ?? "";
+  const shapeRanges = balanceRangesFor(data);
   // A number in the colour table marks the routes it counts while it is pointed at.
   const classicRows = compareWithClassics(data);
   const pointAt = (length: number | null, colour: string | null) => ({ className: cn("colour-cell", pinKey === `cell:${length ?? "*"}:${colour ?? "*"}` && "pinned"), "aria-pressed": pinKey === `cell:${length ?? "*"}:${colour ?? "*"}`, onClick: () => onPin(`cell:${length ?? "*"}:${colour ?? "*"}`, colourRouteIds(data, length, colour), null), onPointerEnter: () => onPreviewRoutes(colourRouteIds(data, length, colour)), onPointerLeave: () => onPreviewRoutes(null) });
@@ -86,7 +87,7 @@ export function AnalysisPanel({ official, wide, onToggleWide, onAddParallel, len
   return <div className="balance-panel">
     <div className="panel-heading"><span>Map balance</span><Button size="sm" variant="outline" aria-expanded={wide} onClick={onToggleWide}>{wide ? "Collapse" : "Expand"}</Button></div>
       <p className="helper">A quick read on how evenly connected and coloured the network is, and how the tickets lie on it. Point at a row to see it on the map. Click one to keep it marked, and click again to let it go; double-click a stop or a route to pick it for editing.</p>
-      <OfficialFigures official={official} stats={stats} setup={setup} />
+      <OfficialFigures official={official} stats={stats} setup={setup} data={data} />
       <div className="analysis-section bottlenecks">
         <h3>Where the tickets crowd</h3>
         <div className="bottleneck-players">
@@ -97,14 +98,14 @@ export function AnalysisPanel({ official, wide, onToggleWide, onAddParallel, len
         </div>
         <p className="helper">How many tickets want each route, against the lanes a player may use at that table. Only the second lane of a double route depends on the player count{laneFrom !== null && players.max < laneFrom ? ", and on this map it never opens" : ""}.</p>
         {bottlenecks.length === 0
-          ? <p className="helper">No route is wanted by more tickets than it can carry. Official maps have {CROWDING_OFFICIAL[0]}–{CROWDING_OFFICIAL[1]} such routes at a full table, {BALANCE_OFFICIAL.crowdedPct[0]}–{BALANCE_OFFICIAL.crowdedPct[1]} % of their routes: some contention is part of the game.</p>
+          ? <p className="helper">No route is wanted by more tickets than it can carry. {shapeRanges.small ? "The small official maps" : "Official maps"} have {shapeRanges.crowded[0]}–{shapeRanges.crowded[1]} such routes at a full table, {shapeRanges.ranges.crowdedPct[0]}–{shapeRanges.ranges.crowdedPct[1]} % of their routes: some contention is part of the game.</p>
           : <>
             <div className="bottleneck-list">{bottlenecks.slice(0, 8).map((edge) => <button type="button" key={`${edge.a}|${edge.b}`} className={cn("bottleneck-row", edge.onPurpose && "on-purpose")} onPointerEnter={() => onPreviewRoutes(edge.routeIds)} onPointerLeave={() => onPreviewRoutes(null)} aria-pressed={edge.routeIds.length === bottleneckShown.size && edge.routeIds.every((id) => bottleneckShown.has(id))} onClick={() => onShowBottleneck(edge.routeIds)}>
               <strong>{stopName(edge.a)} → {stopName(edge.b)}{edge.onPurpose && <em className="on-purpose-tag">on purpose</em>}</strong>
               <span>{edge.length} spaces · {edge.lanesUsable} of {edge.lanes} lane{edge.lanes === 1 ? "" : "s"} usable · {edge.tickets} ticket{edge.tickets === 1 ? "" : "s"} want it</span>
             </button>)}</div>
             {bottlenecks.some((edge) => edge.onPurpose) && <p className="helper">{bottlenecks.filter((edge) => edge.onPurpose).length} of them {bottlenecks.filter((edge) => edge.onPurpose).length === 1 ? "is" : "are"} contested on purpose, as marked in Properties.</p>}
-            <p className="helper">{bottlenecks.length} route{bottlenecks.length === 1 ? " is" : "s are"} wanted by more tickets than {bottlenecks.length === 1 ? "it" : "they"} can carry at this table. Official maps have {CROWDING_OFFICIAL[0]}–{CROWDING_OFFICIAL[1]} at a full table, {BALANCE_OFFICIAL.crowdedPct[0]}–{BALANCE_OFFICIAL.crowdedPct[1]} % of their routes, most of them on double routes: contention is part of the game. Where a corridor is crowded on purpose, a second lane keeps it open at bigger tables; where it is not, a way round or another ticket eases it. Click a row to keep its route marked, and click again to let go.</p>
+            <p className="helper">{bottlenecks.length} route{bottlenecks.length === 1 ? " is" : "s are"} wanted by more tickets than {bottlenecks.length === 1 ? "it" : "they"} can carry at this table. {shapeRanges.small ? "The small official maps" : "Official maps"} have {shapeRanges.crowded[0]}–{shapeRanges.crowded[1]} at a full table, {shapeRanges.ranges.crowdedPct[0]}–{shapeRanges.ranges.crowdedPct[1]} % of their routes, most of them on double routes: contention is part of the game. Where a corridor is crowded on purpose, a second lane keeps it open at bigger tables; where it is not, a way round or another ticket eases it. Click a row to keep its route marked, and click again to let go.</p>
           </>}
       </div>
       <NetworkShapeSection data={data} onPreviewRoutes={onPreviewRoutes} onPreviewStop={onPreviewStop} onAddParallel={onAddParallel} onSelectStop={onSelectStop} />
@@ -112,7 +113,7 @@ export function AnalysisPanel({ official, wide, onToggleWide, onAddParallel, len
       <div className="analysis-section setup-balance">
         <h3>Game setup against the map</h3>
         <p className="helper">
-          The map holds <strong>{setup.totalSpaces} wagon spaces</strong>{setup.usableSpaces !== setup.totalSpaces ? `, ${setup.usableSpaces} of them open to a table of ${tableWord(setup.table)} (${laneFrom === null ? "the map's own rule for a second lane of a double route" : `a second lane of a double route opens from ${laneFrom} players`})` : ""}. At {setup.wagonsPerPlayer} wagons each, a full table of {tableWord(setup.table)} holds <strong>{setup.wagonsAtTable} wagons</strong>{setup.fill !== null ? <>, <strong>{Math.round(100 * setup.fill)} %</strong> of those spaces: the official maps hold {BALANCE_OFFICIAL.wagonFill[0]}–{BALANCE_OFFICIAL.wagonFill[1]} %</> : ""}.
+          The map holds <strong>{setup.totalSpaces} wagon spaces</strong>{setup.usableSpaces !== setup.totalSpaces ? `, ${setup.usableSpaces} of them open to a table of ${tableWord(setup.table)} (${laneFrom === null ? "the map's own rule for a second lane of a double route" : `a second lane of a double route opens from ${laneFrom} players`})` : ""}. At {setup.wagonsPerPlayer} wagons each, a full table of {tableWord(setup.table)} holds <strong>{setup.wagonsAtTable} wagons</strong>{setup.fill !== null ? <>, <strong>{Math.round(100 * setup.fill)} %</strong> of those spaces: {shapeRanges.small ? "the small official maps hold" : "the official maps hold"} {shapeRanges.ranges.wagonFill[0]}–{shapeRanges.ranges.wagonFill[1]} %</> : ""}.
         </p>
         {setup.spaceVerdict === "tight" && <p className="helper helper-warning space-warning">{setup.fill === null
           ? "No routes to put wagons on yet."
@@ -478,23 +479,24 @@ export function SuggestTicketsDialog({ tension, onTension, open, onOpenChange, d
 // maps have. Pointing at a row marks it on the map.
 // This map's figures beside what the eight official maps measure, each with its own deck at a full
 // table. A fact, never a warning: outside the range says how the map differs, not that it is wrong.
-function OfficialFigures({ official, stats, setup }: { official: { players: number; crowded: number; connections: number; loadRatio: number | null; unusedPct: number; maxPerStop: number }; stats: NetworkStats; setup: SetupBalance }) {
+function OfficialFigures({ official, stats, setup, data }: { data: MapData; official: { players: number; crowded: number; connections: number; loadRatio: number | null; unusedPct: number; maxPerStop: number }; stats: NetworkStats; setup: SetupBalance }) {
+  const ranges = balanceRangesFor(data);
   const hubs = [...stats.hubDegree.values()];
   const hubMean = hubs.length ? hubs.reduce((sum, value) => sum + value, 0) / hubs.length : null;
   const span = ([low, high]: [number, number], unit = "") => `${low}–${high}${unit}`;
   const rows: [string, string, string][] = [
-    ["Crowded routes at a full table, as a share of all routes", official.connections === 0 ? "no routes" : `${Math.round(100 * official.crowded / official.connections)} % (${official.crowded} of ${official.connections} routes, at ${official.players} player${official.players === 1 ? "" : "s"})`, span(BALANCE_OFFICIAL.crowdedPct, " %")],
-    ["Double routes: their ticket traffic against single ones", official.loadRatio === null ? "no double routes" : `${official.loadRatio.toFixed(1)}×`, span(BALANCE_OFFICIAL.loadRatio, "×")],
-    ["Routes no ticket needs", `${Math.round(official.unusedPct)} %`, span(BALANCE_OFFICIAL.unusedPct, " %")],
-    ["Most tickets on one stop", String(official.maxPerStop), span(BALANCE_OFFICIAL.maxPerStop)],
-    ["Wagons at a full table, as a share of the spaces", setup.fill === null ? "no routes" : `${Math.round(100 * setup.fill)} % (${setup.table} × ${setup.wagonsPerPlayer} wagons for ${setup.usableSpaces} spaces)`, span(BALANCE_OFFICIAL.wagonFill, " %")],
-    ["Average hub degree", hubMean === null ? "no stops" : hubMean.toFixed(1), span(BALANCE_OFFICIAL.hubDegree)],
+    ["Crowded routes at a full table, as a share of all routes", official.connections === 0 ? "no routes" : `${Math.round(100 * official.crowded / official.connections)} % (${official.crowded} of ${official.connections} routes, at ${official.players} player${official.players === 1 ? "" : "s"})`, span(ranges.ranges.crowdedPct, " %")],
+    ["Double routes: their ticket traffic against single ones", official.loadRatio === null ? "no double routes" : `${official.loadRatio.toFixed(1)}×`, span(ranges.ranges.loadRatio, "×")],
+    ["Routes no ticket needs", `${Math.round(official.unusedPct)} %`, span(ranges.ranges.unusedPct, " %")],
+    ["Most tickets on one stop", String(official.maxPerStop), span(ranges.ranges.maxPerStop)],
+    ["Wagons at a full table, as a share of the spaces", setup.fill === null ? "no routes" : `${Math.round(100 * setup.fill)} % (${setup.table} × ${setup.wagonsPerPlayer} wagons for ${setup.usableSpaces} spaces)`, span(ranges.ranges.wagonFill, " %")],
+    ["Average hub degree", hubMean === null ? "no stops" : hubMean.toFixed(1), span(ranges.ranges.hubDegree)],
   ];
   return <div className="analysis-section against-official">
-    <h3>Against the official maps</h3>
-    <p className="helper">This map beside what the eight official maps measure, each with its own deck at a full table. Outside the range is not a fault: it says how this map differs.</p>
+    <h3>{ranges.small ? "Against the small official maps" : "Against the official maps"}</h3>
+    <p className="helper">This map beside what {ranges.source} measure, each with its own deck at a full table. Outside the range is not a fault: it says how this map differs.{ranges.small ? " With only two small maps measured the ranges are narrow, so a figure just outside them says little." : ""}</p>
     <div className="analysis-table-scroll"><table className="analysis-table official-table">
-      <thead><tr><th>Figure</th><th>This map</th><th>Official maps</th></tr></thead>
+      <thead><tr><th>Figure</th><th>This map</th><th>{ranges.small ? "Small official maps" : "Official maps"}</th></tr></thead>
       <tbody>{rows.map(([label, here, range]) => <tr key={label}><td>{label}</td><td>{here}</td><td>{range}</td></tr>)}</tbody>
     </table></div>
   </div>;

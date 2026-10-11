@@ -12,7 +12,7 @@ import { curvedPath, isCurved, pathFromPoints, pointsFor } from "./map-geometry"
 import { MapArtwork } from "./map-artwork";
 import { RulesText } from "./rules-text";
 import { versionLabel, versionStatus, type VersionStatus } from "./map-version";
-import { BALANCE_OFFICIAL, colourLengthTable, connectionCount, crossings, networkShape } from "./map-analysis";
+import { balanceRangesFor, colourLengthTable, connectionCount, crossings, networkShape } from "./map-analysis";
 import { evaluateTicketDeck } from "./ticket-suggester";
 import { CUT_MARK_GAP_MM, CUT_MARK_REACH_MM, papers, PRINT_CAPTION_MM, PRINT_MARGIN_MM, printChoices, CARD_MM, boardSource, type BoardSource, type PrintChoice, printPlan, type PrintPlan, type PrintProfile, sameChoice, splits, cardSize, cardsPerRow } from "./print-plan";
 
@@ -180,12 +180,13 @@ function PrintBalance({ data, setId }: { data: MapData; setId: string }) {
   const deck = ticketsInSet(data, setId);
   const set = data.ticketSets.find((item) => item.id === setId);
   const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+  const shapeRanges = balanceRangesFor(data);
   const rows: [string, string][] = [
     ["Network", `${plural(data.stops.length, "stop")}, ${plural(data.routes.length, "route")}, ${plural(data.routes.reduce((sum, route) => sum + route.length, 0), "wagon space")}`],
     ["Crossings", crossingCount ? `${plural(crossingCount, "crossing")} between routes` : "no crossings"],
     ["How it holds together", [plural(shape.deadEnds.length, "dead end"), plural(shape.bridges.length, "route that cuts the map in two", "routes that cut the map in two"), plural(shape.corners.length, "corner"), shape.unconnected.length ? plural(shape.unconnected.length, "stop with no route", "stops with no route") : null].filter(Boolean).join(", ")],
     ["Tickets", `${plural(deck.length, "ticket")} in ${set?.label ?? "the deck"}`],
-    ["Crowded at a full table", `${plural(report.bottlenecks.length, "crowded route")} of ${connectionCount(data)} with ${players} players, the most this map is for (official maps have 8–19 at a full table, ${BALANCE_OFFICIAL.crowdedPct[0]}–${BALANCE_OFFICIAL.crowdedPct[1]} % of their routes)`],
+    ["Crowded at a full table", `${plural(report.bottlenecks.length, "crowded route")} of ${connectionCount(data)} with ${players} players, the most this map is for (${shapeRanges.small ? "the small official maps" : "official maps"} have ${shapeRanges.crowded[0]}–${shapeRanges.crowded[1]} at a full table, ${shapeRanges.ranges.crowdedPct[0]}–${shapeRanges.ranges.crowdedPct[1]} % of their routes)`],
     ["Routes no ticket needs", `${Math.round(report.unusedPct)} %`],
   ];
   return <section className="print-balance">

@@ -82,6 +82,29 @@ const buildMap = (source) => {
   for (const key of Object.keys(suggesterFound)) check(`${key}: Build a full deck quotes what the eight official maps measure`, JSON.stringify(suggesterFound[key]) === JSON.stringify(TICKET_SUGGESTER.official[key]), `${JSON.stringify(suggesterFound[key])} measured, ${JSON.stringify(TICKET_SUGGESTER.official[key])} quoted`);
   check("none of the eight official maps is flagged by the wagon-count warning: each holds its wagons well inside it", measured.every((m) => m.setupVerdict === "ok"), measured.map((m) => `${m.id} ${m.fillPct && m.fillPct.toFixed(0)} % ${m.setupVerdict}`).join(", "));
   for (const key of Object.keys(found)) check(`${key}: the range the editor quotes is what the eight official maps measure`, JSON.stringify(found[key]) === JSON.stringify(BALANCE_OFFICIAL[key]), `${JSON.stringify(found[key])} measured, ${JSON.stringify(BALANCE_OFFICIAL[key])} quoted`);
+
+  // The two small official maps have a set of their own (docs/PROPOSAL-SMALL-BOARDS.md): BALANCE_SMALL says what New York and Amsterdam measure, in the same way.
+  const { BALANCE_SMALL, balanceRangesFor } = require(path.join(out, "map-analysis.js"));
+  const small = reference.maps.filter((map) => ["newyork", "amsterdam"].includes(map.id)).map((source) => {
+    const map = buildMap(source);
+    const report = evaluateTicketDeck(map, { setId: "main", atTable: map.players.max });
+    const stats = networkStats(map);
+    const hubs = [...stats.hubDegree.values()];
+    const setup = setupBalance(map, "main");
+    return { id: source.id, fillPct: 100 * setup.fill, crowded: report.bottlenecks.length, crowdedPct: 100 * report.bottlenecks.length / connectionCount(map), unusedPct: report.unusedPct, maxPerStop: report.maxPerStop, hubDegree: hubs.reduce((a, b) => a + b, 0) / hubs.length };
+  });
+  check("both small maps are in the reference data", small.length === 2);
+  const smallSpan = (key, digits = 0) => { const v = small.map((m) => m[key]); const f = 10 ** digits; return [Math.round(Math.min(...v) * f) / f, Math.round(Math.max(...v) * f) / f]; };
+  check("BALANCE_SMALL names the two maps it is measured on", BALANCE_SMALL && BALANCE_SMALL.maps === 2);
+  for (const [key, digits] of [["fillPct", 0], ["crowded", 0], ["crowdedPct", 0], ["unusedPct", 0], ["maxPerStop", 0], ["hubDegree", 1]]) {
+    const quoted = BALANCE_SMALL[key === "fillPct" ? "wagonFill" : key];
+    check(`${key}: the range quoted for small maps is what New York and Amsterdam measure`, JSON.stringify(smallSpan(key, digits)) === JSON.stringify(quoted), `${JSON.stringify(smallSpan(key, digits))} measured, ${JSON.stringify(quoted)} quoted`);
+  }
+  const small2 = balanceRangesFor({ format: "board-2x2", panelMm: { width: 214, height: 140 } });
+  check("a small board (long side under 500 mm) gets the small ranges", small2.small === true && small2.ranges.unusedPct[1] === BALANCE_SMALL.unusedPct[1] && small2.crowded[1] === BALANCE_SMALL.crowded[1]);
+  check("the standard boards and the extended one get the eight maps' ranges", ["board-2x3", "board-2x4", "board-2x2"].every((format) => { const r = balanceRangesFor({ format }); return r.small === false && r.ranges.unusedPct[1] === BALANCE_OFFICIAL.unusedPct[1]; }));
+  check("a custom board of standard-size panels is not small", balanceRangesFor({ format: "board-3x3" }).small === false);
+  check("a custom size with the real size of a big board is not small either", balanceRangesFor({ format: "board-2x3", panelMm: { width: 263, height: 262 } }).small === false);
 }
 
 for (const line of ok) console.log(`  ok    ${line}`);

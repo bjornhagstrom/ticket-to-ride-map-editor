@@ -25,7 +25,7 @@ import { type DeckCompareView } from "./deck-compare";
 import { DEFAULT_PRINT_CHOICE, isSafari, PRINT_CHOICE_KEY, PRINT_PROFILES, type PrintChoice, type PrintProfile, printPlan } from "./print-plan";
 import { useTicketSuggestion } from "./use-ticket-suggestion";
 import { SettingsDialog, type StyleTarget } from "./map-styles";
-import { BALANCE_OFFICIAL, connectionCount, fittingLength, bandsOf, bandCuts, mapDiameter, deckFigures, defaultStyle, deckRuleFor, TICKET_SUGGESTER, evaluateTicketDeck, suggestedDeckSize, ticketEndStopCount, type TicketStyle, autoPlaceLabels, turnAndTidy, labelledStops, setupBalance, stopCoverage, ticketBand, type TicketBand, reviewTickets, ticketPointsPerSpace, ticketCoverage, type RouteSuggestion, labelCovers, labelAngleOptions, routeSamplePoints, colourLengthTable, crossings as crossingList, networkShape, SHAPE_OFFICIAL, buildAdjacency, networkStats, routeSpacing, shortestPath, suggestRoutes } from "./map-analysis";
+import { balanceRangesFor, connectionCount, fittingLength, bandsOf, bandCuts, mapDiameter, deckFigures, defaultStyle, deckRuleFor, TICKET_SUGGESTER, evaluateTicketDeck, suggestedDeckSize, ticketEndStopCount, type TicketStyle, autoPlaceLabels, turnAndTidy, labelledStops, setupBalance, stopCoverage, ticketBand, type TicketBand, reviewTickets, ticketPointsPerSpace, ticketCoverage, type RouteSuggestion, labelCovers, labelAngleOptions, routeSamplePoints, colourLengthTable, crossings as crossingList, networkShape, SHAPE_OFFICIAL, buildAdjacency, networkStats, routeSpacing, shortestPath, suggestRoutes } from "./map-analysis";
 import { canvasPoint, canvasPointRaw, pointsFor, samePair, stopById } from "./map-geometry";
 import { REPO_URL, newerEditor } from "./version";
 import { RouteLogo } from "./logo";
@@ -34,7 +34,7 @@ import { boardOf, type Orientation } from "./board";
 import { distancesCsv, routesCsv, stopsCsv, templatesZip, ticketsCsv } from "./csv-export";
 import { decodeCsvBytes, readCsvImport, type CsvImport } from "./csv-import";
 import { planRebind, applyRebind, stopKeyOf, type RebindGroup } from "./ticket-rebind";
-import { APP_VERSION, applyBoard, applyBoardPreset, type BoardChoice, moveLegacyStorage, repairMap, cloneForHistory, cloneMap, formatTimestamp, GUIDE_SEEN_KEY, HISTORY_LIMIT, MAX_IMAGE_WARN_BYTES, normalizeBackgroundFile, normalizeNetworkFile, normalizeTicketFile, buildTicketFile, readMapFile, writeMapFile, mapPayload, networkPayload, readBackgroundImage, MAP_HINT_KEY, MAP_HINT_X_KEY } from "./map-storage";
+import { APP_VERSION, applyBoard, applyBoardPreset, gameForPreset, type BoardChoice, moveLegacyStorage, repairMap, cloneForHistory, cloneMap, formatTimestamp, GUIDE_SEEN_KEY, HISTORY_LIMIT, MAX_IMAGE_WARN_BYTES, normalizeBackgroundFile, normalizeNetworkFile, normalizeTicketFile, buildTicketFile, readMapFile, writeMapFile, mapPayload, networkPayload, readBackgroundImage, MAP_HINT_KEY, MAP_HINT_X_KEY } from "./map-storage";
 import { boardDefinition, hasPanelProfile, wagonOf, tensionOf, problemMap, colorLabels, defaultTicketSet, DEFAULT_PLAYERS, DEFAULT_WAGONS_PER_PLAYER, IMAGE_KEEP_ON_BOARD, type Ticket, type StopTypeStyle, type WagonStyle, ticketsInSet, type TicketSet, emptyMap, initialMap, type LineStyle, DEFAULT_END_GAP_MM, type BackgroundImage, type BackgroundShape, type BackgroundType, type MapData, type Point, type Route, type RouteType, type RouteTypeStyle, routeColors, STORAGE_KEY, type Stop, type StopSize, stopSizeMeta, type StopSymbol, stopSymbolMeta, type StopType } from "./map-data";
 
 type MeasureResult = { from: string; to: string; distance: number; routeIds: string[] } | { from: string; to: string; unreachable: true };
@@ -1126,7 +1126,12 @@ export function MapEditor() {
     if (turned.unresolved.length) toast.warning(`${turned.unresolved.length} name${turned.unresolved.length === 1 ? " is" : "s are"} still on a route after the turn: ${turned.unresolved.map((id) => stopById(data, id)?.name).filter(Boolean).slice(0, 4).join(", ")}${turned.unresolved.length > 4 ? ` and ${turned.unresolved.length - 4} more` : ""}. Use Move names clear, or move the stop or bend the route.`);
   };
   // A board from the list in Settings, or the odd one from Custom size: one step, and what is on the map moves with it.
-  const choosePreset = (id: string) => { change((draft) => applyBoardPreset(draft, id)); setDraftPoints([]); clearSelection(); };
+  const choosePreset = (id: string) => {
+    const game = gameForPreset(data, id);
+    change((draft) => applyBoardPreset(draft, id)); setDraftPoints([]); clearSelection();
+    // The board brings its game with it; say so, so the numbers in Settings are not a surprise.
+    if (game) toast.info(`The game follows the board: ${game.wagonsPerPlayer} wagons a player${game.players ? `, ${game.players.min} to ${game.players.max} players` : ", the standard table"}. You can change it in Settings.`);
+  };
   const applyBoardChoice = (choice: BoardChoice) => { change((draft) => applyBoard(draft, choice)); setDraftPoints([]); clearSelection(); };
 
   // Help on hover waits a moment, and each one waits afresh: the pointer passing over the tools on its
@@ -1205,7 +1210,7 @@ export function MapEditor() {
           {shapeCard.all.length > 0 && <p><strong>{shapeCard.title}:</strong> {shapeCard.all.join(", ")}</p>}
           <p>A stop with no route cannot be reached. A route with one lane whose loss cuts the map in two lets a single claim shut part of the map off; none of the {SHAPE_OFFICIAL.maps} official maps has one.</p>
           <p>A dead end, or a corner reached through one or two stops, is character rather than a fault: Edinburgh in Europe is a dead end behind a double route, and {SHAPE_OFFICIAL.mapsWithCorners} of the {SHAPE_OFFICIAL.maps} official maps have corners, such as Iberia. Map balance lists them all.</p>
-          <p><strong>Hub degree</strong> is a stop&apos;s direct neighbours plus the routes touching it; across a whole map the official maps average {BALANCE_OFFICIAL.hubDegree[0]}–{BALANCE_OFFICIAL.hubDegree[1]}. This map: {avgHubDegree.toFixed(1)}.</p>
+          <p><strong>Hub degree</strong> is a stop&apos;s direct neighbours plus the routes touching it; across a whole map {balanceRangesFor(data).small ? "the small official maps" : "the official maps"} average {balanceRangesFor(data).ranges.hubDegree[0]}–{balanceRangesFor(data).ranges.hubDegree[1]}. This map: {avgHubDegree.toFixed(1)}.</p>
         </TooltipContent></Tooltip>}
         <Button variant="outline" size="sm" className="analyze-button" onClick={() => openStyles({ kind: "map" })}><Settings2 />Settings</Button>
         {data.stops.length > 0 && <Button variant="outline" size="sm" className="analyze-button" onClick={() => { setShowSuggestions(false); setHoveredSuggestion(null); setShowTickets(false); setShowRules(false); setShowAnalysis(true); }}><BarChart3 />Map balance</Button>}

@@ -1,6 +1,6 @@
 // The balance layer: everything derived from the stops and routes themselves. All of it is pure,
 // computed on demand from MapData, and none of it is stored in a map file.
-import { pairKeyOf, stopRadiusUnits, nameScale, wagonOf, DEFAULT_WAGONS_PER_PLAYER, DEFAULT_STARTING_TICKETS, DEFAULT_TICKET_BANDS, DEFAULT_TICKET_MIX, type TicketBands, type TicketMix, DEFAULT_PLAYERS, lanesUsableAt, defaultLabelAngle, labelPush, ticketsInSet, type MapData, type Ticket, type Point, type Route, routeColors, type Stop, W } from "./map-data";
+import { boardDefinition, pairKeyOf, stopRadiusUnits, nameScale, wagonOf, DEFAULT_WAGONS_PER_PLAYER, DEFAULT_STARTING_TICKETS, DEFAULT_TICKET_BANDS, DEFAULT_TICKET_MIX, type TicketBands, type TicketMix, DEFAULT_PLAYERS, lanesUsableAt, defaultLabelAngle, labelPush, ticketsInSet, type MapData, type Ticket, type Point, type Route, routeColors, type Stop, W } from "./map-data";
 import type { TicketDeckReport } from "./ticket-suggester";
 import { boardOf, rotateMap, type Orientation } from "./board";
 import { curvedSamples, isCurved, intersects, parallelPoints, pointsFor, polylineLength, stopById } from "./map-geometry";
@@ -584,6 +584,17 @@ export const CROWDING_OFFICIAL: [number, number] = [8, 19];
  *  routes, mean ticket load on double routes against single ones, routes no ticket needs (%), most
  *  tickets on one stop, and the average hub degree. */
 export const BALANCE_OFFICIAL = { wagonFill: [57, 76] as [number, number], crowded: [8, 19] as [number, number], crowdedPct: [10, 17] as [number, number], loadRatio: [1.3, 3.1] as [number, number], unusedPct: [7, 21] as [number, number], maxPerStop: [4, 9] as [number, number], hubDegree: [7.6, 10.8] as [number, number] };
+/** The same figures on the two small official maps, New York and Amsterdam (tests/balance-official.cjs measures them again). Only two maps, so a range here is narrow
+ *  and a figure outside it says little; with more small maps (London) it will widen. */
+export const BALANCE_SMALL = { maps: 2, wagonFill: [71, 72] as [number, number], crowded: [3, 6] as [number, number], crowdedPct: [9, 20] as [number, number], loadRatio: [2.8, 5.4] as [number, number], unusedPct: [19, 33] as [number, number], maxPerStop: [3, 5] as [number, number], hubDegree: [9.1, 9.5] as [number, number] };
+/** A board whose long side is under this many millimetres is a small one: the small official maps are 428 mm, the standard board 790. */
+export const SMALL_BOARD_MM = 500;
+export type BalanceRanges = { small: boolean; maps: number; /** What the ranges are measured on, for the text beside them. */ source: string; ranges: typeof BALANCE_OFFICIAL; crowded: [number, number] };
+/** The official ranges that fit a map's board: the small maps' own on a small board, the eight classic maps' otherwise. */
+export function balanceRangesFor(data: { format?: unknown; panelMm?: unknown }): BalanceRanges {
+  if (boardDefinition(data).widthMm < SMALL_BOARD_MM) return { small: true, maps: BALANCE_SMALL.maps, source: "the two small official maps, New York and Amsterdam", ranges: BALANCE_SMALL, crowded: BALANCE_SMALL.crowded };
+  return { small: false, maps: 8, source: "the eight official maps", ranges: BALANCE_OFFICIAL, crowded: CROWDING_OFFICIAL };
+}
 export const SHAPE_OFFICIAL = { maps: 8, mapsWithDeadEnds: 1, mapsWithBridges: 1, singleLaneBridges: 0, mapsWithCorners: 4, cornersPerMap: [0, 3] as [number, number] };
 
 export function networkShape(data: MapData): NetworkShape {
