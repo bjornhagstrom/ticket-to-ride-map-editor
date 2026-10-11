@@ -5080,6 +5080,47 @@ const sectionStart = (n) => {
     await wide70.context().close();
   }
 
+  // 71. The golden drawing: what the map's artwork draws on the boards the editor has always had must not change when stops, names and lanes are
+  // worked out in millimetres for the small boards (docs/PROPOSAL-SMALL-BOARDS.md, step 2). The drawing of six maps, normalized and
+  // hashed, is compared with tests/golden-drawing.json, which was recorded from the editor before that change (TTR_RECORD_GOLDEN=1 rewrites it).
+  if (wants(71)) {
+  sectionStart(71);
+    const gp = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
+    gp.on("pageerror", (e) => errors.push(String(e)));
+    await gp.goto(BASE, { waitUntil: "networkidle" });
+    await gp.getByRole("button", { name: "Load the example map" }).click();
+    await gp.waitForTimeout(600);
+    const example = await gp.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")));
+    await gp.evaluate(() => localStorage.clear()); await gp.reload({ waitUntil: "networkidle" }); await gp.waitForTimeout(500);
+    await gp.getByRole("button", { name: "Load a map with problems" }).click(); await gp.waitForTimeout(600);
+    const problem = await gp.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")));
+    const fullSample = (m) => { Object.assign(m.stops[0], { hub: true, size: "large", symbol: "letter", letter: "A", labelAngle: 45, endGapMm: 3, locked: true, labelLocked: true }); Object.assign(m.stops[1], { size: "small", symbol: "cross" }); Object.assign(m.routes[0], { contested: true, points: [{ x: m.stops[0].x + 40, y: m.stops[0].y + 30 }], curved: true }); if (m.routes[1]) m.routes[1].curved = false; return m; };
+    const cases = [
+      ["example on 2×3 lying", { ...example }],
+      ["example on 2×4 lying", { ...example, format: "board-2x4" }],
+      ["example on 3×3 standing", { ...example, format: "board-3x3", orientation: "portrait" }],
+      ["problem map on 2×3 lying", { ...problem }],
+      ["problem map on 3×4 standing", { ...problem, format: "board-3x4", orientation: "portrait" }],
+      ["problem map with every optional field on 2×3", fullSample(JSON.parse(JSON.stringify(problem)))],
+    ];
+    const goldenFile = path.join(__dirname, "golden-drawing.json");
+    const record = process.env.TTR_RECORD_GOLDEN === "1";
+    const golden = record || !fs.existsSync(goldenFile) ? {} : JSON.parse(fs.readFileSync(goldenFile, "utf8"));
+    const drawn = {};
+    for (const [label, map] of cases) {
+      await gp.evaluate((m) => localStorage.setItem("ttr-map", JSON.stringify(m)), map);
+      await gp.reload({ waitUntil: "networkidle" }); await gp.waitForTimeout(700);
+      const html = await gp.evaluate(() => { const svg = document.querySelector(".map-canvas"); const clone = svg.cloneNode(true); clone.querySelectorAll("[id]").forEach((el) => el.removeAttribute("id")); return clone.outerHTML.replace(/(clip-path|mask|filter|fill)="url\(#[^)]*\)"/g, "$1=\"url(#x)\"").replace(/\s+/g, " "); });
+      const hash = await gp.evaluate(async (h) => { const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(h)); return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join(""); }, html);
+      drawn[label] = { hash, length: html.length };
+      if (!record) check(`the drawing of the ${label} is what it was`, golden[label] && golden[label].hash === hash, golden[label] ? `${html.length} characters against ${golden[label].length}` : "no golden recorded");
+      if (!record && golden[label] && golden[label].hash !== hash && process.env.TTR_GOLDEN_DUMP) fs.writeFileSync(path.join(os.tmpdir(), `golden-${label.replace(/\W+/g, "-")}.html`), html);
+      if (process.env.TTR_GOLDEN_DUMP) fs.writeFileSync(path.join(os.tmpdir(), `golden-now-${label.replace(/\W+/g, "-")}.html`), html);
+    }
+    if (record) { fs.writeFileSync(goldenFile, `${JSON.stringify(drawn, null, 1)}\n`); check("the golden drawing was recorded", true, Object.keys(drawn).join(", ")); }
+    await gp.context().close();
+  }
+
   if (sectionOpen) sectionTimes[sectionOpen.n] = Math.round((Date.now() - sectionOpen.at) / 100) / 10;
   if (process.env.TTR_TIMES) fs.writeFileSync(process.env.TTR_TIMES, JSON.stringify(sectionTimes));
   console.log("PASS:"); ok.forEach((l) => console.log("  ✓ " + l));
