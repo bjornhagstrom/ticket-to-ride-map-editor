@@ -1,26 +1,26 @@
 {
  "example on 2×3 lying": {
-  "hash": "ae03e3da89d757993ebdc105fd91e7e9d342151d74512c439a84c05ec348a5c6",
-  "length": 71839
+  "hash": "a2f6c2f72ef88d3c1b2fc844f7bb40c9c12eb4c1e3ed902fc88cc6a67c145aff",
+  "length": 57554
  },
  "example on 2×4 lying": {
-  "hash": "37476b7e0cb7c51221dc257a4273d093cd5b73d1d6918a7e3642f4b01a3532ce",
-  "length": 71714
+  "hash": "37cba96af79bf3f19b66fef8a8ce0151ba42184bb4ae75ba6065da64903d325e",
+  "length": 57490
  },
  "example on 3×3 standing": {
-  "hash": "531678d5505990d76db41ecc82d401531027f179d8359d9a360f387078c1e0aa",
-  "length": 71956
+  "hash": "2b5bd487755dff4d8caa068fe53e6ee91b89de51bbc396232b42c0d5e159dbfe",
+  "length": 57643
  },
  "problem map on 2×3 lying": {
-  "hash": "c848f9df612d62e38840ae225f8c9b9014ea682a3a1d89506aa853be9d30ad56",
-  "length": 78279
+  "hash": "3c15931ae372bfa79b2b82f8fd5fafbcaf52ce1ce3380e7854e16922c34ab03c",
+  "length": 62833
  },
  "problem map on 3×4 standing": {
-  "hash": "c9d6ab82df94fd2c46a43a1a70ef98139660c13690a13b509693fdcb9aacee7e",
-  "length": 78240
+  "hash": "4799a691fab9939eef392aed39b2148d8f60fecea2f86f084e3023bdaa4d7b2b",
+  "length": 62834
  },
  "problem map with every optional field on 2×3": {
-  "hash": "9dcb07b8ed96f1a27076400d003a657298f3606307e8b189b5967a7dc6093555",
-  "length": 78302
+  "hash": "39b3644c0e0d5cff60717466b49169026a97aa4c3d3994ca6493272cb161cbaa",
+  "length": 62948
  }
 }

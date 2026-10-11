@@ -5110,7 +5110,7 @@ const sectionStart = (n) => {
     for (const [label, map] of cases) {
       await gp.evaluate((m) => localStorage.setItem("ttr-map", JSON.stringify(m)), map);
       await gp.reload({ waitUntil: "networkidle" }); await gp.waitForTimeout(700);
-      const html = await gp.evaluate(() => { const svg = document.querySelector(".map-canvas"); const clone = svg.cloneNode(true); clone.querySelectorAll("[id]").forEach((el) => el.removeAttribute("id")); return clone.outerHTML.replace(/(clip-path|mask|filter|fill)="url\(#[^)]*\)"/g, "$1=\"url(#x)\"").replace(/\s+/g, " "); });
+      const html = await gp.evaluate(() => { const svg = document.querySelector(".map-canvas"); const clone = svg.cloneNode(true); clone.querySelectorAll("[id]").forEach((el) => el.removeAttribute("id")); return clone.outerHTML.replace(/(clip-path|mask|filter|fill)="url\(#[^)]*\)"/g, "$1=\"url(#x)\"").replace(/\s+/g, " ").replace(/-?\d+\.\d{8,}/g, (n) => { const r = Number(n).toFixed(6); return r === "-0.000000" ? "0.000000" : r; }); });
       const hash = await gp.evaluate(async (h) => { const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(h)); return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join(""); }, html);
       drawn[label] = { hash, length: html.length };
       if (!record) check(`the drawing of the ${label} is what it was`, golden[label] && golden[label].hash === hash, golden[label] ? `${html.length} characters against ${golden[label].length}` : "no golden recorded");

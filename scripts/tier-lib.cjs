@@ -24,8 +24,9 @@ function serveOut(outDir) {
 }
 
 // Names the public notes carry on purpose (a public place name used as an example, a library's attribute, the editor's own storage
-// key). Found in every build since 1.1.0 and looked at each time; a name outside this list is a failure.
-const ALLOWED_NAMES = ["Edinburgh", "London", "Marseille", "Pamplona", "orebro", "Basel", "basel", "Monaco"];
+// key), and from the small boards the names of two published boards, New York and Amsterdam, which Settings offers as presets (their stops and routes are
+// not in the build). Found in every build since 1.1.0 and looked at each time; a name outside this list is a failure.
+const ALLOWED_NAMES = ["Edinburgh", "London", "Marseille", "Pamplona", "orebro", "Basel", "basel", "Monaco", "New York", "new-york", "Amsterdam"];
 
 // The names of places and maps in the private reference data: strings of five or more letters under a key that is a name.
 function referenceNames(file) {
