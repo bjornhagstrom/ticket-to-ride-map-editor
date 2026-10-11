@@ -10,6 +10,7 @@ to the questions at the end.
 - **The wagons are the same size on all three: 2.4 cm long.** Their width, the gap between two wagon spaces and the margin at the ends of a route are not given yet.
 - The data of the New York map (stops, routes, tickets) is coming, and the other two after it. They are official maps, so they go into the private reference data like the
   other eight and never into the repository.
+- **Decided by the owner (2026-10-11):** the wagon's gap, margin and width follow the **standard proportions** of the 20 mm wagon scaled to 24 mm (width 10.8, gap 6.6, end margin 18 mm), said in the map's notes; the **ticket cards may be smaller on small boards** (it does not matter for a prototype), so that more fit on a print.
 - San Francisco was named before; it is not among the three described, so it is left until the owner says otherwise.
 
 What that makes (a panel upright, 14 or 16.5 cm wide and 21.4 cm tall, two panels across and two down; the board is then taller than wide, which the editor calls **standing**, and the same
@@ -53,7 +54,7 @@ On a 428 × 280 mm board (or 428 × 330) with 24 mm wagons the assumptions that 
 
 ```
 panelMm: { width: 214, height: 140 }          // one panel as the board LIES (long side first; a standing board is the lying one turned); absent = 263.3 × 262.5
-wagonMm: { length: 24, width: ?, gap: ?, endMargin: ? }   // absent = 20 × 9, gap 5.5, margin 15
+wagonMm: { length: 24, width: 10.8, gap: 6.6, endMargin: 18 }   // the standard proportions of 20 × 9, gap 5.5, margin 15; absent = 20 × 9, 5.5, 15
 ```
 
 - The board is still named by its panels, and **all three small maps are `board-2x2`**: 2 rows of 2 panels. Its size in millimetres is the panels times `panelMm`: for New York 2 × 214 = 428 across and 2 × 140 = 280 down.
@@ -73,9 +74,10 @@ Values read from a file are held to rule 8: numbers that are not numbers, or out
    `wagonOf(data)` replaces `realWagon`. Round-trip, hostile, and older-build tests (as in `tests/lane-rule.cjs`).
 2. **Everything physical in millimetres** (the largest step, and the risky one). Stop radii, names, strokes, the lane spacing and the end gaps become millimetres converted with the board's `unitMm`, so that on the standard boards the drawing is
    **exactly what it is today**: a golden test first (the example map and the map with problems, on 2×3, 2×4 and 3×4, lying and standing, compared as drawn before and after), then the change. Only then does a small board draw to scale.
-3. **Analysis.** `fittingLength`, `routeSpacing`, "Room per wagon" and the text of Map balance use `wagonOf(data)` and say the real millimetres. Whether the official ranges are shown beside a small map, or a separate set once the small maps' own figures
-   are measured, waits for their data.
-4. **Printing.** Board sizes from the profile (428 × 280 mm and 428 × 330 mm). A panel is 214 × 140 (or 214 × 165) mm, so **a sheet per panel at full size is one A4 sheet each**, four in all, on the paper the real panels are; the whole board at full size is four A4 sheets, or two A3. The ticket cards stay 62 × 45 mm unless the owner says the small boards have smaller ones.
+3. **Analysis.** `fittingLength`, `routeSpacing`, "Room per wagon" and the text of Map balance use `wagonOf(data)` and say the real millimetres. **Map balance for small maps** (the owner's question, answered yes): the figures it works out are mostly ratios and
+   need no page of their own, but the *ranges they are set against* (`BALANCE_OFFICIAL`, measured on eight big maps) should not be the ones for a board of 428 mm. A second set, "Against the small official maps", is measured on New York, Amsterdam and London (three maps: thin evidence,
+   said on the page), and a map is set against it when its board is small (its long side under 500 mm, which all three are). The wagon-fill measure (what a full table holds against the spaces it can claim) is a ratio too, and gets its own range there. Built after the data of all three is in.
+4. **Printing.** Board sizes from the profile (428 × 280 mm and 428 × 330 mm). A panel is 214 × 140 (or 214 × 165) mm, so **a sheet per panel at full size is one A4 sheet each**, four in all, on the paper the real panels are; the whole board at full size is four A4 sheets, or two A3. The ticket cards get a second size, **small (50 × 36 mm, four-fifths of 62 × 45)**, as a choice in the print dialog that the browser remembers (not stored in the map, so no file change): standard 62 × 45 for the standard boards and small for the small ones to begin with, so that more cards fit on a sheet.
 5. **Settings.** The presets and the advanced fields, and the welcome guide's mention of the choices.
 6. **The three maps as reference data.** Converted as the other eight were (private, never committed), run through the calibration, their figures set beside the official ones; whether they become official maps in `BALANCE_OFFICIAL` (and how the ranges are kept for big and small maps) is decided with the figures in front of us.
 7. **Release.** A minor release (1.8.0), with the review, `npm run test:release -- --dev` (the work touches components) and the owner's go.
@@ -89,12 +91,9 @@ Values read from a file are held to rule 8: numbers that are not numbers, or out
 - An older build (1.7.0 and before) opens the file, keeps the profile through a round trip, and says that the file is from a newer editor (compiled from the commits, as in `tests/lane-rule.cjs`).
 - The hostile-maps test sets every odd value in `panelMm` and `wagonMm` without a throw.
 
-## Questions for the owner
+## Questions for the owner (the open ones; the answered are in the first part)
 
 1. **Confirm the board**: a panel is 14 (or 16.5) cm wide and 21.4 cm tall, and the board is 2 panels across and 2 down, so **28 × 42.8 cm** for New York and **33 × 42.8 cm** for Amsterdam and London (standing; the same boards lying are 42.8 × 28 and 42.8 × 33 cm)? And do the boards stand (taller than wide) when played, so that the presets should set the map to standing?
-2. The wagon: **how wide** is it (the 2.4 cm is its length), and what is the **gap** between two wagon spaces and the **margin** at the ends of a route? A measured distance between two stops on a route of known length gives all three. If they are not at hand I use the standard proportions (6.6 and 18 mm) and say so in the map.
-3. **Ticket cards**: 62 × 45 mm on the small boards too?
-4. **Stops and names**: how big is a stop circle on these boards, and how big is a name's lettering? (A measurement of one of each is enough; the three boards are probably alike.) These matter more now: on a 428 mm board the stops and names are the part that would be too small if left as they are.
-5. The data: in what form (a spreadsheet, the JSON of the reference data, photographs of the boards)? I convert it into the private reference data as for the other eight.
-6. Should the three be **official maps in Map balance's comparison** (with separate ranges for small boards), or only example maps for the small boards?
-7. **San Francisco**: is it the same kind of board (and does it get a preset), or something else?
+2. **Stops and names**: how big is a **stop circle** (its diameter, in mm), and how tall are the **capital letters of a city's name** as printed on the board (in mm)? One measurement of each is enough; the three boards are probably alike. (By "name lettering" I mean the printed city names, not the letter you can put on a stop in the editor.)
+3. **The data**: wagons per player, number of players, the numbers of tickets (short and long), the points per route length if they differ from the standard, the rule for double routes by player count, and the board and the cards as photographs or lists (formats in the conversation of 2026-10-11).
+4. **San Francisco**: is it the same kind of board (and does it get a preset), or something else?
