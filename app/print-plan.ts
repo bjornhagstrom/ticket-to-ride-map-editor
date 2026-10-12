@@ -118,7 +118,20 @@ export function printChoiceFor(format: BoardSource, choice: PrintChoice): Requir
   return { split, paper, size };
 }
 
+// A saved Full size that the table does not offer, because it is Per panel on every paper (the small boards), prints as Per panel: the cell the dialog shows
+// as chosen is what comes out, with the panel's own frame and caption.
 export function printPlan(format: BoardSource, raw: PrintChoice, profile: PrintProfile = PRINT_PROFILES.standard, orientation: Orientation = "landscape"): PrintPlan {
+  const asked = printChoiceFor(format, raw);
+  return planOf(format, asked.split === "full" && fullIsPanel(format, asked.size, profile, orientation) ? { ...asked, split: "panel" } : asked, profile, orientation);
+}
+
+// Full size of one size is the same sheets at the same scale as Per panel on every paper.
+const fullIsPanel = (format: BoardSource, size: SizeId, profile: PrintProfile, orientation: Orientation): boolean => papers.every((paper) => {
+  const a = planOf(format, { split: "panel", paper: paper.id }, profile, orientation), b = planOf(format, { split: "full", paper: paper.id, size }, profile, orientation);
+  return a.pages.length === b.pages.length && a.scale === b.scale;
+});
+
+function planOf(format: BoardSource, raw: PrintChoice, profile: PrintProfile, orientation: Orientation): PrintPlan {
   const choice = printChoiceFor(format, raw);
   const board = boardOf({ ...boardSource(format), orientation });
   const standing = board.orientation === "portrait";
@@ -171,12 +184,11 @@ export function printChoices(format: BoardSource, profile: PrintProfile = PRINT_
   ];
   // Full size that is Per panel on every paper (the small boards: a panel fits an A4 at 100 %) is the same choice twice; the one that says what is cut stays.
   const panelAt = columns.findIndex((column) => column.label === "Per panel");
-  const same = (index: number) => papers.every((paper) => { const a = printPlan(format, columns[panelAt].choice(paper.id), profile, orientation), b = printPlan(format, columns[index].choice(paper.id), profile, orientation); return a.pages.length === b.pages.length && a.scale === b.scale; });
-  for (let i = columns.length - 1; i > panelAt; i--) if (same(i)) columns.splice(i, 1);
+  for (let i = columns.length - 1; i > panelAt; i--) if (fullIsPanel(format, sizes[i - panelAt - 1].id, profile, orientation)) columns.splice(i, 1);
   const table = papers.map((paper) => ({
     paper,
     cells: columns.map((column): PrintTableCell => {
-      const plan = printPlan(format, column.choice(paper.id), profile, orientation);
+      const plan = planOf(format, column.choice(paper.id), profile, orientation);
       return { choice: plan.choice, label: column.label, pages: plan.pages.length, scale: plan.scale };
     }),
   }));

@@ -11,6 +11,8 @@ export type TicketLengthsView = {
   skipped: number;
   long: number;
   official: number[];
+  /** What the reference is: the official decks, or on the small boards' rules the two small official maps. */
+  officialLabel?: string;
   own: { label: string; bins: number[] } | null;
 };
 
@@ -26,13 +28,14 @@ function gapSentence(name: string, counts: number[], regular: number, reference:
 
 export function TicketLengths({ view }: { view: TicketLengthsView }) {
   const { counts, regular, reach, skipped, long, official, own } = view;
+  const officialName = view.officialLabel ?? "Official decks";
   return <div className="analysis-section ticket-lengths">
     <h3>Ticket lengths</h3>
     {regular === 0 ? <p className="helper">No regular tickets in this deck yet.</p> : <>
       <p className="helper">How the {regular} regular tickets spread over how far they reach, as a share of the longest ticket a player can build{reach ? ` (${reach} wagon spaces)` : ""}.</p>
       <div className="length-legend" aria-hidden="true">
         <span><i className="length-key deck" />This deck</span>
-        <span><i className="length-key official" />Official decks</span>
+        <span><i className="length-key official" />{officialName}</span>
         {own && <span><i className="length-key own" />{own.label}</span>}
       </div>
       <div className="length-rows">
@@ -40,7 +43,7 @@ export function TicketLengths({ view }: { view: TicketLengthsView }) {
           <span className="length-label">{BIN_LABELS[index]}</span>
           <div className="length-track">
             <div className="length-fill" style={{ width: `${count / regular * 100}%` }} />
-            <span className="length-ref" data-ref="official" style={{ left: `${official[index] * 100}%` }} title={`Official decks: ${pct(official[index])} %`} />
+            <span className="length-ref" data-ref="official" style={{ left: `${official[index] * 100}%` }} title={`${officialName}: ${pct(official[index])} %`} />
             {own && <span className="length-ref" data-ref="own" style={{ left: `${own.bins[index] * 100}%` }} title={`${own.label}: ${pct(own.bins[index])} %`} />}
           </div>
           <span className="length-numbers"><b className="length-count">{count}</b> <span className="length-share">{pct(count / regular)} %</span></span>
@@ -49,7 +52,7 @@ export function TicketLengths({ view }: { view: TicketLengthsView }) {
       {(skipped > 0 || long > 0) && <p className="helper length-excluded" data-skipped={skipped} data-long={long}>
         {skipped > 0 && `${skipped} ticket${skipped === 1 ? " is" : "s are"} not in the bars: longer than a player can build with their wagons, or to a stop nothing reaches.`}{skipped > 0 && long > 0 ? " " : ""}{long > 0 && `${long} long ticket${long === 1 ? " is" : "s are"} kept apart from them.`}
       </p>}
-      <p className="helper length-verdict">{gapSentence("the official decks", counts, regular, official)}{own ? ` ${gapSentence(own.label, counts, regular, own.bins)}` : ""}</p>
+      <p className="helper length-verdict">{gapSentence(officialName === "Official decks" ? "the official decks" : "the small official maps", counts, regular, official)}{own ? ` ${gapSentence(own.label, counts, regular, own.bins)}` : ""}</p>
     </>}
   </div>;
 }

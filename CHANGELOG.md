@@ -10,12 +10,12 @@ This file is written from `app/version.ts` by `npm run changelog`; edit the note
 
 - Small boards: Settings offers New York (standing, 280 by 428 mm), Amsterdam and London (lying, 428 by 330 mm) as boards, with wagons, stops and names drawn at the size they are on the real board, and the map you have moves to the new board.
 - Custom size has a part called Real sizes, where you give the size of a panel, a wagon, a stop and the capitals of the names in millimetres, for a small board of your own.
-- In the print table a small board has no Full size column: a panel fits a sheet at full size, so it is the same four sheets as Per panel and is shown once.
 - Printing a small board takes one A4 sheet for each panel, and the ticket cards can be small (50 by 36 mm) so that more of them fit on a sheet; small is the start on a small board, and your choice is remembered.
+- On New York, Amsterdam and London the print table has no Full size column: a panel fits a sheet at full size, so it is the same four sheets as Per panel and is shown once.
 - Choosing New York or Amsterdam also sets 15 or 16 wagons a player and two to four players, if you have not chosen those yourself, and a message tells you so; going back to a standard board puts the standard game back in the same way.
-- On a small board the deck builder says so at the top: the suggestions follow the rules made from New York and Amsterdam, and Generic is there to use the large maps' targets instead.
-- The deck builder has a fourth set of rules, Small boards, made from New York and Amsterdam, which is the start on a small board; it asks for about 1.3 tickets for each stop, counts the long tickets that a small map's wagons allow, and quotes the small maps beside its numbers.
 - On a small board Map balance sets the map against the two small official maps, New York and Amsterdam, instead of the eight large ones, and says that two maps make a narrow range.
+- Build a full deck of tickets has a fourth set of rules, Small boards, made from New York and Amsterdam, which is the start on a small board: about 1.3 tickets for each stop, and its numbers set against the two small official maps.
+- On a small board Build a full deck of tickets says so at the top: the suggestions follow the rules made from New York and Amsterdam, and Generic is there to use the large maps' targets instead.
 - On a phone the tools and the properties sheets fill all the room from the header to the bar at the foot, worked out by the page itself so that it is right on any screen and when the phone is turned, and Escape shuts the sheet that is open.
 - On a phone the header is two rows: the name of the map with Undo, Redo and a menu button, and Help, Import, Print map and Export in the menu, which opens over the map and shuts when you choose, press Escape or touch the map.
 - On a phone the boxes with facts about the map are a row of their own right under the header, with the saving state, and one button folds the row away, which is remembered.

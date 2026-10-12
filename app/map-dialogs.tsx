@@ -402,7 +402,7 @@ export function SuggestTicketsDialog({ tension, onTension, open, onOpenChange, d
     <DialogContent className="suggest-dialog" style={{ height: "86vh", maxHeight: 860 }}>
       <DialogHeader>
         <DialogTitle>Build a full deck of tickets</DialogTitle>
-        <DialogDescription>Every target below comes from the official Ticket to Ride decks{small ? " (on this small board, the two small ones)" : ""}, not from this map. Save the result as a new deck under a name of your own, or let it replace the deck you are working on.</DialogDescription>
+        <DialogDescription>Every target below comes from the official Ticket to Ride decks{small && style === "small" ? " (on this small board, the two small ones)" : ""}, not from this map. Save the result as a new deck under a name of your own, or let it replace the deck you are working on.</DialogDescription>
       </DialogHeader>
 
       <div className="suggest-scroll">
@@ -436,7 +436,7 @@ export function SuggestTicketsDialog({ tension, onTension, open, onOpenChange, d
       <TensionSlider legend="How tense" name="suggest-tension" value={tension} onChange={onTension} />
       <p className="helper">{busy ? "Working out a deck… " : ""} The wagon count and the tension are this map&apos;s own settings, and changing them here changes them there. A player&apos;s reach is {report?.reach ?? current.reach} wagon spaces, from {rule.lengthCap} × {wagons} wagons.</p>
       {deckSize < needed && <div className="helper helper-warning deck-size-warning" role="status">
-        <span>Too few to deal a full table: {needed} tickets are dealt at the start ({tableWord(data.players?.max ?? 5)} players, {data.startingTickets ?? 3} each), and this deck has {deckSize}. It is allowed. Official decks have {TICKET_SUGGESTER.official.perStop[0]}–{TICKET_SUGGESTER.official.perStop[1]} tickets per stop.</span>
+        <span>Too few to deal a full table: {needed} tickets are dealt at the start ({tableWord(data.players?.max ?? 5)} players, {data.startingTickets ?? 3} each), and this deck has {deckSize}. It is allowed. {small ? "The small official decks" : "Official decks"} have {official.perStop[0]}–{official.perStop[1]} tickets per stop.</span>
         <Button size="sm" variant="outline" onClick={() => onDeckSize(needed)}>Use {needed}</Button>
       </div>}
       <label className="checkbox-row"><input type="checkbox" checked={keepExisting} onChange={(event) => onKeepExisting(event.target.checked)} />Keep the tickets this deck already has</label>

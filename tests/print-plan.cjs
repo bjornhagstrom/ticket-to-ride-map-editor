@@ -197,7 +197,9 @@ check("every cell says what printPlan says", printChoices("board-2x3").table.eve
   const ny = printChoices({ format: "board-2x2", panelMm: { width: 214, height: 140 } }, undefined, "portrait");
   const am = printChoices({ format: "board-2x2", panelMm: { width: 214, height: 165 } });
   check("on New York and Amsterdam, where Full size is Per panel on every paper, the table has no Full size column", [ny, am].every((t) => t.columns.join() === "One sheet,Per panel" && t.table.every((row) => row.cells.length === 2)), JSON.stringify([ny.columns, am.columns]));
-  check("and a printed choice of full size still plans, as the same sheets", printPlan({ format: "board-2x2", panelMm: { width: 214, height: 140 } }, { split: "full", paper: "a4" }, undefined, "portrait").pages.length === 4);
+  const savedFull = printPlan({ format: "board-2x2", panelMm: { width: 214, height: 140 } }, { split: "full", paper: "a4", size: "standard" }, undefined, "portrait");
+  check("and a saved choice of Full size is planned as Per panel, the cell the table shows as chosen: four sheets, split 'panel'", savedFull.pages.length === 4 && savedFull.choice.split === "panel", savedFull.choice.split);
+  check("on the standard board a saved Full size stays Full size", printPlan("board-2x3", { split: "full", paper: "a4", size: "standard" }).choice.split === "full");
   check("the standard and extended boards keep their Full size columns", printChoices("board-2x3").columns.length === 4 && printChoices("board-2x4").columns.includes("Full size"), JSON.stringify([printChoices("board-2x3").columns, printChoices("board-2x4").columns]));
 }
 

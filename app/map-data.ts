@@ -103,7 +103,7 @@ export type NoteBox = {
   locked?: boolean;
   collapsed?: boolean;
 };
-// The terms a deck is suggested on: how many tickets, how long, how they spread. Our three sets live
+// The terms a deck is suggested on: how many tickets, how long, how they spread. Our four sets live
 // in TICKET_SUGGESTER and cannot be changed; a map may carry sets of its own, made from one of ours,
 // and choose which one the suggester follows. Shares are fractions (0.18), as in TICKET_SUGGESTER.
 export type DeckRuleValues = {
@@ -120,7 +120,7 @@ export type DeckRuleValues = {
   /** Own sets only: how much further out than the map's average stop long tickets should end, and
    *  short ones (negative is further in), on a scale from the middle (0) to the edge (1). null means no
    *  preference: only a deck on the wrong side of the average stop is marked down. When both are
-   *  absent, `periphery` decides, as it does for our three. */
+   *  absent, `periphery` decides, as it does for ours. */
   longEnds?: number | null;
   shortEnds?: number | null;
 };
@@ -257,12 +257,12 @@ export const nameMmOf = (source: { nameMm?: unknown }): number => normalizeMm(so
 export const nameTypeMm = (source: { nameMm?: unknown }): number => nameMmOf(source) / 0.7;
 /** What one map unit is on this map's board: the board's width in millimetres over the 1100 units across it. */
 export const unitMmOf = (source: { format?: unknown; panelMm?: unknown }): number => boardDefinition(source).widthMm / W;
-/** The radius of a stop in map units. With a profile it is worked out from the millimetres (so a stop of 18.5 mm is that on any board); without one it is
- *  the size in units the editor has always drawn, so that the boards it has always had are drawn exactly as before. An unknown size is a medium one. */
 /** A board whose long side is under this many millimetres is a small one: the small official maps are 428 mm, the standard board 790. */
 export const SMALL_BOARD_MM = 500;
 export const isSmallBoard = (source: { format?: unknown; panelMm?: unknown }): boolean => boardDefinition(source).widthMm < SMALL_BOARD_MM;
 export const hasPanelProfile = (source: { format?: unknown; panelMm?: unknown }): boolean => validPanelFor(source.format, source.panelMm) !== undefined;
+/** The radius of a stop in map units. With a profile it is worked out from the millimetres (so a stop of 18.5 mm is that on any board); without one it is
+ *  the size in units the editor has always drawn, so that the boards it has always had are drawn exactly as before. An unknown size is a medium one. */
 export const stopRadiusUnits = (source: { format?: unknown; panelMm?: unknown; stopMm?: unknown }, size: unknown): number =>
   normalizeMm(source.stopMm, 3, 40) === undefined && !hasPanelProfile(source) ? stopSizeMetaOf(size).radius : stopSizeMm(source, size) / 2 / unitMmOf(source);
 /** How much bigger (or smaller) a city's name is drawn than the 12 units of type of the standard board: 1 without a profile; with a panel profile the name size

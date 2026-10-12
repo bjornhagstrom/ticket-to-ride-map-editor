@@ -5248,6 +5248,13 @@ const sectionStart = (n) => {
     check("on a small board the ticket cards are small to begin with: 50 × 36 mm", (await pp.getByRole("radio", { name: /Small cards/ }).isChecked()) && (await cardWidth()) === "36mm", String(await cardWidth()));
     const panelCell = pp.locator('.print-table tbody tr[data-paper="a4"] td:nth-of-type(2) button');
     check("the table has One sheet and Per panel only: Full size would be the same four sheets", (await pp.locator(".print-table thead th").allTextContents()).join("|") === "Paper|One sheet|Per panel", (await pp.locator(".print-table thead th").allTextContents()).join("|"));
+    // A Full size saved on a standard board (the choice is kept per browser) prints as Per panel on a small board, with the panel's own caption.
+    await pp.keyboard.press("Escape"); await pp.waitForTimeout(300);
+    await pp.evaluate(() => localStorage.setItem("ttr-print-choice", JSON.stringify({ split: "full", paper: "a4", size: "standard" })));
+    await pp.reload({ waitUntil: "networkidle" }); await pp.waitForTimeout(600);
+    const noteText = await pp.evaluate(() => (document.querySelector(".print-pages .print-sheet-note") || {}).textContent || "");
+    check("a Full size saved on another board prints as Per panel on New York: the caption says Panel, not full size", /^Panel 1 of 4/.test(noteText) && !/^Sheet/.test(noteText), noteText);
+    await openPrint();
     check("a sheet per panel is four A4 sheets on the standing New York board", (await panelCell.getAttribute("data-pages")) === "4", String(await panelCell.getAttribute("data-pages")));
     // The sheets are in the page though out of sight: a wagon of the printed board is 24 mm of the board's 428 (found in review: it printed at 19.5 on a small board).
     await pp.keyboard.press("Escape"); await pp.waitForTimeout(300);
@@ -5322,6 +5329,15 @@ const sectionStart = (n) => {
     check("and how to use the large maps' targets instead", /Generic/.test(await note()));
     await dp.locator(".style-card", { hasText: "Generic" }).first().click(); await dp.waitForTimeout(300);
     check("with Generic chosen the line says Small boards would fit this board better", /small/i.test(await note()) && /Small boards/.test(await note()) && !/follow the rules made/.test(await note()), await note());
+    await dp.locator(".style-card", { hasText: "Small boards" }).first().click(); await dp.waitForTimeout(300);
+    await dp.keyboard.press("Escape"); await dp.waitForTimeout(300);
+    // The other places that quote what the official decks measure follow the small boards' rules too (found in review).
+    await dp.getByRole("button", { name: "Settings" }).click(); await dp.waitForTimeout(400);
+    await dp.locator(".settings-nav-item", { hasText: /deck rules/i }).click(); await dp.waitForTimeout(400);
+    check("the Deck rules page says why a small board is on Small boards, and sets it against the small official maps", /New York and Amsterdam/.test(await dp.locator(".deck-rule-default").textContent()) && /small official maps/.test(await dp.locator(".deck-rule-values").textContent()), (await dp.locator(".deck-rule-default").textContent()));
+    await dp.keyboard.press("Escape"); await dp.waitForTimeout(300);
+    await dp.getByRole("button", { name: "Tickets", exact: true }).click(); await dp.waitForTimeout(500);
+    check("Ticket lengths on a small board is set against the small official maps, not the large ones", /Small official maps/.test(await dp.locator(".length-legend").first().textContent().catch(() => "")), await dp.locator(".length-legend").first().textContent().catch(() => "none"));
     await dp.context().close();
   }
 

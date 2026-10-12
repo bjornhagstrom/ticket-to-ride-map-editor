@@ -1,6 +1,6 @@
 "use client";
 
-// The rules the ticket suggester follows on this map. Our three sets are shown as they are and cannot
+// The rules the ticket suggester follows on this map. Our four sets are shown as they are and cannot
 // be changed; a set of the map's own is made from one of them and can be. The map chooses which one
 // the suggester follows. Shares are kept as fractions and shown as percentages.
 import { Plus, Trash2 } from "lucide-react";
@@ -59,7 +59,7 @@ export function DeckRulesPanel({ data, change }: { data: MapData; change: (fn: (
     if (draft.deckRule === id) draft.deckRule = undefined;
     return draft;
   });
-  const why = "it is the average of the official maps";
+  const why = chosen.id === "small" ? "this board is small, so it starts on the rules made from New York and Amsterdam" : "it is the average of the official maps";
 
   return <div className="deck-rules">
     <fieldset className="deck-rule-list">
@@ -84,7 +84,10 @@ export function DeckRulesPanel({ data, change }: { data: MapData; change: (fn: (
 
 // Ours, shown as they are: what each value is, and where the official decks measure.
 function FixedRuleValues({ rule }: { rule: DeckRule }) {
-  const row = (label: string, value: string, range?: string) => <div key={label}><dt>{label}</dt><dd>{value}{range && <small> · official {range}</small>}</dd></div>;
+  // The small boards' rules are set against what the two small official maps measure, the others against the large ones.
+  const small = rule.id === "small";
+  const official = small ? { ...TICKET_SUGGESTER.official, ...TICKET_SUGGESTER.officialSmall } : TICKET_SUGGESTER.official;
+  const row = (label: string, value: string, range?: string) => <div key={label}><dt>{label}</dt><dd>{value}{range && <small> · {small ? "small official maps" : "official"} {range}</small>}</dd></div>;
   return <>
     <p className="helper">{rule.blurb}</p>
     <dl className="deck-rule-table">
