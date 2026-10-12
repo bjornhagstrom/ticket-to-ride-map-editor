@@ -27,6 +27,7 @@ import { useTicketSuggestion } from "./use-ticket-suggestion";
 import { SettingsDialog, type StyleTarget } from "./map-styles";
 import { balanceRangesFor, connectionCount, fittingLength, bandsOf, bandCuts, mapDiameter, deckFigures, defaultStyle, deckRuleFor, TICKET_SUGGESTER, evaluateTicketDeck, suggestedDeckSize, ticketEndStopCount, type TicketStyle, autoPlaceLabels, turnAndTidy, labelledStops, setupBalance, stopCoverage, ticketBand, type TicketBand, reviewTickets, ticketPointsPerSpace, ticketCoverage, type RouteSuggestion, labelCovers, labelAngleOptions, routeSamplePoints, colourLengthTable, crossings as crossingList, networkShape, SHAPE_OFFICIAL, buildAdjacency, networkStats, routeSpacing, shortestPath, suggestRoutes } from "./map-analysis";
 import { canvasPoint, canvasPointRaw, pointsFor, samePair, stopById } from "./map-geometry";
+import { dragShape, translateShape, circlePoints, rectanglePoints } from "./background-shapes";
 import { REPO_URL, newerEditor } from "./version";
 import { RouteLogo } from "./logo";
 import { ACTION_GAP_MS, countChange, EXPORT_REMINDER_KEY, exportAge, exported, freshReminder, isDue, isLastStep, later, lessOften, readReminder, stop as stopReminding, turnOn, type ExportReminder } from "./export-reminder";
@@ -38,6 +39,10 @@ import { APP_VERSION, applyBoard, applyBoardPreset, gameForPreset, type BoardCho
 import { boardDefinition, hasPanelProfile, wagonOf, tensionOf, problemMap, colorLabels, defaultTicketSet, DEFAULT_PLAYERS, DEFAULT_WAGONS_PER_PLAYER, IMAGE_KEEP_ON_BOARD, type Ticket, type StopTypeStyle, type WagonStyle, ticketsInSet, type TicketSet, emptyMap, initialMap, type LineStyle, DEFAULT_END_GAP_MM, type BackgroundImage, type BackgroundShape, type BackgroundType, type MapData, type Point, type Route, type RouteType, type RouteTypeStyle, routeColors, STORAGE_KEY, type Stop, type StopSize, stopSizeMeta, type StopSymbol, stopSymbolMeta, type StopType } from "./map-data";
 
 type MeasureResult = { from: string; to: string; distance: number; routeIds: string[] } | { from: string; to: string; unreachable: true };
+// What the Object box of Draw background offers: the three kinds the file has, and a rectangle and a circle, which are drawn by dragging and kept as areas.
+const TEXT_INPUT_TYPES = new Set(["text", "number", "search", "email", "url", "tel", "password"]);
+const COALESCE_MS = 1200;
+type BackgroundDraw = BackgroundType | "rectangle" | "circle";
 type Danger = "reset" | "delete" | "load-blank" | "load-example" | "load-problems" | "import-background" | "import-network" | "import-image" | "import-csv" | null;
 type PendingImport = { kind: "background"; background: BackgroundShape[]; backgroundImage?: BackgroundImage } | { kind: "network"; stops: Stop[]; routes: Route[]; lineStyles: LineStyle[]; routeTypeStyles: RouteTypeStyle[]; stopTypeStyles: StopTypeStyle[]; wagonStyles: WagonStyle[]; tickets: Ticket[] } | { kind: "image"; image: BackgroundImage } | { kind: "csv"; result: CsvImport };
 // Snapshots are geometry-only (see cloneForHistory), so a deep stack stays in the low megabytes
@@ -84,7 +89,7 @@ export function MapEditor() {
   const [routeLineStyle, setRouteLineStyle] = useState<string | undefined>(undefined);
   const [stopSymbol, setStopSymbol] = useState<StopSymbol>("none");
   const [stopLetter, setStopLetter] = useState("");
-  const [backgroundType, setBackgroundType] = useState<BackgroundType>("area");
+  const [backgroundType, setBackgroundType] = useState<BackgroundDraw>("area");
   const [backgroundFill, setBackgroundFill] = useState("#b8ddea");
   const [backgroundStroke, setBackgroundStroke] = useState("#4f8394");
   const [draftPoints, setDraftPoints] = useState<Point[]>([]);
@@ -366,6 +371,10 @@ export function MapEditor() {
   const dragWaypointRef = useRef<{ routeId: string; index: number; grabOffset: Point } | null>(null);
   const dragBackgroundPointRef = useRef<{ shapeId: string; index: number } | null>(null);
   const dragBackgroundLabelRef = useRef<string | null>(null);
+  // A whole shape being dragged: where the pointer was, and the shape as it was then, so that the move is always from the start and not a sum of steps.
+  const dragBackgroundShapeRef = useRef<{ id: string; start: Point; original: BackgroundShape } | null>(null);
+  // A rectangle or a circle being dragged out.
+  const drawShapeRef = useRef<{ kind: "rectangle" | "circle"; start: Point; end: Point } | null>(null);
   const dragImageRef = useRef<{ mode: "move"; offsetX: number; offsetY: number } | { mode: "scale" | "rotate" } | null>(null);
   const dragNoteRef = useRef<{ id: string; mode: "move"; offsetX: number; offsetY: number } | { id: string; mode: "resize" } | null>(null);
   const dragSnapshotRef = useRef<MapData | null>(null);
@@ -421,8 +430,8 @@ export function MapEditor() {
       const key = event.key.toLowerCase();
       if (key !== "z" && key !== "y") return;
       const target = event.target as HTMLElement | null;
-      // Leave the browser's own text undo alone while typing in a field.
-      if (target && (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName))) return;
+      // Leave the browser's own text undo alone while typing in a field of text. A colour, a slider, a box to tick or a list has no text to undo, so Ctrl+Z there is the map's.
+      if (target && (target.isContentEditable || target.tagName === "TEXTAREA" || (target.tagName === "INPUT" && TEXT_INPUT_TYPES.has((target as HTMLInputElement).type)))) return;
       event.preventDefault();
       if (key === "y" || event.shiftKey) redoRef.current(); else undoRef.current();
     };
@@ -613,9 +622,16 @@ export function MapEditor() {
   })();
   const selectedB = data.background.find((shape) => shape.id === selectedBackground);
   const selectedN = data.notes.find((note) => note.id === selectedNote);
-  const change = (fn: (draft: MapData) => MapData) => { noteChange(); applyChange(fn); };
-  const applyChange = (fn: (draft: MapData) => MapData) => setData((previous) => { setPast((history) => [...history, cloneForHistory(previous)].slice(-HISTORY_LIMIT)); setFuture([]); setSaved(false); return fn(cloneMap(previous)); });
-  const pushHistory = (snapshot: MapData) => { noteChange(); setPast((history) => [...history, snapshot].slice(-HISTORY_LIMIT)); setFuture([]); setSaved(false); };
+  // `key` names a run of changes that are one to the person, such as a slider being moved or a colour being picked: changes with the same key within a moment of each other are one step of Undo.
+  const change = (fn: (draft: MapData) => MapData, key?: string) => { noteChange(); applyChange(fn, key); };
+  const lastKeyRef = useRef<{ key: string; at: number } | null>(null);
+  const applyChange = (fn: (draft: MapData) => MapData, key?: string) => {
+    const now = Date.now();
+    const sameRun = key !== undefined && lastKeyRef.current !== null && lastKeyRef.current.key === key && now - lastKeyRef.current.at < COALESCE_MS;
+    lastKeyRef.current = key === undefined ? null : { key, at: now };
+    setData((previous) => { if (!sameRun) setPast((history) => [...history, cloneForHistory(previous)].slice(-HISTORY_LIMIT)); setFuture([]); setSaved(false); return fn(cloneMap(previous)); });
+  };
+  const pushHistory = (snapshot: MapData) => { lastKeyRef.current = null; noteChange(); setPast((history) => [...history, snapshot].slice(-HISTORY_LIMIT)); setFuture([]); setSaved(false); };
   const beginDrag = () => { dragSnapshotRef.current = cloneForHistory(data); draggedRef.current = false; };
   const clearSelection = () => { setSelectedStop(null); setSelectedRoute(null); setSelectedBackground(null); setImageSelected(false); setSelectedNote(null); };
   const chooseImage = () => { setImageSelected(true); setSelectedStop(null); setSelectedRoute(null); setSelectedBackground(null); setSelectedNote(null); setTool("select"); };
@@ -633,8 +649,8 @@ export function MapEditor() {
   // A version number, once handed out, is on paper or in a file: undo and redo never take it back.
   const keepVersion = (snapshot: MapData): MapData => ({ ...snapshot, mapVersion: data.mapVersion });
   const undoIfUnchanged = (expected: number) => { if (changeSerialRef.current === expected) undoRef.current(); else toast.info("The map has changed since: use Undo in the toolbar, which undoes the last change first."); };
-  const undo = () => { const previous = past.at(-1); if (!previous) return; changeSerialRef.current += 1; setFuture((items) => [cloneForHistory(data), ...items]); setData(keepVersion(previous)); setPast((items) => items.slice(0, -1)); clearSelection(); };
-  const redo = () => { const next = future[0]; if (!next) return; changeSerialRef.current += 1; setPast((items) => [...items, cloneForHistory(data)]); setData(keepVersion(next)); setFuture((items) => items.slice(1)); clearSelection(); };
+  const undo = () => { const previous = past.at(-1); if (!previous) return; lastKeyRef.current = null; changeSerialRef.current += 1; setFuture((items) => [cloneForHistory(data), ...items]); setData(keepVersion(previous)); setPast((items) => items.slice(0, -1)); clearSelection(); };
+  const redo = () => { const next = future[0]; if (!next) return; lastKeyRef.current = null; changeSerialRef.current += 1; setPast((items) => [...items, cloneForHistory(data)]); setData(keepVersion(next)); setFuture((items) => items.slice(1)); clearSelection(); };
   // Wagon spaces of one route, with any locomotive spaces beyond the new end let go.
   const setLengthOf = (routeId: string, length: number) => change((draft) => { const route = draft.routes.find((item) => item.id === routeId); if (route) { route.length = Math.max(1, length); route.locomotiveSlots = route.locomotiveSlots?.filter((index) => index < route.length); if (!route.locomotiveSlots?.length) route.locomotiveSlots = undefined; } return draft; });
   useEffect(() => { lengthKeyRef.current = (event: KeyboardEvent) => {
@@ -776,7 +792,7 @@ export function MapEditor() {
     const minimum = backgroundType === "area" ? 3 : 2;
     if (draftPoints.length < minimum) return;
     const id = `bg-${Date.now()}`;
-    const shape: BackgroundShape = { id, type: backgroundType, label: backgroundType === "area" ? "Area" : "Boundary", points: draftPoints, fill: backgroundFill, stroke: backgroundStroke, opacity: .65, strokeWidth: 3 };
+    const shape: BackgroundShape = { id, type: backgroundType === "line" ? "line" : "area", label: backgroundType === "line" ? "Boundary" : "Area", points: draftPoints, fill: backgroundFill, stroke: backgroundStroke, opacity: .65, strokeWidth: 3 };
     change((draft) => { draft.background.push(shape); return draft; });
     setDraftPoints([]); setSelectedBackground(id); setSelectedStop(null); setSelectedRoute(null); setTool("select");
   };
@@ -789,6 +805,10 @@ export function MapEditor() {
       return;
     }
     if (tool === "background") {
+      if (backgroundType === "rectangle" || backgroundType === "circle") {
+        drawShapeRef.current = { kind: backgroundType, start: point, end: point };
+        return;
+      }
       if (backgroundType === "label") {
         const id = `bg-${Date.now()}`;
         change((draft) => { draft.background.push({ id, type: "label", label: "Label", points: [point], fill: "#000000", stroke: backgroundStroke, opacity: 1, strokeWidth: 0 }); return draft; });
@@ -810,6 +830,20 @@ export function MapEditor() {
     if (pendingStop) setPickTo(point);
     // Hold the pointer once a drag is under way, so it keeps reporting after it leaves the board.
     if (dragging() && !event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.setPointerCapture(event.pointerId);
+    if (drawShapeRef.current) {
+      const draw = drawShapeRef.current;
+      draw.end = point;
+      setDraftPoints((draw.kind === "rectangle" ? rectanglePoints(draw.start, point) : circlePoints(draw.start, point)));
+      return;
+    }
+    if (dragBackgroundShapeRef.current) {
+      const target = dragBackgroundShapeRef.current;
+      const free = canvasPointRaw(event.currentTarget, event.clientX, event.clientY, format.height, format.width);
+      const dx = free.x - target.start.x, dy = free.y - target.start.y;
+      if (Math.abs(dx) + Math.abs(dy) > 0.5) draggedRef.current = true;
+      setData((current) => ({ ...current, background: current.background.map((shape) => shape.id === target.id ? translateShape(target.original, dx, dy) : shape) }));
+      setSaved(false); return;
+    }
     if (dragNoteRef.current || dragImageRef.current || dragBackgroundLabelRef.current || dragBackgroundPointRef.current || dragWaypointRef.current || dragStopRef.current || dragStopLabelRef.current) draggedRef.current = true;
     if (dragNoteRef.current) {
       const drag = dragNoteRef.current;
@@ -879,13 +913,27 @@ export function MapEditor() {
     setData((current) => ({ ...current, stops: current.stops.map((stop) => stop.id === dragStopRef.current ? { ...stop, ...point } : stop) }));
     setSaved(false);
   };
-  const dragging = () => Boolean(dragNoteRef.current || dragImageRef.current || dragBackgroundLabelRef.current || dragBackgroundPointRef.current || dragWaypointRef.current || dragStopRef.current || dragStopLabelRef.current);
+  const dragging = () => Boolean(drawShapeRef.current || dragBackgroundShapeRef.current || dragNoteRef.current || dragImageRef.current || dragBackgroundLabelRef.current || dragBackgroundPointRef.current || dragWaypointRef.current || dragStopRef.current || dragStopLabelRef.current);
   const stopDragging = () => {
     // Only a drag that actually moved something becomes an undo step — a plain click to select
     // sets the same refs and should not fill the history with no-ops.
     if (draggedRef.current && dragSnapshotRef.current) pushHistory(dragSnapshotRef.current);
     dragSnapshotRef.current = null;
     draggedRef.current = false;
+    dragBackgroundShapeRef.current = null;
+    // A rectangle or a circle is made when the pointer is let go, if it was dragged far enough to be one.
+    const drawn = drawShapeRef.current;
+    drawShapeRef.current = null;
+    if (drawn) {
+      const points = dragShape(drawn.kind, drawn.start, drawn.end);
+      setDraftPoints([]);
+      if (points) {
+        const id = `bg-${Date.now()}`;
+        const shape: BackgroundShape = { id, type: "area", label: drawn.kind === "rectangle" ? "Rectangle" : "Circle", points, fill: backgroundFill, stroke: backgroundStroke, opacity: .65, strokeWidth: 3 };
+        change((draft) => { draft.background.push(shape); return draft; });
+        setSelectedBackground(id); setSelectedStop(null); setSelectedRoute(null); setTool("select");
+      }
+    }
     dragStopRef.current = null; dragStopLabelRef.current = null; dragWaypointRef.current = null; dragBackgroundPointRef.current = null; dragBackgroundLabelRef.current = null; dragImageRef.current = null; dragNoteRef.current = null;
   };
   const stopTicketCount = selectedStop ? data.tickets.filter((ticket) => ticket.a === selectedStop || ticket.b === selectedStop).length : 0;
@@ -1163,7 +1211,7 @@ export function MapEditor() {
           {tool === "measure" && <p className="tool-status">{measureStart ? `From ${stopById(data, measureStart)?.name} · now click the destination stop` : measureResult ? ("unreachable" in measureResult ? `${stopById(data, measureResult.from)?.name} → ${stopById(data, measureResult.to)?.name}: no connected path` : `${stopById(data, measureResult.from)?.name} → ${stopById(data, measureResult.to)?.name}: ${measureResult.distance} wagon spaces`) : "Click two stops for the shortest path."}</p>}
           {tool === "stop" && <div className="tool-options"><div className="grid-two"><div><Label>Stop type</Label><NativeSelect value={stopType} onChange={(event) => setStopType(event.target.value as StopType)}>{data.stopTypeStyles.map((meta) => <NativeSelectOption key={meta.id} value={meta.id}>{meta.label}</NativeSelectOption>)}</NativeSelect></div><div><Label>Stop size</Label><NativeSelect value={stopSize} onChange={(event) => setStopSize(event.target.value as StopSize)}>{Object.entries(stopSizeMeta).map(([key, meta]) => <NativeSelectOption key={key} value={key}>{meta.label}</NativeSelectOption>)}</NativeSelect></div></div><div className="grid-two"><div><Label>Symbol</Label><NativeSelect value={stopSymbol} onChange={(event) => setStopSymbol(event.target.value as StopSymbol)}>{Object.entries(stopSymbolMeta).map(([key, meta]) => <NativeSelectOption key={key} value={key}>{meta.label}</NativeSelectOption>)}</NativeSelect></div>{stopSymbol === "letter" && <div><Label>Letter</Label><Input maxLength={2} value={stopLetter} onChange={(event) => setStopLetter(event.target.value)} /></div>}</div></div>}
           {tool === "route" && <div className="tool-options"><StylePicker label="Route type" value={routeType} styles={data.routeTypeStyles} placeholder="" onChange={(id) => id && setRouteType(id)} onEdit={() => openStyles({ kind: "route", id: routeType })} /><div><Label htmlFor="route-length-choice">Wagon spaces</Label><NativeSelect id="route-length-choice" aria-label="Wagon spaces for new routes" value={String(routeLength)} onChange={(event) => setRouteLength(event.target.value === "fit" ? "fit" : Number(event.target.value))}><NativeSelectOption value="fit">Fit the distance</NativeSelectOption>{[1, 2, 3, 4, 5, 6, 7, 8].map((n) => <NativeSelectOption key={n} value={String(n)}>{n}</NativeSelectOption>)}</NativeSelect></div><label className="checkbox-row"><input type="checkbox" checked={routeCurved} onChange={(event) => setRouteCurved(event.target.checked)} />Draw as a smooth curve</label><div><Label>Colour</Label><NativeSelect value={routeColor} onChange={(event) => setRouteColor(event.target.value)}>{Object.keys(routeColors).map((key) => <NativeSelectOption key={key} value={key}>{colorLabels[key]}</NativeSelectOption>)}</NativeSelect></div></div>}
-          {tool === "background" && <div className="tool-options background-tools"><div className="image-import-row"><Label>Background image</Label><div className="image-import-buttons"><Button size="sm" variant="outline" onClick={() => imageFileRef.current?.click()}><ImageIcon />{data.backgroundImage ? "Replace image" : "Import image"}</Button>{data.backgroundImage && <Button size="sm" variant="ghost" onClick={() => { chooseImage(); setDanger("delete"); }}><Trash2 />Remove</Button>}</div></div><Label>Object</Label><NativeSelect value={backgroundType} onChange={(event) => { setBackgroundType(event.target.value as BackgroundType); setDraftPoints([]); }}><NativeSelectOption value="area">Area</NativeSelectOption><NativeSelectOption value="line">Line</NativeSelectOption><NativeSelectOption value="label">Label</NativeSelectOption></NativeSelect>{backgroundType !== "label" && <><div className="colour-row"><label>Fill <input type="color" value={backgroundFill} onChange={(event) => setBackgroundFill(event.target.value)} disabled={backgroundType === "line"} /></label><label>Outline <input type="color" value={backgroundStroke} onChange={(event) => setBackgroundStroke(event.target.value)} /></label></div><p className="helper">Click to add points. Finish when the shape is ready.</p><div className="draft-actions"><Button size="sm" disabled={draftPoints.length < (backgroundType === "area" ? 3 : 2)} onClick={finishBackground}>Finish shape</Button><Button size="sm" variant="ghost" disabled={!draftPoints.length} onClick={() => setDraftPoints([])}>Cancel</Button></div></>}</div>}
+          {tool === "background" && <div className="tool-options background-tools"><div className="image-import-row"><Label>Background image</Label><div className="image-import-buttons"><Button size="sm" variant="outline" onClick={() => imageFileRef.current?.click()}><ImageIcon />{data.backgroundImage ? "Replace image" : "Import image"}</Button>{data.backgroundImage && <Button size="sm" variant="ghost" onClick={() => { chooseImage(); setDanger("delete"); }}><Trash2 />Remove</Button>}</div></div><Label>Object</Label><NativeSelect value={backgroundType} onChange={(event) => { setBackgroundType(event.target.value as BackgroundDraw); setDraftPoints([]); }}><NativeSelectOption value="area">Area</NativeSelectOption><NativeSelectOption value="line">Line</NativeSelectOption><NativeSelectOption value="label">Label</NativeSelectOption><NativeSelectOption value="rectangle">Rectangle</NativeSelectOption><NativeSelectOption value="circle">Circle</NativeSelectOption></NativeSelect>{backgroundType !== "label" && <><div className="colour-row"><label>Fill <input type="color" value={backgroundFill} onChange={(event) => setBackgroundFill(event.target.value)} disabled={backgroundType === "line"} /></label><label>Outline <input type="color" value={backgroundStroke} onChange={(event) => setBackgroundStroke(event.target.value)} /></label></div>{backgroundType === "rectangle" || backgroundType === "circle" ? <p className="helper">{backgroundType === "rectangle" ? "Drag from one corner to the opposite one." : "Drag from the middle out to the edge."} Afterwards the shape can be dragged, made larger or smaller, and its points moved.</p> : <p className="helper">Click to add points. Finish when the shape is ready.</p>}{backgroundType !== "rectangle" && backgroundType !== "circle" && <div className="draft-actions"><Button size="sm" disabled={draftPoints.length < (backgroundType === "area" ? 3 : 2)} onClick={finishBackground}>Finish shape</Button><Button size="sm" variant="ghost" disabled={!draftPoints.length} onClick={() => setDraftPoints([])}>Cancel</Button></div>}</>}</div>}
         </div>
         {isDue(reminder) && <div className="crossing-card has-warning export-reminder" role="status">
           <div className="crossing-icon"><AlertTriangle /></div>
@@ -1228,7 +1276,11 @@ export function MapEditor() {
         {!phone && <div className="map-status">{statusChips}</div>}
         {hint && hint.atTop && <MapHint atTop title={hint.title} open={routeHintOpen} onToggle={toggleRouteHint} offsetX={routeHintX} onOffsetChange={moveRouteHint}>{hint.body}</MapHint>}
         <svg className={cn("map-canvas", format.orientation === "portrait" && "standing", `tool-${tool}`, hasMarks && "has-marks", rulesPicking && "picking-rules")} style={{ aspectRatio: `${format.width} / ${format.height}` }} viewBox={`0 0 ${format.width} ${format.height}`} onPointerDown={onCanvasDown} onPointerMove={onCanvasMove} onPointerUp={stopDragging} onPointerCancel={stopDragging}>
-          <MapArtwork data={data} tool={tool} highlightRoutes={highlightRoutes} scaleWidthMm={scaleWidthMm} selectedRoute={selectedRoute} selectedStop={selectedStop} selectedBackground={selectedBackground} imageSelected={imageSelected} selectedNote={selectedNote} bottleneckRoutes={showAnalysis ? bottleneckRoutes : undefined} pendingStop={pendingStop} pickTo={pickTo} previewRoutes={balanceRoutes ?? pinnedRoutes ?? (showCrossings ? crossingRoutes : preview?.routes)} crossingMarks={showCrossings ? crossings.map(({ at }) => at) : undefined} previewStop={balanceStop ?? pin?.stop ?? null} previewLabel={preview?.label ?? null} onStopHover={setHoveredStop} draft={{ type: backgroundType, points: draftPoints, fill: backgroundFill, stroke: backgroundStroke }} onRoute={(id) => { setSelectedRoute(id); setSelectedStop(null); setSelectedBackground(null); setSelectedNote(null); setTool("select"); }} onRouteSlot={toggleLocomotiveSlot} onRouteBendInsert={insertRouteBend} onRouteBendRemove={removeRouteBend} onStop={(id, shiftHeld) => { if (rulesPickRef.current?.stop(id)) return; chooseStop(id); if (tool === "select" && (shiftHeld || !stopById(data, id)?.locked)) { beginDrag(); dragStopRef.current = id; } }} onWaypoint={(routeId, index, grabOffset) => { beginDrag(); dragWaypointRef.current = { routeId, index, grabOffset }; }} onBackground={(id) => { setSelectedBackground(id); setSelectedRoute(null); setSelectedStop(null); setSelectedNote(null); setTool("select"); }} onBackgroundPoint={(shapeId, index) => { beginDrag(); dragBackgroundPointRef.current = { shapeId, index }; }} onBackgroundLabel={(shapeId) => { beginDrag(); dragBackgroundLabelRef.current = shapeId; }} onImageSelect={chooseImage} onImageMove={(point) => { chooseImage(); const img = data.backgroundImage; if (img) { beginDrag(); dragImageRef.current = { mode: "move", offsetX: point.x - img.x, offsetY: point.y - img.y }; } }} onImageScale={() => { beginDrag(); dragImageRef.current = { mode: "scale" }; }} onImageRotate={() => { beginDrag(); dragImageRef.current = { mode: "rotate" }; }} suggestionPreview={hoveredSuggestion ? (() => { const a = stopById(data, hoveredSuggestion.a), b = stopById(data, hoveredSuggestion.b); return a && b ? { a, b } : undefined; })() : undefined} onStopLabel={(id, shiftHeld) => { if (rulesPickRef.current?.stop(id)) return; chooseStop(id); if (shiftHeld || !stopById(data, id)?.labelLocked) { beginDrag(); dragStopLabelRef.current = id; } }} onNoteSelect={chooseNote} onNoteMove={(id, point) => { chooseNote(id); const note = data.notes.find((item) => item.id === id); if (note) { beginDrag(); dragNoteRef.current = { id, mode: "move", offsetX: point.x - note.x, offsetY: point.y - note.y }; } }} onNoteResize={(id) => { beginDrag(); dragNoteRef.current = { id, mode: "resize" }; }} onNoteToggle={(id) => change((draft) => { const note = draft.notes.find((item) => item.id === id); if (note) note.collapsed = !note.collapsed || undefined; return draft; })} />
+          <MapArtwork data={data} tool={tool} highlightRoutes={highlightRoutes} scaleWidthMm={scaleWidthMm} selectedRoute={selectedRoute} selectedStop={selectedStop} selectedBackground={selectedBackground} imageSelected={imageSelected} selectedNote={selectedNote} bottleneckRoutes={showAnalysis ? bottleneckRoutes : undefined} pendingStop={pendingStop} pickTo={pickTo} previewRoutes={balanceRoutes ?? pinnedRoutes ?? (showCrossings ? crossingRoutes : preview?.routes)} crossingMarks={showCrossings ? crossings.map(({ at }) => at) : undefined} previewStop={balanceStop ?? pin?.stop ?? null} previewLabel={preview?.label ?? null} onStopHover={setHoveredStop} draft={{ type: backgroundType === "line" ? "line" : "area", points: draftPoints, fill: backgroundFill, stroke: backgroundStroke, dots: backgroundType !== "rectangle" && backgroundType !== "circle" }} onRoute={(id) => { setSelectedRoute(id); setSelectedStop(null); setSelectedBackground(null); setSelectedNote(null); setTool("select"); }} onRouteSlot={toggleLocomotiveSlot} onRouteBendInsert={insertRouteBend} onRouteBendRemove={removeRouteBend} onStop={(id, shiftHeld) => { if (rulesPickRef.current?.stop(id)) return; chooseStop(id); if (tool === "select" && (shiftHeld || !stopById(data, id)?.locked)) { beginDrag(); dragStopRef.current = id; } }} onWaypoint={(routeId, index, grabOffset) => { beginDrag(); dragWaypointRef.current = { routeId, index, grabOffset }; }} onBackground={(id) => { setSelectedBackground(id); setSelectedRoute(null); setSelectedStop(null); setSelectedNote(null); setTool("select"); }} onBackgroundPoint={(shapeId, index) => { beginDrag(); dragBackgroundPointRef.current = { shapeId, index }; }} onBackgroundLabel={(shapeId) => { beginDrag(); dragBackgroundLabelRef.current = shapeId; }} onBackgroundMove={(shapeId, clientX, clientY) => {
+            const svg = document.querySelector<SVGSVGElement>(".map-canvas"); const original = data.background.find((shape) => shape.id === shapeId);
+            if (!svg || !original) return;
+            beginDrag(); dragBackgroundShapeRef.current = { id: shapeId, start: canvasPointRaw(svg, clientX, clientY, format.height, format.width), original };
+          }} onImageSelect={chooseImage} onImageMove={(point) => { chooseImage(); const img = data.backgroundImage; if (img) { beginDrag(); dragImageRef.current = { mode: "move", offsetX: point.x - img.x, offsetY: point.y - img.y }; } }} onImageScale={() => { beginDrag(); dragImageRef.current = { mode: "scale" }; }} onImageRotate={() => { beginDrag(); dragImageRef.current = { mode: "rotate" }; }} suggestionPreview={hoveredSuggestion ? (() => { const a = stopById(data, hoveredSuggestion.a), b = stopById(data, hoveredSuggestion.b); return a && b ? { a, b } : undefined; })() : undefined} onStopLabel={(id, shiftHeld) => { if (rulesPickRef.current?.stop(id)) return; chooseStop(id); if (shiftHeld || !stopById(data, id)?.labelLocked) { beginDrag(); dragStopLabelRef.current = id; } }} onNoteSelect={chooseNote} onNoteMove={(id, point) => { chooseNote(id); const note = data.notes.find((item) => item.id === id); if (note) { beginDrag(); dragNoteRef.current = { id, mode: "move", offsetX: point.x - note.x, offsetY: point.y - note.y }; } }} onNoteResize={(id) => { beginDrag(); dragNoteRef.current = { id, mode: "resize" }; }} onNoteToggle={(id) => change((draft) => { const note = draft.notes.find((item) => item.id === id); if (note) note.collapsed = !note.collapsed || undefined; return draft; })} />
           {/* The route just drawn: − and + to set its wagon spaces without leaving the Draw route tool. */}
           {chipAt && justDrawnRoute && <g className="length-chip" transform={`translate(${chipAt.x},${chipAt.y})`} onPointerDown={(event) => event.stopPropagation()}>
             <rect x={-58} y={-17} width={116} height={34} rx={17} />
@@ -1304,7 +1356,7 @@ const toolDefinitions: Array<{ id: Tool; icon: React.ReactNode; title: string; n
   { id: "select", icon: <MousePointer2 />, title: "Select & move", note: "Click anything on the map to select it, then edit it in the Properties panel or drag it somewhere else." },
   { id: "stop", icon: <MapPinPlus />, title: "Add stop", note: "Click the map to place a stop, using the type, size and symbol set below." },
   { id: "route", icon: <Link2 />, title: "Draw route", note: "Click two stops to connect them, using the route type, colour and special-rule style set below." },
-  { id: "background", icon: <Layers3 />, title: "Draw background", note: "Draw areas, boundaries and labels behind the network, or import a background map image." },
+  { id: "background", icon: <Layers3 />, title: "Draw background", note: "Draw areas, rectangles, circles, boundaries and labels behind the network, or import a background map image." },
   { id: "note", icon: <StickyNote />, title: "Add note", note: "Click the map to drop an evaluation note. Notes are saved with the map and show on screen, in print and in the PNG, but they are not part of the game." },
   { id: "ticket", icon: <TicketIcon />, title: "Add ticket", note: "Click two stops to make a destination ticket between them. The points are suggested from the shortest path and from what this map's other tickets are worth." },
   { id: "measure", icon: <Ruler />, title: "Measure distance", note: "Click two stops to see the shortest path between them, counted in wagon spaces rather than straight-line distance." },

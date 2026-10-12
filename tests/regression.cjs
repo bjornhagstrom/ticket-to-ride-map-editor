@@ -5341,6 +5341,103 @@ const sectionStart = (n) => {
     await dp.context().close();
   }
 
+  // 77. Background shapes (found by the owner on 2026-10-13): Ctrl+Z undoes what is done in the colour and slider fields (it did nothing with focus in them); a rectangle and a
+  // circle are drawn by dragging; a shape is dragged round the board, and with its geometry locked only with Shift held; it is made larger or smaller, and every step is one undo.
+  if (wants(77)) {
+  sectionStart(77);
+    const bp = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
+    bp.on("pageerror", (e) => errors.push(String(e)));
+    await bp.goto(BASE, { waitUntil: "networkidle" });
+    await bp.getByRole("button", { name: "Start with a blank map" }).click(); await bp.waitForTimeout(500);
+    if (await bp.locator('[role="dialog"]').count()) { await bp.keyboard.press("Escape"); await bp.waitForTimeout(400); }
+    const shapes = () => bp.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")).background);
+    const settle = () => bp.waitForTimeout(350);
+    const toClient = (x, y) => bp.evaluate(([x, y]) => { const svg = document.querySelector(".map-canvas"); const pt = svg.createSVGPoint(); pt.x = x; pt.y = y; const m = pt.matrixTransform(svg.getScreenCTM()); return { x: m.x, y: m.y }; }, [x, y]);
+    const drag = async (from, to, { shift = false } = {}) => {
+      const a = await toClient(from[0], from[1]), b = await toClient(to[0], to[1]);
+      if (shift) await bp.keyboard.down("Shift");
+      await bp.mouse.move(a.x, a.y); await bp.mouse.down(); await bp.mouse.move((a.x + b.x) / 2, (a.y + b.y) / 2, { steps: 4 }); await bp.mouse.move(b.x, b.y, { steps: 4 }); await bp.mouse.up();
+      if (shift) await bp.keyboard.up("Shift");
+      await settle();
+    };
+    const box = (shape) => { const xs = shape.points.map((q) => q.x), ys = shape.points.map((q) => q.y); return { x0: Math.min(...xs), y0: Math.min(...ys), x1: Math.max(...xs), y1: Math.max(...ys) }; };
+    const near77 = (a, b, e = 2) => Math.abs(a - b) <= e;
+    await bp.getByRole("button", { name: /Draw background/ }).click(); await bp.waitForTimeout(200);
+    const objectChoices = await bp.locator(".background-tools select option").allTextContents();
+    check("Draw background offers a rectangle and a circle beside area, line and label", ["Area", "Line", "Label", "Rectangle", "Circle"].every((name) => objectChoices.includes(name)), objectChoices.join(", "));
+    await bp.locator(".background-tools select").selectOption({ label: "Rectangle" });
+    await drag([200, 150], [500, 350]);
+    let list = await shapes();
+    check("dragging with Rectangle chosen draws a rectangle between the two corners, and it is selected", list.length === 1 && list[0].type === "area" && list[0].points.length === 4 && near77(box(list[0]).x0, 200) && near77(box(list[0]).y0, 150) && near77(box(list[0]).x1, 500) && near77(box(list[0]).y1, 350) && (await bp.locator(".property-form #background-label").count()) === 1, JSON.stringify(list[0] && box(list[0])));
+    await bp.getByRole("button", { name: /Draw background/ }).click(); await bp.waitForTimeout(200);
+    await bp.locator(".background-tools select").selectOption({ label: "Circle" });
+    await drag([800, 300], [900, 300]);
+    list = await shapes();
+    const circle = list[1];
+    const radii = circle ? circle.points.map((q) => Math.hypot(q.x - 800, q.y - 300)) : [];
+    check("dragging with Circle chosen draws a circle from its centre out to where the pointer stops", list.length === 2 && circle.points.length >= 24 && radii.every((r) => near77(r, 100, 1.5)), `${circle && circle.points.length} points, radii ${Math.min(...radii).toFixed(1)}–${Math.max(...radii).toFixed(1)}`);
+    await bp.getByRole("button", { name: /Draw background/ }).click(); await bp.waitForTimeout(200);
+    await bp.locator(".background-tools select").selectOption({ label: "Rectangle" });
+    await drag([600, 500], [603, 502]);
+    check("a click or a tiny drag draws nothing", (await shapes()).length === 2);
+    await bp.keyboard.press("Control+z"); await settle();
+    check("Ctrl+Z takes the circle away", (await shapes()).length === 1);
+    await bp.keyboard.press("Control+y"); await settle();
+    check("and Ctrl+Y brings it back", (await shapes()).length === 2);
+    await bp.keyboard.press("Control+z"); await settle();
+    // Move: drag the rectangle by its body.
+    await bp.getByRole("button", { name: /Select/ }).first().click().catch(() => {}); await bp.waitForTimeout(200);
+    const rect0 = box((await shapes())[0]);
+    await drag([350, 250], [450, 300]);
+    let rect1 = box((await shapes())[0]);
+    check("dragging a shape by its body moves all of it: 100 right and 50 down", near77(rect1.x0 - rect0.x0, 100) && near77(rect1.y0 - rect0.y0, 50) && near77(rect1.x1 - rect0.x1, 100) && near77(rect1.y1 - rect0.y1, 50), JSON.stringify([rect0, rect1]));
+    await bp.keyboard.press("Control+z"); await settle();
+    check("one Ctrl+Z puts it back", near77(box((await shapes())[0]).x0, rect0.x0) && near77(box((await shapes())[0]).y0, rect0.y0));
+    const pick = async () => { const b = box((await shapes())[0]); const c = await toClient((b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2); await bp.mouse.click(c.x, c.y); await settle(); };
+    await pick();
+    // Size.
+    const sizeNow = async () => { const b = box((await shapes())[0]); return { w: b.x1 - b.x0, h: b.y1 - b.y0, cx: (b.x0 + b.x1) / 2, cy: (b.y0 + b.y1) / 2 }; };
+    const size0 = await sizeNow();
+    await bp.getByRole("button", { name: /^Larger/ }).click(); await settle();
+    const size1 = await sizeNow();
+    check("Larger makes the shape 10 % larger round its middle", near77(size1.w, size0.w * 1.1, 1) && near77(size1.h, size0.h * 1.1, 1) && near77(size1.cx, size0.cx, 1) && near77(size1.cy, size0.cy, 1), JSON.stringify([size0, size1]));
+    await bp.getByRole("button", { name: /^Smaller/ }).click(); await bp.getByRole("button", { name: /^Smaller/ }).click(); await settle();
+    const size2 = await sizeNow();
+    check("Smaller twice makes it smaller than it was", size2.w < size0.w && near77(size2.w, size0.w * 1.1 / 1.21, 1), JSON.stringify(size2));
+    await bp.keyboard.press("Control+z"); await bp.keyboard.press("Control+z"); await bp.keyboard.press("Control+z"); await settle();
+    check("three Ctrl+Z take the three steps back", near77((await sizeNow()).w, size0.w, 0.5));
+    await pick();
+    // Lock: no plain drag, Shift+drag moves.
+    await bp.getByRole("button", { name: /Lock geometry/ }).click(); await settle();
+    const lockedAt = box((await shapes())[0]);
+    check("with the geometry locked, Larger and Smaller are off", await bp.getByRole("button", { name: /^Larger/ }).isDisabled() && await bp.getByRole("button", { name: /^Smaller/ }).isDisabled());
+    await drag([350, 250], [450, 300]);
+    check("a locked shape stays where it is when dragged", near77(box((await shapes())[0]).x0, lockedAt.x0));
+    await drag([350, 250], [410, 250], { shift: true });
+    check("and moves when dragged with Shift held", near77(box((await shapes())[0]).x0 - lockedAt.x0, 60) && (await shapes())[0].locked === true, String(box((await shapes())[0]).x0 - lockedAt.x0));
+    await bp.getByRole("button", { name: /Unlock geometry/ }).click(); await settle();
+    // Undo with focus in the colour field and the slider.
+    const setValue = (selector, value) => bp.locator(selector).first().evaluate((el, v) => { const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set; el.focus(); set.call(el, v); el.dispatchEvent(new Event("input", { bubbles: true })); el.dispatchEvent(new Event("change", { bubbles: true })); }, value);
+    const fill0 = (await shapes())[0].fill;
+    await setValue(".property-form input.colour-input", "#ff0000"); await settle();
+    check("the colour is changed", (await shapes())[0].fill === "#ff0000");
+    await bp.keyboard.press("Control+z"); await settle();
+    check("Ctrl+Z with focus in the colour field undoes it", (await shapes())[0].fill === fill0, (await shapes())[0].fill);
+    await pick();
+    const opacity0 = (await shapes())[0].opacity;
+    for (const v of ["0.5", "0.4", "0.3"]) await setValue(".property-form input[type=range]", v);
+    await settle();
+    check("the slider is moved", near77((await shapes())[0].opacity, 0.3, 0.001));
+    await bp.keyboard.press("Control+z"); await settle();
+    check("one Ctrl+Z with focus in the slider takes back the whole movement of it, not one step", near77((await shapes())[0].opacity, opacity0, 0.001), String((await shapes())[0].opacity));
+    // A line and a label can be moved as well; a label has no size.
+    await bp.getByRole("button", { name: /Draw background/ }).click(); await bp.waitForTimeout(200);
+    await bp.locator(".background-tools select").selectOption({ label: "Label" });
+    await bp.mouse.click((await toClient(700, 600)).x, (await toClient(700, 600)).y); await settle();
+    check("a label has no Larger or Smaller", (await bp.getByRole("button", { name: /^Larger/ }).count()) === 0);
+    await bp.context().close();
+  }
+
   if (sectionOpen) sectionTimes[sectionOpen.n] = Math.round((Date.now() - sectionOpen.at) / 100) / 10;
   if (process.env.TTR_TIMES) fs.writeFileSync(process.env.TTR_TIMES, JSON.stringify(sectionTimes));
   console.log("PASS:"); ok.forEach((l) => console.log("  ✓ " + l));

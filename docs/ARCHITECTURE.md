@@ -70,7 +70,7 @@ The SVG layers are rendered in this order:
 
 1. Paper colour and editor grid
 2. Background image (at most one, raster, optionally cropped/rotated)
-3. Background areas, lines and labels
+3. Background areas, lines and labels (a rectangle and a circle are drawn by dragging and kept as plain areas of four and of 32 points, `app/background-shapes.ts`, so no build needs to know about them; a shape moves by its body, with Shift when its geometry is locked, and is sized round the middle of its box)
 4. Draft background geometry (while drawing a new shape)
 5. Routes, vehicle spaces and locomotive markers
 6. Stops, stop symbols/letters and stop labels

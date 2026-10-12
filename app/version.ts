@@ -16,8 +16,12 @@ export const RELEASES: Release[] = [
   {
     version: "1.7.0",
     date: "2026-10-12",
-    title: "Version 1.7: small boards",
+    title: "Version 1.7: small boards and background shapes",
     changes: [
+    "Draw background has a Rectangle and a Circle: drag from one corner to the other, or from the middle out to the edge. They are areas like the others, so their points can still be dragged one by one.",
+    "A background shape can be dragged round the board by its body, and with its geometry locked it moves only when Shift is held; the lock still keeps its points where they are.",
+    "A background shape has Smaller and Larger buttons, a tenth at a time round its middle, off while the geometry is locked; a line can be sized too, and a label has no size.",
+    "Ctrl+Z now undoes a colour, a slider or a tick box that was just changed, which it did not when the cursor was still in the field, and a slider that is moved is one step of Undo, not one for every notch.",
     "Small boards: Settings offers New York (standing, 280 by 428 mm), Amsterdam and London (lying, 428 by 330 mm) as boards, with wagons, stops and names drawn at the size they are on the real board, and the map you have moves to the new board.",
     "Custom size has a part called Real sizes, where you give the size of a panel, a wagon, a stop and the capitals of the names in millimetres, for a small board of your own.",
     "Printing a small board takes one A4 sheet for each panel, and the ticket cards can be small (50 by 36 mm) so that more of them fit on a sheet; small is the start on a small board, and your choice is remembered.",

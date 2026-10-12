@@ -562,3 +562,5 @@
 .custom-board-real .custom-board-fields { grid-template-columns: 1fr 1fr; margin-top: 6px; }
 .print-cards { border: 0; margin: 0 0 0 26px; padding: 0; display: grid; gap: 2px; }
 .print-option-sub strong { font-weight: 600; }
+
+.background-size-row{display:grid;gap:6px}.background-size-row .grid-two{display:grid;grid-template-columns:1fr 1fr;gap:8px}
