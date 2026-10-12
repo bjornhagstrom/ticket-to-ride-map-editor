@@ -5300,6 +5300,31 @@ const sectionStart = (n) => {
     await gp.context().close();
   }
 
+  // 76. The deck builder says what it did on a small board (docs/PROPOSAL-SMALL-BOARDS.md): a line at the top of the dialog that the suggestions follow the rules made from
+  // New York and Amsterdam, and how to use the large maps' instead; none on the standard board.
+  if (wants(76)) {
+  sectionStart(76);
+    const dp = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
+    dp.on("pageerror", (e) => errors.push(String(e)));
+    await dp.goto(BASE, { waitUntil: "networkidle" });
+    await dp.getByRole("button", { name: "Load the example map" }).click();
+    await dp.waitForTimeout(600);
+    const openBuild76 = async () => { await dp.getByRole("button", { name: "Tickets", exact: true }).click(); await dp.waitForTimeout(400); await dp.getByRole("button", { name: /Add a deck/ }).click(); await dp.waitForTimeout(250); await dp.getByRole("menuitem", { name: /Build a full deck of tickets/ }).click(); await dp.waitForSelector(".suggest-dialog", { timeout: 20000 }); await dp.waitForTimeout(400); };
+    await openBuild76();
+    check("on the standard board the dialog has no note about small boards", (await dp.locator(".suggest-small-note").count()) === 0 && /Generic/.test(await dp.locator(".style-card.chosen").textContent()));
+    await dp.keyboard.press("Escape"); await dp.waitForTimeout(300);
+    await dp.getByRole("button", { name: "Settings" }).click(); await dp.waitForTimeout(300);
+    await dp.locator('#settings-format input[value="small-new-york"]').check(); await dp.waitForTimeout(500);
+    await dp.keyboard.press("Escape"); await dp.waitForTimeout(300);
+    await openBuild76();
+    const note = async () => (await dp.locator(".suggest-small-note").count()) ? ((await dp.locator(".suggest-small-note").textContent()) || "") : "";
+    check("on a small board Small boards is chosen, and a line says the suggestions follow New York and Amsterdam, about 1.3 tickets a stop", /Small boards/.test(await dp.locator(".style-card.chosen").textContent()) && /New York and Amsterdam/.test(await note()) && /1\.3 tickets/.test(await note()), await note());
+    check("and how to use the large maps' targets instead", /Generic/.test(await note()));
+    await dp.locator(".style-card", { hasText: "Generic" }).first().click(); await dp.waitForTimeout(300);
+    check("with Generic chosen the line says Small boards would fit this board better", /small/i.test(await note()) && /Small boards/.test(await note()) && !/follow the rules made/.test(await note()), await note());
+    await dp.context().close();
+  }
+
   if (sectionOpen) sectionTimes[sectionOpen.n] = Math.round((Date.now() - sectionOpen.at) / 100) / 10;
   if (process.env.TTR_TIMES) fs.writeFileSync(process.env.TTR_TIMES, JSON.stringify(sectionTimes));
   console.log("PASS:"); ok.forEach((l) => console.log("  ✓ " + l));

@@ -402,10 +402,13 @@ export function SuggestTicketsDialog({ tension, onTension, open, onOpenChange, d
     <DialogContent className="suggest-dialog" style={{ height: "86vh", maxHeight: 860 }}>
       <DialogHeader>
         <DialogTitle>Build a full deck of tickets</DialogTitle>
-        <DialogDescription>Every target below comes from the official Ticket to Ride decks, not from this map. Save the result as a new deck under a name of your own, or let it replace the deck you are working on.</DialogDescription>
+        <DialogDescription>Every target below comes from the official Ticket to Ride decks{small ? " (on this small board, the two small ones)" : ""}, not from this map. Save the result as a new deck under a name of your own, or let it replace the deck you are working on.</DialogDescription>
       </DialogHeader>
 
       <div className="suggest-scroll">
+      {small && <p className="helper suggest-small-note">{style === "small"
+        ? "This board is small, so the suggestions follow the rules made from New York and Amsterdam: about 1.3 tickets a stop, and tickets up to most of a player's wagons long. Choose Generic below to use the large maps' targets instead."
+        : "This board is small. The Small boards rules, made from New York and Amsterdam, fit it better than these do: about 1.3 tickets a stop, and tickets up to most of a player's wagons long."}</p>}
       <div className="suggest-controls">
         <div><Label htmlFor="suggest-wagons">Wagons per player</Label>
           <Input id="suggest-wagons" type="number" min={1} max={99} value={wagons} onChange={(event) => onWagons(Math.max(1, Math.round(Number(event.target.value) || 1)))} /></div>
