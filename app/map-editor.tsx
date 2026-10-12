@@ -636,11 +636,13 @@ export function MapEditor() {
   // `key` names a run of changes that are one to the person, such as a slider being moved or a colour being picked: changes with the same key within a moment of each other are one step of Undo.
   const change = (fn: (draft: MapData) => MapData, key?: string) => { noteChange(); applyChange(fn, key); };
   const lastKeyRef = useRef<{ key: string; at: number } | null>(null);
+  const lastSnapshotOfRef = useRef<MapData | null>(null);
   const applyChange = (fn: (draft: MapData) => MapData, key?: string) => {
     const now = Date.now();
     const sameRun = key !== undefined && lastKeyRef.current !== null && lastKeyRef.current.key === key && now - lastKeyRef.current.at < COALESCE_MS;
     lastKeyRef.current = key === undefined ? null : { key, at: now };
-    setData((previous) => { if (!sameRun) setPast((history) => [...history, cloneForHistory(previous)].slice(-HISTORY_LIMIT)); setFuture([]); setSaved(false); return fn(cloneMap(previous)); });
+    // React may run this function twice on the same state (always, in development): the snapshot for Undo is taken once for a state, whichever time it is.
+    setData((previous) => { if (!sameRun && lastSnapshotOfRef.current !== previous) { lastSnapshotOfRef.current = previous; setPast((history) => [...history, cloneForHistory(previous)].slice(-HISTORY_LIMIT)); } setFuture([]); setSaved(false); return fn(cloneMap(previous)); });
   };
   const pushHistory = (snapshot: MapData) => { lastKeyRef.current = null; noteChange(); setPast((history) => [...history, snapshot].slice(-HISTORY_LIMIT)); setFuture([]); setSaved(false); };
   const beginDrag = () => { dragSnapshotRef.current = cloneForHistory(data); draggedRef.current = false; };
