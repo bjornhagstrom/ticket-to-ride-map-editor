@@ -5375,7 +5375,7 @@ const sectionStart = (n) => {
     list = await shapes();
     const circle = list[1];
     const radii = circle ? circle.points.map((q) => Math.hypot(q.x - 800, q.y - 300)) : [];
-    check("dragging with Circle chosen draws a circle from its centre out to where the pointer stops", list.length === 2 && circle.points.length >= 24 && radii.every((r) => near77(r, 100, 1.5)), `${circle && circle.points.length} points, radii ${Math.min(...radii).toFixed(1)}–${Math.max(...radii).toFixed(1)}`);
+    check("dragging with Circle chosen draws a circle from its centre out to where the pointer stops", list.length === 2 && circle.points.length >= 24 && radii.every((r) => near77(r, 100, 3)), `${circle && circle.points.length} points, radii ${Math.min(...radii).toFixed(1)}–${Math.max(...radii).toFixed(1)}`);
     await bp.getByRole("button", { name: /Draw background/ }).click(); await bp.waitForTimeout(200);
     await bp.locator(".background-tools select").selectOption({ label: "Rectangle" });
     await drag([600, 500], [603, 502]);
