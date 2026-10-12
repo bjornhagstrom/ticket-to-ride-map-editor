@@ -39,9 +39,9 @@ import { APP_VERSION, applyBoard, applyBoardPreset, gameForPreset, type BoardCho
 import { boardDefinition, hasPanelProfile, wagonOf, tensionOf, problemMap, colorLabels, defaultTicketSet, DEFAULT_PLAYERS, DEFAULT_WAGONS_PER_PLAYER, IMAGE_KEEP_ON_BOARD, type Ticket, type StopTypeStyle, type WagonStyle, ticketsInSet, type TicketSet, emptyMap, initialMap, type LineStyle, DEFAULT_END_GAP_MM, type BackgroundImage, type BackgroundShape, type BackgroundType, type MapData, type Point, type Route, type RouteType, type RouteTypeStyle, routeColors, STORAGE_KEY, type Stop, type StopSize, stopSizeMeta, type StopSymbol, stopSymbolMeta, type StopType } from "./map-data";
 
 type MeasureResult = { from: string; to: string; distance: number; routeIds: string[] } | { from: string; to: string; unreachable: true };
-// What the Object box of Draw background offers: the three kinds the file has, and a rectangle and a circle, which are drawn by dragging and kept as areas.
 const TEXT_INPUT_TYPES = new Set(["text", "number", "search", "email", "url", "tel", "password"]);
 const COALESCE_MS = 1200;
+// What the Object box of Draw background offers: the three kinds the file has, and a rectangle and a circle, which are drawn by dragging and kept as areas.
 type BackgroundDraw = BackgroundType | "rectangle" | "circle";
 type Danger = "reset" | "delete" | "load-blank" | "load-example" | "load-problems" | "import-background" | "import-network" | "import-image" | "import-csv" | null;
 type PendingImport = { kind: "background"; background: BackgroundShape[]; backgroundImage?: BackgroundImage } | { kind: "network"; stops: Stop[]; routes: Route[]; lineStyles: LineStyle[]; routeTypeStyles: RouteTypeStyle[]; stopTypeStyles: StopTypeStyle[]; wagonStyles: WagonStyle[]; tickets: Ticket[] } | { kind: "image"; image: BackgroundImage } | { kind: "csv"; result: CsvImport };
@@ -437,6 +437,17 @@ export function MapEditor() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  // A second finger is a pinch: a shape being dragged or drawn by the first is let go where it is, and a rectangle or a circle half drawn is not made.
+  useEffect(() => {
+    const onSecondFinger = (event: PointerEvent) => {
+      if (event.isPrimary) return;
+      dragBackgroundShapeRef.current = null;
+      if (drawShapeRef.current) { drawShapeRef.current = null; setDraftPoints([]); }
+    };
+    window.addEventListener("pointerdown", onSecondFinger, true);
+    return () => window.removeEventListener("pointerdown", onSecondFinger, true);
   }, []);
 
   // Wagons are measured against the board the map is for. Printing smaller or larger scales them
@@ -839,7 +850,10 @@ export function MapEditor() {
     if (dragBackgroundShapeRef.current) {
       const target = dragBackgroundShapeRef.current;
       const free = canvasPointRaw(event.currentTarget, event.clientX, event.clientY, format.height, format.width);
-      const dx = free.x - target.start.x, dy = free.y - target.start.y;
+      // Like a background image, a shape keeps a corner of itself on the board, so it cannot be dropped where nothing could select it again.
+      const xs = target.original.points.map((q) => q.x), ys = target.original.points.map((q) => q.y);
+      const dx = Math.max(IMAGE_KEEP_ON_BOARD - Math.max(...xs), Math.min(format.width - IMAGE_KEEP_ON_BOARD - Math.min(...xs), free.x - target.start.x));
+      const dy = Math.max(IMAGE_KEEP_ON_BOARD - Math.max(...ys), Math.min(format.height - IMAGE_KEEP_ON_BOARD - Math.min(...ys), free.y - target.start.y));
       if (Math.abs(dx) + Math.abs(dy) > 0.5) draggedRef.current = true;
       setData((current) => ({ ...current, background: current.background.map((shape) => shape.id === target.id ? translateShape(target.original, dx, dy) : shape) }));
       setSaved(false); return;

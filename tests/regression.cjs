@@ -5404,7 +5404,8 @@ const sectionStart = (n) => {
     await bp.getByRole("button", { name: /^Smaller/ }).click(); await bp.getByRole("button", { name: /^Smaller/ }).click(); await settle();
     const size2 = await sizeNow();
     check("Smaller twice makes it smaller than it was", size2.w < size0.w && near77(size2.w, size0.w * 1.1 / 1.21, 1), JSON.stringify(size2));
-    await bp.keyboard.press("Control+z"); await bp.keyboard.press("Control+z"); await bp.keyboard.press("Control+z"); await settle();
+    for (let i = 0; i < 3; i += 1) { await bp.keyboard.press("Control+z"); await bp.waitForTimeout(250); }
+    await settle();
     check("three Ctrl+Z take the three steps back", near77((await sizeNow()).w, size0.w, 0.5));
     await pick();
     // Lock: no plain drag, Shift+drag moves.
@@ -5430,11 +5431,53 @@ const sectionStart = (n) => {
     check("the slider is moved", near77((await shapes())[0].opacity, 0.3, 0.001));
     await bp.keyboard.press("Control+z"); await settle();
     check("one Ctrl+Z with focus in the slider takes back the whole movement of it, not one step", near77((await shapes())[0].opacity, opacity0, 0.001), String((await shapes())[0].opacity));
+    // Merging stops where it should: two shapes, an undo in between, a plain click (found in review).
+    await bp.getByRole("button", { name: /Draw background/ }).click(); await bp.waitForTimeout(200);
+    await bp.locator(".background-tools select").selectOption({ label: "Rectangle" });
+    await drag([700, 400], [900, 550]);
+    const ids = (await shapes()).map((x) => x.id);
+    const opacityOf = async (i) => (await shapes())[i].opacity;
+    const baseA = await opacityOf(0), baseB = await opacityOf(1);
+    await setValue(".property-form input[type=range]", "0.5");
+    const pickAt = async (i) => { const b = box((await shapes())[i]); const c = await toClient((b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2); await bp.mouse.click(c.x, c.y); await bp.waitForTimeout(250); };
+    await pickAt(0);
+    await setValue(".property-form input[type=range]", "0.5"); await settle();
+    check("two shapes' sliders moved within a moment of each other are two changes", (await opacityOf(0)) === 0.5 && (await opacityOf(1)) === 0.5 && ids.length === 2);
+    await bp.keyboard.press("Control+z"); await settle();
+    check("one Ctrl+Z takes back only the second shape's", (await opacityOf(0)) === baseA && (await opacityOf(1)) === 0.5, JSON.stringify([await opacityOf(0), await opacityOf(1)]));
+    await bp.keyboard.press("Control+z"); await settle();
+    check("and the next the first's", (await opacityOf(1)) === baseB);
+    await pickAt(1);
+    await setValue(".property-form input[type=range]", "0.4");
+    await bp.keyboard.press("Control+z"); await bp.waitForTimeout(150);
+    await pickAt(1);
+    await setValue(".property-form input[type=range]", "0.3");
+    await bp.keyboard.press("Control+z"); await settle();
+    check("a slider moved again right after an Undo is a step of its own: Ctrl+Z goes back to where Undo left it, not through it", (await opacityOf(1)) === baseB, String(await opacityOf(1)));
+    await bp.keyboard.press("Control+y"); await settle();
+    check("and Ctrl+Y brings the movement back", near77(await opacityOf(1), 0.3, 0.001), String(await opacityOf(1)));
+    await bp.keyboard.press("Control+z"); await settle();
+    await pickAt(1);
+    await setValue(".property-form input[type=range]", "0.45"); await settle();
+    await pickAt(1); await pickAt(1);
+    await bp.keyboard.press("Control+z"); await settle();
+    check("clicking a shape without moving it adds no step of Undo", (await opacityOf(1)) === baseB, String(await opacityOf(1)));
+    // A shape cannot be dragged off the board where nothing could reach it.
+    await pickAt(0);
+    const farLeft = await toClient(-420, 250), mid = await toClient(...[(box((await shapes())[0]).x0 + box((await shapes())[0]).x1) / 2, 250]);
+    await bp.mouse.move(mid.x, mid.y); await bp.mouse.down(); await bp.mouse.move(farLeft.x, farLeft.y, { steps: 8 }); await bp.mouse.up(); await settle();
+    check("dragged far off the board, a shape keeps a corner of itself on it, as a background image does", box((await shapes())[0]).x1 >= 29, JSON.stringify(box((await shapes())[0])));
     // A line and a label can be moved as well; a label has no size.
     await bp.getByRole("button", { name: /Draw background/ }).click(); await bp.waitForTimeout(200);
     await bp.locator(".background-tools select").selectOption({ label: "Label" });
     await bp.mouse.click((await toClient(700, 600)).x, (await toClient(700, 600)).y); await settle();
-    check("a label has no Larger or Smaller", (await bp.getByRole("button", { name: /^Larger/ }).count()) === 0);
+    const labelAt = (await shapes()).at(-1);
+    check("a label is made and its form shown, and it has no Larger or Smaller", labelAt.type === "label" && (await bp.getByText("Text colour").count()) === 1 && (await bp.getByRole("button", { name: /^Larger/ }).count()) === 0, JSON.stringify(labelAt && labelAt.type));
+    const labelPoint = (await shapes()).at(-1).points[0];
+    const labelScreen = await toClient(labelPoint.x + 30, labelPoint.y - 17);
+    await bp.mouse.move(labelScreen.x, labelScreen.y); await bp.mouse.down(); await bp.mouse.move(labelScreen.x + 60, labelScreen.y + 30, { steps: 5 }); await bp.mouse.up(); await settle();
+    const movedLabel = (await shapes()).at(-1).points[0];
+    check("a label is dragged by its text", movedLabel.x - labelPoint.x > 20 && movedLabel.y - labelPoint.y > 5, JSON.stringify([labelPoint, movedLabel]));
     await bp.context().close();
   }
 
