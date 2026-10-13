@@ -18,6 +18,7 @@ export const RELEASES: Release[] = [
     date: "2026-10-12",
     title: "Version 1.7: small boards and background shapes",
     changes: [
+    "Draw background lists how to use it under its options: drag a shape to move it, hold Shift to move one whose geometry is locked, Smaller and Larger in Properties, and Ctrl+Z.",
     "Draw background has a Rectangle and a Circle: drag from one corner to the other, or from the middle out to the edge. They are areas like the others, so their points can still be dragged one by one.",
     "A background shape can be dragged round the board by its body, and with its geometry locked it moves only when Shift is held; the lock still keeps its points where they are.",
     "A background shape has Smaller and Larger buttons, a tenth at a time round its middle, off while the geometry is locked; a line can be sized too, and a label has no size.",

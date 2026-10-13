@@ -564,3 +564,4 @@
 .print-option-sub strong { font-weight: 600; }
 
 .background-size-row{display:grid;gap:6px}.background-size-row .grid-two{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.background-tips{margin:4px 0 0;padding-left:18px;display:grid;gap:3px}
