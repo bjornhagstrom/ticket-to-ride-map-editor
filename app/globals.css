@@ -30,3 +30,4 @@
 
 .map-canvas.tool-background .background-object.selected .background-point{pointer-events:all}
 .background-point.active>circle:last-child{fill:#d6402b;stroke:#fff;stroke-width:3}
+.map-canvas.tool-background:not(.is-editing) .background-object{pointer-events:auto}
