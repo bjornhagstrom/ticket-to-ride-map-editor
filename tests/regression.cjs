@@ -5362,24 +5362,25 @@ const sectionStart = (n) => {
     };
     const box = (shape) => { const xs = shape.points.map((q) => q.x), ys = shape.points.map((q) => q.y); return { x0: Math.min(...xs), y0: Math.min(...ys), x1: Math.max(...xs), y1: Math.max(...ys) }; };
     const near77 = (a, b, e = 2) => Math.abs(a - b) <= e;
-    await bp.getByRole("button", { name: /Draw background/ }).click(); await bp.waitForTimeout(200);
+    const enterDraw = async () => { if ((await bp.locator(".background-tools").count()) === 0) { await bp.getByRole("button", { name: /Draw background/ }).click(); await bp.waitForTimeout(200); } };
+    await enterDraw();
     const objectChoices = await bp.locator(".background-tools select option").allTextContents();
     check("Draw background offers a rectangle and a circle beside area, line and label", ["Area", "Line", "Label", "Rectangle", "Circle"].every((name) => objectChoices.includes(name)), objectChoices.join(", "));
     // The tool says how it works, in a few lines: draw, move, lock and Shift, size, undo.
     const tips = ((await bp.locator(".background-tips").textContent().catch(() => "")) || "").replace(/\s+/g, " ");
-    check("Draw background has tips on how to use it: drag it to move it, hold Shift to move a locked one, Larger and Smaller, Ctrl+Z", /drag it to move it/i.test(tips) && /Shift/.test(tips) && /Larger/.test(tips) && /Ctrl\+Z/.test(tips), tips);
+    check("Draw background has tips on how to use it: mark a point, double-click to remove it, Shift and drag, Larger and Smaller, Esc, Ctrl+Z", /mark it/i.test(tips) && /double-click/i.test(tips) && /Shift/.test(tips) && /Larger/.test(tips) && /Esc/.test(tips) && /Ctrl\+Z/.test(tips), tips);
     await bp.locator(".background-tools select").selectOption({ label: "Rectangle" });
     await drag([200, 150], [500, 350]);
     let list = await shapes();
     check("dragging with Rectangle chosen draws a rectangle between the two corners, and it is selected", list.length === 1 && list[0].type === "area" && list[0].points.length === 4 && near77(box(list[0]).x0, 200) && near77(box(list[0]).y0, 150) && near77(box(list[0]).x1, 500) && near77(box(list[0]).y1, 350) && (await bp.locator(".property-form #background-label").count()) === 1, JSON.stringify(list[0] && box(list[0])));
-    await bp.getByRole("button", { name: /Draw background/ }).click(); await bp.waitForTimeout(200);
+    await enterDraw();
     await bp.locator(".background-tools select").selectOption({ label: "Circle" });
     await drag([800, 300], [900, 300]);
     list = await shapes();
     const circle = list[1];
     const radii = circle ? circle.points.map((q) => Math.hypot(q.x - 800, q.y - 300)) : [];
     check("dragging with Circle chosen draws a circle from its centre out to where the pointer stops", list.length === 2 && circle.points.length >= 24 && radii.every((r) => near77(r, 100, 3)), `${circle && circle.points.length} points, radii ${Math.min(...radii).toFixed(1)}–${Math.max(...radii).toFixed(1)}`);
-    await bp.getByRole("button", { name: /Draw background/ }).click(); await bp.waitForTimeout(200);
+    await enterDraw();
     await bp.locator(".background-tools select").selectOption({ label: "Rectangle" });
     await drag([600, 500], [603, 502]);
     check("a click or a tiny drag draws nothing", (await shapes()).length === 2);
@@ -5435,9 +5436,10 @@ const sectionStart = (n) => {
     await bp.keyboard.press("Control+z"); await settle();
     check("one Ctrl+Z with focus in the slider takes back the whole movement of it, not one step", near77((await shapes())[0].opacity, opacity0, 0.001), String((await shapes())[0].opacity));
     // Merging stops where it should: two shapes, an undo in between, a plain click (found in review).
-    await bp.getByRole("button", { name: /Draw background/ }).click(); await bp.waitForTimeout(200);
+    await enterDraw();
     await bp.locator(".background-tools select").selectOption({ label: "Rectangle" });
     await drag([700, 400], [900, 550]);
+    await bp.getByRole("button", { name: /Select & move/ }).click(); await bp.waitForTimeout(250);
     const ids = (await shapes()).map((x) => x.id);
     const opacityOf = async (i) => (await shapes())[i].opacity;
     const baseA = await opacityOf(0), baseB = await opacityOf(1);
@@ -5471,11 +5473,12 @@ const sectionStart = (n) => {
     await bp.mouse.move(mid.x, mid.y); await bp.mouse.down(); await bp.mouse.move(farLeft.x, farLeft.y, { steps: 8 }); await bp.mouse.up(); await settle();
     check("dragged far off the board, a shape keeps a corner of itself on it, as a background image does", box((await shapes())[0]).x1 >= 29, JSON.stringify(box((await shapes())[0])));
     // A line and a label can be moved as well; a label has no size.
-    await bp.getByRole("button", { name: /Draw background/ }).click(); await bp.waitForTimeout(200);
+    await enterDraw();
     await bp.locator(".background-tools select").selectOption({ label: "Label" });
     await bp.mouse.click((await toClient(700, 600)).x, (await toClient(700, 600)).y); await settle();
     const labelAt = (await shapes()).at(-1);
     check("a label is made and its form shown, and it has no Larger or Smaller", labelAt.type === "label" && (await bp.getByText("Text colour").count()) === 1 && (await bp.getByRole("button", { name: /^Larger/ }).count()) === 0, JSON.stringify(labelAt && labelAt.type));
+    await bp.getByRole("button", { name: /Select & move/ }).click(); await bp.waitForTimeout(250);
     const labelPoint = (await shapes()).at(-1).points[0];
     const labelScreen = await toClient(labelPoint.x + 30, labelPoint.y - 17);
     await bp.mouse.move(labelScreen.x, labelScreen.y); await bp.mouse.down(); await bp.mouse.move(labelScreen.x + 60, labelScreen.y + 30, { steps: 5 }); await bp.mouse.up(); await settle();
@@ -5484,8 +5487,9 @@ const sectionStart = (n) => {
     await bp.context().close();
   }
 
-  // 78. Drawing a background area or line (found by the owner on 2026-10-14): every click is saved in the map at once, so Ctrl+Z takes back the last point and nothing is lost; the points can be
-  // moved while the shape is being drawn; Escape lets go of the drawing; leaving the tool keeps what has enough points.
+  // 78. Drawing a background area or line (found by the owner on 2026-10-14 and 2026-10-15): every click is saved in the map at once, so Ctrl+Z takes back the last point; the points can be moved while the
+  // shape is being drawn; a point that is clicked is the marked one and the next point goes beside it, on the side of the neighbour the click is nearer; a double click on a point takes it away;
+  // Shift and drag moves a shape in this tool as well; the tool stays for the next shape, and Escape goes back to the arrow, keeping what has enough points.
   if (wants(78)) {
   sectionStart(78);
     const dp78 = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
@@ -5497,8 +5501,10 @@ const sectionStart = (n) => {
     const settle78 = () => dp78.waitForTimeout(350);
     const toClient78 = (x, y) => dp78.evaluate(([x, y]) => { const svg = document.querySelector(".map-canvas"); const pt = svg.createSVGPoint(); pt.x = x; pt.y = y; const m = pt.matrixTransform(svg.getScreenCTM()); return { x: m.x, y: m.y }; }, [x, y]);
     const click78 = async (x, y) => { const c = await toClient78(x, y); await dp78.mouse.click(c.x, c.y); await settle78(); };
-    const drag78 = async (from, to) => { const a = await toClient78(...from), b = await toClient78(...to); await dp78.mouse.move(a.x, a.y); await dp78.mouse.down(); await dp78.mouse.move(b.x, b.y, { steps: 6 }); await dp78.mouse.up(); await settle78(); };
-    const openDraw = async (label = "Area") => { await dp78.getByRole("button", { name: /Draw background/ }).click(); await dp78.waitForTimeout(200); await dp78.locator(".background-tools select").selectOption({ label }); };
+    const drag78 = async (from, to, shift = false) => { const a = await toClient78(...from), b = await toClient78(...to); if (shift) await dp78.keyboard.down("Shift"); await dp78.mouse.move(a.x, a.y); await dp78.mouse.down(); await dp78.mouse.move(b.x, b.y, { steps: 6 }); await dp78.mouse.up(); if (shift) await dp78.keyboard.up("Shift"); await settle78(); };
+    const inDraw = async () => (await dp78.locator(".background-tools").count()) === 1;
+    const openDraw = async (label = "Area") => { if (!(await inDraw())) { await dp78.getByRole("button", { name: /Draw background/ }).click(); await dp78.waitForTimeout(200); } await dp78.locator(".background-tools select").selectOption({ label }); };
+    const ptsOf = async (id) => (await shapes78()).find((x) => x.id === id).points;
     await openDraw("Area");
     await click78(200, 200);
     let list = await shapes78();
@@ -5506,70 +5512,83 @@ const sectionStart = (n) => {
     await click78(400, 200); await click78(300, 350);
     list = await shapes78();
     check("each click adds a point to it: three clicks, three points, one shape", list.length === 1 && list[0].points.length === 3, JSON.stringify(list.map((x) => x.points.length)));
-    // Ctrl+Z takes back the last point, and again, and again.
     await dp78.keyboard.press("Control+z"); await settle78();
     check("Ctrl+Z while drawing takes back the last point, and the drawing goes on", (await shapes78())[0].points.length === 2);
     await click78(350, 400);
     check("the next click goes on with the same shape", (await shapes78()).length === 1 && (await shapes78())[0].points.length === 3);
-    await dp78.keyboard.press("Control+z"); await settle78(); await dp78.keyboard.press("Control+z"); await settle78(); await dp78.keyboard.press("Control+z"); await settle78();
+    for (let i = 0; i < 3; i += 1) { await dp78.keyboard.press("Control+z"); await settle78(); }
     check("three more Ctrl+Z take the shape away altogether", (await shapes78()).length === 0);
-    await dp78.keyboard.press("Control+y"); await settle78();
-    check("and Ctrl+Y brings the first point back", (await shapes78()).length === 1 && (await shapes78())[0].points.length === 1);
-    await dp78.keyboard.press("Control+y"); await settle78(); await dp78.keyboard.press("Control+y"); await settle78();
-    check("and the next two", (await shapes78())[0].points.length === 3);
-    // Move a point while drawing.
-    const first = (await shapes78())[0].points[0];
+    for (let i = 0; i < 3; i += 1) { await dp78.keyboard.press("Control+y"); await settle78(); }
+    check("and three Ctrl+Y bring its three points back", (await shapes78()).length === 1 && (await shapes78())[0].points.length === 3);
+    const id1 = (await shapes78())[0].id;
+    const first = (await ptsOf(id1))[0];
     await drag78([first.x, first.y], [first.x - 60, first.y + 40]);
-    list = await shapes78();
-    check("a point can be dragged while the shape is still being drawn, and no new point is made by it", list[0].points.length === 3 && Math.abs(list[0].points[0].x - (first.x - 60)) < 3 && Math.abs(list[0].points[0].y - (first.y + 40)) < 3, JSON.stringify(list[0].points[0]));
+    check("a point can be dragged while the shape is still being drawn, and no new point is made by it", (await ptsOf(id1)).length === 3 && Math.abs((await ptsOf(id1))[0].x - (first.x - 60)) < 3, JSON.stringify((await ptsOf(id1))[0]));
     await dp78.keyboard.press("Control+z"); await settle78();
-    check("Ctrl+Z puts the point back where it was", Math.abs((await shapes78())[0].points[0].x - first.x) < 3);
-    await click78(450, 420);
-    check("and the drawing goes on after it", (await shapes78())[0].points.length === 4 || (await shapes78()).length === 1);
-    // Escape lets go of the drawing.
-    await dp78.keyboard.press("Escape"); await settle78();
-    check("Escape ends the drawing and takes the shape that was being drawn away, the tool staying", (await shapes78()).length === 0 && (await dp78.locator(".background-tools").count()) === 1, JSON.stringify((await shapes78()).length));
+    check("Ctrl+Z puts the point back where it was", Math.abs((await ptsOf(id1))[0].x - first.x) < 3);
+    await click78(300, 450);
+    let pts = await ptsOf(id1);
+    check("a click goes on adding at the end while no point has been picked", pts.length === 4 && Math.abs(pts[3].x - 300) < 3);
+    const handle = async (n) => { const p = (await ptsOf(id1))[n]; return [p.x, p.y]; };
+    await click78(...(await handle(1)));
+    check("a click on a point marks it, and adds no point", (await dp78.locator(".background-point.active").count()) === 1 && (await ptsOf(id1)).length === 4);
+    // Points now: P0 (200,200)  P1 (400,200)  P2 (300,350)  P3 (300,450). P1 is marked; a click nearer P2 than P0 goes between P1 and P2.
+    await click78(430, 330);
+    pts = await ptsOf(id1);
+    check("a click nearer the next neighbour goes between the marked point and it", pts.length === 5 && Math.abs(pts[2].x - 430) < 3 && Math.abs(pts[2].y - 330) < 3 && Math.abs(pts[1].x - 400) < 3, JSON.stringify(pts.map((q) => [Math.round(q.x), Math.round(q.y)])));
+    // The new point (index 2) is marked now. A click nearer P1 (before it) goes between P1 and it.
+    await click78(415, 215);
+    pts = await ptsOf(id1);
+    check("and a click nearer the neighbour before it goes between that one and the marked point", pts.length === 6 && Math.abs(pts[2].x - 415) < 3 && Math.abs(pts[3].x - 430) < 3, JSON.stringify(pts.map((q) => [Math.round(q.x), Math.round(q.y)])));
+    const before = (await ptsOf(id1)).length;
+    const dc = await toClient78(...(await handle(2)));
+    await dp78.mouse.dblclick(dc.x, dc.y); await settle78();
+    check("a double click on a point takes it away", (await ptsOf(id1)).length === before - 1);
     await dp78.keyboard.press("Control+z"); await settle78();
-    check("Ctrl+Z gives it back", (await shapes78()).length === 1);
-    await dp78.keyboard.press("Escape"); await settle78();
-    // Leaving the tool keeps a shape with enough points.
-    const base78 = (await shapes78()).length;
-    await click78(200, 200); await click78(400, 200); await click78(300, 350);
-    await dp78.getByRole("button", { name: /Select & move/ }).click(); await settle78();
-    list = await shapes78();
-    check("leaving Draw background keeps the area, with its three points, and selects it", list.length === base78 + 1 && list.at(-1).points.length === 3 && (await dp78.locator(".property-form #background-label").count()) === 1, JSON.stringify(list.map((x) => x.points.length)));
+    check("and Ctrl+Z gives it back", (await ptsOf(id1)).length === before);
+    const p0 = (await ptsOf(id1))[0];
+    await drag78([310, 300], [360, 330], true);
+    check("Shift and drag moves the shape that is being drawn, by its body", Math.abs((await ptsOf(id1))[0].x - p0.x - 50) < 3 && Math.abs((await ptsOf(id1))[0].y - p0.y - 30) < 3, JSON.stringify([p0, (await ptsOf(id1))[0]]));
     await dp78.keyboard.press("Control+z"); await settle78();
-    check("one Ctrl+Z takes back its last point, however the drawing was left", (await shapes78()).length === base78 + 1 && (await shapes78()).at(-1).points.length === 2, JSON.stringify((await shapes78()).map((x) => x.points.length)));
-    // A shape with too few points is dropped on leaving.
-    await dp78.keyboard.press("Escape");
-    await openDraw("Area");
-    await click78(600, 200); await click78(700, 260);
-    const before = (await shapes78()).length;
-    await dp78.getByRole("button", { name: /Select & move/ }).click(); await settle78();
-    check("leaving with an area of two points drops it: an area needs three", (await shapes78()).length === before - 1, `${before} before, ${(await shapes78()).length} after`);
-    // A line needs two.
-    await openDraw("Line");
-    await click78(600, 500); await click78(800, 520);
-    await dp78.getByRole("button", { name: /Select & move/ }).click(); await settle78();
-    check("a line of two points is kept on leaving", (await shapes78()).some((x) => x.type === "line" && x.points.length === 2));
-    // Finish shape ends the drawing, as before.
-    await openDraw("Area");
-    await click78(850, 200); await click78(1000, 220); await click78(930, 330);
     await dp78.getByRole("button", { name: "Finish shape" }).click(); await settle78();
-    check("Finish shape ends the drawing and selects the area", (await dp78.locator(".property-form #background-label").count()) === 1);
-    // The vertex of a finished area: Ctrl+Z puts it back (it was reported not to).
-    const areas = (await shapes78()).filter((x) => x.type === "area"); const area = areas.at(-1);
-    const vertex = area.points[0];
+    check("Finish shape ends the shape, the tool stays", await inDraw() && (await shapes78()).length === 1);
+    await click78(700, 200); await click78(850, 220); await click78(780, 330);
+    list = await shapes78();
+    check("the next click starts a new shape without choosing Area again", list.length === 2 && list[1].points.length === 3 && list[0].points.length === 6, JSON.stringify(list.map((x) => x.points.length)));
+    const q0 = (await ptsOf(id1))[0];
+    await drag78([300, 300], [340, 300], true);
+    check("Shift and drag moves a finished shape in Draw background too", Math.abs((await ptsOf(id1))[0].x - q0.x - 40) < 3 && (await shapes78()).length === 2);
+    await dp78.getByRole("button", { name: "Finish shape" }).click().catch(() => {}); await settle78();
+    await click78(100, 500); await click78(200, 520); await click78(150, 600);
+    await dp78.keyboard.press("Escape"); await settle78();
+    list = await shapes78();
+    check("Escape goes back to the arrow, and the area drawn so far is kept", !(await inDraw()) && list.length === 3 && list[2].points.length === 3, JSON.stringify(list.map((x) => x.points.length)));
+    await openDraw("Area");
+    await click78(900, 500); await click78(1000, 520);
+    await dp78.keyboard.press("Escape"); await settle78();
+    check("an area of two points is dropped on Escape: an area needs three", (await shapes78()).length === 3 && !(await inDraw()));
+    await openDraw("Line");
+    await click78(900, 500); await click78(1000, 520);
+    await dp78.keyboard.press("Escape"); await settle78();
+    check("a line of two points is kept", (await shapes78()).length === 4 && (await shapes78())[3].type === "line");
+    await openDraw("Area");
+    await click78(100, 650); await click78(250, 650); await click78(180, 700);
+    await dp78.getByRole("button", { name: /Select & move/ }).click(); await settle78();
+    check("choosing the arrow keeps the shape and selects it", (await shapes78()).length === 5 && (await dp78.locator(".property-form #background-label").count()) === 1);
+    const area = (await shapes78())[4]; const vertex = area.points[0];
     await drag78([vertex.x, vertex.y], [vertex.x + 50, vertex.y + 30]);
-    check("a point of a finished area is dragged", Math.abs((await shapes78()).find((x) => x.id === area.id).points[0].x - (vertex.x + 50)) < 3);
+    check("a point of a finished area is dragged", Math.abs((await ptsOf(area.id))[0].x - (vertex.x + 50)) < 3);
     await dp78.keyboard.press("Control+z"); await settle78();
-    check("and Ctrl+Z puts it back", Math.abs((await shapes78()).find((x) => x.id === area.id).points[0].x - vertex.x) < 3);
-    // Escape lets go of a rectangle being dragged out.
+    check("and Ctrl+Z puts it back", Math.abs((await ptsOf(area.id))[0].x - vertex.x) < 3);
     await openDraw("Rectangle");
     const n0 = (await shapes78()).length;
+    await drag78([700, 450], [900, 600]);
+    check("a rectangle is made, and the tool stays for the next", (await shapes78()).length === n0 + 1 && await inDraw());
     const a0 = await toClient78(100, 450), b0 = await toClient78(400, 650);
     await dp78.mouse.move(a0.x, a0.y); await dp78.mouse.down(); await dp78.mouse.move(b0.x, b0.y, { steps: 6 }); await dp78.keyboard.press("Escape"); await dp78.mouse.up(); await settle78();
-    check("Escape while a rectangle is being dragged out makes none", (await shapes78()).length === n0, `${n0} / ${(await shapes78()).length}`);
+    check("Escape while a rectangle is being dragged out makes none (and the tool stays)", (await shapes78()).length === n0 + 1 && await inDraw());
+    await dp78.keyboard.press("Escape"); await settle78();
+    check("a second Escape goes back to the arrow", !(await inDraw()));
     await dp78.context().close();
   }
 

@@ -27,7 +27,7 @@ import { useTicketSuggestion } from "./use-ticket-suggestion";
 import { SettingsDialog, type StyleTarget } from "./map-styles";
 import { balanceRangesFor, connectionCount, fittingLength, bandsOf, bandCuts, mapDiameter, deckFigures, defaultStyle, deckRuleFor, TICKET_SUGGESTER, evaluateTicketDeck, suggestedDeckSize, ticketEndStopCount, type TicketStyle, autoPlaceLabels, turnAndTidy, labelledStops, setupBalance, stopCoverage, ticketBand, type TicketBand, reviewTickets, ticketPointsPerSpace, ticketCoverage, type RouteSuggestion, labelCovers, labelAngleOptions, routeSamplePoints, colourLengthTable, crossings as crossingList, networkShape, SHAPE_OFFICIAL, buildAdjacency, networkStats, routeSpacing, shortestPath, suggestRoutes } from "./map-analysis";
 import { canvasPoint, canvasPointRaw, pointsFor, samePair, stopById } from "./map-geometry";
-import { dragShape, translateShape, circlePoints, rectanglePoints } from "./background-shapes";
+import { dragShape, translateShape, circlePoints, rectanglePoints, insertNextTo, shapeAt } from "./background-shapes";
 import { REPO_URL, newerEditor } from "./version";
 import { RouteLogo } from "./logo";
 import { ACTION_GAP_MS, countChange, EXPORT_REMINDER_KEY, exportAge, exported, freshReminder, isDue, isLastStep, later, lessOften, readReminder, stop as stopReminding, turnOn, type ExportReminder } from "./export-reminder";
@@ -651,7 +651,16 @@ export function MapEditor() {
   // it is drawn. `drawingId` is the shape being drawn; Escape lets it go, Finish shape or leaving the tool ends the drawing, and a shape with too few points to be one is then dropped.
   const [drawingId, setDrawingId] = useState<string | null>(null);
   const minimumPoints = (type: string) => (type === "line" ? 2 : 3);
+  // The marked point: the one that was clicked, or the one just put in beside it. The next click puts its point beside it, on the side of the neighbour the click is nearer.
+  const [activePoint, setActivePoint] = useState<{ shapeId: string; index: number } | null>(null);
   const addDrawingPoint = (point: Point) => {
+    const marked = activePoint && selectedBackground === activePoint.shapeId ? data.background.find((shape) => shape.id === activePoint.shapeId && !shape.locked && shape.type !== "label") : undefined;
+    if (marked && activePoint) {
+      const placed = insertNextTo(marked.points, activePoint.index, point, marked.type === "area");
+      change((draft) => { const shape = draft.background.find((item) => item.id === marked.id); if (shape) shape.points = placed.points; return draft; });
+      setActivePoint({ shapeId: marked.id, index: placed.index });
+      return;
+    }
     const existing = drawingId ? data.background.find((shape) => shape.id === drawingId) : undefined;
     if (existing) { change((draft) => { draft.background.find((shape) => shape.id === existing.id)?.points.push(point); return draft; }); return; }
     const id = `bg-${Date.now()}`;
@@ -659,9 +668,20 @@ export function MapEditor() {
     change((draft) => { draft.background.push(shape); return draft; });
     setDrawingId(id); setSelectedBackground(id); setSelectedStop(null); setSelectedRoute(null);
   };
+  // A double click on a point takes it away, unless that leaves too few for the shape (while it is being drawn it may go to none).
+  const removeBackgroundPoint = (shapeId: string, index: number) => {
+    const shape = data.background.find((item) => item.id === shapeId);
+    if (!shape || index >= shape.points.length) return;
+    const drawing = shapeId === drawingId;
+    if (shape.points.length <= minimumPoints(shape.type) && !drawing) return;
+    if (shape.points.length === 1) { dropDrawing(shapeId); setSelectedBackground(null); setDrawingId(null); setActivePoint(null); return; }
+    change((draft) => { draft.background.find((item) => item.id === shapeId)?.points.splice(index, 1); return draft; });
+    if (activePoint?.shapeId === shapeId) setActivePoint({ shapeId, index: Math.max(0, Math.min(index, shape.points.length - 2)) });
+  };
   const dropDrawing = (id: string) => change((draft) => { draft.background = draft.background.filter((shape) => shape.id !== id); return draft; });
   // The drawing is over: what has enough points stays (and is selected), what has not goes.
   const endDrawing = () => {
+    setActivePoint(null);
     const id = drawingId; if (!id) return null;
     setDrawingId(null);
     const shape = data.background.find((item) => item.id === id);
@@ -669,7 +689,7 @@ export function MapEditor() {
     if (shape.points.length < minimumPoints(shape.type)) { dropDrawing(id); setSelectedBackground(null); return null; }
     setSelectedBackground(id); return id;
   };
-  const finishBackground = () => { if (endDrawing()) setTool("select"); };
+  const finishBackground = () => { endDrawing(); };
   const cancelDrawing = () => { const id = drawingId; if (!id) return; setDrawingId(null); setSelectedBackground(null); if (data.background.some((shape) => shape.id === id)) dropDrawing(id); };
   // Leaving the tool (enterTool ends the drawing); and after Undo or Redo the shape that is being drawn is the selected one again.
   const reselectDrawing = () => { if (drawingId && tool === "background") setSelectedBackground(drawingId); };
@@ -708,7 +728,7 @@ export function MapEditor() {
     if (document.querySelector('[role="dialog"]')) return;
     // A rectangle or a circle being dragged out, or an area or a line being drawn, is let go before anything else.
     if (drawShapeRef.current) { drawShapeRef.current = null; setDraftPoints([]); return; }
-    if (drawingId) { cancelDrawing(); return; }
+    if (tool === "background") { endDrawing(); setTool("select"); return; }
     // Then the side panels, which hold Escape the same way; then a pick in progress; then the ticket.
     if (showAnalysis) closeAnalysis();
     else if (showSuggestions) { setShowSuggestions(false); setHoveredSuggestion(null); }
@@ -832,6 +852,11 @@ export function MapEditor() {
     }
     setSelectedStop(id); setSelectedRoute(null); setSelectedBackground(null);
   };
+  const startShapeMove = (shapeId: string, clientX: number, clientY: number) => {
+    const svg = document.querySelector<SVGSVGElement>(".map-canvas"); const original = data.background.find((shape) => shape.id === shapeId);
+    if (!svg || !original) return;
+    beginDrag(); dragBackgroundShapeRef.current = { id: shapeId, start: canvasPointRaw(svg, clientX, clientY, format.height, format.width), original };
+  };
   const onCanvasDown = (event: React.PointerEvent<SVGSVGElement>) => {
     const target = event.target as SVGElement;
     if (target !== event.currentTarget && !target.classList.contains("map-bg")) return;
@@ -841,6 +866,16 @@ export function MapEditor() {
       return;
     }
     if (tool === "background") {
+      // In this tool the shapes take no clicks, but Shift and drag moves one, locked or not.
+      if (event.shiftKey) {
+        const hit = shapeAt(data.background, canvasPointRaw(event.currentTarget, event.clientX, event.clientY, format.height, format.width));
+        if (hit) {
+          if (hit.id !== drawingId) endDrawing();
+          setSelectedBackground(hit.id); setSelectedStop(null); setSelectedRoute(null);
+          startShapeMove(hit.id, event.clientX, event.clientY);
+          return;
+        }
+      }
       if (backgroundType === "rectangle" || backgroundType === "circle") {
         drawShapeRef.current = { kind: backgroundType, start: point, end: point };
         return;
@@ -848,7 +883,7 @@ export function MapEditor() {
       if (backgroundType === "label") {
         const id = `bg-${Date.now()}`;
         change((draft) => { draft.background.push({ id, type: "label", label: "Label", points: [point], fill: "#000000", stroke: backgroundStroke, opacity: 1, strokeWidth: 0 }); return draft; });
-        setSelectedBackground(id); setTool("select");
+        setSelectedBackground(id);
       } else addDrawingPoint(point);
       return;
     }
@@ -970,7 +1005,7 @@ export function MapEditor() {
         const id = `bg-${Date.now()}`;
         const shape: BackgroundShape = { id, type: "area", label: drawn.kind === "rectangle" ? "Rectangle" : "Circle", points, fill: backgroundFill, stroke: backgroundStroke, opacity: .65, strokeWidth: 3 };
         change((draft) => { draft.background.push(shape); return draft; });
-        setSelectedBackground(id); setSelectedStop(null); setSelectedRoute(null); setTool("select");
+        setSelectedBackground(id); setSelectedStop(null); setSelectedRoute(null);
       }
     }
     dragStopRef.current = null; dragStopLabelRef.current = null; dragWaypointRef.current = null; dragBackgroundPointRef.current = null; dragBackgroundLabelRef.current = null; dragImageRef.current = null; dragNoteRef.current = null;
@@ -1250,7 +1285,7 @@ export function MapEditor() {
           {tool === "measure" && <p className="tool-status">{measureStart ? `From ${stopById(data, measureStart)?.name} · now click the destination stop` : measureResult ? ("unreachable" in measureResult ? `${stopById(data, measureResult.from)?.name} → ${stopById(data, measureResult.to)?.name}: no connected path` : `${stopById(data, measureResult.from)?.name} → ${stopById(data, measureResult.to)?.name}: ${measureResult.distance} wagon spaces`) : "Click two stops for the shortest path."}</p>}
           {tool === "stop" && <div className="tool-options"><div className="grid-two"><div><Label>Stop type</Label><NativeSelect value={stopType} onChange={(event) => setStopType(event.target.value as StopType)}>{data.stopTypeStyles.map((meta) => <NativeSelectOption key={meta.id} value={meta.id}>{meta.label}</NativeSelectOption>)}</NativeSelect></div><div><Label>Stop size</Label><NativeSelect value={stopSize} onChange={(event) => setStopSize(event.target.value as StopSize)}>{Object.entries(stopSizeMeta).map(([key, meta]) => <NativeSelectOption key={key} value={key}>{meta.label}</NativeSelectOption>)}</NativeSelect></div></div><div className="grid-two"><div><Label>Symbol</Label><NativeSelect value={stopSymbol} onChange={(event) => setStopSymbol(event.target.value as StopSymbol)}>{Object.entries(stopSymbolMeta).map(([key, meta]) => <NativeSelectOption key={key} value={key}>{meta.label}</NativeSelectOption>)}</NativeSelect></div>{stopSymbol === "letter" && <div><Label>Letter</Label><Input maxLength={2} value={stopLetter} onChange={(event) => setStopLetter(event.target.value)} /></div>}</div></div>}
           {tool === "route" && <div className="tool-options"><StylePicker label="Route type" value={routeType} styles={data.routeTypeStyles} placeholder="" onChange={(id) => id && setRouteType(id)} onEdit={() => openStyles({ kind: "route", id: routeType })} /><div><Label htmlFor="route-length-choice">Wagon spaces</Label><NativeSelect id="route-length-choice" aria-label="Wagon spaces for new routes" value={String(routeLength)} onChange={(event) => setRouteLength(event.target.value === "fit" ? "fit" : Number(event.target.value))}><NativeSelectOption value="fit">Fit the distance</NativeSelectOption>{[1, 2, 3, 4, 5, 6, 7, 8].map((n) => <NativeSelectOption key={n} value={String(n)}>{n}</NativeSelectOption>)}</NativeSelect></div><label className="checkbox-row"><input type="checkbox" checked={routeCurved} onChange={(event) => setRouteCurved(event.target.checked)} />Draw as a smooth curve</label><div><Label>Colour</Label><NativeSelect value={routeColor} onChange={(event) => setRouteColor(event.target.value)}>{Object.keys(routeColors).map((key) => <NativeSelectOption key={key} value={key}>{colorLabels[key]}</NativeSelectOption>)}</NativeSelect></div></div>}
-          {tool === "background" && <div className="tool-options background-tools"><div className="image-import-row"><Label>Background image</Label><div className="image-import-buttons"><Button size="sm" variant="outline" onClick={() => imageFileRef.current?.click()}><ImageIcon />{data.backgroundImage ? "Replace image" : "Import image"}</Button>{data.backgroundImage && <Button size="sm" variant="ghost" onClick={() => { chooseImage(); setDanger("delete"); }}><Trash2 />Remove</Button>}</div></div><Label>Object</Label><NativeSelect value={backgroundType} onChange={(event) => { endDrawing(); setBackgroundType(event.target.value as BackgroundDraw); setDraftPoints([]); }}><NativeSelectOption value="area">Area</NativeSelectOption><NativeSelectOption value="line">Line</NativeSelectOption><NativeSelectOption value="label">Label</NativeSelectOption><NativeSelectOption value="rectangle">Rectangle</NativeSelectOption><NativeSelectOption value="circle">Circle</NativeSelectOption></NativeSelect>{backgroundType !== "label" && <><div className="colour-row"><label>Fill <input type="color" value={backgroundFill} onChange={(event) => setBackgroundFill(event.target.value)} disabled={backgroundType === "line"} /></label><label>Outline <input type="color" value={backgroundStroke} onChange={(event) => setBackgroundStroke(event.target.value)} /></label></div>{backgroundType === "rectangle" || backgroundType === "circle" ? <p className="helper">{backgroundType === "rectangle" ? "Drag from one corner to the opposite one." : "Drag from the middle out to the edge."} Afterwards the shape can be dragged, made larger or smaller, and its points moved.</p> : <p className="helper">Click to add points: each is saved at once, and Ctrl+Z takes back the last. Drag a point to move it. Esc lets go of the shape; leaving this tool keeps it.</p>}{backgroundType !== "rectangle" && backgroundType !== "circle" && <div className="draft-actions"><Button size="sm" disabled={!drawingId || (data.background.find((shape) => shape.id === drawingId)?.points.length ?? 0) < minimumPoints(backgroundType)} onClick={finishBackground}>Finish shape</Button><Button size="sm" variant="ghost" disabled={!drawingId} onClick={cancelDrawing}>Cancel</Button></div>}</>}<ul className="helper background-tips"><li>Select a shape and <strong>drag it</strong> to move it; drag its dots to change its shape.</li><li>With <strong>Lock geometry</strong> on, hold <strong>Shift</strong> and drag to move it anyway.</li><li>Properties has <strong>Smaller</strong> and <strong>Larger</strong>, and a label to name it.</li><li>Ctrl+Z undoes the last step.</li></ul></div>}
+          {tool === "background" && <div className="tool-options background-tools"><div className="image-import-row"><Label>Background image</Label><div className="image-import-buttons"><Button size="sm" variant="outline" onClick={() => imageFileRef.current?.click()}><ImageIcon />{data.backgroundImage ? "Replace image" : "Import image"}</Button>{data.backgroundImage && <Button size="sm" variant="ghost" onClick={() => { chooseImage(); setDanger("delete"); }}><Trash2 />Remove</Button>}</div></div><Label>Object</Label><NativeSelect value={backgroundType} onChange={(event) => { endDrawing(); setBackgroundType(event.target.value as BackgroundDraw); setDraftPoints([]); }}><NativeSelectOption value="area">Area</NativeSelectOption><NativeSelectOption value="line">Line</NativeSelectOption><NativeSelectOption value="label">Label</NativeSelectOption><NativeSelectOption value="rectangle">Rectangle</NativeSelectOption><NativeSelectOption value="circle">Circle</NativeSelectOption></NativeSelect>{backgroundType !== "label" && <><div className="colour-row"><label>Fill <input type="color" value={backgroundFill} onChange={(event) => setBackgroundFill(event.target.value)} disabled={backgroundType === "line"} /></label><label>Outline <input type="color" value={backgroundStroke} onChange={(event) => setBackgroundStroke(event.target.value)} /></label></div>{backgroundType === "rectangle" || backgroundType === "circle" ? <p className="helper">{backgroundType === "rectangle" ? "Drag from one corner to the opposite one." : "Drag from the middle out to the edge."} Afterwards the shape can be dragged, made larger or smaller, and its points moved.</p> : null}{backgroundType !== "rectangle" && backgroundType !== "circle" && <div className="draft-actions"><Button size="sm" disabled={!drawingId || (data.background.find((shape) => shape.id === drawingId)?.points.length ?? 0) < minimumPoints(backgroundType)} onClick={finishBackground}>Finish shape</Button><Button size="sm" variant="ghost" disabled={!drawingId} onClick={cancelDrawing}>Cancel</Button></div>}</>}<ul className="helper background-tips"><li>Click to add points; each is saved at once, and Ctrl+Z takes back the last.</li><li>Click a point to mark it: the next point goes beside it, on the side of the neighbour you click nearer.</li><li>Drag a point to move it; double-click one to remove it.</li><li><strong>Shift</strong> and drag moves a whole shape, also when its geometry is locked.</li><li>Properties has <strong>Smaller</strong> and <strong>Larger</strong>.</li><li>Finish shape, then click for the next one. <strong>Esc</strong> goes back to the arrow and keeps what you drew.</li></ul></div>}
         </div>
         {isDue(reminder) && <div className="crossing-card has-warning export-reminder" role="status">
           <div className="crossing-icon"><AlertTriangle /></div>
@@ -1315,11 +1350,7 @@ export function MapEditor() {
         {!phone && <div className="map-status">{statusChips}</div>}
         {hint && hint.atTop && <MapHint atTop title={hint.title} open={routeHintOpen} onToggle={toggleRouteHint} offsetX={routeHintX} onOffsetChange={moveRouteHint}>{hint.body}</MapHint>}
         <svg className={cn("map-canvas", format.orientation === "portrait" && "standing", `tool-${tool}`, hasMarks && "has-marks", rulesPicking && "picking-rules")} style={{ aspectRatio: `${format.width} / ${format.height}` }} viewBox={`0 0 ${format.width} ${format.height}`} onPointerDown={onCanvasDown} onPointerMove={onCanvasMove} onPointerUp={stopDragging} onPointerCancel={stopDragging}>
-          <MapArtwork data={data} tool={tool} highlightRoutes={highlightRoutes} scaleWidthMm={scaleWidthMm} selectedRoute={selectedRoute} selectedStop={selectedStop} selectedBackground={selectedBackground} imageSelected={imageSelected} selectedNote={selectedNote} bottleneckRoutes={showAnalysis ? bottleneckRoutes : undefined} pendingStop={pendingStop} pickTo={pickTo} previewRoutes={balanceRoutes ?? pinnedRoutes ?? (showCrossings ? crossingRoutes : preview?.routes)} crossingMarks={showCrossings ? crossings.map(({ at }) => at) : undefined} previewStop={balanceStop ?? pin?.stop ?? null} previewLabel={preview?.label ?? null} onStopHover={setHoveredStop} draft={{ type: backgroundType === "line" ? "line" : "area", points: draftPoints, fill: backgroundFill, stroke: backgroundStroke, dots: backgroundType !== "rectangle" && backgroundType !== "circle" }} onRoute={(id) => { setSelectedRoute(id); setSelectedStop(null); setSelectedBackground(null); setSelectedNote(null); setTool("select"); }} onRouteSlot={toggleLocomotiveSlot} onRouteBendInsert={insertRouteBend} onRouteBendRemove={removeRouteBend} onStop={(id, shiftHeld) => { if (rulesPickRef.current?.stop(id)) return; chooseStop(id); if (tool === "select" && (shiftHeld || !stopById(data, id)?.locked)) { beginDrag(); dragStopRef.current = id; } }} onWaypoint={(routeId, index, grabOffset) => { beginDrag(); dragWaypointRef.current = { routeId, index, grabOffset }; }} onBackground={(id) => { setSelectedBackground(id); setSelectedRoute(null); setSelectedStop(null); setSelectedNote(null); setTool("select"); }} onBackgroundPoint={(shapeId, index) => { beginDrag(); dragBackgroundPointRef.current = { shapeId, index }; }} onBackgroundLabel={(shapeId) => { beginDrag(); dragBackgroundLabelRef.current = shapeId; }} onBackgroundMove={(shapeId, clientX, clientY) => {
-            const svg = document.querySelector<SVGSVGElement>(".map-canvas"); const original = data.background.find((shape) => shape.id === shapeId);
-            if (!svg || !original) return;
-            beginDrag(); dragBackgroundShapeRef.current = { id: shapeId, start: canvasPointRaw(svg, clientX, clientY, format.height, format.width), original };
-          }} onImageSelect={chooseImage} onImageMove={(point) => { chooseImage(); const img = data.backgroundImage; if (img) { beginDrag(); dragImageRef.current = { mode: "move", offsetX: point.x - img.x, offsetY: point.y - img.y }; } }} onImageScale={() => { beginDrag(); dragImageRef.current = { mode: "scale" }; }} onImageRotate={() => { beginDrag(); dragImageRef.current = { mode: "rotate" }; }} suggestionPreview={hoveredSuggestion ? (() => { const a = stopById(data, hoveredSuggestion.a), b = stopById(data, hoveredSuggestion.b); return a && b ? { a, b } : undefined; })() : undefined} onStopLabel={(id, shiftHeld) => { if (rulesPickRef.current?.stop(id)) return; chooseStop(id); if (shiftHeld || !stopById(data, id)?.labelLocked) { beginDrag(); dragStopLabelRef.current = id; } }} onNoteSelect={chooseNote} onNoteMove={(id, point) => { chooseNote(id); const note = data.notes.find((item) => item.id === id); if (note) { beginDrag(); dragNoteRef.current = { id, mode: "move", offsetX: point.x - note.x, offsetY: point.y - note.y }; } }} onNoteResize={(id) => { beginDrag(); dragNoteRef.current = { id, mode: "resize" }; }} onNoteToggle={(id) => change((draft) => { const note = draft.notes.find((item) => item.id === id); if (note) note.collapsed = !note.collapsed || undefined; return draft; })} />
+          <MapArtwork data={data} tool={tool} highlightRoutes={highlightRoutes} scaleWidthMm={scaleWidthMm} selectedRoute={selectedRoute} selectedStop={selectedStop} selectedBackground={selectedBackground} imageSelected={imageSelected} selectedNote={selectedNote} bottleneckRoutes={showAnalysis ? bottleneckRoutes : undefined} pendingStop={pendingStop} pickTo={pickTo} previewRoutes={balanceRoutes ?? pinnedRoutes ?? (showCrossings ? crossingRoutes : preview?.routes)} crossingMarks={showCrossings ? crossings.map(({ at }) => at) : undefined} previewStop={balanceStop ?? pin?.stop ?? null} previewLabel={preview?.label ?? null} onStopHover={setHoveredStop} draft={{ type: backgroundType === "line" ? "line" : "area", points: draftPoints, fill: backgroundFill, stroke: backgroundStroke, dots: backgroundType !== "rectangle" && backgroundType !== "circle" }} onRoute={(id) => { setSelectedRoute(id); setSelectedStop(null); setSelectedBackground(null); setSelectedNote(null); setTool("select"); }} onRouteSlot={toggleLocomotiveSlot} onRouteBendInsert={insertRouteBend} onRouteBendRemove={removeRouteBend} onStop={(id, shiftHeld) => { if (rulesPickRef.current?.stop(id)) return; chooseStop(id); if (tool === "select" && (shiftHeld || !stopById(data, id)?.locked)) { beginDrag(); dragStopRef.current = id; } }} onWaypoint={(routeId, index, grabOffset) => { beginDrag(); dragWaypointRef.current = { routeId, index, grabOffset }; }} onBackground={(id) => { setSelectedBackground(id); setSelectedRoute(null); setSelectedStop(null); setSelectedNote(null); setTool("select"); }} onBackgroundPoint={(shapeId, index) => { beginDrag(); dragBackgroundPointRef.current = { shapeId, index }; setActivePoint({ shapeId, index }); }} activePoint={activePoint} onBackgroundPointRemove={removeBackgroundPoint} onBackgroundLabel={(shapeId) => { beginDrag(); dragBackgroundLabelRef.current = shapeId; }} onBackgroundMove={(shapeId, clientX, clientY) => startShapeMove(shapeId, clientX, clientY)} onImageSelect={chooseImage} onImageMove={(point) => { chooseImage(); const img = data.backgroundImage; if (img) { beginDrag(); dragImageRef.current = { mode: "move", offsetX: point.x - img.x, offsetY: point.y - img.y }; } }} onImageScale={() => { beginDrag(); dragImageRef.current = { mode: "scale" }; }} onImageRotate={() => { beginDrag(); dragImageRef.current = { mode: "rotate" }; }} suggestionPreview={hoveredSuggestion ? (() => { const a = stopById(data, hoveredSuggestion.a), b = stopById(data, hoveredSuggestion.b); return a && b ? { a, b } : undefined; })() : undefined} onStopLabel={(id, shiftHeld) => { if (rulesPickRef.current?.stop(id)) return; chooseStop(id); if (shiftHeld || !stopById(data, id)?.labelLocked) { beginDrag(); dragStopLabelRef.current = id; } }} onNoteSelect={chooseNote} onNoteMove={(id, point) => { chooseNote(id); const note = data.notes.find((item) => item.id === id); if (note) { beginDrag(); dragNoteRef.current = { id, mode: "move", offsetX: point.x - note.x, offsetY: point.y - note.y }; } }} onNoteResize={(id) => { beginDrag(); dragNoteRef.current = { id, mode: "resize" }; }} onNoteToggle={(id) => change((draft) => { const note = draft.notes.find((item) => item.id === id); if (note) note.collapsed = !note.collapsed || undefined; return draft; })} />
           {/* The route just drawn: − and + to set its wagon spaces without leaving the Draw route tool. */}
           {chipAt && justDrawnRoute && <g className="length-chip" transform={`translate(${chipAt.x},${chipAt.y})`} onPointerDown={(event) => event.stopPropagation()}>
             <rect x={-58} y={-17} width={116} height={34} rx={17} />
