@@ -4215,7 +4215,7 @@ const sectionStart = (n) => {
     const guide = xp.getByRole("dialog", { name: "Welcome to the map editor" });
     check("the welcome box offers a map with problems beside the clean example", (await guide.getByRole("button", { name: "Load the example map" }).count()) === 1 && (await guide.getByRole("button", { name: "Load a map with problems" }).count()) === 1);
     const fit = await guide.evaluate((dlg) => { const box = dlg.getBoundingClientRect(); return Array.from(dlg.querySelectorAll('[data-slot="dialog-footer"] button')).map((b) => { const r = b.getBoundingClientRect(); return { text: b.textContent.trim(), inside: r.left >= box.left - 1 && r.right <= box.right + 1 }; }); });
-    check("the three choices all fit inside the welcome box", fit.length === 3 && fit.every((b) => b.inside), JSON.stringify(fit));
+    check("the four choices (a file of one's own, the example, a map with problems, a blank map) all fit inside the welcome box", fit.length === 4 && fit.every((b) => b.inside), JSON.stringify(fit));
     await guide.getByRole("button", { name: "Load a map with problems" }).click();
     await xp.waitForTimeout(800);
     check("it loads the example map with problems", (await xp.locator(".map-name input, input[aria-label='Map name']").first().inputValue().catch(() => "")) === "Example map with problems" || /Example map with problems/.test(await xp.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")).name)));
