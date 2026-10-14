@@ -5647,6 +5647,46 @@ const sectionStart = (n) => {
     await wp.context().close(); await wp2.context().close();
   }
 
+  // 80. The Delete key takes away what is selected (found by the owner on 2026-10-15): a shape, a stop, a route, a note; Backspace too, which is the Delete key of a Mac.
+  if (wants(80)) {
+  sectionStart(80);
+    const kp = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
+    kp.on("pageerror", (e) => errors.push(String(e)));
+    await kp.goto(BASE, { waitUntil: "networkidle" });
+    await kp.getByRole("button", { name: "Load the example map" }).click(); await kp.waitForTimeout(700);
+    const counts = () => kp.evaluate(() => { const m = JSON.parse(localStorage.getItem("ttr-map")); return { stops: m.stops.length, routes: m.routes.length, background: m.background.length, notes: m.notes.length }; });
+    const settleK = () => kp.waitForTimeout(350);
+    const start = await counts();
+    // A stop.
+    const stopBox = await kp.locator("g.stop").first().boundingBox();
+    await kp.mouse.click(stopBox.x + stopBox.width / 2, stopBox.y + stopBox.height / 2); await settleK();
+    await kp.keyboard.press("Delete"); await settleK();
+    check("Delete takes away the stop that is selected, and the routes that ended at it", (await counts()).stops === start.stops - 1 && (await counts()).routes < start.routes);
+    await kp.keyboard.press("Control+z"); await settleK();
+    check("and Ctrl+Z gives it all back", JSON.stringify(await counts()) === JSON.stringify(start));
+    // A route.
+    await kp.keyboard.press("Escape"); await settleK();
+    const hit = await kp.locator(".route-hit").first().boundingBox();
+    await kp.locator(".route-hit").first().click({ force: true, position: { x: hit.width / 2, y: hit.height / 2 } }); await settleK();
+    await kp.keyboard.press("Delete"); await settleK();
+    check("Delete takes away the route that is selected", (await counts()).routes === start.routes - 1 && (await counts()).stops === start.stops);
+    await kp.keyboard.press("Control+z"); await settleK();
+    // A background shape, with Backspace.
+    const shape = await kp.locator(".background-object").first().boundingBox();
+    await kp.mouse.click(shape.x + shape.width / 2, shape.y + shape.height / 2); await settleK();
+    const hadSelection = (await kp.locator(".property-form #background-label").count()) === 1;
+    if (hadSelection) { await kp.keyboard.press("Backspace"); await settleK(); }
+    check("Backspace, the Delete key of a Mac, takes away the shape that is selected", hadSelection && (await counts()).background === start.background - 1, JSON.stringify(await counts()));
+    await kp.keyboard.press("Control+z"); await settleK();
+    check("and it comes back with Ctrl+Z", (await counts()).background === start.background);
+    // Nothing is taken away while a field takes text.
+    await kp.mouse.click(shape.x + shape.width / 2, shape.y + shape.height / 2); await settleK();
+    await kp.locator("#background-label").focus();
+    await kp.keyboard.press("Backspace"); await settleK();
+    check("with the cursor in a text field Delete and Backspace edit the text, and take nothing away", (await counts()).background === start.background);
+    await kp.context().close();
+  }
+
   if (sectionOpen) sectionTimes[sectionOpen.n] = Math.round((Date.now() - sectionOpen.at) / 100) / 10;
   if (process.env.TTR_TIMES) fs.writeFileSync(process.env.TTR_TIMES, JSON.stringify(sectionTimes));
   console.log("PASS:"); ok.forEach((l) => console.log("  ✓ " + l));

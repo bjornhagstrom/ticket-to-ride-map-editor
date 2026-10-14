@@ -386,6 +386,7 @@ export function MapEditor() {
   const changeSerialRef = useRef(0);
   const cancelPickRef = useRef<() => void>(() => {});
   const endDrawingRef = useRef<() => unknown>(() => null);
+  const deleteByKeyRef = useRef<() => boolean>(() => false);
   const lengthKeyRef = useRef<(event: KeyboardEvent) => boolean>(() => false);
   const redoRef = useRef<() => void>(() => {});
   const fileRef = useRef<HTMLInputElement>(null);
@@ -427,6 +428,14 @@ export function MapEditor() {
     const onKeyDown = (event: KeyboardEvent) => {
       if (lengthKeyRef.current(event)) return;
       if (event.key === "Escape") { const target = event.target as HTMLElement | null; if (target?.tagName === "TEXTAREA") { target.blur(); return; } cancelPickRef.current(); return; }
+      // Delete (Backspace on a Mac, where the key called Delete sends it) takes away what is selected: a stop, a route, a background shape, a note or the image. Not while a field takes text, or a box is open.
+      if ((event.key === "Delete" || event.key === "Backspace") && !event.metaKey && !event.ctrlKey && !event.altKey) {
+        const field = event.target as HTMLElement | null;
+        if (field && (field.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(field.tagName))) return;
+        if (document.querySelector('[role="dialog"], [role="alertdialog"]')) return;
+        if (deleteByKeyRef.current()) event.preventDefault();
+        return;
+      }
       if (!(event.metaKey || event.ctrlKey)) return;
       const key = event.key.toLowerCase();
       if (key !== "z" && key !== "y") return;
@@ -1036,8 +1045,20 @@ export function MapEditor() {
       if (selectedStop) { draft.stops = draft.stops.filter((stop) => stop.id !== selectedStop); draft.routes = draft.routes.filter((route) => route.a !== selectedStop && route.b !== selectedStop); draft.tickets = draft.tickets.filter((ticket) => ticket.a !== selectedStop && ticket.b !== selectedStop); }
       return draft;
     });
+    if (selectedBackground && selectedBackground === drawingId) { setDrawingId(null); setActivePoint(null); freshDrawingRef.current = null; }
     clearSelection(); setDanger(null);
   };
+  // The Delete key: what is selected goes at once, with a word on screen and Undo; true if something was selected.
+  const deleteByKey = () => {
+    const what = selectedStop ? "stop" : selectedRoute ? "route" : selectedBackground ? "shape" : selectedNote ? "note" : imageSelected ? "image" : null;
+    if (!what) return false;
+    const serialAfter = changeSerialRef.current + 1;
+    const withTickets = Boolean(selectedStop && stopTicketCount);
+    deleteSelected();
+    if (!withTickets) toast(`The ${what} is deleted.`, { duration: 8000, action: { label: "Undo", onClick: () => undoIfUnchanged(serialAfter) } });
+    return true;
+  };
+  useEffect(() => { deleteByKeyRef.current = deleteByKey; });
   const toggleLocomotiveSlot = (routeId: string, index: number) => {
     change((draft) => {
       const route = draft.routes.find((item) => item.id === routeId);
