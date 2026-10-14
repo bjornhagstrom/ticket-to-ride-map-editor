@@ -5484,6 +5484,95 @@ const sectionStart = (n) => {
     await bp.context().close();
   }
 
+  // 78. Drawing a background area or line (found by the owner on 2026-10-14): every click is saved in the map at once, so Ctrl+Z takes back the last point and nothing is lost; the points can be
+  // moved while the shape is being drawn; Escape lets go of the drawing; leaving the tool keeps what has enough points.
+  if (wants(78)) {
+  sectionStart(78);
+    const dp78 = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
+    dp78.on("pageerror", (e) => errors.push(String(e)));
+    await dp78.goto(BASE, { waitUntil: "networkidle" });
+    await dp78.getByRole("button", { name: "Start with a blank map" }).click(); await dp78.waitForTimeout(500);
+    if (await dp78.locator('[role="dialog"]').count()) { await dp78.keyboard.press("Escape"); await dp78.waitForTimeout(400); }
+    const shapes78 = () => dp78.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")).background);
+    const settle78 = () => dp78.waitForTimeout(350);
+    const toClient78 = (x, y) => dp78.evaluate(([x, y]) => { const svg = document.querySelector(".map-canvas"); const pt = svg.createSVGPoint(); pt.x = x; pt.y = y; const m = pt.matrixTransform(svg.getScreenCTM()); return { x: m.x, y: m.y }; }, [x, y]);
+    const click78 = async (x, y) => { const c = await toClient78(x, y); await dp78.mouse.click(c.x, c.y); await settle78(); };
+    const drag78 = async (from, to) => { const a = await toClient78(...from), b = await toClient78(...to); await dp78.mouse.move(a.x, a.y); await dp78.mouse.down(); await dp78.mouse.move(b.x, b.y, { steps: 6 }); await dp78.mouse.up(); await settle78(); };
+    const openDraw = async (label = "Area") => { await dp78.getByRole("button", { name: /Draw background/ }).click(); await dp78.waitForTimeout(200); await dp78.locator(".background-tools select").selectOption({ label }); };
+    await openDraw("Area");
+    await click78(200, 200);
+    let list = await shapes78();
+    check("the first click of an area is saved in the map at once, as a shape of one point", list.length === 1 && list[0].points.length === 1 && list[0].type === "area", JSON.stringify(list.map((x) => x.points.length)));
+    await click78(400, 200); await click78(300, 350);
+    list = await shapes78();
+    check("each click adds a point to it: three clicks, three points, one shape", list.length === 1 && list[0].points.length === 3, JSON.stringify(list.map((x) => x.points.length)));
+    // Ctrl+Z takes back the last point, and again, and again.
+    await dp78.keyboard.press("Control+z"); await settle78();
+    check("Ctrl+Z while drawing takes back the last point, and the drawing goes on", (await shapes78())[0].points.length === 2);
+    await click78(350, 400);
+    check("the next click goes on with the same shape", (await shapes78()).length === 1 && (await shapes78())[0].points.length === 3);
+    await dp78.keyboard.press("Control+z"); await settle78(); await dp78.keyboard.press("Control+z"); await settle78(); await dp78.keyboard.press("Control+z"); await settle78();
+    check("three more Ctrl+Z take the shape away altogether", (await shapes78()).length === 0);
+    await dp78.keyboard.press("Control+y"); await settle78();
+    check("and Ctrl+Y brings the first point back", (await shapes78()).length === 1 && (await shapes78())[0].points.length === 1);
+    await dp78.keyboard.press("Control+y"); await settle78(); await dp78.keyboard.press("Control+y"); await settle78();
+    check("and the next two", (await shapes78())[0].points.length === 3);
+    // Move a point while drawing.
+    const first = (await shapes78())[0].points[0];
+    await drag78([first.x, first.y], [first.x - 60, first.y + 40]);
+    list = await shapes78();
+    check("a point can be dragged while the shape is still being drawn, and no new point is made by it", list[0].points.length === 3 && Math.abs(list[0].points[0].x - (first.x - 60)) < 3 && Math.abs(list[0].points[0].y - (first.y + 40)) < 3, JSON.stringify(list[0].points[0]));
+    await dp78.keyboard.press("Control+z"); await settle78();
+    check("Ctrl+Z puts the point back where it was", Math.abs((await shapes78())[0].points[0].x - first.x) < 3);
+    await click78(450, 420);
+    check("and the drawing goes on after it", (await shapes78())[0].points.length === 4 || (await shapes78()).length === 1);
+    // Escape lets go of the drawing.
+    await dp78.keyboard.press("Escape"); await settle78();
+    check("Escape ends the drawing and takes the shape that was being drawn away, the tool staying", (await shapes78()).length === 0 && (await dp78.locator(".background-tools").count()) === 1, JSON.stringify((await shapes78()).length));
+    await dp78.keyboard.press("Control+z"); await settle78();
+    check("Ctrl+Z gives it back", (await shapes78()).length === 1);
+    await dp78.keyboard.press("Escape"); await settle78();
+    // Leaving the tool keeps a shape with enough points.
+    const base78 = (await shapes78()).length;
+    await click78(200, 200); await click78(400, 200); await click78(300, 350);
+    await dp78.getByRole("button", { name: /Select & move/ }).click(); await settle78();
+    list = await shapes78();
+    check("leaving Draw background keeps the area, with its three points, and selects it", list.length === base78 + 1 && list.at(-1).points.length === 3 && (await dp78.locator(".property-form #background-label").count()) === 1, JSON.stringify(list.map((x) => x.points.length)));
+    await dp78.keyboard.press("Control+z"); await settle78();
+    check("one Ctrl+Z takes back its last point, however the drawing was left", (await shapes78()).length === base78 + 1 && (await shapes78()).at(-1).points.length === 2, JSON.stringify((await shapes78()).map((x) => x.points.length)));
+    // A shape with too few points is dropped on leaving.
+    await dp78.keyboard.press("Escape");
+    await openDraw("Area");
+    await click78(600, 200); await click78(700, 260);
+    const before = (await shapes78()).length;
+    await dp78.getByRole("button", { name: /Select & move/ }).click(); await settle78();
+    check("leaving with an area of two points drops it: an area needs three", (await shapes78()).length === before - 1, `${before} before, ${(await shapes78()).length} after`);
+    // A line needs two.
+    await openDraw("Line");
+    await click78(600, 500); await click78(800, 520);
+    await dp78.getByRole("button", { name: /Select & move/ }).click(); await settle78();
+    check("a line of two points is kept on leaving", (await shapes78()).some((x) => x.type === "line" && x.points.length === 2));
+    // Finish shape ends the drawing, as before.
+    await openDraw("Area");
+    await click78(850, 200); await click78(1000, 220); await click78(930, 330);
+    await dp78.getByRole("button", { name: "Finish shape" }).click(); await settle78();
+    check("Finish shape ends the drawing and selects the area", (await dp78.locator(".property-form #background-label").count()) === 1);
+    // The vertex of a finished area: Ctrl+Z puts it back (it was reported not to).
+    const areas = (await shapes78()).filter((x) => x.type === "area"); const area = areas.at(-1);
+    const vertex = area.points[0];
+    await drag78([vertex.x, vertex.y], [vertex.x + 50, vertex.y + 30]);
+    check("a point of a finished area is dragged", Math.abs((await shapes78()).find((x) => x.id === area.id).points[0].x - (vertex.x + 50)) < 3);
+    await dp78.keyboard.press("Control+z"); await settle78();
+    check("and Ctrl+Z puts it back", Math.abs((await shapes78()).find((x) => x.id === area.id).points[0].x - vertex.x) < 3);
+    // Escape lets go of a rectangle being dragged out.
+    await openDraw("Rectangle");
+    const n0 = (await shapes78()).length;
+    const a0 = await toClient78(100, 450), b0 = await toClient78(400, 650);
+    await dp78.mouse.move(a0.x, a0.y); await dp78.mouse.down(); await dp78.mouse.move(b0.x, b0.y, { steps: 6 }); await dp78.keyboard.press("Escape"); await dp78.mouse.up(); await settle78();
+    check("Escape while a rectangle is being dragged out makes none", (await shapes78()).length === n0, `${n0} / ${(await shapes78()).length}`);
+    await dp78.context().close();
+  }
+
   if (sectionOpen) sectionTimes[sectionOpen.n] = Math.round((Date.now() - sectionOpen.at) / 100) / 10;
   if (process.env.TTR_TIMES) fs.writeFileSync(process.env.TTR_TIMES, JSON.stringify(sectionTimes));
   console.log("PASS:"); ok.forEach((l) => console.log("  ✓ " + l));

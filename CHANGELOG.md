@@ -8,6 +8,8 @@ This file is written from `app/version.ts` by `npm run changelog`; edit the note
 
 **Version 1.7: small boards and background shapes**
 
+- An area or a line in Draw background is saved at every click, so Ctrl+Z takes back the last point and nothing is lost if the page is closed; its points can be moved while it is being drawn.
+- Esc lets go of a background shape that is being drawn, or a rectangle or a circle being dragged out; leaving Draw background keeps what has enough points (three for an area, two for a line) and drops the rest.
 - Draw background lists how to use it under its options: drag a shape to move it, hold Shift to move one whose geometry is locked, Smaller and Larger in Properties, and Ctrl+Z.
 - Draw background has a Rectangle and a Circle: drag from one corner to the other, or from the middle out to the edge. They are areas like the others, so their points can still be dragged one by one.
 - A background shape can be dragged round the board by its body, and with its geometry locked it moves only when Shift is held; the lock still keeps its points where they are.
