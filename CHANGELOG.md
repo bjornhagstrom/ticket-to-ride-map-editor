@@ -10,7 +10,7 @@ This file is written from `app/version.ts` by `npm run changelog`; edit the note
 
 - An area or a line in Draw background is saved at every click, so Ctrl+Z takes back the last point and nothing is lost if the page is closed; its points can be moved while it is being drawn.
 - The welcome box has a button, Open a map file, beside the example, the map with problems and the blank map, so a map of your own can be opened from the very first screen.
-- Coming into Draw background nothing is being edited: click a shape to edit it, or click the map to start a new one of the kind chosen, and Alt and click starts one on top of a shape. The shape being edited has a thicker outline and larger points, which go back to normal when the editing ends.
+- Coming into Draw background nothing is being edited: click a shape to edit it, or click the map to start a new one of the kind chosen, and Alt (Option on a Mac) and click starts one on top of a shape. The shape being edited has a thicker outline and larger points, which go back to normal when the editing ends.
 - Esc in Draw background ends the editing of the shape being drawn or edited, and keeps it if it has enough points (three for an area, two for a line); Esc again, with no shape being edited, goes back to Select & move. The tool stays chosen after a shape is finished.
 - In Draw background a point that is clicked is marked, and the next point goes beside it, on the side of the neighbour the click is nearer; a double click on a point takes it away; Shift and drag moves a whole shape, locked or not.
 - Esc also lets go of a rectangle or a circle that is being dragged out.

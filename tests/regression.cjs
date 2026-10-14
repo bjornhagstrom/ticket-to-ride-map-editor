@@ -5368,7 +5368,7 @@ const sectionStart = (n) => {
     check("Draw background offers a rectangle and a circle beside area, line and label", ["Area", "Line", "Label", "Rectangle", "Circle"].every((name) => objectChoices.includes(name)), objectChoices.join(", "));
     // The tool says how it works, in a few lines: draw, move, lock and Shift, size, undo.
     const tips = ((await bp.locator(".background-tips").textContent().catch(() => "")) || "").replace(/\s+/g, " ");
-    check("Draw background has tips on how to use it: mark a point, double-click to remove it, Shift and drag, Larger and Smaller, Esc, Ctrl+Z", /mark it/i.test(tips) && /double-click/i.test(tips) && /Shift/.test(tips) && /Larger/.test(tips) && /Esc/.test(tips) && /Ctrl\+Z/.test(tips), tips);
+    check("Draw background has tips on how to use it: mark a point, double-click to remove it, Shift and drag, Larger and Smaller, Esc, Ctrl+Z", /mark it/i.test(tips) && /double-click/i.test(tips) && /Shift/.test(tips) && /Larger/.test(tips) && /Esc/.test(tips) && /Ctrl\+Z/.test(tips) && /Option/.test(tips), tips);
     await bp.locator(".background-tools select").selectOption({ label: "Rectangle" });
     await drag([200, 150], [500, 350]);
     let list = await shapes();
