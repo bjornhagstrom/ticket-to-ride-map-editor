@@ -4,7 +4,7 @@ What changed in each version of the [Ticket to Ride map editor](https://hagstrom
 
 This file is written from `app/version.ts` by `npm run changelog`; edit the notes there.
 
-## 1.7.0 · 2026-10-12
+## 1.7.0 · 2026-10-15
 
 **Version 1.7: small boards and background shapes**
 
@@ -15,9 +15,9 @@ This file is written from `app/version.ts` by `npm run changelog`; edit the note
 - Esc in Draw background ends the editing of the shape being drawn or edited, and keeps it if it has enough points (three for an area, two for a line); Esc again, with no shape being edited, goes back to Select & move. The tool stays chosen after a shape is finished.
 - In Draw background a point that is clicked is marked, and the next point goes beside it, on the side of the neighbour the click is nearer; a double click on a point takes it away; Shift and drag moves a whole shape, locked or not.
 - Esc also lets go of a rectangle or a circle that is being dragged out.
-- Draw background lists how to use it under its options: drag a shape to move it, hold Shift to move one whose geometry is locked, Smaller and Larger in Properties, and Ctrl+Z.
+- Draw background lists how to use it under its options: click a shape to edit it, Shift and drag to move it, Smaller and Larger in Properties, Esc to end the editing and again to go back to Select & move, and Ctrl+Z.
 - Draw background has a Rectangle and a Circle: drag from one corner to the other, or from the middle out to the edge. They are areas like the others, so their points can still be dragged one by one.
-- A background shape can be dragged round the board by its body, and with its geometry locked it moves only when Shift is held; the lock still keeps its points where they are.
+- In Select & move a background shape can be dragged round the board by its body, and with its geometry locked it moves only when Shift is held; it keeps a corner of itself on the board, so it cannot be lost off the edge.
 - A background shape has Smaller and Larger buttons, a tenth at a time round its middle, off while the geometry is locked; a line can be sized too, and a label has no size.
 - Ctrl+Z now undoes a colour, a slider or a tick box that was just changed, which it did not when the cursor was still in the field, and on a background shape a slider or a colour that is moved is one step of Undo, not one for every notch.
 - Small boards: Settings offers New York (standing, 280 by 428 mm), Amsterdam and London (lying, 428 by 330 mm) as boards, with wagons, stops and names drawn at the size they are on the real board, and the map you have moves to the new board.

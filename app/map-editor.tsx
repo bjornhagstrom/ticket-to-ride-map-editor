@@ -386,6 +386,8 @@ export function MapEditor() {
   const changeSerialRef = useRef(0);
   const cancelPickRef = useRef<() => void>(() => {});
   const endDrawingRef = useRef<() => unknown>(() => null);
+  // Going to Select & move from wherever a click leads there ends the drawing on the way.
+  const leaveDrawTool = () => { endDrawingRef.current(); setTool("select"); };
   const deleteByKeyRef = useRef<() => boolean>(() => false);
   const lengthKeyRef = useRef<(event: KeyboardEvent) => boolean>(() => false);
   const redoRef = useRef<() => void>(() => {});
@@ -432,7 +434,9 @@ export function MapEditor() {
       if ((event.key === "Delete" || event.key === "Backspace") && !event.metaKey && !event.ctrlKey && !event.altKey) {
         const field = event.target as HTMLElement | null;
         if (field && (field.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(field.tagName))) return;
-        if (document.querySelector('[role="dialog"], [role="alertdialog"]')) return;
+        if (document.querySelector('[role="dialog"], [role="alertdialog"], [role="menu"]')) return;
+        // Only with the focus on the page or on the map itself: a row of tickets, a button or a link has its own business with the key.
+        if (field && field !== document.body && !field.closest(".map-canvas")) return;
         if (deleteByKeyRef.current()) event.preventDefault();
         return;
       }
@@ -672,7 +676,7 @@ export function MapEditor() {
       setActivePoint({ shapeId: marked.id, index: placed.index });
       return;
     }
-    const existing = drawingId ? data.background.find((shape) => shape.id === drawingId) : undefined;
+    const existing = drawingId ? data.background.find((shape) => shape.id === drawingId && !shape.locked && shape.type !== "label") : undefined;
     if (existing) { change((draft) => { draft.background.find((shape) => shape.id === existing.id)?.points.push(point); return draft; }); return; }
     const id = `bg-${Date.now()}`;
     const shape: BackgroundShape = { id, type: backgroundType === "line" ? "line" : "area", label: backgroundType === "line" ? "Boundary" : "Area", points: [point], fill: backgroundFill, stroke: backgroundStroke, opacity: .65, strokeWidth: 3 };
@@ -693,21 +697,24 @@ export function MapEditor() {
   const dropDrawing = (id: string) => change((draft) => { draft.background = draft.background.filter((shape) => shape.id !== id); return draft; });
   // The drawing is over: what has enough points stays (and is selected), what has not goes.
   const endDrawing = () => {
-    setActivePoint(null); freshDrawingRef.current = null;
-    const id = drawingId; if (!id) return null;
+    setActivePoint(null);
+    const id = drawingId; const fresh = id !== null && freshDrawingRef.current === id; freshDrawingRef.current = null;
+    if (!id) return null;
     setDrawingId(null);
     const shape = data.background.find((item) => item.id === id);
     if (!shape) return null;
-    if (shape.points.length < minimumPoints(shape.type)) { dropDrawing(id); setSelectedBackground(null); return null; }
+    // Only the shape made by this drawing can be too small to keep; one that was there before is never taken away by ending its editing.
+    if (fresh && shape.points.length < minimumPoints(shape.type)) { dropDrawing(id); setSelectedBackground(null); return null; }
     setSelectedBackground(id); return id;
   };
   const finishBackground = () => { endDrawing(); };
-  const cancelDrawing = () => { const id = drawingId; if (!id) return; setDrawingId(null); setSelectedBackground(null); if (data.background.some((shape) => shape.id === id)) dropDrawing(id); };
+  // Cancel lets go of the shape just drawn; a shape that was there before is only let go of, as by Esc.
+  const cancelDrawing = () => { const id = drawingId; if (!id) return; const fresh = freshDrawingRef.current === id; if (!fresh) { endDrawing(); return; } freshDrawingRef.current = null; setDrawingId(null); setActivePoint(null); setSelectedBackground(null); if (data.background.some((shape) => shape.id === id)) dropDrawing(id); };
   // Leaving the tool (enterTool ends the drawing); and after Undo or Redo the shape that is being drawn is the selected one again.
   const reselectDrawing = () => { if (drawingId && tool === "background") setSelectedBackground(drawingId); };
   const clearSelection = () => { setSelectedStop(null); setSelectedRoute(null); setSelectedBackground(null); setImageSelected(false); setSelectedNote(null); };
-  const chooseImage = () => { setImageSelected(true); setSelectedStop(null); setSelectedRoute(null); setSelectedBackground(null); setSelectedNote(null); setTool("select"); };
-  const chooseNote = (id: string) => { setSelectedNote(id); setSelectedStop(null); setSelectedRoute(null); setSelectedBackground(null); setImageSelected(false); setTool("select"); };
+  const chooseImage = () => { setImageSelected(true); setSelectedStop(null); setSelectedRoute(null); setSelectedBackground(null); setSelectedNote(null); leaveDrawTool(); };
+  const chooseNote = (id: string) => { setSelectedNote(id); setSelectedStop(null); setSelectedRoute(null); setSelectedBackground(null); setImageSelected(false); leaveDrawTool(); };
   // Going to a tool, whoever asks. A click on the tool row goes through selectTool instead, which
   // lets a tool go when it is already the current one.
   const enterTool = (next: Tool) => {
@@ -737,11 +744,11 @@ export function MapEditor() {
     // Picking a stop for the rules text is the innermost thing: Escape ends it before anything else.
     if (rulesPickRef.current?.cancel()) return;
     // An open dialog owns Escape: the first press closes it, a later one clears what it lit up.
-    if (document.querySelector('[role="dialog"]')) return;
+    if (document.querySelector('[role="dialog"], [role="alertdialog"]')) return;
     // A rectangle or a circle being dragged out, or an area or a line being drawn, is let go before anything else.
     if (drawShapeRef.current) { drawShapeRef.current = null; setDraftPoints([]); return; }
     // Escape in Draw background ends the editing of the shape being drawn or edited; with none, it goes back to Select & move.
-    if (tool === "background") { if (drawingId) endDrawing(); else setTool("select"); return; }
+    if (tool === "background") { if (drawingId) endDrawing(); else leaveDrawTool(); return; }
     // Then the side panels, which hold Escape the same way; then a pick in progress; then the ticket.
     if (showAnalysis) closeAnalysis();
     else if (showSuggestions) { setShowSuggestions(false); setHoveredSuggestion(null); }
@@ -799,7 +806,7 @@ export function MapEditor() {
     change(() => cloneMap(map));
     clearSelection();
     setDraftPoints([]);
-    setTool("select");
+    leaveDrawTool();
     dismissGuide();
     setDanger(null);
     // An empty map has nothing to look at, and the board format decides everything drawn on it, so
@@ -870,6 +877,9 @@ export function MapEditor() {
     if (shapeId !== drawingId) endDrawing();
     setSelectedBackground(shapeId); setSelectedStop(null); setSelectedRoute(null);
     if (shift) { startShapeMove(shapeId, clientX, clientY); return; }
+    // A label has no points to edit and a locked shape keeps its geometry: a click only selects them.
+    const shape = data.background.find((item) => item.id === shapeId);
+    if (!shape || shape.locked || shape.type === "label") return;
     setDrawingId(shapeId); setActivePoint(null);
   };
   const startShapeMove = (shapeId: string, clientX: number, clientY: number) => {
@@ -1050,6 +1060,7 @@ export function MapEditor() {
   };
   // The Delete key: what is selected goes at once, with a word on screen and Undo; true if something was selected.
   const deleteByKey = () => {
+    if (dragging()) return false;
     const what = selectedStop ? "stop" : selectedRoute ? "route" : selectedBackground ? "shape" : selectedNote ? "note" : imageSelected ? "image" : null;
     if (!what) return false;
     const serialAfter = changeSerialRef.current + 1;
@@ -1382,7 +1393,7 @@ export function MapEditor() {
         {!phone && <div className="map-status">{statusChips}</div>}
         {hint && hint.atTop && <MapHint atTop title={hint.title} open={routeHintOpen} onToggle={toggleRouteHint} offsetX={routeHintX} onOffsetChange={moveRouteHint}>{hint.body}</MapHint>}
         <svg className={cn("map-canvas", format.orientation === "portrait" && "standing", `tool-${tool}`, drawingId && "is-editing", hasMarks && "has-marks", rulesPicking && "picking-rules")} style={{ aspectRatio: `${format.width} / ${format.height}` }} viewBox={`0 0 ${format.width} ${format.height}`} onPointerDown={onCanvasDown} onPointerMove={onCanvasMove} onPointerUp={stopDragging} onPointerCancel={stopDragging}>
-          <MapArtwork data={data} tool={tool} highlightRoutes={highlightRoutes} scaleWidthMm={scaleWidthMm} selectedRoute={selectedRoute} selectedStop={selectedStop} selectedBackground={selectedBackground} imageSelected={imageSelected} selectedNote={selectedNote} bottleneckRoutes={showAnalysis ? bottleneckRoutes : undefined} pendingStop={pendingStop} pickTo={pickTo} previewRoutes={balanceRoutes ?? pinnedRoutes ?? (showCrossings ? crossingRoutes : preview?.routes)} crossingMarks={showCrossings ? crossings.map(({ at }) => at) : undefined} previewStop={balanceStop ?? pin?.stop ?? null} previewLabel={preview?.label ?? null} onStopHover={setHoveredStop} draft={{ type: backgroundType === "line" ? "line" : "area", points: draftPoints, fill: backgroundFill, stroke: backgroundStroke, dots: backgroundType !== "rectangle" && backgroundType !== "circle" }} onRoute={(id) => { setSelectedRoute(id); setSelectedStop(null); setSelectedBackground(null); setSelectedNote(null); setTool("select"); }} onRouteSlot={toggleLocomotiveSlot} onRouteBendInsert={insertRouteBend} onRouteBendRemove={removeRouteBend} onStop={(id, shiftHeld) => { if (rulesPickRef.current?.stop(id)) return; chooseStop(id); if (tool === "select" && (shiftHeld || !stopById(data, id)?.locked)) { beginDrag(); dragStopRef.current = id; } }} onWaypoint={(routeId, index, grabOffset) => { beginDrag(); dragWaypointRef.current = { routeId, index, grabOffset }; }} onBackground={(id) => { setSelectedBackground(id); setSelectedRoute(null); setSelectedStop(null); setSelectedNote(null); setTool("select"); }} onBackgroundPoint={(shapeId, index) => { beginDrag(); dragBackgroundPointRef.current = { shapeId, index }; setActivePoint({ shapeId, index }); }} activePoint={activePoint} onBackgroundPointRemove={removeBackgroundPoint} editingBackground={tool === "background" ? drawingId : null} onBackgroundEdit={editBackgroundShape} onBackgroundLabel={(shapeId) => { beginDrag(); dragBackgroundLabelRef.current = shapeId; }} onBackgroundMove={(shapeId, clientX, clientY) => startShapeMove(shapeId, clientX, clientY)} onImageSelect={chooseImage} onImageMove={(point) => { chooseImage(); const img = data.backgroundImage; if (img) { beginDrag(); dragImageRef.current = { mode: "move", offsetX: point.x - img.x, offsetY: point.y - img.y }; } }} onImageScale={() => { beginDrag(); dragImageRef.current = { mode: "scale" }; }} onImageRotate={() => { beginDrag(); dragImageRef.current = { mode: "rotate" }; }} suggestionPreview={hoveredSuggestion ? (() => { const a = stopById(data, hoveredSuggestion.a), b = stopById(data, hoveredSuggestion.b); return a && b ? { a, b } : undefined; })() : undefined} onStopLabel={(id, shiftHeld) => { if (rulesPickRef.current?.stop(id)) return; chooseStop(id); if (shiftHeld || !stopById(data, id)?.labelLocked) { beginDrag(); dragStopLabelRef.current = id; } }} onNoteSelect={chooseNote} onNoteMove={(id, point) => { chooseNote(id); const note = data.notes.find((item) => item.id === id); if (note) { beginDrag(); dragNoteRef.current = { id, mode: "move", offsetX: point.x - note.x, offsetY: point.y - note.y }; } }} onNoteResize={(id) => { beginDrag(); dragNoteRef.current = { id, mode: "resize" }; }} onNoteToggle={(id) => change((draft) => { const note = draft.notes.find((item) => item.id === id); if (note) note.collapsed = !note.collapsed || undefined; return draft; })} />
+          <MapArtwork data={data} tool={tool} highlightRoutes={highlightRoutes} scaleWidthMm={scaleWidthMm} selectedRoute={selectedRoute} selectedStop={selectedStop} selectedBackground={selectedBackground} imageSelected={imageSelected} selectedNote={selectedNote} bottleneckRoutes={showAnalysis ? bottleneckRoutes : undefined} pendingStop={pendingStop} pickTo={pickTo} previewRoutes={balanceRoutes ?? pinnedRoutes ?? (showCrossings ? crossingRoutes : preview?.routes)} crossingMarks={showCrossings ? crossings.map(({ at }) => at) : undefined} previewStop={balanceStop ?? pin?.stop ?? null} previewLabel={preview?.label ?? null} onStopHover={setHoveredStop} draft={{ type: backgroundType === "line" ? "line" : "area", points: draftPoints, fill: backgroundFill, stroke: backgroundStroke, dots: backgroundType !== "rectangle" && backgroundType !== "circle" }} onRoute={(id) => { setSelectedRoute(id); setSelectedStop(null); setSelectedBackground(null); setSelectedNote(null); leaveDrawTool(); }} onRouteSlot={toggleLocomotiveSlot} onRouteBendInsert={insertRouteBend} onRouteBendRemove={removeRouteBend} onStop={(id, shiftHeld) => { if (rulesPickRef.current?.stop(id)) return; chooseStop(id); if (tool === "select" && (shiftHeld || !stopById(data, id)?.locked)) { beginDrag(); dragStopRef.current = id; } }} onWaypoint={(routeId, index, grabOffset) => { beginDrag(); dragWaypointRef.current = { routeId, index, grabOffset }; }} onBackground={(id) => { setSelectedBackground(id); setSelectedRoute(null); setSelectedStop(null); setSelectedNote(null); leaveDrawTool(); }} onBackgroundPoint={(shapeId, index) => { beginDrag(); dragBackgroundPointRef.current = { shapeId, index }; setActivePoint({ shapeId, index }); }} activePoint={activePoint} onBackgroundPointRemove={removeBackgroundPoint} editingBackground={tool === "background" ? drawingId : null} onBackgroundEdit={editBackgroundShape} onBackgroundLabel={(shapeId) => { beginDrag(); dragBackgroundLabelRef.current = shapeId; }} onBackgroundMove={(shapeId, clientX, clientY) => startShapeMove(shapeId, clientX, clientY)} onImageSelect={chooseImage} onImageMove={(point) => { chooseImage(); const img = data.backgroundImage; if (img) { beginDrag(); dragImageRef.current = { mode: "move", offsetX: point.x - img.x, offsetY: point.y - img.y }; } }} onImageScale={() => { beginDrag(); dragImageRef.current = { mode: "scale" }; }} onImageRotate={() => { beginDrag(); dragImageRef.current = { mode: "rotate" }; }} suggestionPreview={hoveredSuggestion ? (() => { const a = stopById(data, hoveredSuggestion.a), b = stopById(data, hoveredSuggestion.b); return a && b ? { a, b } : undefined; })() : undefined} onStopLabel={(id, shiftHeld) => { if (rulesPickRef.current?.stop(id)) return; chooseStop(id); if (shiftHeld || !stopById(data, id)?.labelLocked) { beginDrag(); dragStopLabelRef.current = id; } }} onNoteSelect={chooseNote} onNoteMove={(id, point) => { chooseNote(id); const note = data.notes.find((item) => item.id === id); if (note) { beginDrag(); dragNoteRef.current = { id, mode: "move", offsetX: point.x - note.x, offsetY: point.y - note.y }; } }} onNoteResize={(id) => { beginDrag(); dragNoteRef.current = { id, mode: "resize" }; }} onNoteToggle={(id) => change((draft) => { const note = draft.notes.find((item) => item.id === id); if (note) note.collapsed = !note.collapsed || undefined; return draft; })} />
           {/* The route just drawn: − and + to set its wagon spaces without leaving the Draw route tool. */}
           {chipAt && justDrawnRoute && <g className="length-chip" transform={`translate(${chipAt.x},${chipAt.y})`} onPointerDown={(event) => event.stopPropagation()}>
             <rect x={-58} y={-17} width={116} height={34} rx={17} />
@@ -1396,7 +1407,7 @@ export function MapEditor() {
       </section>
       <aside ref={propertiesSheetRef} tabIndex={-1} aria-label="Properties" className={cn("properties panel", showSuggestions && "showing-suggestions", widePanel && "showing-balance", phoneSheet === "properties" && "phone-open")}>
         <div className="phone-sheet-bar"><Button type="button" variant="ghost" size="icon" className="phone-sheet-close" aria-label="Close the properties" onClick={closePhoneSheet}><X /></Button></div>
-        {showAnalysis && <AnalysisPanel official={{ players: playerRange.max, crowded: fullTableReport.bottlenecks.length, connections: connectionCount(data), loadRatio: fullTableReport.loadRatio, unusedPct: fullTableReport.unusedPct, maxPerStop: fullTableReport.maxPerStop }} wide={rightWidth >= RIGHT_WIDTH_WIDE} onToggleWide={() => (rightWidth >= RIGHT_WIDTH_WIDE ? resetRight() : resizeRight(RIGHT_WIDTH_WIDE))} onAddParallel={addParallelRoute} lengthView={lengthsView} setup={setup} bottlenecks={deckReport.bottlenecks} atTable={atTable} onAtTable={(count) => { setBottleneckTable(count); setBottleneckRoutes(new Set()); }} onShowBottleneck={(routeIds) => setBottleneckRoutes((current) => (routeIds.length === current.size && routeIds.every((id) => current.has(id)) ? new Set() : new Set(routeIds)))} bottleneckShown={bottleneckRoutes} pinKey={pin?.key ?? null} onPin={togglePin} onClose={closeAnalysis} onPreviewRoutes={(routeIds) => setBalanceRoutes(routeIds ? new Set(routeIds) : null)} onPreviewStop={setBalanceStop} data={data} stats={stats} colourTable={colourTable} spacing={spacing} scaleWidthMm={scaleWidthMm} onSelectRoute={(routeId) => { closeAnalysis(); setSelectedRoute(routeId); setSelectedStop(null); setSelectedBackground(null); setSelectedNote(null); setImageSelected(false); setTool("select"); }} onSelectStop={(stopId) => { closeAnalysis(); setSelectedStop(stopId); setSelectedRoute(null); setSelectedBackground(null); setSelectedNote(null); setImageSelected(false); setTool("select"); }}  />}
+        {showAnalysis && <AnalysisPanel official={{ players: playerRange.max, crowded: fullTableReport.bottlenecks.length, connections: connectionCount(data), loadRatio: fullTableReport.loadRatio, unusedPct: fullTableReport.unusedPct, maxPerStop: fullTableReport.maxPerStop }} wide={rightWidth >= RIGHT_WIDTH_WIDE} onToggleWide={() => (rightWidth >= RIGHT_WIDTH_WIDE ? resetRight() : resizeRight(RIGHT_WIDTH_WIDE))} onAddParallel={addParallelRoute} lengthView={lengthsView} setup={setup} bottlenecks={deckReport.bottlenecks} atTable={atTable} onAtTable={(count) => { setBottleneckTable(count); setBottleneckRoutes(new Set()); }} onShowBottleneck={(routeIds) => setBottleneckRoutes((current) => (routeIds.length === current.size && routeIds.every((id) => current.has(id)) ? new Set() : new Set(routeIds)))} bottleneckShown={bottleneckRoutes} pinKey={pin?.key ?? null} onPin={togglePin} onClose={closeAnalysis} onPreviewRoutes={(routeIds) => setBalanceRoutes(routeIds ? new Set(routeIds) : null)} onPreviewStop={setBalanceStop} data={data} stats={stats} colourTable={colourTable} spacing={spacing} scaleWidthMm={scaleWidthMm} onSelectRoute={(routeId) => { closeAnalysis(); setSelectedRoute(routeId); setSelectedStop(null); setSelectedBackground(null); setSelectedNote(null); setImageSelected(false); leaveDrawTool(); }} onSelectStop={(stopId) => { closeAnalysis(); setSelectedStop(stopId); setSelectedRoute(null); setSelectedBackground(null); setSelectedNote(null); setImageSelected(false); leaveDrawTool(); }}  />}
         {showTickets && <TicketsPanel compare={compareView} onHoverTicket={setHoveredTicket} lengthView={lengthsView} wide={rightWidth >= RIGHT_WIDTH_WIDE} onToggleWide={() => (rightWidth >= RIGHT_WIDTH_WIDE ? resetRight() : resizeRight(RIGHT_WIDTH_WIDE))} onClose={() => setShowTickets(false)} data={data} reviews={ticketReviews} coverage={ticketCoverage(data, activeTicketSet.id)} rate={ticketRate} selected={selectedTicket} activeSet={activeTicketSet} onSelect={setSelectedTicket}
           onSelectSet={(setId) => { setTicketSetId(setId); setSelectedTicket(null); }}
           onAddSet={() => { const id = `ts-${Date.now()}`; change((draft) => { draft.ticketSets.push({ id, label: nextDeckLabel(draft.ticketSets) }); return draft; }); setTicketSetId(id); setSelectedTicket(null); }}

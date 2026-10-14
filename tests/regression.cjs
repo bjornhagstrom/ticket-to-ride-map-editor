@@ -5687,6 +5687,81 @@ const sectionStart = (n) => {
     await kp.context().close();
   }
 
+  // 81. What the review of 1.7.0 found (2026-10-15): ending or cancelling the editing of a shape that was already there never deletes it; a label or a locked shape is not edited by clicks;
+  // leaving Draw background by any way ends the drawing; the Delete key leaves a ticket row alone.
+  if (wants(81)) {
+  sectionStart(81);
+    const rp = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
+    rp.on("pageerror", (e) => errors.push(String(e)));
+    await rp.goto(BASE, { waitUntil: "networkidle" });
+    await rp.getByRole("button", { name: "Load the example map" }).click(); await rp.waitForTimeout(700);
+    const store = () => rp.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")));
+    const settleR = () => rp.waitForTimeout(350);
+    const toClientR = (x, y) => rp.evaluate(([x, y]) => { const svg = document.querySelector(".map-canvas"); const pt = svg.createSVGPoint(); pt.x = x; pt.y = y; const m = pt.matrixTransform(svg.getScreenCTM()); return { x: m.x, y: m.y }; }, [x, y]);
+    const clickR = async (x, y) => { const c = await toClientR(x, y); await rp.mouse.click(c.x, c.y); await settleR(); };
+    // A place on the board where nothing is: the background of the board is what is under the pointer.
+    const emptySpots = async (n) => { const found = []; for (let gy = 700; gy > 40 && found.length < n; gy -= 25) for (let gx = 40; gx < 1060 && found.length < n; gx += 40) { const c = await toClientR(gx, gy); const top = await rp.evaluate(([x, y]) => { const e = document.elementsFromPoint(x, y)[0]; return e ? e.tagName + "." + (e.getAttribute("class") || "") : ""; }, [c.x, c.y]); if (top === "rect.map-bg" && found.every((f) => Math.hypot(f.x - gx, f.y - gy) > 120)) found.push({ x: gx, y: gy }); } return found; };
+    const inDrawR = async () => (await rp.locator(".background-tools").count()) === 1;
+    const openDrawR = async (label) => { if (!(await inDrawR())) { await rp.getByRole("button", { name: /Draw background/ }).click(); await rp.waitForTimeout(200); } await rp.locator(".background-tools select").selectOption({ label }); };
+    // A label that was made, then clicked in Draw background, then Escape: it is still there.
+    await openDrawR("Label");
+    await clickR(560, 690);
+    const labels0 = (await store()).background.filter((x) => x.type === "label").length;
+    const labelAt81 = (await store()).background.filter((x) => x.type === "label").at(-1).points[0];
+    const labelScreen81 = await toClientR(labelAt81.x + 30, labelAt81.y - 17);
+    await rp.mouse.click(labelScreen81.x, labelScreen81.y); await settleR();
+    await rp.keyboard.press("Escape"); await settleR();
+    check("a label that is clicked in Draw background and left with Escape is still there", (await store()).background.filter((x) => x.type === "label").length === labels0 && labels0 >= 1);
+    await rp.keyboard.press("Escape"); await settleR();
+    check("and a second Escape leaves the tool", !(await inDrawR()));
+    // An existing area, edited and then Cancel: it stays (Cancel only lets go of a shape that was just drawn).
+    await openDrawR("Area");
+    const areas = (await store()).background.filter((x) => x.type === "area");
+    const target = areas[0];
+    const cx = target.points.reduce((t, v) => t + v.x, 0) / target.points.length, cy = target.points.reduce((t, v) => t + v.y, 0) / target.points.length;
+    const before = (await store()).background.length;
+    await clickR(cx + 30, cy + 30);
+    const cancel = rp.getByRole("button", { name: "Cancel" });
+    if (await cancel.isEnabled().catch(() => false)) { await cancel.click(); await settleR(); }
+    await rp.keyboard.press("Escape"); await settleR();
+    check("an area that was there is not deleted by Cancel or by ending its editing", (await store()).background.length === before, `${before} → ${(await store()).background.length}`);
+    // A locked area takes no point from a click.
+    await rp.keyboard.press("Escape"); await settleR();
+    await rp.evaluate(() => { const m = JSON.parse(localStorage.getItem("ttr-map")); m.background[0].locked = true; localStorage.setItem("ttr-map", JSON.stringify(m)); });
+    await rp.reload({ waitUntil: "networkidle" }); await rp.waitForTimeout(700);
+    await openDrawR("Area");
+    const lockedPts = (await store()).background[0].points.length;
+    const lockedShape = (await store()).background[0];
+    const lcx = lockedShape.points.reduce((t, v) => t + v.x, 0) / lockedShape.points.length, lcy = lockedShape.points.reduce((t, v) => t + v.y, 0) / lockedShape.points.length;
+    await clickR(lcx + 25, lcy + 25); await clickR(50, 700);
+    check("clicks do not put points into an area whose geometry is locked", (await store()).background[0].points.length === lockedPts, `${lockedPts} → ${(await store()).background[0].points.length}`);
+    await rp.keyboard.press("Escape"); await settleR(); await rp.keyboard.press("Escape"); await settleR();
+    // Leaving the tool by a click on a route ends the drawing.
+    await openDrawR("Area");
+    const spots = await emptySpots(3);
+    check("empty places on the board are found", spots.length === 3);
+    await clickR(spots[0].x, spots[0].y); await clickR(spots[1].x, spots[1].y);
+    const n1 = (await store()).background.length;
+    const route = await rp.locator(".route-hit").first().boundingBox();
+    await rp.locator(".route-hit").first().click({ force: true, position: { x: route.width / 2, y: route.height / 2 } }); await settleR();
+    check("a click on a route leaves Draw background and ends the drawing: an area of two points is dropped", !(await inDrawR()) && (await store()).background.length === n1 - 1, `${n1} → ${(await store()).background.length}`);
+    await openDrawR("Area");
+    await clickR(spots[2].x, spots[2].y);
+    check("coming back, nothing is being edited: the first click makes a new shape", (await store()).background.length === n1 && (await rp.locator(".background-object.editing").count()) === 1, `${(await store()).background.length} vs ${n1}, editing ${await rp.locator(".background-object.editing").count()}`);
+    await rp.keyboard.press("Escape"); await settleR(); await rp.keyboard.press("Escape"); await settleR();
+    // The Delete key leaves a ticket row alone: a stop is selected, a ticket opened from it, its row has the focus.
+    const stopBox = await rp.locator("g.stop").first().boundingBox();
+    await rp.mouse.click(stopBox.x + stopBox.width / 2, stopBox.y + stopBox.height / 2); await settleR();
+    const stops0 = (await store()).stops.length;
+    const row = rp.locator(".property-form button, .property-form [role=button]").filter({ hasText: /→|—|to/ }).first();
+    const hasTicketLink = (await row.count()) > 0;
+    if (hasTicketLink) { await row.click().catch(() => {}); await settleR(); }
+    const ticketRow = rp.locator("tr[role=button]").first();
+    if (await ticketRow.count()) { await ticketRow.focus(); await rp.keyboard.press("Delete"); await settleR(); }
+    check("Delete with a ticket row in focus takes no stop away", (await store()).stops.length === stops0, `${stops0} → ${(await store()).stops.length}`);
+    await rp.context().close();
+  }
+
   if (sectionOpen) sectionTimes[sectionOpen.n] = Math.round((Date.now() - sectionOpen.at) / 100) / 10;
   if (process.env.TTR_TIMES) fs.writeFileSync(process.env.TTR_TIMES, JSON.stringify(sectionTimes));
   console.log("PASS:"); ok.forEach((l) => console.log("  ✓ " + l));

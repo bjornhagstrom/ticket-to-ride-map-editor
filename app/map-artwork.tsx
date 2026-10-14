@@ -175,6 +175,8 @@ export function NoteBoxObject({ note, height, selected, print, tool, onSelect, o
 
 export function BackgroundObject({ shape, height, width = W, selected, print, tool, onSelect, onPoint, onLabel, onMove, activePoint, onPointRemove, editing, onEdit }: { shape: BackgroundShape; height: number; width?: number; selected: boolean; print: boolean; tool: Tool; onSelect?: (id: string) => void; onPoint?: (id: string, index: number) => void; onLabel?: (id: string) => void; onMove?: (id: string, clientX: number, clientY: number, shift: boolean) => void; activePoint?: number; onPointRemove?: (id: string, index: number) => void; editing?: boolean; onEdit?: (id: string, clientX: number, clientY: number, shift: boolean) => void }) {
   const points = shape.points.map((point) => `${point.x},${point.y}`).join(" ");
+  // One or two points are not yet an area (nor one point a line): nothing is drawn of it, not even its name, until it is.
+  const incomplete = shape.type === "area" ? shape.points.length < 3 : shape.type === "line" ? shape.points.length < 2 : false;
   const anchor = shape.type === "label" ? shape.points[0] : (shape.labelPoint ?? automaticLabelPoint(shape, height, width));
   const labelAtRightEdge = Boolean(anchor && anchor.x > width - 140);
   const handleX = anchor ? Math.max(18, Math.min(width - 18, anchor.x)) : 0;
@@ -193,7 +195,7 @@ export function BackgroundObject({ shape, height, width = W, selected, print, to
     {shape.type === "area" && <polygon points={points} fill={shape.fill} fillOpacity={shape.opacity} stroke={shape.stroke} strokeOpacity={shape.opacity} strokeWidth={shape.strokeWidth} />}
     {shape.type === "line" && <polyline points={points} fill="none" stroke={shape.stroke} strokeOpacity={shape.opacity} strokeWidth={shape.strokeWidth} strokeLinecap="round" strokeLinejoin="round" />}
     {shape.type === "label" && anchor && <text x={labelX} y={labelY} textAnchor={labelAnchor} fill={shape.stroke} fillOpacity={shape.opacity}>{shape.label}</text>}
-    {shape.type !== "label" && shape.label && anchor && <text x={labelX} y={labelY} textAnchor={labelAnchor} fill={shape.stroke} fillOpacity={Math.min(1, shape.opacity + .25)}>{shape.label}</text>}
+    {shape.type !== "label" && shape.label && anchor && !incomplete && <text x={labelX} y={labelY} textAnchor={labelAnchor} fill={shape.stroke} fillOpacity={Math.min(1, shape.opacity + .25)}>{shape.label}</text>}
     {!print && selected && !shape.locked && shape.points.map((point, index) => <g key={index} className={cn("background-point", activePoint === index && "active")} transform={`translate(${point.x},${point.y})`} onPointerDown={(event) => { event.stopPropagation(); onPoint?.(shape.id, index); }} onDoubleClick={(event) => { event.stopPropagation(); onPointRemove?.(shape.id, index); }}><circle className="point-hit" r="18" /><circle r={pointRadius} /></g>)}
     {!print && selected && !shape.locked && shape.type !== "label" && anchor && <g className="background-label-handle" transform={`translate(${handleX},${handleY})`} onPointerDown={(event) => { event.stopPropagation(); onLabel?.(shape.id); }}><circle className="point-hit" r="20" /><rect x="-7" y="-7" width="14" height="14" rx="2" transform="rotate(45)" /></g>}
   </g>;
