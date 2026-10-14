@@ -19,6 +19,7 @@ export const RELEASES: Release[] = [
     title: "Version 1.7: small boards and background shapes",
     changes: [
     "An area or a line in Draw background is saved at every click, so Ctrl+Z takes back the last point and nothing is lost if the page is closed; its points can be moved while it is being drawn.",
+    "The welcome box has a button, Open a map file, beside the example, the map with problems and the blank map, so a map of your own can be opened from the very first screen.",
     "Draw background stays chosen after a shape is finished, so the next area, line, rectangle or circle can be drawn at once; Esc goes back to the arrow, keeping what has enough points (three for an area, two for a line) and dropping the rest.",
     "In Draw background a point that is clicked is marked, and the next point goes beside it, on the side of the neighbour the click is nearer; a double click on a point takes it away; Shift and drag moves a whole shape, locked or not.",
     "Esc also lets go of a rectangle or a circle that is being dragged out.",

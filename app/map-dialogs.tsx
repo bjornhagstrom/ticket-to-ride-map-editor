@@ -45,7 +45,7 @@ function TourVideo() {
   </div>;
 }
 
-export function WelcomeGuide({ open, onOpenChange, onChooseBlank, onChooseExample, onChooseProblems }: { open: boolean; onOpenChange: (open: boolean) => void; onChooseBlank: () => void; onChooseExample: () => void; onChooseProblems: () => void }) {
+export function WelcomeGuide({ open, onOpenChange, onChooseBlank, onChooseExample, onChooseProblems, onChooseFile }: { open: boolean; onOpenChange: (open: boolean) => void; onChooseBlank: () => void; onChooseExample: () => void; onChooseProblems: () => void; onChooseFile: () => void }) {
   // What matters, in a line or two each. How a print is laid out is for the print dialog to say.
   const steps: Array<{ icon: React.ReactNode; title: string; text: string }> = [
     { icon: <FileStack />, title: "Choose a board", text: "The standard 2×3, the extended 2×4 or a size of your own, lying or standing. Change it whenever you like; everything on the map comes along." },
@@ -62,6 +62,7 @@ export function WelcomeGuide({ open, onOpenChange, onChooseBlank, onChooseExampl
       <ol className="guide-steps">{steps.map((step) => <li key={step.title}><span className="guide-step-icon">{step.icon}</span><div><strong>{step.title}</strong><p>{step.text}</p></div></li>)}</ol>
       <p className="helper guide-more">More about what it is for, and where its numbers come from, on the <a href="./about">About page</a>.</p>
       <DialogFooter className="sm:flex-wrap">
+        <Button variant="outline" onClick={onChooseFile}><Upload />Open a map file</Button>
         <Button variant="outline" onClick={onChooseExample}><Pencil />Load the example map</Button>
         <Button variant="outline" onClick={onChooseProblems}><AlertTriangle />Load a map with problems</Button>
         <Button onClick={onChooseBlank}>Start with a blank map</Button>

@@ -5592,6 +5592,33 @@ const sectionStart = (n) => {
     await dp78.context().close();
   }
 
+  // 79. The welcome box can open a map file of one's own (found by the owner on 2026-10-15), beside the example, the map with problems and the blank map.
+  if (wants(79)) {
+  sectionStart(79);
+    const wp = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
+    wp.on("pageerror", (e) => errors.push(String(e)));
+    await wp.goto(BASE, { waitUntil: "networkidle" });
+    check("the welcome box has a button to open a map file of one's own", await wp.getByRole("button", { name: "Open a map file" }).isVisible());
+    const own = path.join(os.tmpdir(), `ttr-own-${Date.now()}.json`);
+    fs.writeFileSync(own, JSON.stringify({ format: "ticket-to-ride-map", version: 4, kind: "map", payload: { name: "Opened from the welcome box", format: "board-2x3", stops: [{ id: "a", name: "Alpha", type: "city", x: 200, y: 200 }, { id: "b", name: "Beta", type: "city", x: 600, y: 300 }], routes: [{ id: "r1", a: "a", b: "b", length: 3, type: "city", color: "red" }] } }));
+    const chooser = wp.waitForEvent("filechooser");
+    await wp.getByRole("button", { name: "Open a map file" }).click();
+    await (await chooser).setFiles(own);
+    await wp.waitForTimeout(800);
+    const opened = await wp.evaluate(() => { const m = JSON.parse(localStorage.getItem("ttr-map") || "null"); return m && { name: m.name, stops: m.stops.length, routes: m.routes.length }; });
+    check("choosing a file opens it as the map", opened && opened.name === "Opened from the welcome box" && opened.stops === 2 && opened.routes === 1, JSON.stringify(opened));
+    check("and the welcome box is gone, and does not come back after a reload", (await wp.getByRole("button", { name: "Open a map file" }).count()) === 0 && (await (async () => { await wp.reload({ waitUntil: "networkidle" }); await wp.waitForTimeout(500); return wp.getByRole("button", { name: "Open a map file" }).count(); })()) === 0);
+    fs.unlinkSync(own);
+    // Cancelling the file box leaves the welcome box where it was.
+    const wp2 = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
+    await wp2.goto(BASE, { waitUntil: "networkidle" });
+    const chooser2 = wp2.waitForEvent("filechooser");
+    await wp2.getByRole("button", { name: "Open a map file" }).click();
+    await chooser2;
+    check("opening the file box does not close the welcome box until a file is chosen", await wp2.getByRole("button", { name: "Load the example map" }).isVisible());
+    await wp.context().close(); await wp2.context().close();
+  }
+
   if (sectionOpen) sectionTimes[sectionOpen.n] = Math.round((Date.now() - sectionOpen.at) / 100) / 10;
   if (process.env.TTR_TIMES) fs.writeFileSync(process.env.TTR_TIMES, JSON.stringify(sectionTimes));
   console.log("PASS:"); ok.forEach((l) => console.log("  ✓ " + l));
