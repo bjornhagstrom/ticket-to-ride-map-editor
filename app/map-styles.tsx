@@ -345,7 +345,7 @@ export function SettingsDialog({ open, onOpenChange, target, onTarget, data, cha
               <Button size="sm" variant="outline" onClick={create}><Plus />New</Button>
             </div>
             {selected ? <div className="style-fields">
-              <div><Label>Name</Label><Input value={selected.label} onChange={(event) => update({ label: event.target.value })} /></div>
+              <div><Label>Name</Label><Input value={selected.label} onChange={(event) => update({ label: event.target.value })} onBlur={(event) => { if (!event.target.value.trim()) update({ label: kind === "stop" ? "Stop type" : kind === "route" ? "Route type" : "Style" }); }} /></div>
               {kind === "stop" && <StopTypeFields style={selected as StopTypeStyle} update={update} data={data} />}
               {kind === "route" && <RouteTypeFields style={selected as RouteTypeStyle} update={update} />}
               <Button size="sm" variant="ghost" disabled={locked} onClick={() => remove(selected.id)}>

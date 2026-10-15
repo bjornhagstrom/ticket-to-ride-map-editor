@@ -131,6 +131,14 @@ if (live) {
   check("back here, the edit made there counts as a change: the next print is version 2", version.versionStatus(home).changed && version.issueVersion(home, "print", day(5)).number === 2);
 }
 
+// The maps the editor starts people with are written in the form that reading a file gives back, so that a map exported and opened again, untouched, is the version it was (found in the user test of 2026-10-15: the map with problems said it had changed).
+{
+  const builtIn = require(path.join(out, "map-data.js"));
+  for (const [name, source] of [["the empty map", builtIn.emptyMap], ["the example", builtIn.initialMap], ["the example with problems", builtIn.problemMap]]) {
+    check(`${name} has the same fingerprint as when it is read back from a file`, version.fingerprint(clone(source)) === version.fingerprint(storage.normalizeMap(clone(source))));
+  }
+}
+
 for (const line of ok) console.log(`  ok    ${line}`);
 for (const line of bad) console.log(`  FAIL  ${line}`);
 console.log(`\n${ok.length} passed, ${bad.length} failed`);

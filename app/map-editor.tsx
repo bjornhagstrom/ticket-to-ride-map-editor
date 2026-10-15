@@ -25,7 +25,9 @@ import { type DeckCompareView } from "./deck-compare";
 import { DEFAULT_PRINT_CHOICE, isSafari, PRINT_CHOICE_KEY, PRINT_PROFILES, type PrintChoice, type PrintProfile, printPlan } from "./print-plan";
 import { useTicketSuggestion } from "./use-ticket-suggestion";
 import { SettingsDialog, type StyleTarget } from "./map-styles";
+import { plural } from "./plural";
 import { isUnchangedBuiltIn } from "./built-in-maps";
+import { sharedStopNames, unevenDoubleRoutes } from "./map-analysis";
 import { balanceRangesFor, connectionCount, fittingLength, bandsOf, bandCuts, mapDiameter, deckFigures, defaultStyle, deckRuleFor, TICKET_SUGGESTER, evaluateTicketDeck, suggestedDeckSize, ticketEndStopCount, type TicketStyle, autoPlaceLabels, turnAndTidy, tidyNames, labelledStops, setupBalance, stopCoverage, ticketBand, type TicketBand, reviewTickets, ticketPointsPerSpace, ticketCoverage, type RouteSuggestion, labelCovers, labelAngleOptions, routeSamplePoints, colourLengthTable, crossings as crossingList, networkShape, SHAPE_OFFICIAL, buildAdjacency, networkStats, routeSpacing, shortestPath, suggestRoutes } from "./map-analysis";
 import { canvasPoint, canvasPointRaw, pointsFor, samePair, stopById } from "./map-geometry";
 import { dragShape, translateShape, circlePoints, rectanglePoints, insertNextTo, shapeAt } from "./background-shapes";
@@ -40,6 +42,8 @@ import { APP_VERSION, fileNameBase, applyBoard, applyBoardPreset, gameForPreset,
 import { boardDefinition, hasPanelProfile, wagonOf, tensionOf, problemMap, colorLabels, defaultTicketSet, DEFAULT_PLAYERS, DEFAULT_WAGONS_PER_PLAYER, IMAGE_KEEP_ON_BOARD, type Ticket, type StopTypeStyle, type WagonStyle, ticketsInSet, type TicketSet, emptyMap, initialMap, type LineStyle, DEFAULT_END_GAP_MM, type BackgroundImage, type BackgroundShape, type BackgroundType, type MapData, type Point, type Route, type RouteType, type RouteTypeStyle, routeColors, STORAGE_KEY, type Stop, type StopSize, stopSizeMeta, type StopSymbol, stopSymbolMeta, type StopType } from "./map-data";
 
 type MeasureResult = { from: string; to: string; distance: number; routeIds: string[] } | { from: string; to: string; unreachable: true };
+/** The deck that is open, remembered in this browser (by its id) so that a reload comes back to it. */
+const ACTIVE_DECK_KEY = "ttr-active-deck";
 const TEXT_INPUT_TYPES = new Set(["text", "number", "search", "email", "url", "tel", "password"]);
 const COALESCE_MS = 1200;
 // What the Object box of Draw background offers: the three kinds the file has, and a rectangle and a circle, which are drawn by dragging and kept as areas.
@@ -409,6 +413,8 @@ export function MapEditor() {
       try {
         const { map, repairs } = repairMap(JSON.parse(stored));
         setData(map); localStorage.setItem(GUIDE_SEEN_KEY, "1");
+        // The deck that was open when the page was left, if the map still has it.
+        try { const deck = localStorage.getItem(ACTIVE_DECK_KEY); if (deck && map.ticketSets.some((set) => set.id === deck)) setTicketSetId(deck); } catch { /* not remembered */ }
         if (repairs.length) toast.warning(`Your map opened, but not all of it could be used. ${repairs.join(" ")}`, { duration: 20000 });
       } catch {
         // A map that cannot be read at all is put aside word for word, never overwritten, so it can
@@ -426,6 +432,7 @@ export function MapEditor() {
     } else { try { if (!localStorage.getItem(GUIDE_SEEN_KEY)) setShowGuide(true); } catch { /* storage blocked */ } }
     setReady(true);
   }); }, []);
+  useEffect(() => { if (!ready) return; try { localStorage.setItem(ACTIVE_DECK_KEY, ticketSetId); } catch { /* not remembered */ } }, [ready, ticketSetId]);
   useEffect(() => { if (!ready) return; if (holdSaveRef.current) { if (data === emptyMap) return; holdSaveRef.current = false; } localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); const timer = window.setTimeout(() => setSaved(true), 0); return () => window.clearTimeout(timer); }, [data, ready]);
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -436,8 +443,8 @@ export function MapEditor() {
         const field = event.target as HTMLElement | null;
         if (field && (field.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(field.tagName))) return;
         if (document.querySelector('[role="dialog"], [role="alertdialog"], [role="menu"]')) return;
-        // Only with the focus on the page or on the map itself: a row of tickets, a button or a link has its own business with the key.
-        if (field && field !== document.body && !field.closest(".map-canvas")) return;
+        // Only with the focus on the page, on the map, or on a plain button (which has no business of its own with the key, as a button the person has just pressed in Properties): a row of tickets or a link has.
+        if (field && field !== document.body && !field.closest(".map-canvas") && !(field.tagName === "BUTTON" && !field.closest(".tickets-panel, .balance-panel"))) return;
         if (deleteByKeyRef.current()) event.preventDefault();
         return;
       }
@@ -551,7 +558,7 @@ export function MapEditor() {
     setSelectedTicket(null);
     setShowSuggest(false);
     openTickets();
-    toast.success(`${suggestion.tickets.length} tickets built into ${mode === "replace" ? activeTicketSet.label : label}.`);
+    toast.success(`${plural(suggestion.tickets.length, "ticket")} built into ${mode === "replace" ? activeTicketSet.label : label}.`);
   };
   // The Tickets panel stays under the dialog, so backing out leaves it as it was.
   const openSuggest = () => { setSuggestStyle(null); setSuggestSize(null); setSuggestSeed(1); setSuggestName(""); setShowSuggest(true); };
@@ -571,6 +578,8 @@ export function MapEditor() {
   }, [stopTicketView, ticketReviews, data, ticketDiameter, activeTicketSet.label]);
   const highlightRoutes = useMemo(() => new Set((hoveredTicket ?? selectedTicket) ? ticketReviews.find((review) => review.ticket.id === (hoveredTicket ?? selectedTicket))?.routeIds ?? [] : []), [hoveredTicket, selectedTicket, ticketReviews]);
   const routeSamples = useMemo(() => routeSamplePoints(data), [data]);
+  const sharedNames = useMemo(() => sharedStopNames(data), [data.stops]); // eslint-disable-line react-hooks/exhaustive-deps
+  const unevenDoubles = useMemo(() => unevenDoubleRoutes(data), [data.stops, data.routes, data.routeTypeStyles]); // eslint-disable-line react-hooks/exhaustive-deps
   const coveredNames = useMemo(() => labelledStops(data).filter((stop) => labelCovers(data, stop, routeSamples)), [data, routeSamples]);
 
   const adjacency = useMemo(() => buildAdjacency(data), [data]);
@@ -600,8 +609,10 @@ export function MapEditor() {
     if (shape.unconnected.length) { const n = shape.unconnected.map((stop) => stop.name); return { warn: true, title: `${n.length} stop${n.length === 1 ? "" : "s"} with no route`, line: few(n), all: n }; }
     if (cuts.length) return { warn: true, title: `${cuts.length} route${cuts.length === 1 ? " cuts" : "s cut"} the map in two`, line: `${few(cuts)}, with one lane`, all: cuts };
     if (shape.deadEnds.length) { const n = shape.deadEnds.map((stop) => stop.name); return { warn: false, title: `${n.length} dead end${n.length === 1 ? "" : "s"}`, line: few(n), all: n }; }
+    // Nothing to say about a network that has no routes.
+    if (!data.routes.length) return { warn: false, title: "No routes yet", line: "Nothing to read about the network", all: [] as string[] };
     return { warn: false, title: "Well connected", line: `avg hub degree ${avgHubDegree.toFixed(1)}`, all: [] as string[] };
-  }, [shape, avgHubDegree]);
+  }, [shape, avgHubDegree, data.routes.length]);
   const suggestions = useMemo(() => suggestRoutes(data, stats, colourTable), [data, stats, colourTable]);
   const selectedS = data.stops.find((stop) => stop.id === selectedStop);
   // For the selected stop: is its name on a route, which bearings are clear, and which is best.
@@ -626,7 +637,7 @@ export function MapEditor() {
   // A deck can be given any name at all, so the button that carries it has to be able to cut it off.
   // How many tickets the deck holds is shown with the other map figures above the map; with more than
   // one deck it names the deck, cut short if long, with the whole name on hover.
-  const ticketCount = `${ticketsHere.length} ticket${ticketsHere.length === 1 ? "" : "s"}`;
+  const ticketCount = plural(ticketsHere.length, "ticket");
   const ticketCountLabel = data.ticketSets.length > 1 ? `${ticketCount} in ${activeTicketSet.label}` : ticketCount;
   const startTicketFrom = (stopId: string) => { setShowTickets(false); setSelectedTicket(null); enterTool("ticket"); setTicketStart(stopId); };
   const openTicket = (ticketId: string) => { const ticket = data.tickets.find((item) => item.id === ticketId); if (!ticket) return; setTicketSetId(ticket.set ?? data.ticketSets[0].id); setSelectedTicket(ticketId); openTickets(); };
@@ -755,7 +766,7 @@ export function MapEditor() {
     else if (showSuggestions) { setShowSuggestions(false); setHoveredSuggestion(null); }
     else if (showTickets) setShowTickets(false);
     else if (showRules) setShowRules(false);
-    else if (pendingStop) cancelPick(); else setSelectedTicket(null);
+    else if (pendingStop) cancelPick(); else if (tool !== "select" && !justDrawnRoute) leaveDrawTool(); else setSelectedTicket(null);
   }; });
   // Ticket cards print on their own paper, so the print tree swaps to them, prints, and swaps back.
   useEffect(() => { queueMicrotask(() => { try { const stored = localStorage.getItem(PRINT_CHOICE_KEY); if (stored) setPrintChoice(JSON.parse(stored)); } catch { /* keep the default */ } }); }, []);
@@ -1049,7 +1060,8 @@ export function MapEditor() {
     // would be left out as damage the next time the map is opened. Said on screen, with Undo.
     const goneStop = selectedStop ? data.stops.find((stop) => stop.id === selectedStop) : null;
     const serialAfter = changeSerialRef.current + 1;
-    if (goneStop && stopTicketCount) toast(`${goneStop.name} is deleted, with ${stopTicketCount} ticket${stopTicketCount === 1 ? "" : "s"} that named it.`, { duration: 15000, action: { label: "Undo", onClick: () => undoIfUnchanged(serialAfter) } });
+    const endingHere = goneStop ? data.routes.filter((route) => route.a === goneStop.id || route.b === goneStop.id).length : 0;
+    if (goneStop && stopTicketCount) toast(`${goneStop.name} is deleted, with ${endingHere ? `${plural(endingHere, "route")} that ended there and ` : ""}${plural(stopTicketCount, "ticket")} that named it.`, { duration: 15000, action: { label: "Undo", onClick: () => undoIfUnchanged(serialAfter) } });
     change((draft) => {
       if (imageSelected) draft.backgroundImage = undefined;
       if (selectedNote) draft.notes = draft.notes.filter((note) => note.id !== selectedNote);
@@ -1068,8 +1080,10 @@ export function MapEditor() {
     if (!what) return false;
     const serialAfter = changeSerialRef.current + 1;
     const withTickets = Boolean(selectedStop && stopTicketCount);
+    const goneRoutes = selectedStop ? data.routes.filter((route) => route.a === selectedStop || route.b === selectedStop).length : 0;
+    const goneName = selectedStop ? data.stops.find((stop) => stop.id === selectedStop)?.name : undefined;
     deleteSelected();
-    if (!withTickets) toast(`The ${what} is deleted.`, { duration: 8000, action: { label: "Undo", onClick: () => undoIfUnchanged(serialAfter) } });
+    if (!withTickets) toast(selectedStop ? `${goneName ?? "The stop"} is deleted${goneRoutes ? `, with ${plural(goneRoutes, "route")} that ended there` : ""}.` : `The ${what} is deleted.`, { duration: 8000, action: { label: "Undo", onClick: () => undoIfUnchanged(serialAfter) } });
     return true;
   };
   useEffect(() => { deleteByKeyRef.current = deleteByKey; });
@@ -1124,7 +1138,7 @@ export function MapEditor() {
   // A template keeps its plain name, with no time stamp: it is a form to fill in, not a copy of this map.
   const downloadTemplates = () => { const url = URL.createObjectURL(new Blob([templatesZip() as BlobPart], { type: "application/zip" })); const link = document.createElement("a"); link.href = url; link.download = "spreadsheet-templates.zip"; link.click(); URL.revokeObjectURL(url); toast.success("Saved spreadsheet-templates.zip: a template for stops, routes and tickets, and the guide to every column."); };
   const downloadCsv = (text: string, filenameBase: string) => download(new Blob([text], { type: "text/csv;charset=utf-8" }), filenameBase, "csv");
-  const saveImage = (blob: Blob) => { setMakingImage(false); const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = `${data.name}${data.mapVersion ? ` v${data.mapVersion.number}` : ""}.png`; document.body.append(link); link.click(); link.remove(); URL.revokeObjectURL(url); };
+  const saveImage = (blob: Blob) => { setMakingImage(false); const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = `${fileNameBase(`${data.name}${data.mapVersion ? ` v${data.mapVersion.number}` : ""}`)}-${formatTimestamp()}.png`; document.body.append(link); link.click(); link.remove(); URL.revokeObjectURL(url); };
   const exportMap = () => { const { data: d, number } = issue("export"); downloadJson(writeMapFile("map", mapPayload(d), d), `${d.name} v${number}`); setReminder((r) => exported(r, new Date())); setClock(new Date()); };
   const exportBackground = () => { const { number } = issue("export"); downloadJson(writeMapFile("background", { format: data.format, ...(data.panelMm ? { panelMm: data.panelMm } : {}), ...(data.orientation === "portrait" ? { orientation: "portrait" } : {}), background: data.background, backgroundImage: data.backgroundImage }, data), `${data.name} v${number} background`); };
   const exportNetwork = () => { const { number } = issue("export"); downloadJson(writeMapFile("network", networkPayload(data), data), `${data.name} v${number} network`); };
@@ -1174,7 +1188,7 @@ export function MapEditor() {
       return next;
     });
     clearSelection(); setDanger(null); setPendingImport(null);
-    if (tickets.length) toast.success(`${tickets.length} tickets came with the network and went into ${activeTicketSet.label}.`);
+    if (tickets.length) toast.success(`${plural(tickets.length, "ticket")} came with the network and went into ${activeTicketSet.label}.`);
     // The tickets of the decks that stay may name stops that are gone or now mean something else: ask.
     askAboutTickets(stops, data.tickets.filter((ticket) => (ticket.set ?? data.ticketSets[0].id) !== activeTicketSet.id || !tickets.length));
   };
@@ -1206,7 +1220,7 @@ export function MapEditor() {
     if (result.network) askAboutTickets(result.stops, data.tickets);
     setDanger(null); setPendingImport(null);
     if (result.sets.length) { setTicketSetId(result.sets[0].id); if (!result.network) openTickets(); }
-    const read = [result.network && `${result.stops.length} stops`, result.network && `${result.routes.length} routes`, result.tickets.length && `${result.tickets.length} tickets`].filter(Boolean).join(", ");
+    const read = [result.network && plural(result.stops.length, "stop"), result.network && plural(result.routes.length, "route"), result.tickets.length && plural(result.tickets.length, "ticket")].filter(Boolean).join(", ");
     const said = result.warnings.join(" ");
     if (result.warnings.length) toast.warning(`Imported ${read}. ${said}`, { duration: 12000 }); else toast.success(`Imported ${read}.`);
   };
@@ -1347,7 +1361,7 @@ export function MapEditor() {
           {tool === "ticket" && <p className="tool-status">{ticketStart ? `From ${stopById(data, ticketStart)?.name} · now click the other end` : `Click two stops to make a ticket for ${activeTicketSet.label}. ${ticketsHere.length} so far.`}</p>}
           {tool === "measure" && <p className="tool-status">{measureStart ? `From ${stopById(data, measureStart)?.name} · now click the destination stop` : measureResult ? ("unreachable" in measureResult ? `${stopById(data, measureResult.from)?.name} → ${stopById(data, measureResult.to)?.name}: no connected path` : `${stopById(data, measureResult.from)?.name} → ${stopById(data, measureResult.to)?.name}: ${measureResult.distance} wagon spaces`) : "Click two stops for the shortest path."}</p>}
           {tool === "stop" && <div className="tool-options"><div className="grid-two"><div><Label>Stop type</Label><NativeSelect value={stopType} onChange={(event) => setStopType(event.target.value as StopType)}>{data.stopTypeStyles.map((meta) => <NativeSelectOption key={meta.id} value={meta.id}>{meta.label}</NativeSelectOption>)}</NativeSelect></div><div><Label>Stop size</Label><NativeSelect value={stopSize} onChange={(event) => setStopSize(event.target.value as StopSize)}>{Object.entries(stopSizeMeta).map(([key, meta]) => <NativeSelectOption key={key} value={key}>{meta.label}</NativeSelectOption>)}</NativeSelect></div></div><div className="grid-two"><div><Label>Symbol</Label><NativeSelect value={stopSymbol} onChange={(event) => setStopSymbol(event.target.value as StopSymbol)}>{Object.entries(stopSymbolMeta).map(([key, meta]) => <NativeSelectOption key={key} value={key}>{meta.label}</NativeSelectOption>)}</NativeSelect></div>{stopSymbol === "letter" && <div><Label>Letter</Label><Input maxLength={2} value={stopLetter} onChange={(event) => setStopLetter(event.target.value)} /></div>}</div></div>}
-          {tool === "route" && <div className="tool-options"><StylePicker label="Route type" value={routeType} styles={data.routeTypeStyles} placeholder="" onChange={(id) => id && setRouteType(id)} onEdit={() => openStyles({ kind: "route", id: routeType })} /><div><Label htmlFor="route-length-choice">Wagon spaces</Label><NativeSelect id="route-length-choice" aria-label="Wagon spaces for new routes" value={String(routeLength)} onChange={(event) => setRouteLength(event.target.value === "fit" ? "fit" : Number(event.target.value))}><NativeSelectOption value="fit">Fit the distance</NativeSelectOption>{[1, 2, 3, 4, 5, 6, 7, 8].map((n) => <NativeSelectOption key={n} value={String(n)}>{n}</NativeSelectOption>)}</NativeSelect></div><label className="checkbox-row"><input type="checkbox" checked={routeCurved} onChange={(event) => setRouteCurved(event.target.checked)} />Draw as a smooth curve</label><div><Label>Colour</Label><NativeSelect value={routeColor} onChange={(event) => setRouteColor(event.target.value)}>{Object.keys(routeColors).map((key) => <NativeSelectOption key={key} value={key}>{colorLabels[key]}</NativeSelectOption>)}</NativeSelect></div></div>}
+          {tool === "route" && <div className="tool-options"><StylePicker label="Route type" value={routeType} styles={data.routeTypeStyles} placeholder="" onChange={(id) => id && setRouteType(id)} onEdit={() => openStyles({ kind: "route", id: routeType })} /><div><Label htmlFor="route-length-choice">Wagon spaces</Label><NativeSelect id="route-length-choice" aria-label="Wagon spaces for new routes" value={String(routeLength)} onChange={(event) => setRouteLength(event.target.value === "fit" ? "fit" : Number(event.target.value))}><NativeSelectOption value="fit">Fit the distance</NativeSelectOption>{[1, 2, 3, 4, 5, 6, 7, 8].map((n) => <NativeSelectOption key={n} value={String(n)}>{n}</NativeSelectOption>)}</NativeSelect><p className="helper">Fit the distance gives 1 to 8 spaces; a line longer than 8 spaces is roomy: put a stop part of the way.</p></div><label className="checkbox-row"><input type="checkbox" checked={routeCurved} onChange={(event) => setRouteCurved(event.target.checked)} />Draw as a smooth curve</label><div><Label>Colour</Label><NativeSelect value={routeColor} onChange={(event) => setRouteColor(event.target.value)}>{Object.keys(routeColors).map((key) => <NativeSelectOption key={key} value={key}>{colorLabels[key]}</NativeSelectOption>)}</NativeSelect></div></div>}
           {tool === "background" && <div className="tool-options background-tools"><div className="image-import-row"><Label>Background image</Label><div className="image-import-buttons"><Button size="sm" variant="outline" onClick={() => imageFileRef.current?.click()}><ImageIcon />{data.backgroundImage ? "Replace image" : "Import image"}</Button>{data.backgroundImage && <Button size="sm" variant="ghost" onClick={() => { chooseImage(); setDanger("delete"); }}><Trash2 />Remove</Button>}</div></div><Label>Object</Label><NativeSelect value={backgroundType} onChange={(event) => { endDrawing(); setBackgroundType(event.target.value as BackgroundDraw); setDraftPoints([]); }}><NativeSelectOption value="area">Area</NativeSelectOption><NativeSelectOption value="line">Line</NativeSelectOption><NativeSelectOption value="label">Label</NativeSelectOption><NativeSelectOption value="rectangle">Rectangle</NativeSelectOption><NativeSelectOption value="circle">Circle</NativeSelectOption></NativeSelect>{backgroundType !== "label" && <><div className="colour-row"><label>Fill <input type="color" value={backgroundFill} onChange={(event) => setBackgroundFill(event.target.value)} disabled={backgroundType === "line"} /></label><label>Outline <input type="color" value={backgroundStroke} onChange={(event) => setBackgroundStroke(event.target.value)} /></label></div>{backgroundType === "rectangle" || backgroundType === "circle" ? <p className="helper">{backgroundType === "rectangle" ? "Drag from one corner to the opposite one." : "Drag from the middle out to the edge."} Afterwards the shape can be dragged, made larger or smaller, and its points moved.</p> : null}{backgroundType !== "rectangle" && backgroundType !== "circle" && <div className="draft-actions"><Button size="sm" disabled={!drawingId || (data.background.find((shape) => shape.id === drawingId)?.points.length ?? 0) < minimumPoints(backgroundType)} onClick={finishBackground}>Finish shape</Button><Button size="sm" variant="ghost" disabled={!drawingId} onClick={cancelDrawing}>Cancel</Button></div>}</>}<ul className="helper background-tips"><li>Click a shape to edit it, or click the map to start a new one of the kind above; <strong>Alt</strong> (<strong>Option</strong> ⌥ on a Mac) and click starts a new one on top of a shape.</li><li>While a shape is edited it is drawn larger. Each click adds a point, saved at once; Ctrl/Cmd+Z takes back the last.</li><li>Click a point to mark it: the next point goes beside it, on the side of the neighbour you click nearer. Drag a point to move it; double-click one to remove it.</li><li><strong>Shift</strong> and drag moves a whole shape, also when its geometry is locked.</li><li>Properties has <strong>Smaller</strong> and <strong>Larger</strong>.</li><li><strong>Esc</strong> ends the editing of the shape; <strong>Esc</strong> again goes back to Select &amp; move.</li></ul></div>}
         </div>
         {isDue(reminder) && <div className="crossing-card has-warning export-reminder" role="status">
@@ -1379,7 +1393,7 @@ export function MapEditor() {
           <p>Any that cannot be placed are named afterwards, so you can move the stop, bend the route away, or set those by hand with <strong>Name on the map</strong>.</p>
         </TooltipContent></Tooltip>}
         <Tooltip><TooltipTrigger asChild>
-          <div className={cn("crossing-card", crossings.length && "has-warning")} tabIndex={0} onPointerEnter={() => setCrossingHover(true)} onPointerLeave={() => setCrossingHover(false)} onFocus={() => setCrossingHover(true)} onBlur={() => setCrossingHover(false)}><div className="crossing-icon">{crossings.length ? <AlertTriangle /> : <Check />}</div><div><strong>{crossings.length ? `${crossings.length} crossing${crossings.length === 1 ? "" : "s"}` : "No crossings"}</strong><p>{crossings.length ? "between buildable routes" : "The route network is geometrically clean"}</p></div></div>
+          <div className={cn("crossing-card", crossings.length && "has-warning")} tabIndex={0} onPointerEnter={() => setCrossingHover(true)} onPointerLeave={() => setCrossingHover(false)} onFocus={() => setCrossingHover(true)} onBlur={() => setCrossingHover(false)}><div className="crossing-icon">{crossings.length ? <AlertTriangle /> : <Check />}</div><div><strong>{crossings.length ? `${crossings.length} crossing${crossings.length === 1 ? "" : "s"}` : data.routes.length < 2 ? "No routes to cross" : "No crossings"}</strong><p>{crossings.length ? "between buildable routes" : data.routes.length < 2 ? "Two routes are needed to cross" : "The route network is geometrically clean"}</p></div></div>
         </TooltipTrigger><TooltipContent side="bottom" align="start" className="balance-tooltip crossing-tooltip">
           {/* Below the card, in the left column: to the right it would cover the crossings it marks. */}
           <p><strong>Crossings</strong> are places where two buildable routes pass over each other without meeting at a stop.</p>
@@ -1402,6 +1416,10 @@ export function MapEditor() {
         <Button variant="outline" size="sm" className="analyze-button" title={`Tickets · ${activeTicketSet.label}`} onClick={openTickets}><TicketIcon /><span className="button-label">Tickets</span></Button>
         <Button variant="outline" size="sm" className="analyze-button" onClick={openRules}><ScrollText />Rules</Button>
         {data.stops.length > 1 && <Button variant="outline" size="sm" className="analyze-button" onClick={() => { closeAnalysis(); setShowTickets(false); setShowRules(false); setShowSuggestions(true); }}><Lightbulb />Suggest routes</Button>}
+        {(sharedNames.length > 0 || unevenDoubles.length > 0) && <div className="crossing-card has-warning" role="status"><div className="crossing-icon"><AlertTriangle /></div><div>
+          {sharedNames.length > 0 && <><strong>{sharedNames.length === 1 ? "Two stops share a name" : `${sharedNames.length} names are shared`}</strong><p>{sharedNames.slice(0, 3).map((entry) => `${entry.name} (${entry.count} stops)`).join(", ")}{sharedNames.length > 3 ? ` and ${sharedNames.length - 3} more` : ""}. Tickets and rules links find the first one.</p></>}
+          {unevenDoubles.length > 0 && <><strong>{plural(unevenDoubles.length, "double route")} with lanes of different lengths</strong><p>{unevenDoubles.slice(0, 3).map((entry) => `${entry.a} – ${entry.b} (${entry.lengths.join(" and ")})`).join(", ")}{unevenDoubles.length > 3 ? ` and ${unevenDoubles.length - 3} more` : ""}. In the game both lanes are as long as each other.</p></>}
+        </div></div>}
         <div className="legend"><p className="eyebrow">Stop types</p>{data.stopTypeStyles.map((meta) => <button type="button" key={meta.id} className="legend-item" title={`Edit the ${meta.label} stop type`} onClick={() => openStyles({ kind: "stop", id: meta.id })}><i style={{ background: meta.fill, borderColor: meta.stroke }} />{meta.label}</button>)}</div>
       </aside>
       {phone && <div className={cn("phone-status", statusFolded && "folded")}>

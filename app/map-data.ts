@@ -426,7 +426,7 @@ export const stopSizeMetaOf = (size: unknown): { label: string; radius: number }
 export const wagonShapeMetaOf = (shape: unknown): { label: string } => (typeof shape === "string" && Object.hasOwn(wagonShapeMeta, shape) ? wagonShapeMeta[shape as WagonShape] : wagonShapeMeta.plain);
 
 export const stopSymbolMeta: Record<StopSymbol, { label: string }> = {
-  none: { label: "No symbol" },
+  none: { label: "None" },
   dot: { label: "Dot" },
   dash: { label: "Dash" },
   cross: { label: "Cross (X)" },
@@ -656,7 +656,7 @@ Move a stop or bend the route so that it no longer crosses, or let it cross at a
   stops: [...initialMap.stops, problemStop],
   routes: [
     ...initialMap.routes,
-    { id: "problem-route-1", a: "example-fernside", b: "problem-outpost", length: 4, type: "city", color: "white", points: [], curved: false },
-    { id: "problem-route-2", a: "example-fernside", b: "example-deepcut", length: 8, type: "city", color: "blue", points: [], curved: false },
+    { id: "problem-route-1", a: "example-fernside", b: "problem-outpost", length: 4, type: "city", color: "white", curved: false },
+    { id: "problem-route-2", a: "example-fernside", b: "example-deepcut", length: 8, type: "city", color: "blue", curved: false },
   ],
 };

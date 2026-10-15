@@ -24,7 +24,7 @@ export function StopProperties({ stop, change, onDelete, labelState, mapEndGapMm
   const update = (values: Partial<Stop>) => change((draft) => { const item = stopById(draft, stop.id); if (item) Object.assign(item, values); return draft; });
   const symbol = stop.symbol ?? "none";
   return <div className="property-form">
-    <div><Label htmlFor="stop-name">Name</Label><Input id="stop-name" value={stop.name} onChange={(event) => update({ name: event.target.value })} /></div>
+    <div><Label htmlFor="stop-name">Name</Label><Input id="stop-name" value={stop.name} onChange={(event) => update({ name: event.target.value })} onBlur={(event) => { if (!event.target.value.trim()) update({ name: "Unnamed stop" }); }} /></div>
     <div className="grid-two">
       <div><Label>Stop size</Label><NativeSelect value={stop.size ?? "medium"} onChange={(event) => update({ size: event.target.value as StopSize })}>{Object.entries(stopSizeMeta).map(([key, meta]) => <NativeSelectOption key={key} value={key}>{meta.label}</NativeSelectOption>)}</NativeSelect></div>
     </div>
@@ -132,9 +132,10 @@ export function BackgroundProperties({ shape, change, onDelete }: { shape: Backg
   return <div className="property-form"><div><Label htmlFor="background-label">Label</Label><Input id="background-label" value={shape.label} placeholder={shape.type === "label" ? "The text on the map" : "Left empty, nothing is written on the map"} onChange={(event) => update({ label: event.target.value })} /></div>{shape.type === "area" && <div><Label>Fill colour</Label><input className="colour-input" type="color" value={shape.fill} onChange={(event) => update({ fill: event.target.value }, "fill")} /></div>}<div><Label>{shape.type === "label" ? "Text colour" : "Line colour"}</Label><input className="colour-input" type="color" value={shape.stroke} onChange={(event) => update({ stroke: event.target.value }, "stroke")} /></div><div><Label>Opacity · {Math.round(shape.opacity * 100)}%</Label><input className="range-input" type="range" min="0.1" max="1" step="0.05" value={shape.opacity} onChange={(event) => update({ opacity: Number(event.target.value) }, "opacity")} /></div>{shape.type !== "label" && <><div><Label>Line width</Label><Input type="number" min="1" max="16" value={shape.strokeWidth} onChange={(event) => update({ strokeWidth: Math.max(1, Math.min(16, Number(event.target.value))) }, "width")} /></div><Button variant="outline" onClick={() => update({ labelPoint: undefined })}>Reset label position</Button><p className="helper label-helper">Drag the green handle to position the label freely.</p><div className="background-size-row"><Label>Size</Label><div className="grid-two"><Button variant="outline" disabled={shape.locked} onClick={() => resize(1 / SIZE_STEP)}><Minus />Smaller</Button><Button variant="outline" disabled={shape.locked} onClick={() => resize(SIZE_STEP)}><Plus />Larger</Button></div></div></>}<p className="helper">{shape.locked ? "The geometry is locked: hold Shift and drag the shape to move it." : "Drag the shape to move it."}</p><Button variant="outline" onClick={() => update({ locked: !shape.locked })}>{shape.locked ? <Unlock /> : <Lock />}{shape.locked ? "Unlock geometry" : "Lock geometry"}</Button><Button variant="destructive" onClick={onDelete}><Trash2 />Delete background object</Button></div>;
 }
 
-export function BackgroundImageProperties({ image, formatHeight, formatWidth = W, change, onDelete }: { image: BackgroundImage; formatHeight: number; formatWidth?: number; change: (fn: (draft: MapData) => MapData) => void; onDelete: () => void }) {
-  const update = (values: Partial<BackgroundImage>) => change((draft) => { if (draft.backgroundImage) Object.assign(draft.backgroundImage, values); return draft; });
-  const updateCrop = (edge: keyof ImageCrop, percent: number) => change((draft) => { if (draft.backgroundImage) draft.backgroundImage.crop = { ...draft.backgroundImage.crop, [edge]: Math.max(0, Math.min(45, percent)) / 100 }; return draft; });
+export function BackgroundImageProperties({ image, formatHeight, formatWidth = W, change, onDelete }: { image: BackgroundImage; formatHeight: number; formatWidth?: number; change: (fn: (draft: MapData) => MapData, key?: string) => void; onDelete: () => void }) {
+  // A slider moved or a key held on it is one step of Undo, not one for every notch.
+  const update = (values: Partial<BackgroundImage>, run?: string) => change((draft) => { if (draft.backgroundImage) Object.assign(draft.backgroundImage, values); return draft; }, run ? `image:${run}` : undefined);
+  const updateCrop = (edge: keyof ImageCrop, percent: number) => change((draft) => { if (draft.backgroundImage) draft.backgroundImage.crop = { ...draft.backgroundImage.crop, [edge]: Math.max(0, Math.min(45, percent)) / 100 }; return draft; }, `image:crop-${edge}`);
   const center = () => update({ x: (formatWidth - image.width) / 2, y: (formatHeight - image.height) / 2 });
   const fitToPage = () => {
     const scale = Math.min((formatWidth * 0.9) / image.naturalWidth, (formatHeight * 0.9) / image.naturalHeight);
@@ -145,8 +146,8 @@ export function BackgroundImageProperties({ image, formatHeight, formatWidth = W
   return <div className="property-form">
     <div className="image-fit-actions"><Button size="sm" variant="outline" onClick={center}><Crosshair />Center</Button><Button size="sm" variant="outline" onClick={fitToPage}><Maximize2 />Fit to page</Button></div>
     <p className="helper">Fit to page leaves a small margin on every side, since most printers cannot print all the way to the edge.</p>
-    <div><Label>Opacity · {Math.round(image.opacity * 100)}%</Label><input className="range-input" type="range" min="0.1" max="1" step="0.05" value={image.opacity} onChange={(event) => update({ opacity: Number(event.target.value) })} /></div>
-    <div><Label>Rotation · {Math.round(image.rotation)}°</Label><input className="range-input" type="range" min="-180" max="180" step="1" value={image.rotation} onChange={(event) => update({ rotation: Number(event.target.value) })} /></div>
+    <div><Label>Opacity · {Math.round(image.opacity * 100)}%</Label><input className="range-input" type="range" min="0.1" max="1" step="0.05" value={image.opacity} onChange={(event) => update({ opacity: Number(event.target.value) }, "opacity")} /></div>
+    <div><Label>Rotation · {Math.round(image.rotation)}°</Label><input className="range-input" type="range" min="-180" max="180" step="1" value={image.rotation} onChange={(event) => update({ rotation: Number(event.target.value) }, "rotation")} /></div>
     <div className="crop-controls">
       <Label>Crop</Label>
       <div className="grid-two">
@@ -211,12 +212,12 @@ export function TicketCoveragePanel({ rows, deck, cuts, sort, onSort, onlyUncove
     <div className="coverage-scroll"><table className="coverage-table">
       <thead><tr>{head("stop", "Stop")}{head("short", "S", `Short tickets — up to ${cuts.medium} wagon spaces`)}{head("medium", "M", `Medium tickets — up to ${cuts.long} wagon spaces`)}{head("long", "F", `Far tickets — beyond ${cuts.long} wagon spaces`)}</tr></thead>
       <tbody>{shown.map((row) => <tr key={row.stop.id} className={cn(row.total === 0 && "coverage-empty")}>
-        <td><button type="button" className="coverage-stop" disabled={row.total === 0} onClick={() => onOpen(row.stop.id)}>{row.stop.name}</button></td>
+        <td><button type="button" className="coverage-stop" title={row.stop.name} disabled={row.total === 0} onClick={() => onOpen(row.stop.id)}>{row.stop.name}</button></td>
         {ticketBands.map((band) => <td key={band}>{row[band] > 0
           ? <button type="button" className="coverage-count" onClick={() => onOpen(row.stop.id, band)}>{row[band]}</button>
           : <span className="coverage-zero">0</span>}</td>)}
       </tr>)}</tbody>
     </table></div>
-    {!shown.length && <p className="helper">Every stop is named by at least one ticket.</p>}
+    {!shown.length && <p className="helper">{rows.length === 0 ? "No stops yet." : "Every stop is named by at least one ticket."}</p>}
   </div>;
 }

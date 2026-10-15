@@ -672,3 +672,35 @@ export function networkShape(data: MapData): NetworkShape {
     corners,
   };
 }
+
+
+/** Names that two or more stops share (compared without capitals and without space at the ends), each as the first stop's spelling, with how many stops carry it. */
+export function sharedStopNames(data: Pick<MapData, "stops">): { name: string; count: number }[] {
+  const seen = new Map<string, { name: string; count: number }>();
+  for (const stop of data.stops) {
+    const key = stop.name.trim().toLowerCase();
+    if (!key) continue;
+    const entry = seen.get(key);
+    if (entry) entry.count += 1; else seen.set(key, { name: stop.name.trim(), count: 1 });
+  }
+  return [...seen.values()].filter((entry) => entry.count > 1);
+}
+
+/** Double routes whose lanes are not of the same length: in the game both lanes of a double route are as long as each other. */
+export function unevenDoubleRoutes(data: Pick<MapData, "stops" | "routes" | "routeTypeStyles">): { a: string; b: string; lengths: number[] }[] {
+  const infrastructure = new Set(data.routeTypeStyles.filter((style) => style.infrastructure).map((style) => style.id));
+  const names = new Map(data.stops.map((stop) => [stop.id, stop.name]));
+  const lanes = new Map<string, Route[]>();
+  for (const route of data.routes) {
+    if (infrastructure.has(route.type)) continue;
+    const key = pairKeyOf(route.a, route.b);
+    lanes.set(key, [...(lanes.get(key) ?? []), route]);
+  }
+  const out: { a: string; b: string; lengths: number[] }[] = [];
+  for (const group of lanes.values()) {
+    if (group.length < 2) continue;
+    const lengths = group.map((route) => route.length);
+    if (new Set(lengths).size > 1) out.push({ a: names.get(group[0].a) ?? "a stop", b: names.get(group[0].b) ?? "a stop", lengths });
+  }
+  return out;
+}

@@ -34,7 +34,7 @@ export function TicketLengths({ view }: { view: TicketLengthsView }) {
   return <div className="analysis-section ticket-lengths">
     <h3>Ticket lengths</h3>
     {regular === 0 ? <p className="helper">No regular tickets in this deck yet.</p> : <>
-      <p className="helper">How the {regular} regular tickets spread over how long they are, as a share of reach: the longest regular ticket this style asks for{reach ? ` (${reach} wagon spaces${view.reachWhy ? `, ${view.reachWhy}` : ""})` : ""}.</p>
+      <p className="helper">How the {regular} regular {regular === 1 ? "ticket spreads" : "tickets spread"} over how long they are, as a share of reach: the longest regular ticket this style asks for{reach ? ` (${reach} wagon spaces${view.reachWhy ? `, ${view.reachWhy}` : ""})` : ""}.</p>
       <div className="length-legend" aria-hidden="true">
         <span><i className="length-key deck" />This deck</span>
         <span><i className="length-key official" />{officialName}</span>

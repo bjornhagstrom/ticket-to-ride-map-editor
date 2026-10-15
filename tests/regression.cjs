@@ -786,7 +786,8 @@ const sectionStart = (n) => {
     const pngFile = path.join(os.tmpdir(), `ttr-image-${Date.now()}.png`);
     await png.saveAs(pngFile);
     const bytes = fs.readFileSync(pngFile);
-    check("the picture is named after the map and is a .png", new RegExp(`^${mapName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} v\\d+\\.png$`).test(png.suggestedFilename()), png.suggestedFilename());
+    const slugOf = (name) => name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+    check("the picture is named like the map file: the map's name in lowercase, its version, the date, and .png", new RegExp(`^${slugOf(mapName)}-v\\d+-\\d{8}-\\d{6}\\.png$`).test(png.suggestedFilename()), png.suggestedFilename());
     check("and really is a PNG", bytes.subarray(0, 8).toString("hex") === "89504e470d0a1a0a");
     const pngWidth = bytes.readUInt32BE(16), pngHeight = bytes.readUInt32BE(20);
     check("it is big enough to print from, and has the board's proportions", pngWidth >= 2200 && Math.abs(pngWidth / pngHeight - viewBox[2] / viewBox[3]) < 0.01, `${pngWidth} x ${pngHeight}, board ${viewBox[2]} x ${viewBox[3]}`);
@@ -4308,7 +4309,7 @@ const sectionStart = (n) => {
     const after = await mapNow();
     check("deleting the stop takes every ticket that names it, and nothing else", named(after) === 0 && after.tickets.length === before.tickets.length - named(before), `${before.tickets.length} tickets before, ${after.tickets.length} after`);
     const note = (await dp.locator("[data-sonner-toast]").allTextContents()).join(" | ");
-    check("and says so on screen, with how many", new RegExp(`Westport is deleted, with ${named(before)} tickets? that named it`).test(note), note);
+    check("and says so on screen, with how many", new RegExp(`Westport is deleted, with (\\d+ routes? that ended there and )?${named(before)} tickets? that named it`).test(note), note);
     // Reopened, the map is whole: nothing is reported as damaged.
     await dp.reload({ waitUntil: "networkidle" });
     await dp.waitForTimeout(800);
@@ -5955,6 +5956,129 @@ const sectionStart = (n) => {
       check("a rectangle starts with no name, so nothing is written on the map", lastShape && lastShape.label === "" && (await g5.locator(".property-form #background-label").getAttribute("placeholder")) === "Left empty, nothing is written on the map", JSON.stringify(lastShape && lastShape.label));
       check("and the drawing tips say Ctrl/Cmd+Z", /Ctrl\/Cmd\+Z/.test((await g5.locator(".background-tips").textContent()) || ""));
       await g5.context().close();
+      // 45: a map exported and loaded again, untouched, is still the version it was.
+      for (const kind of ["problems", "example"]) {
+        const ev = await (await browser.newContext({ viewport: { width: 1500, height: 1000 }, acceptDownloads: true })).newPage();
+        ev.on("pageerror", (e) => errors.push(String(e)));
+        await ev.goto(BASE, { waitUntil: "networkidle" });
+        await ev.getByRole("button", { name: kind === "problems" ? "Load a map with problems" : "Load the example map" }).click(); await ev.waitForTimeout(600);
+        const dl = ev.waitForEvent("download");
+        await ev.getByRole("button", { name: "Export", exact: true }).click(); await ev.waitForTimeout(250);
+        await ev.getByRole("menuitem", { name: "Full map", exact: true }).click(); await dl; await ev.waitForTimeout(500);
+        const before = ((await ev.locator(".map-status .map-version").textContent()) || "").trim();
+        await ev.reload({ waitUntil: "networkidle" }); await ev.waitForTimeout(700);
+        const after = ((await ev.locator(".map-status .map-version").textContent()) || "").trim();
+        check(`the ${kind === "problems" ? "map with problems" : "example"}, exported and loaded again untouched, is not changed: ${before}`, before === "Version 1" && after === "Version 1", `${before} → ${after}`);
+        await ev.context().close();
+      }
+      // Group 5: small things.
+      {
+        const g6 = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
+        g6.on("pageerror", (e) => errors.push(String(e)));
+        await g6.goto(BASE, { waitUntil: "networkidle" });
+        const f6 = path.join(os.tmpdir(), `ttr-small82-${Date.now()}.json`);
+        const bigName = "Ett väldigt långt stoppnamn som aldrig verkar ta slut Centralstation Norra";
+        fs.writeFileSync(f6, JSON.stringify({ format: "ticket-to-ride-map", version: 4, kind: "map", payload: { name: "Small things", format: "board-2x3", stops: [{ id: "a", name: bigName, type: "city", x: 200, y: 200 }, { id: "b", name: bigName, type: "city", x: 600, y: 300 }], routes: [{ id: "r1", a: "a", b: "b", length: 3, type: "city", color: "red" }, { id: "r2", a: "a", b: "b", length: 6, type: "city", color: "blue" }], background: [{ id: "bg1", type: "area", label: "", points: [{ x: 100, y: 400 }, { x: 300, y: 400 }, { x: 200, y: 500 }], fill: "#b8ddea", stroke: "#4f8394", opacity: 0.65, strokeWidth: 3 }], tickets: [{ id: "t1", a: "a", b: "b", points: 5, set: "main" }] } }));
+        await g6.locator('input[type="file"][accept="application/json"]').setInputFiles(f6); await g6.waitForTimeout(800);
+        fs.unlinkSync(f6);
+        const facts6 = ((await g6.locator(".map-status").textContent()) || "").replace(/\s+/g, " ");
+        check("one of a thing is said in the singular: 2 stops, 2 routes, 1 background object, 1 ticket", /2 stops/.test(facts6) && /2 routes/.test(facts6) && /1 background object(?!s)/.test(facts6) && /1 ticket(?!s)/.test(facts6), facts6.slice(0, 200));
+        const cards6 = ((await g6.locator(".tools-panel").textContent()) || "").replace(/\s+/g, " ");
+        check("two stops with the same name are said so", /Two stops share a name/.test(cards6) && /\(2 stops\)/.test(cards6), cards6.slice(0, 260));
+        check("and a double route with lanes of 3 and 6 spaces is said to be uneven", /1 double route with lanes of different lengths/.test(cards6) && /3 and 6/.test(cards6));
+        // An emptied stop name becomes Unnamed stop.
+        const sb6 = await g6.locator("g.stop").first().boundingBox();
+        await g6.mouse.click(sb6.x + sb6.width / 2, sb6.y + sb6.height / 2); await g6.waitForTimeout(300);
+        await g6.locator("#stop-name").fill(""); await g6.locator("#stop-name").blur(); await g6.waitForTimeout(400);
+        check("a stop name that is emptied becomes Unnamed stop, not a blank in the lists", (await g6.locator("#stop-name").inputValue()) === "Unnamed stop");
+        // Tickets: the points field can be emptied to type another number, and an empty one puts the old back.
+        await g6.getByRole("button", { name: "Tickets", exact: true }).click(); await g6.waitForTimeout(400);
+        const pts = g6.locator("input.ticket-points").first();
+        await pts.fill(""); await g6.waitForTimeout(200);
+        const stillStored = await g6.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")).tickets[0].points);
+        await pts.blur(); await g6.waitForTimeout(200);
+        check("the points of a ticket stay 5 while the field is empty, and the field shows 5 again when it is left", stillStored === 5 && (await pts.inputValue()) === "5", `${stillStored} / ${await pts.inputValue()}`);
+        const longCell = await g6.locator(".tickets-panel .analysis-table-scroll").first().evaluate((el) => { const box = el.getBoundingClientRect(); const head = [...el.querySelectorAll("thead th")].find((th) => /^Points/.test(th.textContent || "")); return Boolean(head) && head.getBoundingClientRect().right <= box.right + 1; });
+        check("a long stop name in the ticket table is cut short, so the Points column after it is in view without scrolling", longCell);
+        await g6.getByRole("button", { name: "Done" }).click().catch(() => {}); await g6.waitForTimeout(300);
+        // Esc leaves the tools that pick two stops.
+        await g6.getByRole("button", { name: /Add ticket/ }).click(); await g6.waitForTimeout(200);
+        check("Add ticket is chosen", /tool-ticket/.test((await g6.locator(".map-canvas").getAttribute("class")) || ""));
+        await g6.keyboard.press("Escape"); await g6.waitForTimeout(250);
+        check("Escape goes back to Select & move from Add ticket", /tool-select/.test((await g6.locator(".map-canvas").getAttribute("class")) || ""));
+        // A message with a button is as wide as a message, the button under the words.
+        await g6.getByRole("button", { name: /Draw route/ }).click(); await g6.waitForTimeout(200);
+        const pos = await g6.evaluate(() => { const m = JSON.parse(localStorage.getItem("ttr-map")); const svg = document.querySelector(".map-canvas"); const out = {}; for (const id of ["a", "b"]) { const s = m.stops.find((x) => x.id === id); const pt = svg.createSVGPoint(); pt.x = s.x; pt.y = s.y; const c = pt.matrixTransform(svg.getScreenCTM()); out[id] = { x: c.x, y: c.y }; } return out; });
+        await g6.mouse.click(pos.a.x, pos.a.y); await g6.waitForTimeout(150); await g6.mouse.click(pos.b.x, pos.b.y); await g6.waitForTimeout(500);
+        const toastBox = await g6.locator("[data-sonner-toast]").first().boundingBox().catch(() => null);
+        check("the message about a second route between two stops is wide, not a narrow tall column", toastBox !== null && toastBox.width >= 300 && toastBox.height <= 260, JSON.stringify(toastBox));
+        await g6.keyboard.press("Escape"); await g6.waitForTimeout(200);
+        await g6.context().close();
+        // Delete after a click on a button in Properties still takes the shape away.
+        const g7 = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
+        g7.on("pageerror", (e) => errors.push(String(e)));
+        await g7.goto(BASE, { waitUntil: "networkidle" });
+        await g7.getByRole("button", { name: "Start with a blank map" }).click(); await g7.waitForTimeout(500);
+        if (await g7.locator('[role="dialog"]').count()) { await g7.keyboard.press("Escape"); await g7.waitForTimeout(300); }
+        await g7.getByRole("button", { name: /Draw background/ }).click(); await g7.waitForTimeout(200);
+        await g7.locator(".background-tools select").selectOption({ label: "Rectangle" });
+        const box7 = await g7.evaluate(() => { const r = document.querySelector(".map-canvas").getBoundingClientRect(); return { x: r.left + r.width * 0.2, y: r.top + r.height * 0.3, x2: r.left + r.width * 0.4, y2: r.top + r.height * 0.5 }; });
+        await g7.mouse.move(box7.x, box7.y); await g7.mouse.down(); await g7.mouse.move(box7.x2, box7.y2, { steps: 5 }); await g7.mouse.up(); await g7.waitForTimeout(400);
+        await g7.getByRole("button", { name: /Lock geometry/ }).click(); await g7.waitForTimeout(300);
+        await g7.keyboard.press("Delete"); await g7.waitForTimeout(400);
+        check("Delete takes the selected shape away even when the last click was on Lock geometry", (await g7.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")).background.length)) === 0);
+        await g7.context().close();
+      }
+      // 34: the lists of the stop tool are wide enough for their words in a narrow window.
+      {
+        const nw = await (await browser.newContext({ viewport: { width: 800, height: 520 } })).newPage();
+        nw.on("pageerror", (e) => errors.push(String(e)));
+        await nw.goto(BASE, { waitUntil: "networkidle" });
+        await nw.getByRole("button", { name: "Start with a blank map" }).click(); await nw.waitForTimeout(500);
+        if (await nw.locator('[role="dialog"]').count()) { await nw.keyboard.press("Escape"); await nw.waitForTimeout(300); }
+        await nw.getByRole("button", { name: /Add stop/ }).click(); await nw.waitForTimeout(300);
+        const fits = await nw.locator(".tool-options select").evaluateAll((els) => els.map((e) => { const cs = getComputedStyle(e); const ctx = document.createElement("canvas").getContext("2d"); ctx.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`; const word = e.options[e.selectedIndex].text; const room = e.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight); return { word, need: Math.ceil(ctx.measureText(word).width), room: Math.floor(room) }; }));
+        check("in a narrow window the chosen words of the stop type, size and symbol lists fit in their lists", fits.length >= 3 && fits.every((f) => f.need <= f.room), JSON.stringify(fits));
+        await nw.context().close();
+      }
+      // 46: the deck that was open is the deck that is open after a reload.
+      {
+        const dk = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
+        dk.on("pageerror", (e) => errors.push(String(e)));
+        await dk.goto(BASE, { waitUntil: "networkidle" });
+        await dk.getByRole("button", { name: "Load the example map" }).click(); await dk.waitForTimeout(600);
+        await dk.getByRole("button", { name: "Tickets", exact: true }).click(); await dk.waitForTimeout(400);
+        await dk.getByRole("button", { name: /Add a deck/ }).click(); await dk.waitForTimeout(250);
+        await dk.getByRole("menuitem", { name: /Duplicate this one/ }).click(); await dk.waitForTimeout(500);
+        const chosen = await dk.locator("#ticket-set").inputValue();
+        await dk.reload({ waitUntil: "networkidle" }); await dk.waitForTimeout(700);
+        await dk.getByRole("button", { name: "Tickets", exact: true }).click(); await dk.waitForTimeout(400);
+        check("the deck that was open comes back open after a reload", (await dk.locator("#ticket-set").inputValue()) === chosen && chosen !== "main", `${chosen} → ${await dk.locator("#ticket-set").inputValue()}`);
+        await dk.context().close();
+      }
+      // Fields and tick boxes have names for a screen reader, in every page.
+      {
+        const g8 = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
+        g8.on("pageerror", (e) => errors.push(String(e)));
+        await g8.goto(BASE, { waitUntil: "networkidle" });
+        await g8.getByRole("button", { name: "Load the example map" }).click(); await g8.waitForTimeout(600);
+        const unnamedNow = () => g8.evaluate(() => [...document.querySelectorAll("input:not([type=hidden]):not([type=file]), select, textarea")].filter((e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; }).filter((e) => { const ids = (e.getAttribute("aria-labelledby") || "").split(/\s+/).map((id) => (document.getElementById(id) || {}).textContent || "").join("").trim(); const labels = e.labels ? [...e.labels].map((l) => l.textContent).join("").trim() : ""; return !(e.getAttribute("aria-label") || ids || labels || e.getAttribute("title")); }).length);
+        const sb8 = await g8.locator("g.stop").first().boundingBox(); await g8.mouse.click(sb8.x + sb8.width / 2, sb8.y + sb8.height / 2); await g8.waitForTimeout(400);
+        check("a stop's Properties: every field has a name", (await unnamedNow()) === 0, String(await unnamedNow()));
+        await g8.getByRole("button", { name: "Settings" }).click(); await g8.waitForTimeout(400);
+        let total8 = 0; const pages8 = await g8.locator(".settings-nav-item").allTextContents();
+        for (const nav of pages8) { await g8.locator(".settings-nav-item", { hasText: nav.trim() }).first().click(); await g8.waitForTimeout(250); total8 += await unnamedNow(); }
+        check("Settings, every page: every field, slider and list has a name", total8 === 0, `${total8} without in ${pages8.length} pages`);
+        await g8.keyboard.press("Escape"); await g8.waitForTimeout(250);
+        await g8.getByRole("button", { name: "Tickets", exact: true }).click(); await g8.waitForTimeout(500);
+        check("the tickets table: every tick box has a name", (await unnamedNow()) === 0, String(await unnamedNow()));
+        await g8.context().close();
+        const g9 = await (await browser.newContext({ viewport: { width: 400, height: 820 } })).newPage();
+        await g9.goto(BASE, { waitUntil: "networkidle" }); await g9.waitForTimeout(500);
+        const order9 = await g9.evaluate(() => { const b = [...document.querySelectorAll('[role="dialog"] [data-slot="dialog-footer"] button')].map((x) => x.getBoundingClientRect().top); return b; });
+        check("the welcome box on a phone: the buttons are in the order that Tab goes through them, top to bottom", order9.every((t, i) => i === 0 || t >= order9[i - 1] - 1), JSON.stringify(order9));
+        await g9.context().close();
+      }
       const ph = await (await browser.newContext({ viewport: { width: 400, height: 820 }, hasTouch: true, isMobile: true })).newPage();
       ph.on("pageerror", (e) => errors.push(String(e)));
       await ph.goto(BASE, { waitUntil: "networkidle" });

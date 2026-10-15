@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { plural } from "./plural";
 import { isSmallBoard, DEFAULT_TICKET_MIX, lanesOpenFrom, colorLabelOf, type MapData, wagonOf, type Stop, type Ticket, ticketsInSet, type TicketSet } from "./map-data";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Input } from "@/components/ui/input";
@@ -61,7 +62,7 @@ export function WelcomeGuide({ open, onOpenChange, onChooseBlank, onChooseExampl
       <TourVideo />
       <ol className="guide-steps">{steps.map((step) => <li key={step.title}><span className="guide-step-icon">{step.icon}</span><div><strong>{step.title}</strong><p>{step.text}</p></div></li>)}</ol>
       <p className="helper guide-more">More about what it is for, and where its numbers come from, on the <a href="./about">About page</a>.</p>
-      <DialogFooter className="sm:flex-wrap">
+      <DialogFooter className="flex-col sm:flex-row sm:flex-wrap">
         <Button variant="outline" onClick={onChooseFile}><Upload />Open a map file</Button>
         <Button variant="outline" onClick={onChooseExample}><Pencil />Load the example map</Button>
         <Button variant="outline" onClick={onChooseProblems}><AlertTriangle />Load a map with problems</Button>
@@ -104,7 +105,7 @@ export function AnalysisPanel({ behind, official, wide, onToggleWide, onAddParal
           : <>
             <div className="bottleneck-list">{bottlenecks.slice(0, 8).map((edge) => <button type="button" key={`${edge.a}|${edge.b}`} className={cn("bottleneck-row", edge.onPurpose && "on-purpose")} onPointerEnter={() => onPreviewRoutes(edge.routeIds)} onPointerLeave={() => onPreviewRoutes(null)} aria-pressed={edge.routeIds.length === bottleneckShown.size && edge.routeIds.every((id) => bottleneckShown.has(id))} onClick={() => onShowBottleneck(edge.routeIds)}>
               <strong>{stopName(edge.a)} → {stopName(edge.b)}{edge.onPurpose && <em className="on-purpose-tag">on purpose</em>}</strong>
-              <span>{edge.length} spaces · {edge.lanesUsable} of {edge.lanes} lane{edge.lanes === 1 ? "" : "s"} usable · {edge.tickets} ticket{edge.tickets === 1 ? "" : "s"} want it</span>
+              <span>{edge.length} spaces · {edge.lanesUsable} of {edge.lanes} lane{edge.lanes === 1 ? "" : "s"} usable · {edge.tickets} ticket{edge.tickets === 1 ? " wants" : "s want"} it</span>
             </button>)}</div>
             {bottlenecks.some((edge) => edge.onPurpose) && <p className="helper">{bottlenecks.filter((edge) => edge.onPurpose).length} of them {bottlenecks.filter((edge) => edge.onPurpose).length === 1 ? "is" : "are"} contested on purpose, as marked in Properties.</p>}
             <p className="helper">{bottlenecks.length} route{bottlenecks.length === 1 ? " is" : "s are"} crowded at this table: {bottlenecks.length === 1 ? "it stands" : "they stand"} out, among the busiest tenth of routes with at least three tickets, or at twice the average load for the lanes a player may use. {shapeRanges.small ? "The small official maps" : "Official maps"} have {shapeRanges.crowded[0]}–{shapeRanges.crowded[1]} at a full table, {shapeRanges.ranges.crowdedPct[0]}–{shapeRanges.ranges.crowdedPct[1]} % of their routes, most of them on double routes: contention is part of the game. Where a corridor is crowded on purpose, a second lane keeps it open at bigger tables; where it is not, a way round or another ticket eases it. Click a row to keep its route marked, and click again to let go.</p>
@@ -193,7 +194,7 @@ export function AnalysisPanel({ behind, official, wide, onToggleWide, onAddParal
 export function SuggestionsPanel({ suggestions, onAdd, onHover, onClose }: { suggestions: RouteSuggestion[]; onAdd: (suggestion: RouteSuggestion) => void; onHover: (suggestion: RouteSuggestion | null) => void; onClose: () => void }) {
   return <div className="suggestion-panel">
     <div className="panel-heading"><span>Suggested routes</span><small>{suggestions.length} to consider</small></div>
-    <p className="helper">Nearby stops with no route yet, that would not cross an existing route, least-connected stops first. Point at one to see it on the map. Length and colour are a starting guess to adjust.</p>
+    <p className="helper">Nearby stops with no route yet, that would not cross an existing route, least-connected stops first. Point at one to see it on the map. Length (1 to 8 spaces, in step with the other routes) and colour are a starting guess to adjust.</p>
     {suggestions.length === 0 ? <p className="helper">No good candidates right now: every nearby pair is connected already, would cross a route, or there are not enough stops yet.</p>
       : <ul className="suggestion-list">
         {suggestions.map((suggestion) => <li key={`${suggestion.a}-${suggestion.b}`} className="suggestion-row" onPointerEnter={() => onHover(suggestion)} onPointerLeave={() => onHover(null)} onFocus={() => onHover(suggestion)} onBlur={() => onHover(null)}>
@@ -207,6 +208,14 @@ export function SuggestionsPanel({ suggestions, onAdd, onHover, onClose }: { sug
 
 
 type TicketSortColumn = "ticket" | "spaces" | "points" | "suggested" | "long";
+
+// The points of a ticket: the field may be emptied to type another number, and the old number stays in the ticket until a new one is there; leaving it empty puts the old one back.
+function PointsInput({ value, onChange }: { value: number; onChange: (points: number) => void }) {
+  const [text, setText] = useState<string | null>(null);
+  return <input className="ticket-points" type="number" min={1} max={99} aria-label="Points" value={text ?? String(value)}
+    onChange={(event) => { setText(event.target.value); const number = Math.round(Number(event.target.value)); if (event.target.value.trim() !== "" && Number.isFinite(number) && number >= 1) onChange(Math.min(99, number)); }}
+    onBlur={() => setText(null)} />;
+}
 
 export function TicketsPanel({ behind, compare, onHoverTicket, lengthView, wide, onToggleWide, onClose, data, reviews, coverage, rate, selected, activeSet, onSelect, onUpdate, onDelete, onSelectSet, onAddSet, onDuplicateSet, onRenameSet, onDeleteSet, onExport, onExportCsv, onImport, onPrint, onStartFrom, onSuggest }: {
   behind?: string;
@@ -266,7 +275,7 @@ export function TicketsPanel({ behind, compare, onHoverTicket, lengthView, wide,
   return <div className="balance-panel tickets-panel">
     <div className="panel-heading"><span>Destination tickets</span><Button size="sm" variant="outline" aria-expanded={wide} onClick={onToggleWide}>{wide ? "Collapse" : "Expand"}</Button></div>
     {behind && <p className="helper properties-behind">Properties of {behind} are behind this panel: Done brings them back.</p>}
-    <p className="helper">{reviews.length} ticket{reviews.length === 1 ? "" : "s"} in this deck, worth about {rate.toFixed(1)} point{rate.toFixed(1) === "1.0" ? "" : "s"} per wagon space.</p>
+    <p className="helper">{reviews.length === 0 ? "No tickets in this deck yet." : <>{reviews.length} ticket{reviews.length === 1 ? "" : "s"} in this deck, worth about {rate.toFixed(1)} point{rate.toFixed(1) === "1.0" ? "" : "s"} per wagon space.</>}</p>
 
       <div className="ticket-set-bar">
         <div className="ticket-set-field"><Label htmlFor="ticket-set">Deck</Label><NativeSelect id="ticket-set" value={activeSet.id} onChange={(event) => onSelectSet(event.target.value)}>{data.ticketSets.map((set) => <NativeSelectOption key={set.id} value={set.id}>{set.label} ({ticketsInSet(data, set.id).length})</NativeSelectOption>)}</NativeSelect></div>
@@ -305,9 +314,9 @@ export function TicketsPanel({ behind, compare, onHoverTicket, lengthView, wide,
             onPointerEnter={() => onHoverTicket(review.ticket.id)} onPointerLeave={() => onHoverTicket(null)} onFocus={() => onHoverTicket(review.ticket.id)} onBlur={() => onHoverTicket(null)}
             onClick={() => onSelect(review.ticket.id === selected ? null : review.ticket.id)}
             onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onSelect(review.ticket.id === selected ? null : review.ticket.id); } }}>
-            <td>{name(review.ticket.a)} → {name(review.ticket.b)}{review.verdict === "unreachable" ? " · not connected" : review.verdict === "duplicate" ? " · duplicate" : ""}</td>
+            <td className="ticket-names" title={`${name(review.ticket.a)} → ${name(review.ticket.b)}`}>{name(review.ticket.a)} → {name(review.ticket.b)}{review.verdict === "unreachable" ? " · not connected" : review.verdict === "duplicate" ? " · duplicate" : ""}</td>
             <td>{review.distance ?? "—"}</td>
-            <td onClick={(event) => event.stopPropagation()}><input className="ticket-points" type="number" min={1} max={99} value={review.ticket.points} onChange={(event) => onUpdate(review.ticket.id, { points: Math.max(1, Number(event.target.value) || 1) })} /></td>
+            <td onClick={(event) => event.stopPropagation()}><PointsInput value={review.ticket.points} onChange={(points) => onUpdate(review.ticket.id, { points })} /></td>
             <td>{review.suggested ?? "—"}{review.verdict === "generous" ? " · high" : review.verdict === "stingy" ? " · low" : ""}</td>
             <td onClick={(event) => event.stopPropagation()}><input type="checkbox" checked={Boolean(review.ticket.long)} onChange={(event) => onUpdate(review.ticket.id, { long: event.target.checked })} /></td>
             <td onClick={(event) => event.stopPropagation()}><Button size="sm" variant="ghost" onClick={() => onDelete(review.ticket.id)}>Delete</Button></td>
@@ -329,7 +338,7 @@ export function TicketsPanel({ behind, compare, onHoverTicket, lengthView, wide,
         {uncovered.length ? <>
           <p className="helper">{uncovered.length} of {coverage.length}. Nothing sends a player there — pick one to start a ticket from it.</p>
           <div className="uncovered-stops">{uncovered.map((entry) => <button type="button" key={entry.stop.id} className="uncovered-stop" onClick={() => onStartFrom(entry.stop.id)}>{entry.stop.name}</button>)}</div>
-        </> : <p className="helper">Every stop is named by at least one ticket.</p>}
+        </> : <p className="helper">{data.stops.length === 0 ? "No stops yet." : "Every stop is named by at least one ticket."}</p>}
       </div>
     <Button variant="outline" size="sm" onClick={onClose}>Done</Button>
   </div>;
@@ -451,7 +460,7 @@ export function SuggestTicketsDialog({ tension, onTension, open, onOpenChange, d
       <label className="checkbox-row"><input type="checkbox" checked={keepExisting} onChange={(event) => onKeepExisting(event.target.checked)} />Keep the tickets this deck already has</label>
 
       {report?.note && <p className="helper helper-warning">{report.note}</p>}
-      {suggestion && suggestion.tickets.length < deckSize && <p className="helper">Only {suggestion.tickets.length} different tickets could be made for this map, so that is the size of the deck, not {deckSize}.</p>}
+      {suggestion && suggestion.tickets.length < deckSize && <p className="helper">Only {plural(suggestion.tickets.length, "different ticket")} could be made for this map, so that is the size of the deck, not {deckSize}.</p>}
 
       <div className={cn("analysis-table-scroll", busy && "suggest-busy")}><table className="analysis-table suggest-table">
         <thead><tr><th>Measure</th><th>Now</th><th>Suggested</th><th>Reference</th></tr></thead>

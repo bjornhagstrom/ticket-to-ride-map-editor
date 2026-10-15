@@ -574,3 +574,20 @@
   /* The menu opens from the header and must lie over the sheets, which are fixed at 30 and the bar at 40 below. */
   .topbar { z-index: 36 !important; }
 }
+
+/* A long stop name is cut short (the whole name is the tooltip), so the columns after it stay in view. */
+.coverage-table td:first-child { max-width: 11em; }
+.coverage-table .coverage-stop { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
+.analysis-table td.ticket-names { max-width: 14em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* The lists in the tool options (type, size, symbol) are as wide as their words: two to a row only where there is room, or the last letters are cut off. */
+.tool-options .grid-two { grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr)); }
+
+/* A message with a button puts the button on a line of its own, so the words keep the width of the message and are not squeezed into a narrow, tall column. */
+body [data-sonner-toast][data-styled="true"] { flex-wrap: wrap; row-gap: 8px; }
+body [data-sonner-toast][data-styled="true"] [data-content] { flex: 1 1 14rem; min-width: 0; }
+body [data-sonner-toast][data-styled="true"] [data-button] { margin-left: auto; height: auto; padding: 6px 10px; line-height: 1.3; white-space: normal; }
+
+/* In the narrow tools column the lists have room for their words: less padding, a smaller chevron and type. */
+.tool-options select { padding-left: 8px; padding-right: 22px; font-size: 12px; }
+.tool-options [data-slot="native-select-wrapper"] svg, .tool-options .group\/native-select svg { right: 5px; width: 13px; height: 13px; }
