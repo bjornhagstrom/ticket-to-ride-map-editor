@@ -225,9 +225,9 @@ export function MapEditor() {
     }
   }, [phoneSheet]);
   // The map on a phone: its width in pixels, from the whole map in the area it is in (Fit) to six times that, changed by the buttons in
-  // the bar and by a pinch of two fingers, which keeps the point between them where it is. It starts at 900 px, a size to work in.
+  // the bar and by a pinch of two fingers, which keeps the point between them where it is. It starts as the whole map (null: as wide as the area it is in).
   const mapWrapRef = useRef<HTMLElement>(null);
-  const [phoneMapWidth, setPhoneMapWidth] = useState(900);
+  const [phoneMapWidth, setPhoneMapWidth] = useState<number | null>(null);
   const PHONE_ZOOM_MAX = 6, PHONE_ZOOM_STEP = 1.4;
   const phoneFitWidth = () => { const wrap = mapWrapRef.current; if (!wrap) return 360; const cs = getComputedStyle(wrap); return Math.max(200, wrap.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)); };
   const zoomPhoneMapTo = (width: number) => {
@@ -1426,7 +1426,7 @@ export function MapEditor() {
         <Button type="button" id="phone-status-toggle" variant="ghost" size="icon" aria-expanded={!statusFolded} aria-label={statusFolded ? "Show the facts about the map" : "Fold away the facts about the map"} onClick={() => foldStatus(!statusFolded)}>{statusFolded ? <ChevronDown /> : <ChevronUp />}</Button>
         {!statusFolded ? <div className="map-status">{saveState}{statusChips}</div> : <span className="phone-status-folded">Facts about the map</span>}
       </div>}
-      <section ref={mapWrapRef} className="map-wrap" style={{ "--phone-map-width": `${phoneMapWidth}px` } as React.CSSProperties} onPointerDownCapture={() => setPhoneSheet(null)}>
+      <section ref={mapWrapRef} className="map-wrap" style={{ "--phone-map-width": phoneMapWidth === null ? "100%" : `${phoneMapWidth}px` } as React.CSSProperties} onPointerDownCapture={() => setPhoneSheet(null)}>
         {litTicket && <div className="highlight-chip"><TicketIcon /><span>{stopById(data, litTicket.a)?.name} → {stopById(data, litTicket.b)?.name}</span><Button variant="ghost" size="icon" aria-label="Stop showing this ticket" onClick={() => setSelectedTicket(null)}><X /></Button></div>}
         {!phone && <div className="map-status">{statusChips}</div>}
         {hint && hint.atTop && <MapHint atTop title={hint.title} open={routeHintOpen} onToggle={toggleRouteHint} offsetX={routeHintX} onOffsetChange={moveRouteHint}>{hint.body}</MapHint>}

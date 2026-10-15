@@ -26,6 +26,7 @@ export const UNRELEASED: string[] = [
   "A stop name that is emptied becomes Unnamed stop, stops that share a name and double routes with lanes of different lengths are said in the side panel, and a deleted stop says how many routes went with it.",
   "A ticket's points keep their number while the field is empty, the sliders of the background image are one step of Undo, the picture is named like the map file, and the deck that was open is open again after a reload.",
   "A map named with å, ä, ö or another letter with a mark, such as Örebro, keeps that letter in the name of an exported file (as a, a and o) and no longer starts it with a hyphen where the letter was.",
+  "On a phone the map starts as the whole map, as wide as the screen, instead of 900 px of it; the zoom buttons and the pinch work as before.",
 ];
 
 export const RELEASES: Release[] = [

@@ -4804,9 +4804,9 @@ const sectionStart = (n) => {
     const canvasWidth = () => pz.evaluate(() => Math.round(document.querySelector(".map-canvas").getBoundingClientRect().width));
     const wrapInner = () => pz.evaluate(() => { const w = document.querySelector(".map-wrap"); const cs = getComputedStyle(w); return Math.round(w.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)); });
     const sideways = () => pz.evaluate(() => document.documentElement.scrollWidth);
-    // The size it has always had on a phone, to work in.
+    // User test 47: it starts as the whole map, as wide as the area it is in (not the 900 px it had before).
     const start = await canvasWidth();
-    check("the map starts at a size to work in: about 900 px wide, as before, in its own scrolling area", start >= 850 && start <= 950, String(start));
+    check("the map starts whole: as wide as the area it is in, nothing to scroll sideways", Math.abs(start - (await wrapInner())) <= 2 && start < 600, `${start} against ${await wrapInner()}`);
     check("the bar has the zoom: smaller, the whole map, larger", (await pz.locator("#phone-zoom-out").isVisible()) && (await pz.locator("#phone-zoom-fit").isVisible()) && (await pz.locator("#phone-zoom-in").isVisible()));
     await pz.locator("#phone-zoom-fit").tap(); await pz.waitForTimeout(300);
     const fit = await canvasWidth(), inner = await wrapInner();
