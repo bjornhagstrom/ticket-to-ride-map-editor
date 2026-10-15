@@ -565,3 +565,12 @@
 
 .background-size-row{display:grid;gap:6px}.background-size-row .grid-two{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .background-tips{margin:4px 0 0;padding-left:18px;display:grid;gap:3px}
+
+/* On a phone the cells of the print table would run into each other ("35 %6 sheets"): the sheets over the scale, in columns wide enough, and the table scrolls sideways when the screen is narrower. */
+@media (max-width: 720px) {
+  .print-table { table-layout: auto; min-width: 560px; }
+  .print-table td button { white-space: normal; display: flex; flex-direction: column; align-items: flex-start; gap: 0; }
+  .print-table td button small { margin-left: 0; }
+  /* The menu opens from the header and must lie over the sheets, which are fixed at 30 and the bar at 40 below. */
+  .topbar { z-index: 36 !important; }
+}

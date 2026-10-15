@@ -75,8 +75,7 @@ function CustomBoardSize({ data, onApply }: { data: MapData; onApply: (choice: B
   const within = (value: string, low: number, high: number) => Number.isFinite(Number(value)) && Number(value) >= low && Number(value) <= high;
   const panelGiven = filled(real.panelLong) || filled(real.panelShort);
   const panel = panelGiven && within(real.panelLong, 40, 1500) && within(real.panelShort, 40, 1500) ? { width: Number(real.panelLong), height: Number(real.panelShort) } : undefined;
-  const problem = !valid(asked.long) || !valid(asked.short) ? `Use whole numbers from 1 to ${MAX_PANELS}.` : asked.short > asked.long ? "The short side cannot have more panels than the long side. To stand the board up, use Orientation."
-    : asked.long < 2 ? "A board needs at least two panels along its long side."
+  const problem = !valid(asked.short) ? `The short side needs a whole number of panels, from 1 to ${MAX_PANELS}.` : !valid(asked.long) || asked.long < 2 ? `The long side needs a whole number of panels, from 2 to ${MAX_PANELS}.` : asked.short > asked.long ? "The short side cannot have more panels than the long side. To stand the board up, use Orientation."
     : panelGiven && !panel ? "A panel is 40 to 1500 mm on each side: give both, long side first."
     : panel && Number(real.panelShort) > Number(real.panelLong) ? "The panel's short side cannot be longer than its long side: give the long side first, and use Orientation to stand the board up."
     : panel && asked.short * panel.height > asked.long * panel.width ? "That makes a board taller than wide: give the panels the other way round, and use Orientation to stand it."

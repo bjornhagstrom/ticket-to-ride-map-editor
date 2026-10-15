@@ -4606,9 +4606,9 @@ const sectionStart = (n) => {
     await cb.locator("#custom-board-long").fill("2"); await cb.waitForTimeout(200);
     check("a short side longer than the long side is said so, and cannot be used", /cannot have more panels/.test(await cb.locator(".custom-board-result").textContent()) && (await cb.locator("#custom-board-apply").isDisabled()));
     await cb.locator("#custom-board-long").fill("9"); await cb.waitForTimeout(200);
-    check("so is a number out of range", /whole numbers from 1 to 6/.test(await cb.locator(".custom-board-result").textContent()) && (await cb.locator("#custom-board-apply").isDisabled()));
+    check("so is a number out of range", /long side needs a whole number of panels, from 2 to 6/.test(await cb.locator(".custom-board-result").textContent()) && (await cb.locator("#custom-board-apply").isDisabled()));
     await cb.locator("#custom-board-long").fill("1"); await cb.locator("#custom-board-short").fill("1"); await cb.waitForTimeout(200);
-    check("one panel alone is not a board, and is said so", /at least two panels/.test(await cb.locator(".custom-board-result").textContent()) && (await cb.locator("#custom-board-apply").isDisabled()));
+    check("one panel alone is not a board, and is said so", /long side needs a whole number of panels, from 2 to 6/.test(await cb.locator(".custom-board-result").textContent()) && (await cb.locator("#custom-board-apply").isDisabled()));
     await cb.getByRole("button", { name: "Cancel" }).click(); await cb.waitForTimeout(300);
     check("Cancel leaves the board as it was", (await stored()).format === before.format);
     await cb.locator("#settings-custom-board").click(); await cb.waitForTimeout(300);
@@ -5267,7 +5267,7 @@ const sectionStart = (n) => {
     check("on the printed sheets a wagon of New York is 24 of the board's 428 mm (5.6 %)", share !== null && Math.abs(share - 24 / 428) < 0.002, String(share));
     await openPrint();
     check("and there is no Anniversary size to offer", (await pp.locator(".print-table thead").textContent()).indexOf("Anniversary") === -1);
-    check("the dialog says the board stays a custom one of the size it is", /Custom board 2×2/.test(await pp.locator(".print-dialog").textContent()), (await pp.locator(".print-dialog").textContent()).slice(0, 160));
+    check("the dialog calls the board by its name: Small board, New York", /Small board, New York/.test(await pp.locator(".print-dialog").textContent()), (await pp.locator(".print-dialog").textContent()).slice(0, 160));
     await pp.context().close();
   }
 
@@ -5838,6 +5838,62 @@ const sectionStart = (n) => {
     await up3.context().close();
     fs.unlinkSync(fileU);
     await up2.context().close();
+    // Group 2: the interface.
+    {
+      // 2: a small board is called by its name, in the facts row, not Custom board.
+      const bn = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
+      bn.on("pageerror", (e) => errors.push(String(e)));
+      await bn.goto(BASE, { waitUntil: "networkidle" });
+      await bn.getByRole("button", { name: "Start with a blank map" }).click(); await bn.waitForTimeout(500);
+      if (await bn.locator('[role="dialog"]').count()) { await bn.keyboard.press("Escape"); await bn.waitForTimeout(300); }
+      await bn.getByRole("button", { name: "Settings" }).click(); await bn.waitForTimeout(400);
+      await bn.locator('#settings-format input[value="small-new-york"]').check(); await bn.waitForTimeout(500);
+      await bn.keyboard.press("Escape"); await bn.waitForTimeout(300);
+      const facts = (await bn.locator(".map-facts, .facts-row, main").first().textContent()) || "";
+      check("a small board is named in the facts row: Small board, New York, not Custom board 2×2", /Small board, New York/.test(await bn.locator("body").textContent()) && !/Custom board 2×2/.test(await bn.locator(".map-facts, [class*=facts]").first().textContent().catch(() => "")));
+      // 13: the long side needs two, said for 0 and for 1 alike.
+      await bn.getByRole("button", { name: "Settings" }).click(); await bn.waitForTimeout(300);
+      await bn.locator("#settings-custom-board").click(); await bn.waitForTimeout(300);
+      await bn.locator("#custom-board-long").fill("0"); await bn.waitForTimeout(200);
+      const m0 = await bn.locator(".custom-board-result").textContent();
+      await bn.locator("#custom-board-long").fill("1"); await bn.waitForTimeout(200);
+      const m1 = await bn.locator(".custom-board-result").textContent();
+      check("a long side of 0 and of 1 get the same word: from 2 to 6", /from 2 to 6/.test(m0) && /from 2 to 6/.test(m1), `${m0} | ${m1}`);
+      await bn.context().close();
+      // 12: something selected while a panel holds the column: the panel names it.
+      const bp2 = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
+      bp2.on("pageerror", (e) => errors.push(String(e)));
+      await bp2.goto(BASE, { waitUntil: "networkidle" });
+      await bp2.getByRole("button", { name: "Load the example map" }).click(); await bp2.waitForTimeout(500);
+      const sb = await bp2.locator("g.stop").first().boundingBox();
+      await bp2.mouse.click(sb.x + sb.width / 2, sb.y + sb.height / 2); await bp2.waitForTimeout(300);
+      await bp2.getByRole("button", { name: "Tickets", exact: true }).click(); await bp2.waitForTimeout(400);
+      check("with a stop selected and Tickets open, the panel says the stop's properties are behind it", /Properties of .+ are behind this panel/.test((await bp2.locator(".tickets-panel").textContent()) || ""));
+      await bp2.context().close();
+      // 1, 7, 8: welcome box, phone menu, print table.
+      for (const [w, h] of [[1400, 900], [572, 821], [400, 820]]) {
+        const wp2 = await (await browser.newContext({ viewport: { width: w, height: h } })).newPage();
+        await wp2.goto(BASE, { waitUntil: "networkidle" }); await wp2.waitForTimeout(500);
+        const lay = await wp2.evaluate(() => ({ video: document.querySelector(".tour-video").getBoundingClientRect().bottom, steps: document.querySelector(".guide-steps").getBoundingClientRect().top }));
+        check(`the welcome box at ${w} px: the video does not lie over the list`, lay.steps >= lay.video - 1, JSON.stringify(lay));
+        await wp2.context().close();
+      }
+      const ph = await (await browser.newContext({ viewport: { width: 400, height: 820 }, hasTouch: true, isMobile: true })).newPage();
+      ph.on("pageerror", (e) => errors.push(String(e)));
+      await ph.goto(BASE, { waitUntil: "networkidle" });
+      await ph.getByRole("button", { name: "Load the example map" }).click(); await ph.waitForTimeout(600);
+      await ph.locator("#phone-properties").click(); await ph.waitForTimeout(400);
+      await ph.locator("#phone-menu").click(); await ph.waitForTimeout(400);
+      const menuOnTop = await ph.evaluate(() => { const item = document.querySelector(".header-actions.open button"); if (!item) return "no menu"; const r = item.getBoundingClientRect(); const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return item.contains(top) || (top && top.closest(".header-actions")) ? "on top" : (top ? top.className : "nothing"); });
+      check("on a phone the menu lies over an open sheet, where it can be used", menuOnTop === "on top", String(menuOnTop));
+      await ph.locator("#phone-menu").click().catch(() => {}); await ph.waitForTimeout(200);
+      await ph.keyboard.press("Escape"); await ph.waitForTimeout(200);
+      await ph.locator("#phone-menu").click(); await ph.waitForTimeout(300);
+      await ph.getByRole("button", { name: "Print map" }).click(); await ph.waitForTimeout(600);
+      const overflowing = await ph.evaluate(() => [...document.querySelectorAll(".print-table td button")].filter((b) => b.scrollWidth > b.clientWidth + 1).length);
+      check("on a phone no cell of the print table runs over its edge", overflowing === 0, String(overflowing));
+      await ph.context().close();
+    }
   }
 
   if (sectionOpen) sectionTimes[sectionOpen.n] = Math.round((Date.now() - sectionOpen.at) / 100) / 10;

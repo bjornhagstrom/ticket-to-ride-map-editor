@@ -235,7 +235,9 @@ export function boardDefinition(source: { format?: unknown; panelMm?: unknown })
   const panel = validPanelFor(source.format, source.panelMm);
   if (!panel) return base;
   const widthMm = base.columns * panel.width, heightMm = base.rows * panel.height;
-  const label = `Custom board ${base.rows}×${base.columns}`;
+  // A board with exactly the panels of one of the small boards is called by its name; any other size of panel is a custom board.
+  const named = BOARD_PRESETS.find((preset) => preset.profile && preset.format === source.format && preset.profile.panelMm.width === panel.width && preset.profile.panelMm.height === panel.height);
+  const label = named ? named.label : `Custom board ${base.rows}×${base.columns}`;
   return { label, shortLabel: label, note: `${base.columns} panels across, ${base.rows} down, panels of ${panel.width} × ${panel.height} mm`, width: W, height: Math.round(W * heightMm / widthMm), widthMm, heightMm, columns: base.columns, rows: base.rows, custom: true };
 }
 /** The wagon a map is measured with: its own, with the standard proportions where a part is left out, or the editor's own 20 × 9 mm. */

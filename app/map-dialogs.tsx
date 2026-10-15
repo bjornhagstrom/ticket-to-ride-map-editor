@@ -74,7 +74,7 @@ export function WelcomeGuide({ open, onOpenChange, onChooseBlank, onChooseExampl
 const NUMBER_WORDS: Record<number, string> = {2: "two", 3: "three", 4: "four", 5: "five", 6: "six", 7: "seven", 8: "eight"};
 const tableWord = (count: number) => NUMBER_WORDS[count] ?? String(count);
 
-export function AnalysisPanel({ official, wide, onToggleWide, onAddParallel, lengthView, pinKey, onPin, bottleneckShown, onClose, onPreviewRoutes, onPreviewStop, data, stats, colourTable, spacing, scaleWidthMm, setup, bottlenecks, atTable, onAtTable, onShowBottleneck, onSelectRoute, onSelectStop }: { official: { players: number; crowded: number; connections: number; loadRatio: number | null; unusedPct: number; maxPerStop: number }; wide: boolean; onToggleWide: () => void; onAddParallel: (routeId: string) => void; lengthView: TicketLengthsView; pinKey: string | null; onPin: (key: string, routes: string[] | null, stop: string | null) => void; bottleneckShown: Set<string>; setup: SetupBalance; bottlenecks: Bottleneck[]; atTable: number; onAtTable: (players: number) => void; onShowBottleneck: (routeIds: string[]) => void; onClose: () => void; onPreviewRoutes: (routeIds: string[] | null) => void; onPreviewStop: (stopId: string | null) => void; onSelectRoute: (routeId: string) => void; onSelectStop: (stopId: string) => void; data: MapData; stats: NetworkStats; colourTable: ColourLengthTable; spacing: RouteSpacing[]; scaleWidthMm: number }) {
+export function AnalysisPanel({ behind, official, wide, onToggleWide, onAddParallel, lengthView, pinKey, onPin, bottleneckShown, onClose, onPreviewRoutes, onPreviewStop, data, stats, colourTable, spacing, scaleWidthMm, setup, bottlenecks, atTable, onAtTable, onShowBottleneck, onSelectRoute, onSelectStop }: { behind?: string; official: { players: number; crowded: number; connections: number; loadRatio: number | null; unusedPct: number; maxPerStop: number }; wide: boolean; onToggleWide: () => void; onAddParallel: (routeId: string) => void; lengthView: TicketLengthsView; pinKey: string | null; onPin: (key: string, routes: string[] | null, stop: string | null) => void; bottleneckShown: Set<string>; setup: SetupBalance; bottlenecks: Bottleneck[]; atTable: number; onAtTable: (players: number) => void; onShowBottleneck: (routeIds: string[]) => void; onClose: () => void; onPreviewRoutes: (routeIds: string[] | null) => void; onPreviewStop: (stopId: string | null) => void; onSelectRoute: (routeId: string) => void; onSelectStop: (stopId: string) => void; data: MapData; stats: NetworkStats; colourTable: ColourLengthTable; spacing: RouteSpacing[]; scaleWidthMm: number }) {
   const stopName = (id: string) => data.stops.find((stop) => stop.id === id)?.name ?? "";
   const shapeRanges = balanceRangesFor(data);
   // A number in the colour table marks the routes it counts while it is pointed at.
@@ -87,6 +87,7 @@ export function AnalysisPanel({ official, wide, onToggleWide, onAddParallel, len
   // the stop or routes it is about, and picking one selects it as before.
   return <div className="balance-panel">
     <div className="panel-heading"><span>Map balance</span><Button size="sm" variant="outline" aria-expanded={wide} onClick={onToggleWide}>{wide ? "Collapse" : "Expand"}</Button></div>
+    {behind && <p className="helper properties-behind">Properties of {behind} are behind this panel: Done brings them back.</p>}
       <p className="helper">A quick read on how evenly connected and coloured the network is, and how the tickets lie on it. Point at a row to see it on the map. Click one to keep it marked, and click again to let it go; double-click a stop or a route to pick it for editing.</p>
       <OfficialFigures official={official} stats={stats} setup={setup} data={data} />
       <div className="analysis-section bottlenecks">
@@ -206,7 +207,8 @@ export function SuggestionsPanel({ suggestions, onAdd, onHover, onClose }: { sug
 
 type TicketSortColumn = "ticket" | "spaces" | "points" | "suggested" | "long";
 
-export function TicketsPanel({ compare, onHoverTicket, lengthView, wide, onToggleWide, onClose, data, reviews, coverage, rate, selected, activeSet, onSelect, onUpdate, onDelete, onSelectSet, onAddSet, onDuplicateSet, onRenameSet, onDeleteSet, onExport, onExportCsv, onImport, onPrint, onStartFrom, onSuggest }: {
+export function TicketsPanel({ behind, compare, onHoverTicket, lengthView, wide, onToggleWide, onClose, data, reviews, coverage, rate, selected, activeSet, onSelect, onUpdate, onDelete, onSelectSet, onAddSet, onDuplicateSet, onRenameSet, onDeleteSet, onExport, onExportCsv, onImport, onPrint, onStartFrom, onSuggest }: {
+  behind?: string;
   compare: DeckCompareView | null;
   onHoverTicket: (ticketId: string | null) => void;
   lengthView: TicketLengthsView;
@@ -262,6 +264,7 @@ export function TicketsPanel({ compare, onHoverTicket, lengthView, wide, onToggl
   // In the right column rather than a dialog, so the map stays in view beside the list.
   return <div className="balance-panel tickets-panel">
     <div className="panel-heading"><span>Destination tickets</span><Button size="sm" variant="outline" aria-expanded={wide} onClick={onToggleWide}>{wide ? "Collapse" : "Expand"}</Button></div>
+    {behind && <p className="helper properties-behind">Properties of {behind} are behind this panel: Done brings them back.</p>}
     <p className="helper">{reviews.length} ticket{reviews.length === 1 ? "" : "s"} in this deck, worth about {rate.toFixed(1)} point{rate.toFixed(1) === "1.0" ? "" : "s"} per wagon space.</p>
 
       <div className="ticket-set-bar">
@@ -355,7 +358,7 @@ export function StopTicketsDialog({ open, onOpenChange, stopName, band, tickets,
 }
 
 // Build a full deck of tickets for the map that is open, then let the person edit it as ordinary tickets.
-export function SuggestTicketsDialog({ tension, onTension, open, onOpenChange, data, current, suggestion, style, onStyle, wagons, onWagons, deckSize, onDeckSize, keepExisting, onKeepExisting, busy, deckName, onDeckName, currentDeck, currentCounts, onShuffle, onApply }: { tension: DeckTension; onTension: (tension: DeckTension) => void;
+export function SuggestTicketsDialog({ tension, onTension, open, onOpenChange, data, current, suggestion, style, onStyle, wagons, onWagons, deckSize, onDeckSize, keepExisting, onKeepExisting, busy, deckName, onDeckName, currentDeck, currentCounts, onShuffle, onApply }: { behind?: string; tension: DeckTension; onTension: (tension: DeckTension) => void;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   data: MapData;
