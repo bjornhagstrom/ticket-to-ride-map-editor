@@ -4,6 +4,12 @@ What changed in each version of the [Ticket to Ride map editor](https://hagstrom
 
 This file is written from `app/version.ts` by `npm run changelog`; edit the notes there.
 
+## Unreleased
+
+Changes since the last release, to go into the next version.
+
+- A map named with å, ä, ö or another letter with a mark, such as Örebro, keeps that letter in the name of an exported file (as a, a and o) and no longer starts it with a hyphen where the letter was.
+
 ## 1.7.0 · 2026-10-15
 
 **Version 1.7: small boards and background shapes**

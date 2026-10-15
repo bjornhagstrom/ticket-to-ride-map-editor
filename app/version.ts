@@ -10,6 +10,7 @@ export type Release = { version: string; date: string; title: string; changes: s
 // the top of CHANGELOG.md under Unreleased, and become the notes of the next version when it is
 // decided; the What's new page in the editor shows released versions only.
 export const UNRELEASED: string[] = [
+  "A map named with å, ä, ö or another letter with a mark, such as Örebro, keeps that letter in the name of an exported file (as a, a and o) and no longer starts it with a hyphen where the letter was.",
 ];
 
 export const RELEASES: Release[] = [

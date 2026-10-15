@@ -631,6 +631,13 @@ export const readBackgroundImage = (file: File): Promise<{ dataUrl: string; natu
   };
   reader.readAsDataURL(file);
 });
+// The start of a downloaded file's name: the map's name in plain lowercase letters and digits, with hyphens between the words. A letter with a mark on it (å, ä, ö, é, ñ) or a few that are not
+// made of two (ø, æ, ß, ł) keeps its plain letter, rather than being taken for a hyphen as any other sign is.
+const LETTER_MAP: Record<string, string> = { "ø": "o", "æ": "ae", "œ": "oe", "ß": "ss", "ł": "l", "đ": "d", "ð": "d", "þ": "th", "ı": "i" };
+export function fileNameBase(name: string): string {
+  const plain = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[øæœßłđðþı]/g, (letter) => LETTER_MAP[letter] ?? letter);
+  return plain.replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "map";
+}
 export function formatTimestamp(date: Date = new Date()): string {
   const pad = (value: number) => String(value).padStart(2, "0");
   return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}-${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
