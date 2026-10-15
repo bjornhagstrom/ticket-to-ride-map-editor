@@ -866,7 +866,7 @@ const sectionStart = (n) => {
     await page.getByRole("menuitem", { name: "Spreadsheet (CSV)" }).click();
     await page.waitForTimeout(250);
     const csvItems = (await page.getByRole("menu").last().getByRole("menuitem").allTextContents()).map((t) => t.trim());
-    check("Import → Spreadsheet has the import first, and then, plainly marked as a download, the templates", JSON.stringify(csvItems) === JSON.stringify(["Import spreadsheets…", "Download templates (.zip)"]), csvItems.join(" | "));
+    check("Import → Spreadsheet has the import first, and then, plainly marked as a download, the templates", JSON.stringify(csvItems) === JSON.stringify(["Import spreadsheets…", "Templates to fill in (.zip)"]), csvItems.join(" | "));
     await page.getByRole("menuitem", { name: "Import spreadsheets…" }).click();
     await page.waitForTimeout(300);
     const csvDialog = page.getByRole("dialog", { name: "Import spreadsheets" });
@@ -884,7 +884,7 @@ const sectionStart = (n) => {
     check("also in a window 600 wide", fitNarrow.overflow <= 1 && fitNarrow.outside.length === 0, JSON.stringify(fitNarrow));
     await page.setViewportSize({ width: 1500, height: 1000 });
     await page.waitForTimeout(300);
-    check("and the dialog says where the templates are", /Download templates/.test(await csvDialog.textContent()) && /Export/.test(await csvDialog.textContent()));
+    check("and the dialog says where the templates are, in the words of the menu", /Templates to fill in/.test(await csvDialog.textContent()) && /Export/.test(await csvDialog.textContent()));
     const chooser = page.waitForEvent("filechooser");
     await csvDialog.getByRole("button", { name: "Choose files…" }).click();
     await (await chooser).setFiles([stops.file, routes.file, tickets.file]);
@@ -924,7 +924,7 @@ const sectionStart = (n) => {
     await page.waitForTimeout(300);
     check("and the screen says that the zip was saved", /spreadsheet-templates\.zip/.test((await page.locator("[data-sonner-toast]").allTextContents()).join(" ")), (await page.locator("[data-sonner-toast]").allTextContents()).join(" | "));
     const openImportCsvMenu = async () => { await page.getByRole("button", { name: "Import", exact: true }).click(); await page.waitForTimeout(250); await page.getByRole("menuitem", { name: "Spreadsheet (CSV)" }).click(); await page.waitForTimeout(250); };
-    const zipFromImport = await zipDownload(openImportCsvMenu, { menuitem: "Download templates (.zip)" });
+    const zipFromImport = await zipDownload(openImportCsvMenu, { menuitem: "Templates to fill in (.zip)" });
     check("the Import menu's download is the same zip as Export's: the same files, with the same contents", zipFromImport.name === "spreadsheet-templates.zip" && JSON.stringify(zipFromImport.entries) === JSON.stringify(zipFromExport.entries) && zipFromImport.entries.every((name) => fs.readFileSync(path.join(zipFromImport.dir, name), "utf8") === fs.readFileSync(path.join(zipFromExport.dir, name), "utf8")));
     await page.waitForTimeout(300);
     await page.evaluate(() => { const map = JSON.parse(localStorage.getItem("ttr-map")); localStorage.setItem("ttr-map", JSON.stringify({ ...map, stops: [], routes: [], tickets: [], ticketSets: [{ id: "main", label: "Main deck" }] })); });
@@ -4575,7 +4575,7 @@ const sectionStart = (n) => {
     await importFile(withApp("newer", { name: "Map prototypes", version: "99.1.0" }));
     const said = await toasts();
     check("a file from a newer editor opens", (await mapIs()).name === "From newer");
-    check("and says which version wrote it and what to do", /newer version of the editor/.test(said) && /99\.1\.0/.test(said) && /Reload the page, or update your copy/.test(said), said);
+    check("and says which version wrote it and what to do", /newer version of the editor/.test(said) && /99\.1\.0/.test(said) && /Reload the page to get the newest version/.test(said), said);
     await clearToasts();
     for (const [name, label, app] of [["older", "an older version", { name: "Map prototypes", version: "1.0.0" }], ["noapp", "no version", undefined], ["odd", "a version that is no number", { name: "x", version: "next" }]]) {
       await importFile(withApp(name, app));
@@ -5373,7 +5373,7 @@ const sectionStart = (n) => {
     check("Draw background offers a rectangle and a circle beside area, line and label", ["Area", "Line", "Label", "Rectangle", "Circle"].every((name) => objectChoices.includes(name)), objectChoices.join(", "));
     // The tool says how it works, in a few lines: draw, move, lock and Shift, size, undo.
     const tips = ((await bp.locator(".background-tips").textContent().catch(() => "")) || "").replace(/\s+/g, " ");
-    check("Draw background has tips on how to use it: mark a point, double-click to remove it, Shift and drag, Larger and Smaller, Esc, Ctrl+Z", /mark it/i.test(tips) && /double-click/i.test(tips) && /Shift/.test(tips) && /Larger/.test(tips) && /Esc/.test(tips) && /Ctrl\+Z/.test(tips) && /Option/.test(tips), tips);
+    check("Draw background has tips on how to use it: mark a point, double-click to remove it, Shift and drag, Larger and Smaller, Esc, Ctrl+Z", /mark it/i.test(tips) && /double-click/i.test(tips) && /Shift/.test(tips) && /Larger/.test(tips) && /Esc/.test(tips) && /Ctrl\/Cmd\+Z/.test(tips) && /Option/.test(tips), tips);
     await bp.locator(".background-tools select").selectOption({ label: "Rectangle" });
     await drag([200, 150], [500, 350]);
     let list = await shapes();
@@ -5911,6 +5911,50 @@ const sectionStart = (n) => {
       check("and a score that means nothing is not printed as a number", !/\b\d{3,}\.\d\b/.test(((await g3.locator(".suggest-table tr", { hasText: "Score" }).first().textContent()) || "")));
       await g3.keyboard.press("Escape"); await g3.waitForTimeout(300);
       await g3.context().close();
+      // Group 4: other texts.
+      const g4 = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
+      g4.on("pageerror", (e) => errors.push(String(e)));
+      await g4.goto(BASE, { waitUntil: "networkidle" });
+      const welcomeText = ((await g4.locator('[role="dialog"]').textContent()) || "").replace(/\s+/g, " ");
+      check("the welcome box names the small boards among the boards", /the extended 2×4, a small board or a size of your own/.test(welcomeText));
+      await g4.getByRole("button", { name: "Load the example map" }).click(); await g4.waitForTimeout(500);
+      const aboutText = await (await g4.context().newPage()).goto(BASE.replace(/\/$/, "") + "/about/").then(async (r) => r && (await r.text()));
+      check("the About page names them too", /a small board \(New York or Amsterdam\)/.test((aboutText || "").replace(/<[^>]+>/g, "").replace(/\s+/g, " ")));
+      const sb4 = await g4.locator("g.stop").first().boundingBox();
+      await g4.mouse.click(sb4.x + sb4.width / 2, sb4.y + sb4.height / 2); await g4.waitForTimeout(300);
+      const order = await g4.evaluate(() => { const form = document.querySelector(".properties .property-form") || document.querySelector(".properties"); const text = (el) => el.textContent || ""; const nodes = [...form.querySelectorAll("label, p.helper")]; const idx = (re) => nodes.findIndex((n) => re.test(text(n))); return { symbol: idx(/^Symbol/), helper: idx(/Mark a stop with a symbol/), type: idx(/^Stop type/) }; });
+      check("the line about symbols stands under Symbol, before Stop type", order.symbol >= 0 && order.helper > order.symbol && (order.type === -1 || order.helper < order.type), JSON.stringify(order));
+      await g4.getByRole("button", { name: "Settings" }).click(); await g4.waitForTimeout(400);
+      await g4.locator(".settings-nav-item", { hasText: /route types/i }).click(); await g4.waitForTimeout(300);
+      check("Route types says that a route from the start has the colour of its type, the rest of the routes their own", /only a route that is on the board from the start takes the colour of its type/.test(((await g4.locator('[role="dialog"]').textContent()) || "").replace(/\s+/g, " ")));
+      await g4.keyboard.press("Escape"); await g4.waitForTimeout(300);
+      await g4.getByRole("button", { name: "Map balance", exact: true }).click(); await g4.waitForTimeout(500);
+      const bal4 = ((await g4.locator(".balance-panel").textContent()) || "").replace(/\s+/g, " ");
+      check("Map balance sends the person to the right place for the wagon's size", /Settings → Board → Custom size → Real sizes/.test(bal4) || !/Settings → Map\b/.test(bal4));
+      await g4.keyboard.press("Escape"); await g4.waitForTimeout(300);
+      // A ticket file given to Map project says what it was.
+      const tf = path.join(os.tmpdir(), `ttr-tix82-${Date.now()}.json`);
+      const stopNames = await g4.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")).stops.slice(0, 2).map((x) => ({ id: x.id, name: x.name })));
+      fs.writeFileSync(tf, JSON.stringify({ format: "ticket-to-ride-map", version: 4, kind: "tickets", payload: { kind: "tickets", map: "x", sets: [{ id: "tx", label: "From a ticket file" }], tickets: [{ id: "t1", a: stopNames[0].id, b: stopNames[1].id, points: 5, set: "tx", aName: stopNames[0].name, bName: stopNames[1].name }] } }));
+      await g4.locator('input[type="file"][accept="application/json"]').setInputFiles(tf); await g4.waitForTimeout(800);
+      check("a ticket file opened as a map project says it holds tickets only and was added as decks", /That file holds tickets only/.test((await g4.locator("[data-sonner-toast]").allTextContents()).join(" ")), (await g4.locator("[data-sonner-toast]").allTextContents()).join(" | "));
+      fs.unlinkSync(tf);
+      await g4.keyboard.press("Escape"); await g4.waitForTimeout(300);
+      // Shapes start with no name: nothing is written on the map.
+      await g4.context().close();
+      const g5 = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
+      g5.on("pageerror", (e) => errors.push(String(e)));
+      await g5.goto(BASE, { waitUntil: "networkidle" });
+      await g5.getByRole("button", { name: "Start with a blank map" }).click(); await g5.waitForTimeout(500);
+      if (await g5.locator('[role="dialog"]').count()) { await g5.keyboard.press("Escape"); await g5.waitForTimeout(300); }
+      await g5.getByRole("button", { name: /Draw background/ }).click(); await g5.waitForTimeout(200);
+      await g5.locator(".background-tools select").selectOption({ label: "Rectangle" });
+      const c1 = await g5.evaluate(() => { const svg = document.querySelector(".map-canvas"); const r = svg.getBoundingClientRect(); return { x: r.left + r.width * 0.2, y: r.top + r.height * 0.3, x2: r.left + r.width * 0.4, y2: r.top + r.height * 0.5 }; });
+      await g5.mouse.move(c1.x, c1.y); await g5.mouse.down(); await g5.mouse.move(c1.x2, c1.y2, { steps: 5 }); await g5.mouse.up(); await g5.waitForTimeout(400);
+      const lastShape = await g5.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")).background.at(-1));
+      check("a rectangle starts with no name, so nothing is written on the map", lastShape && lastShape.label === "" && (await g5.locator(".property-form #background-label").getAttribute("placeholder")) === "Left empty, nothing is written on the map", JSON.stringify(lastShape && lastShape.label));
+      check("and the drawing tips say Ctrl/Cmd+Z", /Ctrl\/Cmd\+Z/.test((await g5.locator(".background-tips").textContent()) || ""));
+      await g5.context().close();
       const ph = await (await browser.newContext({ viewport: { width: 400, height: 820 }, hasTouch: true, isMobile: true })).newPage();
       ph.on("pageerror", (e) => errors.push(String(e)));
       await ph.goto(BASE, { waitUntil: "networkidle" });

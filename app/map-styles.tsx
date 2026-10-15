@@ -26,7 +26,7 @@ const kindMeta: Record<StyleKind, { label: string; blurb: string }> = {
   map: { label: "Map", blurb: "Basic map settings." },
   ticket: { label: "Deck rules", blurb: "The rules the editor follows when it builds a full deck of tickets on this map — ours, which are fixed, or a set of your own made from one of them — and where a ticket stops being short and starts being long, with how much of the deck belongs in each band." },
   stop: { label: "Stop types", blurb: "What each kind of stop looks like on the map." },
-  route: { label: "Route types", blurb: "Line thickness and dash pattern per type. Colour comes from each route, so types are told apart by shape." },
+  route: { label: "Route types", blurb: "Line thickness and dash pattern per type. Colour comes from each route, so types are told apart by shape; only a route that is on the board from the start takes the colour of its type." },
   defaults: { label: "Default object style", blurb: "The style the next stop or route you draw will get. These are settings for your pen, not for the map: changing them leaves everything already drawn exactly as it is." },
 };
 const styleKinds: StyleKind[] = ["stop", "route"];
