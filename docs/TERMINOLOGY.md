@@ -82,6 +82,7 @@ The editor speaks English. Swedish equivalents are given where the work is discu
 Words we have chosen not to use, each with the word to use instead.
 
 - `wagon slot`, use `wagon space`
+- `vehicle space`, use `wagon space`
 - `Suggest a deck`, use `Build a full deck of tickets`
 - `Saved locally`, use `Saved in this browser`
 - `minimap`, use `small map`

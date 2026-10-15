@@ -10,6 +10,21 @@ export type Release = { version: string; date: string; title: string; changes: s
 // the top of CHANGELOG.md under Unreleased, and become the notes of the next version when it is
 // decided; the What's new page in the editor shows released versions only.
 export const UNRELEASED: string[] = [
+  "A small board is called by its name, Small board, New York or Amsterdam and London, in the facts row and in the print dialog, and no longer Custom board 2×2.",
+  "Import > Map project asks before it replaces a map of your own. An unchanged example, the blank map or the map with problems is replaced without a question, also by Start over and in the welcome box.",
+  "Choosing a board that turns the map, such as New York, moves the names that end up on a route clear of it in the same step, as turning the board does, and Undo takes both back.",
+  "A new empty map no longer says it was exported minutes ago: the time of the last export belongs to the map, and a map opened from a file starts counting again.",
+  "Compare decks counts a ticket worth more or less than its path under Points off the path rule, which always said 0, and calls what it counts Near-duplicate pairs. The map with problems keeps the version it was exported with.",
+  "The deck dialog counts all the tickets of the deck under Now and says how many it leaves out of the other figures, says when a deck cannot be as big as asked, and shows no score that means nothing.",
+  "Reach, the longest regular ticket a style asks for, is said the same way in Ticket lengths, Deck rules and the deck dialog. The length groups are short, medium and far; long is kept for a ticket in the long deck.",
+  "Map balance says what a crowded route is, that it counts connections (a double route is one), that the busiest stop counts regular tickets, and which rules its figures are read with.",
+  "The welcome box, About and the menus use the same words for the small boards and the templates, a newer file says Reload the page, and the welcome video no longer covers its list.",
+  "On a phone the menu opens over an open panel, and the cells of the print table no longer run into each other.",
+  "Shapes in Draw background start with no name, so nothing is written on the map or in the print until you give one.",
+  "Every field, slider and tick box has a name for a screen reader, and the buttons of the welcome box are in the order Tab goes through them.",
+  "Smaller things: one stop, one route and one ticket in the singular, the lists of the stop tool fit their words, a message with a button is wide, Esc leaves the tools that pick two stops, and Delete works after a click on a button in Properties.",
+  "A stop name that is emptied becomes Unnamed stop, stops that share a name and double routes with lanes of different lengths are said in the side panel, and a deleted stop says how many routes went with it.",
+  "A ticket's points keep their number while the field is empty, the sliders of the background image are one step of Undo, the picture is named like the map file, and the deck that was open is open again after a reload.",
   "A map named with å, ä, ö or another letter with a mark, such as Örebro, keeps that letter in the name of an exported file (as a, a and o) and no longer starts it with a hyphen where the letter was.",
 ];
 
