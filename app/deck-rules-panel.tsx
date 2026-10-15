@@ -15,7 +15,7 @@ import { tensionOf, type DeckRuleSet, type MapData } from "./map-data";
 // Short enough to sit on one line above a field; how far a ticket reaches, as a share of reach.
 export const BIN_LABELS = ["< 30 %", "30–45 %", "45–60 %", "60–75 %", "75 %+"];
 // The same bands in words, for the deck rules: how far across the map a ticket reaches.
-const REACH_WORDS = ["less than 30 % of the way across the map", "30–45 % of the way across", "45–60 % of the way across", "60–75 % of the way across", "75 % of the way across or more"];
+const REACH_WORDS = ["under 30 % of reach", "30–45 % of reach", "45–60 % of reach", "60–75 % of reach", "75 % of reach or more"];
 const pct = (share: number) => Math.round(share * 1000) / 10;
 const clamp = (value: number, low: number, high: number) => Math.min(high, Math.max(low, value));
 const official = TICKET_SUGGESTER.official;
@@ -59,7 +59,7 @@ export function DeckRulesPanel({ data, change }: { data: MapData; change: (fn: (
     if (draft.deckRule === id) draft.deckRule = undefined;
     return draft;
   });
-  const why = chosen.id === "small" ? "this board is small, so it starts on the rules made from New York and Amsterdam" : "it is the average of the official maps";
+  const why = chosen.id === "small" ? "this board is small, so it starts on the rules made from New York and Amsterdam" : "it is the average of the seven classic official maps";
 
   return <div className="deck-rules">
     <fieldset className="deck-rule-list">
@@ -93,11 +93,11 @@ function FixedRuleValues({ rule }: { rule: DeckRule }) {
     <dl className="deck-rule-table">
       {row("Tickets per stop", String(rule.ticketsPerStop), `${official.perStop[0]}–${official.perStop[1]}`)}
       {row("Long deck, per stop", rule.longPerStop ? String(rule.longPerStop) : "none")}
-      <div key="lengths"><dt>How far the tickets reach</dt><dd><ul className="deck-rule-lengths">{rule.bins.map((share, index) => <li key={index}>{pct(share)} % of the tickets reach {REACH_WORDS[index]}</li>)}</ul><small>Across the map means its longest shortest path, from one end to the other.</small></dd></div>
+      <div key="lengths"><dt>How long the tickets are</dt><dd><ul className="deck-rule-lengths">{rule.bins.map((share, index) => <li key={index}>{pct(share)} % of the tickets are {REACH_WORDS[index]}</li>)}</ul><small>Reach is the longest regular ticket this style asks for: a share of a player&apos;s wagons ({pct(rule.lengthCap)} % of the wagons), not the length of the map.</small></dd></div>
       {row("Long tickets reach", rule.longRange ? `${pct(rule.longRange[0])}–${pct(rule.longRange[1])} % of reach` : "no separate long deck")}
-      {row("Extra points for the longest tickets", rule.bonusFrom === null ? "none: a ticket is worth its distance" : `+1 for a ticket reaching ${pct(rule.bonusFrom)} % of the way across the map or more, +2 for the single longest`)}
+      {row("Extra points for the longest tickets", rule.bonusFrom === null ? "none: a ticket is worth its distance" : `+1 for a ticket of ${pct(rule.bonusFrom)} % of reach or more, +2 for the single longest`)}
       {row("Longest regular ticket", `${pct(rule.lengthCap)} % of reach`, `${pct(official.lengthCap[0])}–${pct(official.lengthCap[1])} %`)}
-      {row("Most tickets at one stop", String(rule.maxPerStop), `${official.maxPerStop[0]}–${official.maxPerStop[1]}`)}
+      {row("Most tickets on one stop", String(rule.maxPerStop), `${official.maxPerStop[0]}–${official.maxPerStop[1]}`)}
       {row("Near-duplicate tickets", `${pct(rule.dupRate)} %`, `${official.dupPct[0]}–${official.dupPct[1]} %`)}
       {row("Where tickets start and end", rule.periphery === "relative" ? PERIPHERY.relative : PERIPHERY.point)}
     </dl>
@@ -123,7 +123,7 @@ function OwnRuleFields({ rule, onChange, onDelete }: { rule: DeckRule; onChange:
     <div className="deck-rule-fields">
       {number("rule-tickets-per-stop", "Tickets per stop", rule.ticketsPerStop, (value) => onChange({ ticketsPerStop: clamp(value, 0.05, 5) }), 0.05, `official ${official.perStop[0]}–${official.perStop[1]}`)}
       {number("rule-long-per-stop", "Long deck, per stop", rule.longPerStop, (value) => onChange({ longPerStop: clamp(value, 0, 2) }), 0.01)}
-      {number("rule-max-per-stop", "Most tickets at one stop", rule.maxPerStop, (value) => onChange({ maxPerStop: Math.max(1, Math.round(value)) }), 1, `official ${official.maxPerStop[0]}–${official.maxPerStop[1]}`)}
+      {number("rule-max-per-stop", "Most tickets on one stop", rule.maxPerStop, (value) => onChange({ maxPerStop: Math.max(1, Math.round(value)) }), 1, `official ${official.maxPerStop[0]}–${official.maxPerStop[1]}`)}
       {number("rule-length-cap", "Longest regular ticket, % of reach", pct(rule.lengthCap), (value) => onChange({ lengthCap: clamp(value, 1, 100) / 100 }), 1, `official ${pct(official.lengthCap[0])}–${pct(official.lengthCap[1])} %`)}
       {number("rule-dup-rate", "Near-duplicate tickets, %", pct(rule.dupRate), (value) => onChange({ dupRate: clamp(value, 0, 100) / 100 }), 0.5, `official ${official.dupPct[0]}–${official.dupPct[1]} %`)}
       {optionalPct("rule-bonus-from", "Bonus from, % of reach", rule.bonusFrom, (value) => onChange({ bonusFrom: value }))}
@@ -137,7 +137,7 @@ function OwnRuleFields({ rule, onChange, onDelete }: { rule: DeckRule; onChange:
       </div>
     </div>
     <Label>Lengths: share of the regular deck in each band</Label>
-    <small className="deck-rule-hint">Bands are how far a ticket reaches, as a share of reach: the longest ticket a player can build.</small>
+    <small className="deck-rule-hint">Bands are how long a ticket is, as a share of reach: the longest regular ticket this style asks for, a share of a player&apos;s wagons.</small>
     <div className="deck-rule-bins">
       {rule.bins.map((share, index) => <div key={index}>
         <Label htmlFor={`rule-bin-${index}`}>{BIN_LABELS[index]}</Label>

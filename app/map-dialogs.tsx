@@ -15,7 +15,7 @@ import { TicketLengths, type TicketLengthsView } from "./ticket-lengths";
 import { DeckCompare, type DeckCompareView } from "./deck-compare";
 import { TensionSlider } from "./tension-slider";
 import type { RebindGroup } from "./ticket-rebind";
-import { type DeckTension, BALANCE_OFFICIAL, balanceRangesFor, networkShape, SHAPE_OFFICIAL, colourRouteIds, compareWithClassics, CLASSIC_ROUTE_MAPS, type Bottleneck, dealtToFullTable, deckRuleFor, deckRules, TICKET_SUGGESTER, type TicketDeckReport, type TicketStyle, type SetupBalance, type TicketReview, type ColourLengthTable, type NetworkStats, type RouteSpacing, type RouteSuggestion } from "./map-analysis";
+import { type DeckTension, BALANCE_OFFICIAL, balanceRangesFor, networkShape, SHAPE_OFFICIAL, colourRouteIds, compareWithClassics, CLASSIC_ROUTE_MAPS, type Bottleneck, dealtToFullTable, defaultStyle, deckRuleFor, deckRules, TICKET_SUGGESTER, type TicketDeckReport, type TicketStyle, type SetupBalance, type TicketReview, type ColourLengthTable, type NetworkStats, type RouteSpacing, type RouteSuggestion } from "./map-analysis";
 
 // The tour on YouTube, as a picture with a play button until someone asks for it: nothing is loaded
 // from YouTube before then, so no cookie is set and no script runs for anyone who does not watch. The
@@ -390,6 +390,8 @@ export function SuggestTicketsDialog({ tension, onTension, open, onOpenChange, d
     <td>{label}</td><td>{now}</td><td>{next}</td><td className="suggest-range">{hint}</td>
   </tr>;
   const pct = (value: number) => `${value.toFixed(1)} %`;
+  // A deck that is far from every official deck has a score that means nothing as a number: it is said to be over 100.
+  const scoreText = (score: number) => (score > 100 ? "over 100" : score.toFixed(1));
   const mix = data.ticketMix ?? DEFAULT_TICKET_MIX;
   const mixShare = (r: TicketDeckReport) => {
     const total = r.mix.reduce((sum, count) => sum + count, 0);
@@ -448,6 +450,7 @@ export function SuggestTicketsDialog({ tension, onTension, open, onOpenChange, d
       <label className="checkbox-row"><input type="checkbox" checked={keepExisting} onChange={(event) => onKeepExisting(event.target.checked)} />Keep the tickets this deck already has</label>
 
       {report?.note && <p className="helper helper-warning">{report.note}</p>}
+      {suggestion && suggestion.tickets.length < deckSize && <p className="helper">Only {suggestion.tickets.length} different tickets could be made for this map, so that is the size of the deck, not {deckSize}.</p>}
 
       <div className={cn("analysis-table-scroll", busy && "suggest-busy")}><table className="analysis-table suggest-table">
         <thead><tr><th>Measure</th><th>Now</th><th>Suggested</th><th>Reference</th></tr></thead>
@@ -455,13 +458,13 @@ export function SuggestTicketsDialog({ tension, onTension, open, onOpenChange, d
           {row("Tickets", `${currentCounts.tickets}`, report ? `${report.regular + report.long}` : "—", `${rule.ticketsPerStop} per stop`)}
           {row("Long tickets", `${currentCounts.long}`, report ? `${report.long}` : "—", style === "europe" ? "Europe draws 6 of its 46 separately" : rule.longPerStop > 0 ? `a long deck of about ${rule.longPerStop} per stop` : "this style has no separate long deck")}
           {row("Tickets per stop", current.perStop.toFixed(2), report ? report.perStop.toFixed(2) : "—", range(official.perStop))}
-          {row("Reach", `${current.reach}`, report ? `${report.reach}` : "—", "the longest ticket a player can build")}
+          {row("Reach", `${current.reach}`, report ? `${report.reach}` : "—", `the longest regular ticket this style asks for: ${Math.round(rule.lengthCap * 100)} % of ${wagons} wagons`)}
           {row("Stops with no ticket", `${current.zeroStops}`, report ? `${report.zeroStops}` : "—", "USA 6, Europe 0")}
           {row("Most tickets on one stop", `${current.maxPerStop}`, report ? `${report.maxPerStop}` : "—", range(official.maxPerStop))}
           {row("Near-duplicates", pct(current.dupPct), report ? pct(report.dupPct) : "—", range(official.dupPct, " %"))}
           {row("Routes no ticket uses", pct(current.unusedPct), report ? pct(report.unusedPct) : "—", range(official.unusedPct, " %"))}
-          {row("Short / medium / long", mixShare(current), report ? mixShare(report) : "—", `aiming at ${mix.short} / ${mix.medium} / ${mix.long} %`)}
-          {row("Score", current.score.toFixed(1), report ? report.score.toFixed(1) : "—", "under 5 is official-like, over 10 is random")}
+          {row("Short / medium / far", mixShare(current), report ? mixShare(report) : "—", data.ticketMix ? `aiming at ${mix.short} / ${mix.medium} / ${mix.long} %, the map's own mix` : "no aim of its own: the deck follows the lengths of the style, shown below")}
+          {row("Score", scoreText(current.score), report ? scoreText(report.score) : "—", "under 5 is official-like, over 10 is random")}
         </tbody>
       </table></div>
 
@@ -493,20 +496,21 @@ export function SuggestTicketsDialog({ tension, onTension, open, onOpenChange, d
 // table. A fact, never a warning: outside the range says how the map differs, not that it is wrong.
 function OfficialFigures({ official, stats, setup, data }: { data: MapData; official: { players: number; crowded: number; connections: number; loadRatio: number | null; unusedPct: number; maxPerStop: number }; stats: NetworkStats; setup: SetupBalance }) {
   const ranges = balanceRangesFor(data);
+  const readRule = deckRuleFor(data, defaultStyle(data));
   const hubs = [...stats.hubDegree.values()];
   const hubMean = hubs.length ? hubs.reduce((sum, value) => sum + value, 0) / hubs.length : null;
   const span = ([low, high]: [number, number], unit = "") => `${low}–${high}${unit}`;
   const rows: [string, string, string][] = [
-    ["Crowded routes at a full table, as a share of all routes", official.connections === 0 ? "no routes" : `${Math.round(100 * official.crowded / official.connections)} % (${official.crowded} of ${official.connections} routes, at ${official.players} player${official.players === 1 ? "" : "s"})`, span(ranges.ranges.crowdedPct, " %")],
+    ["Crowded routes at a full table, as a share of all connections (a double route counts as one)", official.connections === 0 ? "no routes" : `${Math.round(100 * official.crowded / official.connections)} % (${official.crowded} of ${official.connections} connections, at ${official.players} player${official.players === 1 ? "" : "s"})`, span(ranges.ranges.crowdedPct, " %")],
     ["Double routes: their ticket traffic against single ones", official.loadRatio === null ? "no double routes" : `${official.loadRatio.toFixed(1)}×`, span(ranges.ranges.loadRatio, "×")],
     ["Routes no ticket needs", `${Math.round(official.unusedPct)} %`, span(ranges.ranges.unusedPct, " %")],
-    ["Most tickets on one stop", String(official.maxPerStop), span(ranges.ranges.maxPerStop)],
+    ["Most tickets on one stop (regular tickets, the long ones left out)", String(official.maxPerStop), span(ranges.ranges.maxPerStop)],
     ["Wagons at a full table, as a share of the spaces", setup.fill === null ? "no routes" : `${Math.round(100 * setup.fill)} % (${setup.table} × ${setup.wagonsPerPlayer} wagons for ${setup.usableSpaces} spaces)`, span(ranges.ranges.wagonFill, " %")],
     ["Average hub degree", hubMean === null ? "no stops" : hubMean.toFixed(1), span(ranges.ranges.hubDegree)],
   ];
   return <div className="analysis-section against-official">
     <h3>{ranges.small ? "Against the small official maps" : "Against the official maps"}</h3>
-    <p className="helper">This map beside what {ranges.source} measure, each with its own deck at a full table. Outside the range is not a fault: it says how this map differs.{ranges.small ? " With only two small maps measured the ranges are narrow, so a figure just outside them says little." : ""}</p>
+    <p className="helper">This map beside what {ranges.source} measure, each with its own deck at a full table. Outside the range is not a fault: it says how this map differs. The tickets of this map are read with the rules of {readRule.label}, which allow a ticket to be as long as {Math.round(readRule.lengthCap * 100)} % of the wagons ({data.wagonsPerPlayer ?? 45} each); with other rules some figures change.{ranges.small ? " With only two small maps measured the ranges are narrow, so a figure just outside them says little." : ""}</p>
     <div className="analysis-table-scroll"><table className="analysis-table official-table">
       <thead><tr><th>Figure</th><th>This map</th><th>{ranges.small ? "Small official maps" : "Official maps"}</th></tr></thead>
       <tbody>{rows.map(([label, here, range]) => <tr key={label}><td>{label}</td><td>{here}</td><td>{range}</td></tr>)}</tbody>

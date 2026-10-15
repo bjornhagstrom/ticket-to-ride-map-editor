@@ -226,11 +226,11 @@ export function SettingsDialog({ open, onOpenChange, target, onTarget, data, cha
             return <><DeckRulesPanel data={data} change={change} /><h4 className="deck-rules-subhead">Ticket lengths</h4><div className="ticket-mix">
               <div className="mix-fields">
                 {edge("mix-medium-edge", "Short up to · spaces", bands.medium, "medium")}
-                {edge("mix-long-edge", "Long from · spaces", bands.long, "long")}
+                {edge("mix-long-edge", "Far from · spaces", bands.long, "long")}
               </div>
               <p className="helper">{diameter < 2
                 ? "Draw some routes first: the boundaries are counted against the longest journey on the map, and there is not one yet."
-                : `Counted in wagon spaces along the shortest route between two stops. The longest journey on this map is ${diameter} spaces, so a ticket of ${cuts.medium} spaces or fewer is short, one of ${cuts.long} or more is long, and the rest are medium.`}</p>
+                : `Counted in wagon spaces along the shortest route between two stops. The longest journey on this map is ${diameter} spaces, so a ticket of ${cuts.medium} spaces or fewer is short, one of ${cuts.long} or more is far, and the rest are medium. (A ticket marked long is another thing: it belongs to a separate long deck.)`}</p>
               <p className="helper">Kept as a share of that longest journey rather than as a fixed number, so the same mix means the same thing if you change the board size or follow another map. That is also how the official decks were measured.</p>
 
               <div className="mix-fields">

@@ -3728,7 +3728,7 @@ const sectionStart = (n) => {
     await bp.getByRole("radio", { name: "Classic", exact: true }).check();
     await bp.waitForTimeout(300);
     const rules = (await bp.locator(".deck-rule-values").textContent()).replace(/\s+/g, " ");
-    check("ticket lengths are said in words: how many of the tickets reach how far across the map", /of the tickets/i.test(rules) && /across the map/i.test(rules) && !/% < 30 %/.test(rules), rules.slice(0, 300));
+    check("ticket lengths are said in words: how many of the tickets are how long, as a share of reach", /of the tickets/i.test(rules) && /of reach/i.test(rules) && !/across the map/i.test(rules) && !/% < 30 %/.test(rules), rules.slice(0, 300));
     check("the bonus says what it is: extra points for the longest tickets, +1 and +2", /Extra points for the longest tickets/.test(rules) && /\+1/.test(rules) && /\+2/.test(rules), rules.slice(0, 400));
     await bp.keyboard.press("Escape");
     // A new map starts with the playtest box, in its top right corner.
@@ -3960,7 +3960,7 @@ const sectionStart = (n) => {
     check("the wagon count is one of them: this map's share beside 57–76 %", wagonRow && /\d+ %/.test(wagonRow[1]) && /3 × 28 wagons for 95 spaces/.test(wagonRow[1]) && wagonRow[2] === "57–76 %", JSON.stringify(wagonRow));
     check("each with this map's figure and the official range", rows.every((r) => r.length === 3 && r[1] !== "" && /\d.*–.*\d/.test(r[2])), JSON.stringify(rows));
     const crowdedRow = rows.find((r) => /^Crowded routes/.test(r[0])) || [];
-    check("crowding is a share of the routes, since a count grows with the size of the map", /as a share of all routes/.test(crowdedRow[0] || "") && /^\d+ % \(\d+ of \d+ routes, at \d players?\)$/.test(crowdedRow[1] || "") && /^\d+–\d+ %$/.test(crowdedRow[2] || ""), JSON.stringify(crowdedRow));
+    check("crowding is a share of the connections, since a count grows with the size of the map", /as a share of all connections/.test(crowdedRow[0] || "") && /^\d+ % \(\d+ of \d+ connections, at \d players?\)$/.test(crowdedRow[1] || "") && /^\d+–\d+ %$/.test(crowdedRow[2] || ""), JSON.stringify(crowdedRow));
     check("and nothing in it is a warning", (await section.locator(".has-warning, .helper-warning, .analysis-warning-row").count()) === 0);
     check("the hub degree advice is the official range, not a guess", !/roughly 4–6/.test(await ob.locator("body").textContent()));
     await ob.context().close();
@@ -5878,6 +5878,39 @@ const sectionStart = (n) => {
         check(`the welcome box at ${w} px: the video does not lie over the list`, lay.steps >= lay.video - 1, JSON.stringify(lay));
         await wp2.context().close();
       }
+      // Group 3: the same words and numbers wherever they stand.
+      const g3 = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
+      g3.on("pageerror", (e) => errors.push(String(e)));
+      await g3.goto(BASE, { waitUntil: "networkidle" });
+      await g3.getByRole("button", { name: "Load the example map" }).click(); await g3.waitForTimeout(600);
+      await g3.getByRole("button", { name: "Map balance", exact: true }).click(); await g3.waitForTimeout(500);
+      const balText = ((await g3.locator(".balance-panel").textContent()) || "").replace(/\s+/g, " ");
+      check("Map balance counts connections and says that a double route is one", /as a share of all connections \(a double route counts as one\)/.test(balText) && /\d+ of \d+ connections/.test(balText), balText.slice(0, 120));
+      check("it says the busiest stop is counted in regular tickets", /Most tickets on one stop \(regular tickets, the long ones left out\)/.test(balText));
+      check("and which rules the tickets are read with, and how long a ticket may be under them", /read with the rules of [A-Za-z ]+, which allow a ticket to be as long as \d+ % of the wagons/.test(balText), balText.slice(0, 300));
+      check("Ticket lengths says what reach is and where it comes from", /as a share of reach: the longest regular ticket this style asks for \(\d+ wagon spaces, \d+ % of \d+ wagons\)/.test(balText), balText.slice(balText.indexOf("Ticket lengths"), balText.indexOf("Ticket lengths") + 260));
+      check("and leaves out the tickets longer than reach in those words", !/longer than a player can build/.test(balText));
+      await g3.keyboard.press("Escape"); await g3.waitForTimeout(300);
+      await g3.getByRole("button", { name: "Settings" }).click(); await g3.waitForTimeout(400);
+      await g3.locator(".settings-nav-item", { hasText: /deck rules/i }).click(); await g3.waitForTimeout(400);
+      const rulesText = ((await g3.locator(".deck-rules").textContent()) || "").replace(/\s+/g, " ");
+      check("Deck rules measures the lengths in reach too, and no longer says across the map", /of reach/.test(rulesText) && !/Across the map means/.test(rulesText) && /Reach is the longest regular ticket this style asks for/.test(rulesText), rulesText.slice(0, 160));
+      check("and says Most tickets on one stop, as everywhere", /Most tickets on one stop/.test(rulesText) && !/Most tickets at one stop/.test(rulesText));
+      const settingsText = ((await g3.locator('[role="dialog"]').textContent()) || "").replace(/\s+/g, " ");
+      check("the length groups are short, medium and far, and a long ticket is another thing", /Far from · spaces/.test(settingsText) && /is far/.test(settingsText) && /A ticket marked long is another thing/.test(settingsText));
+      await g3.keyboard.press("Escape"); await g3.waitForTimeout(300);
+      await g3.getByRole("button", { name: "Tickets", exact: true }).click(); await g3.waitForTimeout(400);
+      await g3.getByRole("button", { name: /Add a deck/ }).click(); await g3.waitForTimeout(250);
+      await g3.getByRole("menuitem", { name: /Build a full deck of tickets/ }).click(); await g3.waitForSelector(".suggest-dialog", { timeout: 20000 }); await g3.waitForTimeout(400);
+      const dlg = ((await g3.locator(".suggest-dialog").textContent()) || "").replace(/\s+/g, " ");
+      check("the deck dialog names the groups short / medium / far, and says what reach is", /Short \/ medium \/ far/.test(dlg) && /the longest regular ticket this style asks for: \d+ % of \d+ wagons/.test(dlg), dlg.slice(dlg.indexOf("Reach") - 20, dlg.indexOf("Reach") + 120));
+      check("the average of seven is the seven classic maps", /seven classic official maps/.test(dlg));
+      await g3.locator("#suggest-size").fill("999"); await g3.waitForTimeout(2500);
+      const big = ((await g3.locator(".suggest-dialog").textContent()) || "").replace(/\s+/g, " ");
+      check("999 tickets are said to be more than the map has, with the size the deck got", /Only \d+ different tickets could be made for this map, so that is the size of the deck, not 999/.test(big), big.slice(big.indexOf("Only"), big.indexOf("Only") + 120));
+      check("and a score that means nothing is not printed as a number", !/\b\d{3,}\.\d\b/.test(((await g3.locator(".suggest-table tr", { hasText: "Score" }).first().textContent()) || "")));
+      await g3.keyboard.press("Escape"); await g3.waitForTimeout(300);
+      await g3.context().close();
       const ph = await (await browser.newContext({ viewport: { width: 400, height: 820 }, hasTouch: true, isMobile: true })).newPage();
       ph.on("pageerror", (e) => errors.push(String(e)));
       await ph.goto(BASE, { waitUntil: "networkidle" });

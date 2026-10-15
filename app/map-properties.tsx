@@ -206,10 +206,10 @@ export function TicketCoveragePanel({ rows, deck, cuts, sort, onSort, onlyUncove
   </th>;
 
   return <div className="coverage-panel">
-    <p className="helper">Tickets in {deck}, counted at both ends. On this map short is up to {cuts.medium} wagon spaces, medium up to {cuts.long}, long beyond that. A ticket nobody can complete has no length and lands in none of the three. <button type="button" className="mix-link" onClick={onEditMix}>Change the lengths</button></p>
+    <p className="helper">Tickets in {deck}, counted at both ends. On this map short is up to {cuts.medium} wagon spaces, medium up to {cuts.long}, far beyond that. A ticket nobody can complete has no length and lands in none of the three. <button type="button" className="mix-link" onClick={onEditMix}>Change the lengths</button></p>
     <label className="checkbox-row"><input type="checkbox" checked={onlyUncovered} onChange={(event) => onOnlyUncovered(event.target.checked)} />Only stops with no tickets</label>
     <div className="coverage-scroll"><table className="coverage-table">
-      <thead><tr>{head("stop", "Stop")}{head("short", "S", `Short tickets — up to ${cuts.medium} wagon spaces`)}{head("medium", "M", `Medium tickets — up to ${cuts.long} wagon spaces`)}{head("long", "L", `Long tickets — beyond ${cuts.long} wagon spaces`)}</tr></thead>
+      <thead><tr>{head("stop", "Stop")}{head("short", "S", `Short tickets — up to ${cuts.medium} wagon spaces`)}{head("medium", "M", `Medium tickets — up to ${cuts.long} wagon spaces`)}{head("long", "F", `Far tickets — beyond ${cuts.long} wagon spaces`)}</tr></thead>
       <tbody>{shown.map((row) => <tr key={row.stop.id} className={cn(row.total === 0 && "coverage-empty")}>
         <td><button type="button" className="coverage-stop" disabled={row.total === 0} onClick={() => onOpen(row.stop.id)}>{row.stop.name}</button></td>
         {ticketBands.map((band) => <td key={band}>{row[band] > 0

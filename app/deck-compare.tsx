@@ -27,9 +27,9 @@ const groups: { title: string; rows: Row[] }[] = [
     { id: "shortest", label: "Shortest", get: (f) => f.shortest },
     { id: "median", label: "Median", get: (f) => f.median },
     { id: "longest", label: "Longest", get: (f) => f.longest },
-    { id: "mix-short", label: "Short", get: (f) => f.mix?.[0] ?? null, unit: "%" },
-    { id: "mix-medium", label: "Medium", get: (f) => f.mix?.[1] ?? null, unit: "%" },
-    { id: "mix-long", label: "Long", get: (f) => f.mix?.[2] ?? null, unit: "%" },
+    { id: "mix-short", label: "Share short", get: (f) => f.mix?.[0] ?? null, unit: "%" },
+    { id: "mix-medium", label: "Share medium", get: (f) => f.mix?.[1] ?? null, unit: "%" },
+    { id: "mix-long", label: "Share far", get: (f) => f.mix?.[2] ?? null, unit: "%" },
     ...BIN_LABELS.map((label, index): Row => ({ id: `bin-${index}`, label: `Reach ${label}`, get: (f) => f.bins?.[index] ?? null, unit: "%" })),
   ] },
   { title: "How it lies on the map", rows: [

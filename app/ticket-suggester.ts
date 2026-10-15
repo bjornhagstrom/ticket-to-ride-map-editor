@@ -23,7 +23,7 @@ export const TICKET_SUGGESTER = {
     // against the USA-only targets, several official decks came out worse than random decks.
     generic: {
       label: "Generic",
-      blurb: "The average of seven official maps, and the safest start for a map of your own.",
+      blurb: "The average of the seven classic official maps (the eight complete ones without Europe, which has a long deck), and the safest start for a map of your own.",
       lengths: "A spread with few very short tickets: most sit between a third and half of what a player can build.",
       deck: "About 1.1 tickets per stop, all in one deck.",
       after: "Long tickets reach the edges of the map and short ones stay nearer the middle, but only the wrong side counts against a deck.",

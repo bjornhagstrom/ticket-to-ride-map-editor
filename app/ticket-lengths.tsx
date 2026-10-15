@@ -13,6 +13,8 @@ export type TicketLengthsView = {
   official: number[];
   /** What the reference is: the official decks, or on the small boards' rules the two small official maps. */
   officialLabel?: string;
+  /** Where reach comes from, for the line above the bars: the share of a player's wagons the style allows. */
+  reachWhy?: string;
   own: { label: string; bins: number[] } | null;
 };
 
@@ -32,7 +34,7 @@ export function TicketLengths({ view }: { view: TicketLengthsView }) {
   return <div className="analysis-section ticket-lengths">
     <h3>Ticket lengths</h3>
     {regular === 0 ? <p className="helper">No regular tickets in this deck yet.</p> : <>
-      <p className="helper">How the {regular} regular tickets spread over how far they reach, as a share of the longest ticket a player can build{reach ? ` (${reach} wagon spaces)` : ""}.</p>
+      <p className="helper">How the {regular} regular tickets spread over how long they are, as a share of reach: the longest regular ticket this style asks for{reach ? ` (${reach} wagon spaces${view.reachWhy ? `, ${view.reachWhy}` : ""})` : ""}.</p>
       <div className="length-legend" aria-hidden="true">
         <span><i className="length-key deck" />This deck</span>
         <span><i className="length-key official" />{officialName}</span>
@@ -50,7 +52,7 @@ export function TicketLengths({ view }: { view: TicketLengthsView }) {
         </div>)}
       </div>
       {(skipped > 0 || long > 0) && <p className="helper length-excluded" data-skipped={skipped} data-long={long}>
-        {skipped > 0 && `${skipped} ticket${skipped === 1 ? " is" : "s are"} not in the bars: longer than a player can build with their wagons, or to a stop nothing reaches.`}{skipped > 0 && long > 0 ? " " : ""}{long > 0 && `${long} long ticket${long === 1 ? " is" : "s are"} kept apart from them.`}
+        {skipped > 0 && `${skipped} ticket${skipped === 1 ? " is" : "s are"} not in the bars: longer than reach, or to a stop nothing reaches.`}{skipped > 0 && long > 0 ? " " : ""}{long > 0 && `${long} long ticket${long === 1 ? " is" : "s are"} kept apart from them.`}
       </p>}
       <p className="helper length-verdict">{gapSentence(officialName === "Official decks" ? "the official decks" : "the small official maps", counts, regular, official)}{own ? ` ${gapSentence(own.label, counts, regular, own.bins)}` : ""}</p>
     </>}

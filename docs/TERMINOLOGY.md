@@ -34,6 +34,10 @@ The editor speaks English. Swedish equivalents are given where the work is discu
 | **deck** | A set of tickets. A map can hold several decks side by side. | lek, biljettlek |
 | **long deck** | The separate deck of long tickets some maps have, as Europe does. | lång lek |
 | **Build a full deck of tickets** | The editor building a whole deck for the map, under rules taken from the official decks. Inside the code and the technical docs it is the *suggester*. | bygg en hel lek |
+| **reach** | The longest regular ticket a deck style asks for, in wagon spaces: a share of a player's wagons (47 % on Generic, 60 % on Small boards), not the length of the map. Tickets longer than reach are left out of the length figures and said to be. Where it is used as a measure (the five bands of Ticket lengths, the Deck rules) it is said to be *of reach*. | räckvidd |
+| **short / medium / far** | The three length groups of the ticket mix, counted against the longest journey on the map (Settings → Deck rules → Ticket lengths). *Far*, not *long*: **long** is kept for a ticket marked long, in the long deck. The spreadsheet and the file keep their own word, `long`. | kort / medel / långt |
+| **near-duplicate** | Two tickets of about the same length where one costs at most one wagon more once the other is built (Compare decks counts these as *Near-duplicate pairs*). It is not two tickets with the same stops. | nästan-dubblett |
+| **official maps** | Fifteen official maps are transcribed; eight of them are complete and give the ranges (*the official maps*); seven of those, all but Europe, are the *classic maps* the deck rules *Generic* are the average of; New York and Amsterdam are the *small official maps*, for small boards. Say which when a number is quoted. | officiella kartor |
 | **score** | How a deck measures up against the official decks: lower is better. Only decks have a score; a ticket has points. | poängtal (för en lek) |
 | **ticket card** | A ticket as printed, to cut out, with a **small map** of the board on it. | biljettkort |
 
@@ -43,7 +47,8 @@ The editor speaks English. Swedish equivalents are given where the work is discu
 | --- | --- | --- |
 | **Map balance** | The panel that reads the network and the deck: colours, lengths, crowding. | kartbalans |
 | **crossing** | Two routes passing over each other without meeting at a stop. | korsning |
-| **crowded route** | A route more tickets want than it can carry at a given table. | trång rutt |
+| **crowded route** | A route that stands out at a given table: among the busiest tenth of routes with at least three tickets, or at twice the average load for the lanes a player may use. | trång rutt |
+| **connection** | The count Map balance uses for routes: all lanes between the same two stops are one (a double route is one connection), so it can be fewer than the routes in the facts row. | förbindelse |
 | **dead end** | A stop on one route only: one way in. Character, as Edinburgh is on Europe. | återvändsgränd |
 | **route that cuts the map in two** | A route whose loss splits the network. With one lane it is warned about (a single claim shuts part of the map off; no official map has one); as a double route it is described. | rutt som delar kartan |
 | **corner** | Two or more stops reached only through one or two **gates**, as Iberia is through Pamplona and Marseille. Character, not a fault. | hörn |
