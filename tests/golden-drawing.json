@@ -12,15 +12,15 @@
   "length": 57643
  },
  "problem map on 2×3 lying": {
-  "hash": "3c15931ae372bfa79b2b82f8fd5fafbcaf52ce1ce3380e7854e16922c34ab03c",
-  "length": 62833
+  "hash": "1feca646bf707201cb1ddbd4c6f079896c0a92b14fdd6cc58d6643c250fcc8c5",
+  "length": 62900
  },
  "problem map on 3×4 standing": {
-  "hash": "4799a691fab9939eef392aed39b2148d8f60fecea2f86f084e3023bdaa4d7b2b",
-  "length": 62834
+  "hash": "49bba3acf630833503d09139976b2f5d0e3b662812bf12f7ca9010a0c6f58baf",
+  "length": 62901
  },
  "problem map with every optional field on 2×3": {
-  "hash": "39b3644c0e0d5cff60717466b49169026a97aa4c3d3994ca6493272cb161cbaa",
-  "length": 62948
+  "hash": "9e1b2e8bad8176097f91c00fe6b1339dff4bf10dc30dd523617bc625a7b9094d",
+  "length": 63015
  }
 }

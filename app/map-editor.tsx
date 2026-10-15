@@ -25,13 +25,14 @@ import { type DeckCompareView } from "./deck-compare";
 import { DEFAULT_PRINT_CHOICE, isSafari, PRINT_CHOICE_KEY, PRINT_PROFILES, type PrintChoice, type PrintProfile, printPlan } from "./print-plan";
 import { useTicketSuggestion } from "./use-ticket-suggestion";
 import { SettingsDialog, type StyleTarget } from "./map-styles";
-import { balanceRangesFor, connectionCount, fittingLength, bandsOf, bandCuts, mapDiameter, deckFigures, defaultStyle, deckRuleFor, TICKET_SUGGESTER, evaluateTicketDeck, suggestedDeckSize, ticketEndStopCount, type TicketStyle, autoPlaceLabels, turnAndTidy, labelledStops, setupBalance, stopCoverage, ticketBand, type TicketBand, reviewTickets, ticketPointsPerSpace, ticketCoverage, type RouteSuggestion, labelCovers, labelAngleOptions, routeSamplePoints, colourLengthTable, crossings as crossingList, networkShape, SHAPE_OFFICIAL, buildAdjacency, networkStats, routeSpacing, shortestPath, suggestRoutes } from "./map-analysis";
+import { isUnchangedBuiltIn } from "./built-in-maps";
+import { balanceRangesFor, connectionCount, fittingLength, bandsOf, bandCuts, mapDiameter, deckFigures, defaultStyle, deckRuleFor, TICKET_SUGGESTER, evaluateTicketDeck, suggestedDeckSize, ticketEndStopCount, type TicketStyle, autoPlaceLabels, turnAndTidy, tidyNames, labelledStops, setupBalance, stopCoverage, ticketBand, type TicketBand, reviewTickets, ticketPointsPerSpace, ticketCoverage, type RouteSuggestion, labelCovers, labelAngleOptions, routeSamplePoints, colourLengthTable, crossings as crossingList, networkShape, SHAPE_OFFICIAL, buildAdjacency, networkStats, routeSpacing, shortestPath, suggestRoutes } from "./map-analysis";
 import { canvasPoint, canvasPointRaw, pointsFor, samePair, stopById } from "./map-geometry";
 import { dragShape, translateShape, circlePoints, rectanglePoints, insertNextTo, shapeAt } from "./background-shapes";
 import { REPO_URL, newerEditor } from "./version";
 import { RouteLogo } from "./logo";
-import { ACTION_GAP_MS, countChange, EXPORT_REMINDER_KEY, exportAge, exported, freshReminder, isDue, isLastStep, later, lessOften, readReminder, stop as stopReminding, turnOn, type ExportReminder } from "./export-reminder";
-import { boardOf, type Orientation } from "./board";
+import { ACTION_GAP_MS, countChange, EXPORT_REMINDER_KEY, exportAge, exported, forNewMap, freshReminder, isDue, isLastStep, later, lessOften, readReminder, stop as stopReminding, turnOn, type ExportReminder } from "./export-reminder";
+import { boardOf, orientationOf, type Orientation } from "./board";
 import { distancesCsv, routesCsv, stopsCsv, templatesZip, ticketsCsv } from "./csv-export";
 import { decodeCsvBytes, readCsvImport, type CsvImport } from "./csv-import";
 import { planRebind, applyRebind, stopKeyOf, type RebindGroup } from "./ticket-rebind";
@@ -43,8 +44,8 @@ const TEXT_INPUT_TYPES = new Set(["text", "number", "search", "email", "url", "t
 const COALESCE_MS = 1200;
 // What the Object box of Draw background offers: the three kinds the file has, and a rectangle and a circle, which are drawn by dragging and kept as areas.
 type BackgroundDraw = BackgroundType | "rectangle" | "circle";
-type Danger = "reset" | "delete" | "load-blank" | "load-example" | "load-problems" | "import-background" | "import-network" | "import-image" | "import-csv" | null;
-type PendingImport = { kind: "background"; background: BackgroundShape[]; backgroundImage?: BackgroundImage } | { kind: "network"; stops: Stop[]; routes: Route[]; lineStyles: LineStyle[]; routeTypeStyles: RouteTypeStyle[]; stopTypeStyles: StopTypeStyle[]; wagonStyles: WagonStyle[]; tickets: Ticket[] } | { kind: "image"; image: BackgroundImage } | { kind: "csv"; result: CsvImport };
+type Danger = "import-map" | "reset" | "delete" | "load-blank" | "load-example" | "load-problems" | "import-background" | "import-network" | "import-image" | "import-csv" | null;
+type PendingImport = { kind: "background"; background: BackgroundShape[]; backgroundImage?: BackgroundImage } | { kind: "network"; stops: Stop[]; routes: Route[]; lineStyles: LineStyle[]; routeTypeStyles: RouteTypeStyle[]; stopTypeStyles: StopTypeStyle[]; wagonStyles: WagonStyle[]; tickets: Ticket[] } | { kind: "map"; map: MapData } | { kind: "image"; image: BackgroundImage } | { kind: "csv"; result: CsvImport };
 // Snapshots are geometry-only (see cloneForHistory), so a deep stack stays in the low megabytes
 // even for a large map. Kept in memory for the session only, never written to local storage.
 
@@ -496,7 +497,7 @@ export function MapEditor() {
   // Crowding is read at a table the designer chooses, inside the range the map is built for.
   const playerRange = data.players ?? DEFAULT_PLAYERS;
   const atTable = Math.min(playerRange.max, Math.max(playerRange.min, bottleneckTable ?? playerRange.max));
-  const deckReport = useMemo(() => evaluateTicketDeck(data, { setId: activeTicketSet.id, atTable }), [data, activeTicketSet.id, atTable]);
+  const deckReport = useMemo(() => evaluateTicketDeck(data, { setId: activeTicketSet.id, atTable, pointsAudit: true }), [data, activeTicketSet.id, atTable]);
   // The figures set against the official maps are read at a full table, whatever table the crowding
   // section is looking at.
   const fullTableReport = useMemo(() => (atTable === playerRange.max ? deckReport : evaluateTicketDeck(data, { setId: activeTicketSet.id, atTable: playerRange.max })), [atTable, playerRange.max, deckReport, data, activeTicketSet.id]);
@@ -519,7 +520,7 @@ export function MapEditor() {
       otherId: compareOtherId,
       onOther: setCompareSetId,
       a: { label: activeTicketSet.label, figures: deckFigures(data, activeTicketSet.id, deckReport) },
-      b: { label: other.label, figures: deckFigures(data, other.id, evaluateTicketDeck(data, { setId: other.id, atTable })) },
+      b: { label: other.label, figures: deckFigures(data, other.id, evaluateTicketDeck(data, { setId: other.id, atTable, pointsAudit: true })) },
     };
   }, [showTickets, data, activeTicketSet, compareOtherId, deckReport, atTable]);
   const suggestDefaultSize = useMemo(() => {
@@ -800,10 +801,12 @@ export function MapEditor() {
   }, [printRequest]);
 
   // The playtest box a new map starts with is not work of its own: a map with only that is still empty.
-  const hasContent = data.stops.length > 0 || data.routes.length > 0 || data.background.length > 0 || data.notes.some((note) => note.kind !== "playtest") || Boolean(data.backgroundImage);
+  // Something that would be lost by replacing the map: not nothing, and not one of the editor's own maps as it came.
+  const hasContent = !isUnchangedBuiltIn(data) && (data.stops.length > 0 || data.routes.length > 0 || data.background.length > 0 || data.notes.some((note) => note.kind !== "playtest") || Boolean(data.backgroundImage));
   const dismissGuide = () => { try { localStorage.setItem(GUIDE_SEEN_KEY, "1"); } catch { /* ignore unavailable storage */ } setShowGuide(false); };
   const applyGuideChoice = (map: MapData) => {
     change(() => cloneMap(map));
+    setReminder(forNewMap);
     clearSelection();
     setDraftPoints([]);
     leaveDrawTool();
@@ -1146,6 +1149,13 @@ export function MapEditor() {
     if (result.data !== data) setData(result.data);
     setPrintRequest((count) => count + 1);
   };
+  // A map opened from a file: it is safe in that file, so counting changes starts again; and it is another map, so the last export was not its own.
+  const applyMapImport = (incoming: MapData) => {
+    change(() => incoming);
+    setReminder(forNewMap);
+    clearSelection(); setDanger(null); setPendingImport(null);
+  };
+  const startOver = () => { change(() => cloneMap(emptyMap)); setReminder(forNewMap); clearSelection(); setDanger(null); };
   const applyBackgroundImport = (background: BackgroundShape[], backgroundImage?: BackgroundImage) => { change((draft) => ({ ...draft, background, backgroundImage })); clearSelection(); setDanger(null); setPendingImport(null); };
   const applyNetworkImport = (stops: Stop[], routes: Route[], lineStyles: LineStyle[], routeTypeStyles: RouteTypeStyle[], stopTypeStyles: StopTypeStyle[], wagonStyles: WagonStyle[], tickets: Ticket[]) => {
     change((draft) => {
@@ -1252,10 +1262,8 @@ export function MapEditor() {
         // An older copy of this same map would hand out numbers already on paper: say so, and suggest a name.
         const older = olderCopyWarning(data, incoming);
         if (older) toast.warning(older, { duration: 20000 });
-        change(() => incoming);
-        // A whole map opened from a file is safe in that file: counting starts again.
-        setReminder((r) => ({ ...r, changes: 0, nextAt: r.nextAt - r.changes }));
-        clearSelection();
+        if (hasContent) { setPendingImport({ kind: "map", map: incoming }); setDanger("import-map"); return; }
+        applyMapImport(incoming);
       } catch (error) {
         // A file from a newer build says so in its own words; anything else is simply not ours.
         // A file from a newer build, or one that holds no map, says so in its own words; a file that is
@@ -1291,13 +1299,22 @@ export function MapEditor() {
     if (turned.unresolved.length) toast.warning(`${turned.unresolved.length} name${turned.unresolved.length === 1 ? " is" : "s are"} still on a route after the turn: ${turned.unresolved.map((id) => stopById(data, id)?.name).filter(Boolean).slice(0, 4).join(", ")}${turned.unresolved.length > 4 ? ` and ${turned.unresolved.length - 4} more` : ""}. Use Move names clear, or move the stop or bend the route.`);
   };
   // A board from the list in Settings, or the odd one from Custom size: one step, and what is on the map moves with it.
+  // A board that turns the map (standing instead of lying, or the other way) moves the names that end up on a route clear of it in the same step, as turning the board does; Undo takes both back.
+  const changeBoard = (make: (draft: MapData) => MapData) => {
+    const next = make(cloneMap(data));
+    const turned = orientationOf(next) !== orientationOf(data);
+    const tidied = turned ? tidyNames(next) : { data: next, moved: 0, unresolved: [] as string[] };
+    change(() => tidied.data); setDraftPoints([]); clearSelection();
+    if (tidied.moved) toast.success(`Moved ${tidied.moved} name${tidied.moved === 1 ? "" : "s"} clear of the routes after the board was turned.`);
+    if (tidied.unresolved.length) toast.warning(`${tidied.unresolved.length} name${tidied.unresolved.length === 1 ? " is" : "s are"} still on a route: ${tidied.unresolved.map((id) => stopById(next, id)?.name).filter(Boolean).slice(0, 4).join(", ")}. Move the stop or bend the route.`);
+  };
   const choosePreset = (id: string) => {
     const game = gameForPreset(data, id);
-    change((draft) => applyBoardPreset(draft, id)); setDraftPoints([]); clearSelection();
+    changeBoard((draft) => applyBoardPreset(draft, id));
     // The board brings its game with it; say so, so the numbers in Settings are not a surprise.
     if (game) toast.info(`The game follows the board: ${game.wagonsPerPlayer} wagons a player${game.players ? `, ${game.players.min} to ${game.players.max} players` : ", the standard table"}. You can change it in Settings.`);
   };
-  const applyBoardChoice = (choice: BoardChoice) => { change((draft) => applyBoard(draft, choice)); setDraftPoints([]); clearSelection(); };
+  const applyBoardChoice = (choice: BoardChoice) => { changeBoard((draft) => applyBoard(draft, choice)); };
 
   // Help on hover waits a moment, and each one waits afresh: the pointer passing over the tools on its
   // way somewhere opens nothing, and resting on one opens its help.
@@ -1438,7 +1455,7 @@ export function MapEditor() {
         </div>
       </nav>
     </div>
-    <AlertDialog open={danger !== null} onOpenChange={(open) => { if (!open) { setDanger(null); setPendingImport(null); } }}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{danger === "reset" ? "Start over with an empty map?" : danger === "load-blank" ? "Replace the current map with a blank one?" : danger === "load-example" ? "Replace the current map with the example?" : danger === "load-problems" ? "Replace the current map with the example with problems?" : danger === "import-background" ? "Replace the background?" : danger === "import-network" ? "Replace stops and routes?" : danger === "import-image" ? "Replace the background image?" : danger === "import-csv" ? "Replace stops and routes?" : (selectedStop && data.stops.find((stop) => stop.id === selectedStop) ? `Delete ${data.stops.find((stop) => stop.id === selectedStop)!.name}?` : "Delete the selected object?")}</AlertDialogTitle><AlertDialogDescription asChild><div>{danger === "reset" ? "Everything on this map is removed from this browser: its stops, routes, tickets and decks, rules, notes and background. An empty map takes its place. Undo brings it back until you close the page; export first to keep a copy." : danger === "load-blank" ? "Your current background objects, stops and routes will be replaced with a blank map. Export the map first if you want to keep your work." : danger === "load-example" ? "Your current background objects, stops and routes will be replaced with the neutral example map. Export the map first if you want to keep your work." : danger === "load-problems" ? "Your current background objects, stops and routes will be replaced with the example map that has two problems on purpose, a crossing and a dead end, to show how the warnings look. Export the map first if you want to keep your work." : danger === "import-background" ? "The imported background, including any background image, will replace the current one. Stops and routes are kept as they are." : danger === "import-network" ? "The imported stops and routes will replace the current network, and any tickets in the file replace the deck you are working in. Background objects are kept as they are." : danger === "import-image" ? "The new image will replace the current background image." : danger === "import-csv" ? "The stops and routes in the spreadsheet will replace the current network. Tickets in it arrive as new decks, beside the ones you have. Background objects are kept as they are." : selectedStop ? <StopDeletionList data={data} stopId={selectedStop} /> : "The selected object will be deleted."}</div></AlertDialogDescription></AlertDialogHeader><AlertDialogFooter>{danger === "reset" && <Button variant="outline" onClick={exportMap}><Download />Export first</Button>}<AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => { if (danger === "reset") { change(() => cloneMap(emptyMap)); clearSelection(); setDanger(null); } else if (danger === "load-blank") applyGuideChoice(emptyMap); else if (danger === "load-example") applyGuideChoice(initialMap); else if (danger === "load-problems") applyGuideChoice(problemMap); else if (danger === "import-background" && pendingImport?.kind === "background") applyBackgroundImport(pendingImport.background, pendingImport.backgroundImage); else if (danger === "import-network" && pendingImport?.kind === "network") applyNetworkImport(pendingImport.stops, pendingImport.routes, pendingImport.lineStyles, pendingImport.routeTypeStyles, pendingImport.stopTypeStyles, pendingImport.wagonStyles, pendingImport.tickets); else if (danger === "import-image" && pendingImport?.kind === "image") applyImageImport(pendingImport.image); else if (danger === "import-csv" && pendingImport?.kind === "csv") applyCsvImport(pendingImport.result); else deleteSelected(); }}>{danger === "reset" ? "Start over" : "Continue"}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+    <AlertDialog open={danger !== null} onOpenChange={(open) => { if (!open) { setDanger(null); setPendingImport(null); } }}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{danger === "import-map" ? "Replace the current map with the one in the file?" : danger === "reset" ? "Start over with an empty map?" : danger === "load-blank" ? "Replace the current map with a blank one?" : danger === "load-example" ? "Replace the current map with the example?" : danger === "load-problems" ? "Replace the current map with the example with problems?" : danger === "import-background" ? "Replace the background?" : danger === "import-network" ? "Replace stops and routes?" : danger === "import-image" ? "Replace the background image?" : danger === "import-csv" ? "Replace stops and routes?" : (selectedStop && data.stops.find((stop) => stop.id === selectedStop) ? `Delete ${data.stops.find((stop) => stop.id === selectedStop)!.name}?` : "Delete the selected object?")}</AlertDialogTitle><AlertDialogDescription asChild><div>{danger === "import-map" ? "The map in the file replaces this one, with its stops, routes, tickets and decks, rules, notes and background. Undo brings this one back until you close the page; export first to keep a copy." : danger === "reset" ? "Everything on this map is removed from this browser: its stops, routes, tickets and decks, rules, notes and background. An empty map takes its place. Undo brings it back until you close the page; export first to keep a copy." : danger === "load-blank" ? "Your current background objects, stops and routes will be replaced with a blank map. Export the map first if you want to keep your work." : danger === "load-example" ? "Your current background objects, stops and routes will be replaced with the neutral example map. Export the map first if you want to keep your work." : danger === "load-problems" ? "Your current background objects, stops and routes will be replaced with the example map that has two problems on purpose, a crossing and a dead end, to show how the warnings look. Export the map first if you want to keep your work." : danger === "import-background" ? "The imported background, including any background image, will replace the current one. Stops and routes are kept as they are." : danger === "import-network" ? "The imported stops and routes will replace the current network, and any tickets in the file replace the deck you are working in. Background objects are kept as they are." : danger === "import-image" ? "The new image will replace the current background image." : danger === "import-csv" ? "The stops and routes in the spreadsheet will replace the current network. Tickets in it arrive as new decks, beside the ones you have. Background objects are kept as they are." : selectedStop ? <StopDeletionList data={data} stopId={selectedStop} /> : "The selected object will be deleted."}</div></AlertDialogDescription></AlertDialogHeader><AlertDialogFooter>{(danger === "reset" || danger === "import-map") && <Button variant="outline" onClick={exportMap}><Download />Export first</Button>}<AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => { if (danger === "reset") startOver(); else if (danger === "import-map" && pendingImport?.kind === "map") applyMapImport(pendingImport.map); else if (danger === "load-blank") applyGuideChoice(emptyMap); else if (danger === "load-example") applyGuideChoice(initialMap); else if (danger === "load-problems") applyGuideChoice(problemMap); else if (danger === "import-background" && pendingImport?.kind === "background") applyBackgroundImport(pendingImport.background, pendingImport.backgroundImage); else if (danger === "import-network" && pendingImport?.kind === "network") applyNetworkImport(pendingImport.stops, pendingImport.routes, pendingImport.lineStyles, pendingImport.routeTypeStyles, pendingImport.stopTypeStyles, pendingImport.wagonStyles, pendingImport.tickets); else if (danger === "import-image" && pendingImport?.kind === "image") applyImageImport(pendingImport.image); else if (danger === "import-csv" && pendingImport?.kind === "csv") applyCsvImport(pendingImport.result); else deleteSelected(); }}>{danger === "reset" ? "Start over" : "Continue"}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
     <StopTicketsDialog open={stopTicketView !== null} onOpenChange={(open) => { if (!open) setStopTicketView(null); }}
       stopName={stopTicketView ? stopById(data, stopTicketView.stopId)?.name ?? "" : ""} band={stopTicketView?.band ?? null} tickets={viewedStopTickets}
       onOpen={(ticketId) => { setStopTicketView(null); openTicket(ticketId); }} />
@@ -1448,10 +1465,10 @@ export function MapEditor() {
       wagons={data.wagonsPerPlayer ?? DEFAULT_WAGONS_PER_PLAYER} onWagons={(value) => change((draft) => { draft.wagonsPerPlayer = value; return draft; })}
       deckSize={suggestSize ?? suggestDefaultSize} onDeckSize={setSuggestSize}
       keepExisting={suggestKeep} onKeepExisting={setSuggestKeep}
-      busy={suggestBusy} deckName={suggestName} onDeckName={setSuggestName} currentDeck={activeTicketSet.label}
+      busy={suggestBusy} deckName={suggestName} onDeckName={setSuggestName} currentDeck={activeTicketSet.label} currentCounts={{ tickets: ticketsInSet(data, activeTicketSet.id).length, long: ticketsInSet(data, activeTicketSet.id).filter((ticket) => ticket.long).length }}
       onShuffle={() => setSuggestSeed((seed) => seed + 1)} onApply={(mode) => applySuggestion(mode, `ts-${Date.now()}`)} />
     <WelcomeGuide open={showGuide} onOpenChange={(open) => !open && dismissGuide()} onChooseBlank={() => chooseFromGuide("blank")} onChooseExample={() => chooseFromGuide("example")} onChooseProblems={() => chooseFromGuide("problems")} onChooseFile={() => { ticketsOnlyRef.current = false; fileRef.current?.click(); }} />
-    <SettingsDialog onStartOver={() => { setShowStyles(false); setDanger("reset"); }} onExport={exportMap} open={showStyles} onOpenChange={setShowStyles} target={styleTarget} onTarget={setStyleTarget} data={data} change={change} onChoosePreset={choosePreset} onApplyBoard={applyBoardChoice} onChangeOrientation={changeOrientation} exportReminder={{ on: !reminder.off, onChange: (on) => setReminder((r) => (on ? turnOn(r) : stopReminding(r))) }} defaults={{ stopType, setStopType, stopSize, setStopSize: (value) => setStopSize(value as StopSize), routeType, setRouteType, routeColor, setRouteColor, routeCurved, setRouteCurved, routeLineStyle, setRouteLineStyle, linkParallel, setLinkParallel }} />
+    <SettingsDialog onStartOver={() => { setShowStyles(false); if (hasContent) setDanger("reset"); else startOver(); }} onExport={exportMap} open={showStyles} onOpenChange={setShowStyles} target={styleTarget} onTarget={setStyleTarget} data={data} change={change} onChoosePreset={choosePreset} onApplyBoard={applyBoardChoice} onChangeOrientation={changeOrientation} exportReminder={{ on: !reminder.off, onChange: (on) => setReminder((r) => (on ? turnOn(r) : stopReminding(r))) }} defaults={{ stopType, setStopType, stopSize, setStopSize: (value) => setStopSize(value as StopSize), routeType, setRouteType, routeColor, setRouteColor, routeCurved, setRouteCurved, routeLineStyle, setRouteLineStyle, linkParallel, setLinkParallel }} />
     <PrintPages data={data} smallCards={smallCards} plan={printPlan(data, (printScope !== "map" || !printParts.board) && printChoice.split === "page" ? { ...printChoice, split: "panel" } : printChoice, printProfile, format.orientation)} parts={runParts} setId={activeTicketSet.id} />
     {makingImage && <ImageStage data={data} onDone={saveImage} onFail={() => setMakingImage(false)} />}
     <ImportSpreadsheetsDialog open={showCsvImport} onOpenChange={setShowCsvImport} guideUrl={`${REPO_URL}/blob/main/docs/CSV.md`}

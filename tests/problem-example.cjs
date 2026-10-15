@@ -61,7 +61,7 @@ check("and the map with problems, which is made from it, has none either", !/Wag
   const ticket = problemMap.tickets.find((t) => (t.a === "example-harbour" && t.b === "example-fernside") || (t.b === "example-harbour" && t.a === "example-fernside"));
   const path = A.shortestPath ? A.shortestPath(adjacency, "example-harbour", "example-fernside") : null;
   check("a ticket from Harbour to Fernside is worth 22, and its shortest path on this map is 19, because of the crossing route", ticket && ticket.points === 22 && path && path.distance === 19, ticket && path ? `${ticket.points} points, ${path.distance} spaces` : "not found");
-  check("the rules name it as a third thing, with both figures, and say where to look and what to do", /third/i.test(problemMap.rules) && /\b22\b/.test(problemMap.rules) && /\b19\b/.test(problemMap.rules) && /Tickets/.test(problemMap.rules) && /Spaces/.test(problemMap.rules) && /Points/.test(problemMap.rules));
+  check("the rules name it as a third thing, with both figures, and say which deck it is in, where to look and what to do", /third/i.test(problemMap.rules) && /\b22\b/.test(problemMap.rules) && /\b19\b/.test(problemMap.rules) && /Tickets/.test(problemMap.rules) && /Long journeys/.test(problemMap.rules) && /Suggested/.test(problemMap.rules) && /Points/.test(problemMap.rules));
   check("and the note on the map says so too", problemMap.notes.some((n) => /ticket/i.test(n.text) && /(path|shortcut)/i.test(n.text)));
   check("the note still fits its box: a few lines, in a box tall enough", problemMap.notes.every((n) => n.text.length / Math.max(1, Math.floor(n.width / 7)) * 18 + 24 <= n.height + 1), problemMap.notes.map((n) => `${n.text.length} characters, ${n.height} high`).join(" | "));
 }

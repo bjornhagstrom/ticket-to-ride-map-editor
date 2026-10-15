@@ -34,6 +34,8 @@ export const lessOften = (r: ExportReminder): ExportReminder => { const level = 
 export const stop = (r: ExportReminder): ExportReminder => ({ ...r, off: true });
 export const turnOn = (r: ExportReminder): ExportReminder => ({ ...r, off: false, level: 0, nextAt: r.changes + REMINDER_STEPS[0] });
 /** A full map exported, or a full map file opened: the work is in a file, so counting starts again. */
+/** A different map has been put on the screen (a blank one, an example, one from a file): the old map's export and its count of changes are not this map's; the choice of being reminded or not stays. */
+export const forNewMap = (r: ExportReminder): ExportReminder => ({ ...freshReminder(), off: r.off });
 export const exported = (r: ExportReminder, now: Date): ExportReminder => ({ ...r, changes: 0, nextAt: REMINDER_STEPS[r.level], lastExport: now.toISOString() });
 
 /** "not exported yet", "exported just now", "exported 5 minutes ago", "exported 2 days ago". */

@@ -99,14 +99,14 @@ export function AnalysisPanel({ official, wide, onToggleWide, onAddParallel, len
         </div>
         <p className="helper">How many tickets want each route, against the lanes a player may use at that table. Only the second lane of a double route depends on the player count{laneFrom !== null && players.max < laneFrom ? ", and on this map it never opens" : ""}.</p>
         {bottlenecks.length === 0
-          ? <p className="helper">No route is wanted by more tickets than it can carry. {shapeRanges.small ? "The small official maps" : "Official maps"} have {shapeRanges.crowded[0]}–{shapeRanges.crowded[1]} such routes at a full table, {shapeRanges.ranges.crowdedPct[0]}–{shapeRanges.ranges.crowdedPct[1]} % of their routes: some contention is part of the game.</p>
+          ? <p className="helper">No route stands out as crowded: none is among the busiest tenth with at least three tickets, or at twice the average load for the lanes a player may use. {shapeRanges.small ? "The small official maps" : "Official maps"} have {shapeRanges.crowded[0]}–{shapeRanges.crowded[1]} such routes at a full table, {shapeRanges.ranges.crowdedPct[0]}–{shapeRanges.ranges.crowdedPct[1]} % of their routes: some contention is part of the game.</p>
           : <>
             <div className="bottleneck-list">{bottlenecks.slice(0, 8).map((edge) => <button type="button" key={`${edge.a}|${edge.b}`} className={cn("bottleneck-row", edge.onPurpose && "on-purpose")} onPointerEnter={() => onPreviewRoutes(edge.routeIds)} onPointerLeave={() => onPreviewRoutes(null)} aria-pressed={edge.routeIds.length === bottleneckShown.size && edge.routeIds.every((id) => bottleneckShown.has(id))} onClick={() => onShowBottleneck(edge.routeIds)}>
               <strong>{stopName(edge.a)} → {stopName(edge.b)}{edge.onPurpose && <em className="on-purpose-tag">on purpose</em>}</strong>
               <span>{edge.length} spaces · {edge.lanesUsable} of {edge.lanes} lane{edge.lanes === 1 ? "" : "s"} usable · {edge.tickets} ticket{edge.tickets === 1 ? "" : "s"} want it</span>
             </button>)}</div>
             {bottlenecks.some((edge) => edge.onPurpose) && <p className="helper">{bottlenecks.filter((edge) => edge.onPurpose).length} of them {bottlenecks.filter((edge) => edge.onPurpose).length === 1 ? "is" : "are"} contested on purpose, as marked in Properties.</p>}
-            <p className="helper">{bottlenecks.length} route{bottlenecks.length === 1 ? " is" : "s are"} wanted by more tickets than {bottlenecks.length === 1 ? "it" : "they"} can carry at this table. {shapeRanges.small ? "The small official maps" : "Official maps"} have {shapeRanges.crowded[0]}–{shapeRanges.crowded[1]} at a full table, {shapeRanges.ranges.crowdedPct[0]}–{shapeRanges.ranges.crowdedPct[1]} % of their routes, most of them on double routes: contention is part of the game. Where a corridor is crowded on purpose, a second lane keeps it open at bigger tables; where it is not, a way round or another ticket eases it. Click a row to keep its route marked, and click again to let go.</p>
+            <p className="helper">{bottlenecks.length} route{bottlenecks.length === 1 ? " is" : "s are"} crowded at this table: {bottlenecks.length === 1 ? "it stands" : "they stand"} out, among the busiest tenth of routes with at least three tickets, or at twice the average load for the lanes a player may use. {shapeRanges.small ? "The small official maps" : "Official maps"} have {shapeRanges.crowded[0]}–{shapeRanges.crowded[1]} at a full table, {shapeRanges.ranges.crowdedPct[0]}–{shapeRanges.ranges.crowdedPct[1]} % of their routes, most of them on double routes: contention is part of the game. Where a corridor is crowded on purpose, a second lane keeps it open at bigger tables; where it is not, a way round or another ticket eases it. Click a row to keep its route marked, and click again to let go.</p>
           </>}
       </div>
       <NetworkShapeSection data={data} onPreviewRoutes={onPreviewRoutes} onPreviewStop={onPreviewStop} onAddParallel={onAddParallel} onSelectStop={onSelectStop} />
@@ -355,7 +355,7 @@ export function StopTicketsDialog({ open, onOpenChange, stopName, band, tickets,
 }
 
 // Build a full deck of tickets for the map that is open, then let the person edit it as ordinary tickets.
-export function SuggestTicketsDialog({ tension, onTension, open, onOpenChange, data, current, suggestion, style, onStyle, wagons, onWagons, deckSize, onDeckSize, keepExisting, onKeepExisting, busy, deckName, onDeckName, currentDeck, onShuffle, onApply }: { tension: DeckTension; onTension: (tension: DeckTension) => void;
+export function SuggestTicketsDialog({ tension, onTension, open, onOpenChange, data, current, suggestion, style, onStyle, wagons, onWagons, deckSize, onDeckSize, keepExisting, onKeepExisting, busy, deckName, onDeckName, currentDeck, currentCounts, onShuffle, onApply }: { tension: DeckTension; onTension: (tension: DeckTension) => void;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   data: MapData;
@@ -373,6 +373,8 @@ export function SuggestTicketsDialog({ tension, onTension, open, onOpenChange, d
   deckName: string;
   onDeckName: (name: string) => void;
   currentDeck: string;
+  /** The tickets in the deck now, and how many of them are marked long: all of them, whether or not they are within a player's reach. */
+  currentCounts: { tickets: number; long: number };
   onShuffle: () => void;
   onApply: (mode: "new" | "replace") => void;
 }) {
@@ -447,8 +449,8 @@ export function SuggestTicketsDialog({ tension, onTension, open, onOpenChange, d
       <div className={cn("analysis-table-scroll", busy && "suggest-busy")}><table className="analysis-table suggest-table">
         <thead><tr><th>Measure</th><th>Now</th><th>Suggested</th><th>Reference</th></tr></thead>
         <tbody>
-          {row("Tickets", `${current.regular + current.long}`, report ? `${report.regular + report.long}` : "—", `${rule.ticketsPerStop} per stop`)}
-          {row("Long tickets", `${current.long}`, report ? `${report.long}` : "—", style === "europe" ? "Europe draws 6 of its 46 separately" : rule.longPerStop > 0 ? `a long deck of about ${rule.longPerStop} per stop` : "this style has no separate long deck")}
+          {row("Tickets", `${currentCounts.tickets}`, report ? `${report.regular + report.long}` : "—", `${rule.ticketsPerStop} per stop`)}
+          {row("Long tickets", `${currentCounts.long}`, report ? `${report.long}` : "—", style === "europe" ? "Europe draws 6 of its 46 separately" : rule.longPerStop > 0 ? `a long deck of about ${rule.longPerStop} per stop` : "this style has no separate long deck")}
           {row("Tickets per stop", current.perStop.toFixed(2), report ? report.perStop.toFixed(2) : "—", range(official.perStop))}
           {row("Reach", `${current.reach}`, report ? `${report.reach}` : "—", "the longest ticket a player can build")}
           {row("Stops with no ticket", `${current.zeroStops}`, report ? `${report.zeroStops}` : "—", "USA 6, Europe 0")}
@@ -460,6 +462,7 @@ export function SuggestTicketsDialog({ tension, onTension, open, onOpenChange, d
         </tbody>
       </table></div>
 
+      {current.skipped > 0 && <p className="helper">{current.skipped} of the {currentCounts.tickets} tickets in {currentDeck} are left out of the figures under Now, apart from the count: they are longer than a player can build ({current.reach} wagon spaces at {wagons} wagons) or go to a stop nothing reaches.</p>}
       {report && report.bins.some((count) => count > 0) && <p className="helper">Lengths, shortest to longest: {report.bins.join(" · ")} against a target of {rule.bins.map((share) => (share * report.regular).toFixed(1)).join(" · ")}.</p>}
       {report && report.ambiguous.length > 0 && <p className="helper">{report.ambiguous.length} ticket{report.ambiguous.length === 1 ? " has" : "s have"} a way round that costs one space more but is built from one route fewer, so it takes a turn less. Several official cards are priced at that higher figure. These are left at the shortest path — raise them by hand if you want to follow suit.</p>}
       {report && report.hard.length > 0 && <p className="helper">{report.hard.length} ticket{report.hard.length === 1 ? "" : "s"} cross a tunnel or need ferry locomotives. They are worth their wagon count all the same — the difficulty is yours to judge.</p>}

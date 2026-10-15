@@ -35,7 +35,7 @@ const groups: { title: string; rows: Row[] }[] = [
   { title: "How it lies on the map", rows: [
     { id: "uncovered", label: "Stops with no ticket names", get: (f) => f.uncovered },
     { id: "crowded", label: "Crowded routes", get: (f) => f.crowded },
-    { id: "duplicates", label: "Duplicate pairs", get: (f) => f.duplicates },
+    { id: "duplicates", label: "Near-duplicate pairs", get: (f) => f.duplicates },
     { id: "unused", label: "Routes no ticket uses", get: (f) => f.unusedPct, unit: "%" },
     { id: "off-path", label: "Points off the path rule", get: (f) => f.offPath },
   ] },

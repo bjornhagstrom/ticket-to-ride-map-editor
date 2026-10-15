@@ -3832,6 +3832,8 @@ const sectionStart = (n) => {
     await op2.goto(BASE, { waitUntil: "networkidle" });
     await op2.getByRole("button", { name: "Load the example map" }).click();
     await op2.waitForTimeout(600);
+    // A map that has been changed: an unchanged example of the editor's own is replaced without a question.
+    await op2.evaluate(() => { const m = JSON.parse(localStorage.getItem("ttr-map")); m.name = "My own map"; localStorage.setItem("ttr-map", JSON.stringify(m)); }); await op2.reload({ waitUntil: "networkidle" }); await op2.waitForTimeout(600);
     const stored = () => op2.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")));
     check("there is no Clear map button among the tools any more", (await op2.getByRole("button", { name: "Clear map" }).count()) === 0);
     await op2.getByRole("button", { name: "Settings" }).click();
@@ -4236,7 +4238,8 @@ const sectionStart = (n) => {
     await xp.waitForTimeout(300);
     // The map says what is wrong, in its note and in its rules.
     check("a note on the map says what is wrong on purpose", /on purpose/.test(await xp.locator(".map-canvas").textContent()) || /on purpose/.test(await xp.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")).notes.map((n) => n.text).join(" "))));
-    // It can be chosen again from Getting started, asking first because the map has content now.
+    // It can be chosen again from Getting started, asking first once the map has been changed (an unchanged example is replaced without a question).
+    await xp.evaluate(() => { const m = JSON.parse(localStorage.getItem("ttr-map")); m.name = "My own map"; localStorage.setItem("ttr-map", JSON.stringify(m)); }); await xp.reload({ waitUntil: "networkidle" }); await xp.waitForTimeout(500);
     await xp.getByRole("button", { name: "Help" }).click();
     await xp.getByRole("menuitem", { name: "Getting started" }).click();
     await xp.waitForTimeout(400);
@@ -4542,6 +4545,7 @@ const sectionStart = (n) => {
     check("a file with no tickets in it is said to have none", /no tickets/i.test((await to.locator("[data-sonner-toast]").allTextContents()).join(" ")), (await to.locator("[data-sonner-toast]").allTextContents()).join(" | "));
     // Map project, over a whole map file, still replaces the map.
     await importAs("Map project", toFile("whole-map-2.json", wrap("map", other)));
+    if (await to.getByRole("alertdialog").count()) { await to.getByRole("alertdialog").getByRole("button", { name: "Continue" }).click(); await to.waitForTimeout(500); }
     const whole = await mapNow();
     check("Map project takes the whole map, as before", whole.name === "Another map" && whole.stops.some((s) => s.id === "zed"), whole.name);
     await to.context().close();
@@ -4564,6 +4568,7 @@ const sectionStart = (n) => {
       const chooser = nv.waitForEvent("filechooser");
       await nv.getByRole("menuitem", { name: "Map project", exact: true }).click();
       await (await chooser).setFiles(file); await nv.waitForTimeout(700);
+      if (await nv.getByRole("alertdialog").count()) { await nv.getByRole("alertdialog").getByRole("button", { name: "Continue" }).click(); await nv.waitForTimeout(500); }
     };
     const toasts = async () => (await nv.locator("[data-sonner-toast]").allTextContents()).join(" | ");
     const clearToasts = () => nv.evaluate(() => document.querySelectorAll("[data-sonner-toast]").forEach((t) => t.remove()));
@@ -5760,6 +5765,79 @@ const sectionStart = (n) => {
     if (await ticketRow.count()) { await ticketRow.focus(); await rp.keyboard.press("Delete"); await settleR(); }
     check("Delete with a ticket row in focus takes no stop away", (await store()).stops.length === stops0, `${stops0} → ${(await store()).stops.length}`);
     await rp.context().close();
+  }
+
+  // 82. What the user test of 1.7.0 found (docs/user-test-2026-10-15/): each group of fixes adds its checks here.
+  if (wants(82)) {
+  sectionStart(82);
+    const up = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
+    up.on("pageerror", (e) => errors.push(String(e)));
+    await up.goto(BASE, { waitUntil: "networkidle" });
+    const settleU = () => up.waitForTimeout(400);
+    // Group 1: figures and claims.
+    await up.getByRole("button", { name: "Load a map with problems" }).click(); await settleU();
+    await up.getByRole("button", { name: "Tickets", exact: true }).click(); await settleU();
+    await up.locator("#ticket-set").selectOption({ label: /Long journeys/ }).catch(async () => { const opts = await up.locator("#ticket-set option").allTextContents(); const k = opts.findIndex((t) => /Long journeys/.test(t)); await up.locator("#ticket-set").selectOption({ index: k }); });
+    await settleU();
+    const cmpU = up.locator(".tickets-panel .deck-compare");
+    check("Compare decks counts the ticket worth 22 on a path of 19 under Points off the path rule (it said 0)", (await cmpU.locator('tr[data-row="off-path"] .cmp-a').getAttribute("data-value")) === "1", await cmpU.locator('tr[data-row="off-path"]').textContent());
+    check("the row about almost-equal tickets is named for what it counts: Near-duplicate pairs", /Near-duplicate pairs/.test(await cmpU.textContent()) && !/Duplicate pairs/.test((await cmpU.textContent()).replace(/Near-duplicate pairs/g, "")));
+    await up.getByRole("button", { name: "Done" }).click().catch(() => {}); await settleU();
+    // The deck dialog counts the tickets the deck has.
+    await up.getByRole("button", { name: "Tickets", exact: true }).click(); await settleU();
+    await up.getByRole("button", { name: /Add a deck/ }).click(); await up.waitForTimeout(250);
+    await up.getByRole("menuitem", { name: /Build a full deck of tickets/ }).click(); await up.waitForSelector(".suggest-dialog", { timeout: 20000 }); await settleU();
+    const nowCol = async (label) => ((await up.locator(".suggest-table tr", { hasText: label }).first().locator("td").nth(1).textContent()) || "").trim();
+    const deckSize = await up.evaluate(() => { const m = JSON.parse(localStorage.getItem("ttr-map")); const first = m.ticketSets[0].id; const active = document.querySelector("#ticket-set") ? document.querySelector("#ticket-set").value : first; return m.tickets.filter((t) => (t.set ?? first) === active).length; });
+    check("the deck dialog's Now column counts all the tickets of the deck, not only those a player could build", (await nowCol("Tickets")) === String(deckSize), `${await nowCol("Tickets")} against ${deckSize}`);
+    check("and says how many it leaves out of the other figures", /left out of the figures under Now/.test(await up.locator(".suggest-dialog").textContent()));
+    await up.keyboard.press("Escape"); await settleU();
+    await up.getByRole("button", { name: "Done" }).click().catch(() => {}); await settleU();
+    // Crowded routes: what it means.
+    await up.getByRole("button", { name: "Map balance", exact: true }).click(); await settleU();
+    const bal = (await up.locator(".balance-panel").textContent()) || "";
+    check("Map balance says what a crowded route is: among the busiest tenth with three tickets, or at twice the average", /busiest tenth/.test(bal) && !/can carry/.test(bal), bal.slice(0, 200));
+    await up.keyboard.press("Escape"); await settleU();
+    // The last export belongs to a map: a new empty map has none.
+    await up.evaluate(() => { const key = "ttr-export-reminder"; const r = JSON.parse(localStorage.getItem(key) || "{}"); localStorage.setItem(key, JSON.stringify({ changes: 0, nextAt: 50, level: 0, off: false, ...r, lastExport: new Date(Date.now() - 4 * 60000).toISOString() })); });
+    await up.reload({ waitUntil: "networkidle" }); await settleU();
+    if (await up.locator('[role="dialog"]').count()) { await up.getByRole("button", { name: "Load a map with problems" }).click(); await settleU(); }
+    const exportedText = async () => ((await up.locator(".save-state, .saved-state, header").first().textContent()) || "") + " " + ((await up.locator("body").textContent()) || "").match(/(not exported yet|exported [^·]*ago|exported just now)/)?.[0];
+    check("before: the saved map shows an export of 4 minutes ago", /exported 4 minutes ago/.test(await exportedText()), await exportedText());
+    await up.getByRole("button", { name: "Settings" }).click(); await settleU();
+    await up.getByRole("button", { name: /Start over/ }).first().click(); await settleU();
+    check("starting over from an unchanged example asks nothing", (await up.locator('[role="alertdialog"]').count()) === 0);
+    await up.keyboard.press("Escape"); await settleU();
+    check("and the new empty map is not exported yet, whatever the last map's export was", /not exported yet/.test(await exportedText()), await exportedText());
+    // A board that turns the map moves the names on routes clear of them.
+    await up.getByRole("button", { name: "Settings" }).click().catch(() => {}); await settleU();
+    await up.context().close();
+    const up2 = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
+    up2.on("pageerror", (e) => errors.push(String(e)));
+    await up2.goto(BASE, { waitUntil: "networkidle" });
+    await up2.getByRole("button", { name: "Load the example map" }).click(); await up2.waitForTimeout(500);
+    await up2.getByRole("button", { name: "Settings" }).click(); await up2.waitForTimeout(400);
+    await up2.locator('#settings-format input[value="small-new-york"]').check(); await up2.waitForTimeout(600);
+    await up2.keyboard.press("Escape"); await up2.waitForTimeout(400);
+    check("choosing New York, which stands the board up, leaves no stop name on a route", (await up2.getByText(/stop names? on a route/).count()) === 0, String(await up2.getByText(/stop names? on a route/).count()));
+    // Opening a map file: asked first when the map on the screen is the person's own, not when it is an unchanged example.
+    const fileU = path.join(os.tmpdir(), `ttr-own82-${Date.now()}.json`);
+    fs.writeFileSync(fileU, JSON.stringify({ format: "ticket-to-ride-map", version: 4, kind: "map", payload: { name: "From a file", format: "board-2x3", stops: [{ id: "a", name: "Alpha", type: "city", x: 200, y: 200 }, { id: "b", name: "Beta", type: "city", x: 600, y: 300 }], routes: [{ id: "r1", a: "a", b: "b", length: 3, type: "city", color: "red" }] } }));
+    // A fresh page with the example map as it came.
+    const up3 = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
+    up3.on("pageerror", (e) => errors.push(String(e)));
+    await up3.goto(BASE, { waitUntil: "networkidle" });
+    await up3.getByRole("button", { name: "Load the example map" }).click(); await up3.waitForTimeout(500);
+    const storedName = () => up3.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")).name);
+    await up3.locator('input[type="file"][accept="application/json"]').setInputFiles(fileU); await up3.waitForTimeout(700);
+    check("the example map, unchanged, is replaced by a file without a question", (await up3.locator('[role="alertdialog"]').count()) === 0 && (await storedName()) === "From a file", await storedName());
+    await up3.locator('input[type="file"][accept="application/json"]').setInputFiles(fileU); await up3.waitForTimeout(700);
+    check("a map of one's own is asked about first: Replace the current map with the one in the file?", /Replace the current map with the one in the file/.test((await up3.locator('[role="alertdialog"]').textContent().catch(() => "")) || ""));
+    await up3.getByRole("button", { name: "Cancel" }).click(); await up3.waitForTimeout(300);
+    check("Cancel leaves it as it was", (await storedName()) === "From a file" && (await up3.locator('[role="alertdialog"]').count()) === 0);
+    await up3.context().close();
+    fs.unlinkSync(fileU);
+    await up2.context().close();
   }
 
   if (sectionOpen) sectionTimes[sectionOpen.n] = Math.round((Date.now() - sectionOpen.at) / 100) / 10;

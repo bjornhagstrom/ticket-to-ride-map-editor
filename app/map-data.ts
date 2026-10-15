@@ -642,7 +642,7 @@ This is the example map with two things done wrong on purpose, so that you can s
 
 - **A route that crosses another.** [[Fernside–Deepcut]] runs over a route it does not meet at a stop. Players cannot tell which one a wagon belongs to where they cross, so Map balance counts the crossing and rings it on the map.
 - **A dead end.** [[Outpost]] is reached by [[Fernside–Outpost]] only: nothing runs on from it, so it is a corner of the map that a ticket can reach by one way alone. How the network holds together lists it.
-- **A ticket worth more than its path.** [[Fernside–Deepcut]] is also a shortcut: the Long journeys ticket from [[Harbour]] to [[Fernside]] is worth 22 points, but its shortest path is now 19 spaces (8 + 5 + 6), where it was 22. Open Tickets and look at Spaces against Points: you can set the points there, to 19 to match the path, or take the shortcut away and the ticket is right again.
+- **A ticket worth more than its path.** [[Fernside–Deepcut]] is also a shortcut: the Long journeys ticket from [[Harbour]] to [[Fernside]] is worth 22 points, but its shortest path is now 19 spaces (8 + 5 + 6), where it was 22. The ticket is in the deck Long journeys (not the one shown first): open Tickets, choose that deck, and look at Points 22 against Suggested 19. Compare decks counts it under Points off the path rule. You can set the points there, to 19 to match the path, or take the shortcut away and the ticket is right again.
 
 ## What to do about it
 
@@ -650,7 +650,7 @@ Move a stop or bend the route so that it no longer crosses, or let it cross at a
 
 *Tip: point at a card in Map balance and the map marks what it is about.*
 `,
-  notes: [{ id: "problem-note", x: 40, y: 24, width: 420, height: 150, text: "Two things are wrong on purpose here: Fernside–Deepcut crosses another route, and Outpost is a dead end, reached by one route only. A third follows: that route is a shortcut, so the ticket Harbour–Fernside is worth 22 but its path is 19. Open Map balance and Tickets to see how the editor says so, then fix them or leave them." }],
+  notes: [{ id: "problem-note", x: 40, y: 24, width: 420, height: 150, text: "Two things are wrong on purpose here: Fernside–Deepcut crosses another route, and Outpost is a dead end, reached by one route only. A third follows: that route is a shortcut, so the ticket Harbour–Fernside is worth 22 but its path is 19. The first two show in Map balance; the third is in Tickets, in the deck Long journeys, where Points 22 stands against Suggested 19. Fix them or leave them." }],
   stops: [...initialMap.stops, problemStop],
   routes: [
     ...initialMap.routes,

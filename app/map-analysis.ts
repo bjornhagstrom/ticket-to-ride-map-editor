@@ -339,12 +339,16 @@ export function autoPlaceLabels(data: MapData): { placed: Map<string, number>; u
 // Turning the board and tidying the names in one go: a name left to place itself is placed again after a turn, and some then sit
 // on a route, so the turn does what the Move names clear button does. A name that is already clear stays where it is, a locked
 // one stays, and what cannot be placed is reported rather than shuffled. Turning to the way the board already lies changes nothing.
+/** The names that sit on a route moved clear of it, as the button in the side panel does. */
+export function tidyNames(data: MapData): { data: MapData; moved: number; unresolved: string[] } {
+  const { placed, unresolved } = autoPlaceLabels(data);
+  if (!placed.size) return { data, moved: 0, unresolved };
+  return { data: { ...data, stops: data.stops.map((stop) => (placed.has(stop.id) ? { ...stop, labelAngle: placed.get(stop.id) } : stop)) }, moved: placed.size, unresolved };
+}
 export function turnAndTidy(data: MapData, to: Orientation): { data: MapData; moved: number; unresolved: string[] } {
   const turned = rotateMap(data, to);
   if (turned === data) return { data, moved: 0, unresolved: [] };
-  const { placed, unresolved } = autoPlaceLabels(turned);
-  if (!placed.size) return { data: turned, moved: 0, unresolved };
-  return { data: { ...turned, stops: turned.stops.map((stop) => (placed.has(stop.id) ? { ...stop, labelAngle: placed.get(stop.id) } : stop)) }, moved: placed.size, unresolved };
+  return tidyNames(turned);
 }
 
 // Junctions only join routes: no ticket ends at one, and its name is never drawn. So they are left
