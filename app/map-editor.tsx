@@ -245,7 +245,7 @@ export function MapEditor() {
     wrap.scrollTop += after.top + fy * after.height - mid.y;
     setPhoneMapWidth(next);
   };
-  const currentPhoneMapWidth = () => mapWrapRef.current?.querySelector<SVGElement>(".map-canvas")?.getBoundingClientRect().width ?? phoneMapWidth;
+  const currentPhoneMapWidth = () => mapWrapRef.current?.querySelector<SVGElement>(".map-canvas")?.getBoundingClientRect().width ?? phoneMapWidth ?? phoneFitWidth();
   useEffect(() => {
     const wrap = mapWrapRef.current;
     if (!wrap) return;
@@ -299,7 +299,7 @@ export function MapEditor() {
       if (!phone()) return;
       const cs = getComputedStyle(wrap);
       const fit = Math.max(200, wrap.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight));
-      setPhoneMapWidth((width) => Math.round(Math.min(fit * 6, Math.max(fit, width))));
+      setPhoneMapWidth((width) => (width === null ? null : Math.round(Math.min(fit * 6, Math.max(fit, width)))));
     };
     window.addEventListener("resize", resize);
     wrap.addEventListener("pointerdown", down, true);
