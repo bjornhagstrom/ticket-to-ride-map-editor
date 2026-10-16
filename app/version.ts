@@ -10,6 +10,14 @@ export type Release = { version: string; date: string; title: string; changes: s
 // the top of CHANGELOG.md under Unreleased, and become the notes of the next version when it is
 // decided; the What's new page in the editor shows released versions only.
 export const UNRELEASED: string[] = [
+];
+
+export const RELEASES: Release[] = [
+  {
+    version: "1.7.1",
+    date: "2026-10-16",
+    title: "Version 1.7.1: fixes after a user test",
+    changes: [
   "A small board is called by its name, Small board, New York or Amsterdam and London, in the facts row and in the print dialog, and no longer Custom board 2×2.",
   "Import > Map project asks before it replaces a map of your own. An unchanged example, the blank map or the map with problems is replaced without a question, also by Start over and in the welcome box.",
   "Choosing a board that turns the map, such as New York, moves the names that end up on a route clear of it in the same step, as turning the board does, and Undo takes both back.",
@@ -29,9 +37,8 @@ export const UNRELEASED: string[] = [
   "On a phone the map starts as the whole map, as wide as the screen, instead of 900 px of it; the zoom buttons and the pinch work as before.",
   "Properties of a stop, a route or a ticket say which properties are behind the panel; Wagon spaces says what the figure is; an empty map says \"No stops yet\", \"No routes yet\" and \"No routes to cross\" instead of showing empty tables.",
   "Start over, loading an example and opening a map file ask first whenever the map has been changed, also when it has no stops or routes yet but has its own board, rules or styles; the far column of Add ticket opens a dialog that says far tickets, and Deck rules gives the longest regular ticket as a share of the wagons.",
-];
-
-export const RELEASES: Release[] = [
+    ],
+  },
   {
     version: "1.7.0",
     date: "2026-10-15",

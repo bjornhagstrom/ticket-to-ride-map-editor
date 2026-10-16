@@ -4,9 +4,9 @@ What changed in each version of the [Ticket to Ride map editor](https://hagstrom
 
 This file is written from `app/version.ts` by `npm run changelog`; edit the notes there.
 
-## Unreleased
+## 1.7.1 · 2026-10-16
 
-Changes since the last release, to go into the next version.
+**Version 1.7.1: fixes after a user test**
 
 - A small board is called by its name, Small board, New York or Amsterdam and London, in the facts row and in the print dialog, and no longer Custom board 2×2.
 - Import > Map project asks before it replaces a map of your own. An unchanged example, the blank map or the map with problems is replaced without a question, also by Start over and in the welcome box.
