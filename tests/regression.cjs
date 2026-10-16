@@ -4309,7 +4309,7 @@ const sectionStart = (n) => {
     const after = await mapNow();
     check("deleting the stop takes every ticket that names it, and nothing else", named(after) === 0 && after.tickets.length === before.tickets.length - named(before), `${before.tickets.length} tickets before, ${after.tickets.length} after`);
     const note = (await dp.locator("[data-sonner-toast]").allTextContents()).join(" | ");
-    check("and says so on screen, with how many", new RegExp(`Westport is deleted, with (\\d+ routes? that ended there and )?${named(before)} tickets? that named it`).test(note), note);
+    check("and says so on screen, with how many", new RegExp(`Westport is deleted, with (\\d+ routes? that ended there and )${named(before)} tickets? that named it`).test(note), note);
     // Reopened, the map is whole: nothing is reported as damaged.
     await dp.reload({ waitUntil: "networkidle" });
     await dp.waitForTimeout(800);
@@ -5837,6 +5837,34 @@ const sectionStart = (n) => {
     await up3.getByRole("button", { name: "Cancel" }).click(); await up3.waitForTimeout(300);
     check("Cancel leaves it as it was", (await storedName()) === "From a file" && (await up3.locator('[role="alertdialog"]').count()) === 0);
     await up3.context().close();
+    // Review of the branch: a map with no stops, routes or shapes but changed settings is still the person's own work.
+    const up4 = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
+    up4.on("pageerror", (e) => errors.push(String(e)));
+    await up4.goto(BASE, { waitUntil: "networkidle" });
+    await up4.getByRole("button", { name: "Start with a blank map" }).click(); await up4.waitForTimeout(500);
+    if (await up4.locator('[role="dialog"]').count()) { await up4.keyboard.press("Escape"); await up4.waitForTimeout(300); }
+    await up4.getByRole("button", { name: "Settings" }).click(); await up4.waitForTimeout(400);
+    await up4.locator('#settings-format input[value="small-new-york"]').check(); await up4.waitForTimeout(500);
+    await up4.locator(".settings-nav-item", { hasText: /^Map/ }).click(); await up4.waitForTimeout(300);
+    await up4.getByRole("button", { name: "Start over…" }).click(); await up4.waitForTimeout(400);
+    check("a blank map with a board chosen, but no stops or routes, is asked about before Start over", (await up4.locator('[role="alertdialog"]').count()) === 1);
+    await up4.context().close();
+    // The far column opens a dialog that says far, not long (long is the long deck's word); the deck rules measure the cap in wagons.
+    const up5 = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
+    up5.on("pageerror", (e) => errors.push(String(e)));
+    await up5.goto(BASE, { waitUntil: "networkidle" });
+    await up5.getByRole("button", { name: "Load the example map" }).click(); await up5.waitForTimeout(500);
+    await up5.getByRole("button", { name: "Add ticket" }).click(); await up5.waitForTimeout(400);
+    const farCount = up5.locator(".coverage-table tbody tr td:nth-child(4) .coverage-count").first();
+    await farCount.click(); await up5.waitForTimeout(450);
+    const farText = ((await up5.locator(".stop-tickets-dialog").textContent()) || "").replace(/\s+/g, " ");
+    check("a count in the far column opens a dialog that says far tickets, not long", /\d+ far tickets? names? this stop/.test(farText) && !/ long tickets? name/.test(farText), farText.slice(0, 100));
+    await up5.keyboard.press("Escape"); await up5.waitForTimeout(300);
+    await up5.getByRole("button", { name: "Settings" }).click(); await up5.waitForTimeout(400);
+    await up5.locator(".settings-nav-item", { hasText: /deck rules/i }).click(); await up5.waitForTimeout(400);
+    const dr5 = ((await up5.locator(".deck-rules").textContent()) || "").replace(/\s+/g, " ");
+    check("Deck rules gives the longest regular ticket in wagons, as reach is, not as a share of reach", /Longest regular ticket\s*\d+ % of the wagons/.test(dr5) && !/Longest regular ticket\s*\d+ % of reach/.test(dr5), dr5.slice(0, 200));
+    await up5.context().close();
     fs.unlinkSync(fileU);
     await up2.context().close();
     // Group 2: the interface.
@@ -5931,8 +5959,21 @@ const sectionStart = (n) => {
       await g4.keyboard.press("Escape"); await g4.waitForTimeout(300);
       await g4.getByRole("button", { name: "Map balance", exact: true }).click(); await g4.waitForTimeout(500);
       const bal4 = ((await g4.locator(".balance-panel").textContent()) || "").replace(/\s+/g, " ");
-      check("Map balance sends the person to the right place for the wagon's size", /Settings → Board → Custom size → Real sizes/.test(bal4) || !/Settings → Map\b/.test(bal4));
+      check("Map balance for a map with no wagon size of its own does not point at a setting that is not in use", !/Settings → Map\b/.test(bal4) && /fitted from the published/.test(bal4), bal4.slice(0, 120));
       await g4.keyboard.press("Escape"); await g4.waitForTimeout(300);
+      // A map with a wagon size of its own (a small board brings one): the way to it is named as it is in Settings.
+      const gw = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
+      gw.on("pageerror", (e) => errors.push(String(e)));
+      await gw.goto(BASE, { waitUntil: "networkidle" });
+      await gw.getByRole("button", { name: "Load the example map" }).click(); await gw.waitForTimeout(500);
+      if (await gw.locator('[role="dialog"]').count()) { await gw.keyboard.press("Escape"); await gw.waitForTimeout(300); }
+      await gw.getByRole("button", { name: "Settings" }).click(); await gw.waitForTimeout(400);
+      await gw.locator('#settings-format input[value="small-new-york"]').check(); await gw.waitForTimeout(500);
+      await gw.keyboard.press("Escape"); await gw.waitForTimeout(300);
+      await gw.getByRole("button", { name: "Map balance", exact: true }).click(); await gw.waitForTimeout(500);
+      const balW = ((await gw.locator(".balance-panel").textContent()) || "").replace(/\s+/g, " ");
+      check("Map balance names the way to the map's own wagon size: Settings → Board → Custom size → Real sizes", /Settings → Board → Custom size → Real sizes/.test(balW) && !/Settings → Map\b/.test(balW), balW.slice(0, 160));
+      await gw.context().close();
       // A ticket file given to Map project says what it was.
       const tf = path.join(os.tmpdir(), `ttr-tix82-${Date.now()}.json`);
       const stopNames = await g4.evaluate(() => JSON.parse(localStorage.getItem("ttr-map")).stops.slice(0, 2).map((x) => ({ id: x.id, name: x.name })));

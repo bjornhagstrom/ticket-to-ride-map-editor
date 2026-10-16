@@ -96,7 +96,7 @@ function FixedRuleValues({ rule }: { rule: DeckRule }) {
       <div key="lengths"><dt>How long the tickets are</dt><dd><ul className="deck-rule-lengths">{rule.bins.map((share, index) => <li key={index}>{pct(share)} % of the tickets are {REACH_WORDS[index]}</li>)}</ul><small>Reach is the longest regular ticket this style asks for: a share of a player&apos;s wagons ({pct(rule.lengthCap)} % of the wagons), not the length of the map.</small></dd></div>
       {row("Long tickets reach", rule.longRange ? `${pct(rule.longRange[0])}–${pct(rule.longRange[1])} % of reach` : "no separate long deck")}
       {row("Extra points for the longest tickets", rule.bonusFrom === null ? "none: a ticket is worth its distance" : `+1 for a ticket of ${pct(rule.bonusFrom)} % of reach or more, +2 for the single longest`)}
-      {row("Longest regular ticket", `${pct(rule.lengthCap)} % of reach`, `${pct(official.lengthCap[0])}–${pct(official.lengthCap[1])} %`)}
+      {row("Longest regular ticket", `${pct(rule.lengthCap)} % of the wagons`, `${pct(official.lengthCap[0])}–${pct(official.lengthCap[1])} %`)}
       {row("Most tickets on one stop", String(rule.maxPerStop), `${official.maxPerStop[0]}–${official.maxPerStop[1]}`)}
       {row("Near-duplicate tickets", `${pct(rule.dupRate)} %`, `${official.dupPct[0]}–${official.dupPct[1]} %`)}
       {row("Where tickets start and end", rule.periphery === "relative" ? PERIPHERY.relative : PERIPHERY.point)}
@@ -124,7 +124,7 @@ function OwnRuleFields({ rule, onChange, onDelete }: { rule: DeckRule; onChange:
       {number("rule-tickets-per-stop", "Tickets per stop", rule.ticketsPerStop, (value) => onChange({ ticketsPerStop: clamp(value, 0.05, 5) }), 0.05, `official ${official.perStop[0]}–${official.perStop[1]}`)}
       {number("rule-long-per-stop", "Long deck, per stop", rule.longPerStop, (value) => onChange({ longPerStop: clamp(value, 0, 2) }), 0.01)}
       {number("rule-max-per-stop", "Most tickets on one stop", rule.maxPerStop, (value) => onChange({ maxPerStop: Math.max(1, Math.round(value)) }), 1, `official ${official.maxPerStop[0]}–${official.maxPerStop[1]}`)}
-      {number("rule-length-cap", "Longest regular ticket, % of reach", pct(rule.lengthCap), (value) => onChange({ lengthCap: clamp(value, 1, 100) / 100 }), 1, `official ${pct(official.lengthCap[0])}–${pct(official.lengthCap[1])} %`)}
+      {number("rule-length-cap", "Longest regular ticket, % of the wagons", pct(rule.lengthCap), (value) => onChange({ lengthCap: clamp(value, 1, 100) / 100 }), 1, `official ${pct(official.lengthCap[0])}–${pct(official.lengthCap[1])} %`)}
       {number("rule-dup-rate", "Near-duplicate tickets, %", pct(rule.dupRate), (value) => onChange({ dupRate: clamp(value, 0, 100) / 100 }), 0.5, `official ${official.dupPct[0]}–${official.dupPct[1]} %`)}
       {optionalPct("rule-bonus-from", "Bonus from, % of reach", rule.bonusFrom, (value) => onChange({ bonusFrom: value }))}
       {optionalPct("rule-long-from", "Long deck reaches from, %", rule.longRange ? rule.longRange[0] : null, (value) => onChange({ longRange: value === null ? null : [value, Math.max(value, rule.longRange?.[1] ?? 1)] }))}

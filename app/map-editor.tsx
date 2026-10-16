@@ -811,9 +811,9 @@ export function MapEditor() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [printRequest]);
 
-  // The playtest box a new map starts with is not work of its own: a map with only that is still empty.
-  // Something that would be lost by replacing the map: not nothing, and not one of the editor's own maps as it came.
-  const hasContent = !isUnchangedBuiltIn(data) && (data.stops.length > 0 || data.routes.length > 0 || data.background.length > 0 || data.notes.some((note) => note.kind !== "playtest") || Boolean(data.backgroundImage));
+  // Something that would be lost by replacing the map: anything but one of the editor's own maps as it came (an empty map with its
+  // rules, board or styles changed is the person's work too). Memoised: it copies and repairs the whole map, image included.
+  const hasContent = useMemo(() => !isUnchangedBuiltIn(data), [data]);
   const dismissGuide = () => { try { localStorage.setItem(GUIDE_SEEN_KEY, "1"); } catch { /* ignore unavailable storage */ } setShowGuide(false); };
   const applyGuideChoice = (map: MapData) => {
     change(() => cloneMap(map));

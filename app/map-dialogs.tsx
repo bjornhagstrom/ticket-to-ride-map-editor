@@ -357,7 +357,7 @@ export function StopTicketsDialog({ open, onOpenChange, stopName, band, tickets,
     <DialogContent className="stop-tickets-dialog">
       <DialogHeader>
         <DialogTitle>{stopName}</DialogTitle>
-        <DialogDescription>{tickets.length} {band ? `${band} ` : ""}ticket{tickets.length === 1 ? "" : "s"} name{tickets.length === 1 ? "s" : ""} this stop. Pick one to edit it.</DialogDescription>
+        <DialogDescription>{tickets.length} {band ? `${band === "long" ? "far" : band} ` : ""}ticket{tickets.length === 1 ? "" : "s"} name{tickets.length === 1 ? "s" : ""} this stop. Pick one to edit it.</DialogDescription>
       </DialogHeader>
       <div className="stop-ticket-rows">{tickets.map((ticket) => <button type="button" key={ticket.id} className="stop-ticket-row" onClick={() => onOpen(ticket.id)}>
         <span>{stopName} → {ticket.other}</span>
