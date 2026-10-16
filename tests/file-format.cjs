@@ -193,8 +193,8 @@ check("the example map carries rules, and they survive being saved and read back
 check("and a rules field that is not text is dropped", storage.normalizeMap({ ...JSON.parse(JSON.stringify(sample)), rules: 42 }).rules === undefined);
 check("a network file does not carry the rules, which belong to the whole map", !("rules" in storage.networkPayload(ruled)));
 
-// The name of a downloaded file: Swedish and other letters keep their letter (found by the owner on 2026-10-15: Örebro came out as "-rebro").
-check("Örebro keeps its O in a file name, with no hyphen in front", storage.fileNameBase("Örebro (abstract test map v0.1) v1") === "orebro-abstract-test-map-v0-1-v1", storage.fileNameBase("Örebro (abstract test map v0.1) v1"));
+// The name of a downloaded file: Swedish and other letters keep their letter (found by the owner on 2026-10-15: a name starting with Ö came out with a hyphen in front).
+check("Ö keeps its O in a file name, with no hyphen in front", storage.fileNameBase("Östersund (test map v0.1) v1") === "ostersund-test-map-v0-1-v1", storage.fileNameBase("Östersund (test map v0.1) v1"));
 check("å, ä and ö become a, a and o", storage.fileNameBase("Åre Västerås Söder") === "are-vasteras-soder", storage.fileNameBase("Åre Västerås Söder"));
 check("other letters of the alphabets around do too: ø, æ, ß, é, ñ, ł", storage.fileNameBase("Bø Æble Straße Café Año Łódź") === "bo-aeble-strasse-cafe-ano-lodz", storage.fileNameBase("Bø Æble Straße Café Año Łódź"));
 check("a name with nothing to keep is called map, and hyphens are not left at the ends", storage.fileNameBase("???") === "map" && storage.fileNameBase("  (Test) ") === "test" && storage.fileNameBase("") === "map");
