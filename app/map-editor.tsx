@@ -443,8 +443,8 @@ export function MapEditor() {
         const field = event.target as HTMLElement | null;
         if (field && (field.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(field.tagName))) return;
         if (document.querySelector('[role="dialog"], [role="alertdialog"], [role="menu"]')) return;
-        // Only with the focus on the page, on the map, or on a plain button (which has no business of its own with the key, as a button the person has just pressed in Properties): a row of tickets or a link has.
-        if (field && field !== document.body && !field.closest(".map-canvas") && !(field.tagName === "BUTTON" && !field.closest(".tickets-panel, .balance-panel"))) return;
+        // Only with the focus on the page, on the map, or on a plain button (which has no business of its own with the key, as a button the person has just pressed in Properties; Safari puts the focus on the panel itself then): a row of tickets or a link has.
+        if (field && field !== document.body && !field.closest(".map-canvas") && !((field.tagName === "BUTTON" || field.matches("aside.properties")) && !field.closest(".tickets-panel, .balance-panel"))) return;
         if (deleteByKeyRef.current()) event.preventDefault();
         return;
       }
