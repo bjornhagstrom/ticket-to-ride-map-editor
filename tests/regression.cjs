@@ -5768,7 +5768,7 @@ const sectionStart = (n) => {
     await rp.context().close();
   }
 
-  // 82. What the user test of 1.7.0 found (docs/user-test-2026-10-15/): each group of fixes adds its checks here.
+  // 82. What the user test of 1.7.0 found: each group of fixes adds its checks here.
   if (wants(82)) {
   sectionStart(82);
     const up = await (await browser.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
